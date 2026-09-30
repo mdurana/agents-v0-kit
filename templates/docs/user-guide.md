@@ -231,19 +231,19 @@ Describe the issue in plain language. The AI fixes, then runs **Verify** again. 
 
 **Include:**
 
-- **Who** uses the feature and **what** they need to accomplish  
-- **Constraints** (privacy, regions, deadlines, systems involved)  
+- **Who, what, and why** in one sentence: As a [role], I want [goal], so that [benefit].  
+- **Constraints** (privacy, regions, deadlines, systems involved). Intake turns the sentence and each constraint into numbered acceptance criteria (`AC-1`, `AC-2`, …).  
 - **Links** (Jira, Confluence, Figma) — paste text if you can’t link  
-- **Out of scope** (what we are *not* doing)
+- **Out of scope** (what we are *not* doing), as its own list
 
 **Example (good):**
 
 ```text
 /intake
 
-As a branch manager I need to approve large withdrawals over PHP 500k.
-Approver must be in the same region as the account.
-Audit log must record who approved and when.
+As a branch manager, I want to approve withdrawals over PHP 500k, so that large payments leave the region only with a local approver.
+The approver must be in the same region as the account.
+The audit log must record who approved and when.
 Not in scope: mobile app this quarter.
 ```
 

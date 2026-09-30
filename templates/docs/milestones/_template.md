@@ -24,9 +24,14 @@
 
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
-| <P2-A> | <as a user, I want ...> | docs/requirements/<feature>.md | planned | — |
+| <P2-A> | As a [role], I want [goal], so that [benefit]. | docs/requirements/<feature>.md | planned | — |
 
 > Conventions:
+> - The User story cell is one sentence: `As a [role], I want [goal], so that [benefit].`
+>   Replace every `<...>` in that cell before `/intake`. Intake copies the sentence into
+>   the feature artifact and splits the goal and each constraint into `AC-1`, `AC-2`, …
+>   (`spec-intake` skill). Out of scope stays a separate list. Intake does not invent a
+>   role, goal, or benefit.
 > - Each linked feature artifact records `Milestone: <Pn-name>` and `Story: <story-id>`
 >   under its title (`spec-intake` skill) for traceability.
 > - Status is prose (planned / in-flight / done); the machine check is evidence-based:

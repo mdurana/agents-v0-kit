@@ -66,7 +66,7 @@ See `docker/README.md` in the target repo after install.
 
 For each row in `docs/milestones/p0-platform-skeleton.md`:
 
-1. `/intake` — paste the user story; approve Intake.
+1. `/intake` — paste the user story as `As a [role], I want [goal], so that [benefit].`; approve Intake.
 2. `/design` — contracts/ADR only when the story needs them (P0-C may reference Maven only).
 3. `/build` — agents require a **green baseline** before edits (`/build` command).
 4. `/verify` then `/release` per story, or `/deliver` for a single story end-to-end.

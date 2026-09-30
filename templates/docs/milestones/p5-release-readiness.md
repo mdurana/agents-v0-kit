@@ -7,7 +7,7 @@ Production readiness: docs, runbooks, CI/CD, release checklist, milestone go/no-
 
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
-| P5-A | As release manager we pass production readiness review | docs/requirements/p5-a-readiness.md | planned | P4 |
+| P5-A | As a release manager, I want the runbook, release notes, and go/no-go recorded, so that production starts only after an approved readiness review. | docs/requirements/p5-a-readiness.md | planned | P4 |
 
 ## Delivery approvals
 

@@ -171,7 +171,7 @@ Tier: Major (new service and new greenfield UI).
 Milestone: P0 — Platform Skeleton
 Story: P0-A
 
-As a developer I can run this address-book app locally and sign in to an empty home shell.
+As a developer, I want to run this address-book app locally and sign in to an empty home shell, so that I can confirm the stack and session work before contact data exists.
 
 Repo layout: Spring code only under backend/. UI only under frontend/ (scaffolded in Build). Delivery kit, docs, ci, and openapi stay at repo root. Record this in docs/project-profile.md Layout.
 
@@ -319,7 +319,7 @@ Story: P1-A
 
 Prerequisite: P0 milestone row is Approved. If it is not, stop.
 
-As a signed-in user I can create, list, view, update, and delete contacts through the API.
+As a signed-in user, I want to create, list, view, update, and delete contacts through the API, so that my address book persists across restarts.
 
 Contact fields: display name (required), email, phone, street, city. Email, when present, must be valid. Persist with the existing H2 file and a Flyway migration under backend/src/main/resources/db/migration/. Data survives a restart.
 All /api/v1/contacts routes require the P0 session. Do not log email or phone.
@@ -432,7 +432,7 @@ Story: P2-A
 
 Prerequisite: P1 milestone row is Approved. If it is not, stop.
 
-As a signed-in user I manage contacts in the browser: add, list, view, edit, and delete.
+As a signed-in user, I want to add, list, view, edit, and delete contacts in the browser, so that I can manage my address book without calling the API directly.
 Use the P1 API in backend/ as-is. Use the Svelte or React decision recorded in P0. Do not ask again.
 All UI work stays in frontend/. No API contract changes unless you stop and ask.
 

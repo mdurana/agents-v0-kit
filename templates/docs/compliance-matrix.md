@@ -23,6 +23,11 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Async only when justified | A solution-architect; S contract-first-design; G Design gate |
 | Mandated docs (README, architecture, network, sequences) | A maintenance-engineer, release-manager; S doc-sync, release-pr; G Release gate |
 | BFF thin; domain logic in services | A bff-engineer; S implement-bff; R architecture-and-diagrams |
+| Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-spring-service; G Build gate |
+| Cache and YugabyteDB only when requirements justify them | A solution-architect; S contract-first-design; G Design gate |
+| DDD defaults (aggregates, value objects, repository ports) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
+| Do not switch MVC and WebFlux without an ADR | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; G Design gate |
+| OMS / order domain only when the task touches that domain | A solution-architect; S contract-first-design; R architecture-and-diagrams |
 
 ## ai-agent-conduct.mdc
 
@@ -31,6 +36,9 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Reconnaissance → Plan → Execute → Verify → Report | R workflow-orchestration; all agents; all skills |
 | Lead with conclusion; no filler/sycophancy | All agents (system prompt) |
 | Minimize scope; no drive-by refactors | A maintenance-engineer; S bugfix-triage, dependency-upgrade |
+| No unsolicited scratch notes, session exports, or duplicate rule dumps | All agents; R ai-agent-conduct |
+| Prefer empirical checks (files, tests, build) over guesses | All agents; R ai-agent-conduct |
+| Prompt efficiency (Context → Task → Constraints; scope vague requests) | All agents (system prompt) |
 | Shell: non-interactive, bounded | A all agents; R ai-agent-conduct |
 | Ask user only when blocked | R workflow-orchestration (approval stops); all agents |
 | Do not commit unless asked | A release-manager; S release-pr; H-B pre-shell.sh (asks on git commit/push; denies force-push/hard reset, `gh pr merge`, destructive git clean; no env/command bypass) |
@@ -45,10 +53,10 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | §1 Authn (OAuth2/JWT, MFA, logout, blacklist fail-closed, dev bypass local) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F1 |
 | §2 Authz (`@PreAuthorize`, server-side, no client role trust, BOLA) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*; H-W after-edit.sh (heuristic only — Verify/Sonar authoritative); R vapt-spring F4, vapt-webapp F4; G Build gate |
 | §3 Secrets (vault/env, no client exposure, PII not in URLs, sanitize logs) | A all build agents; H-B pre-shell.sh (obvious secret-output commands); H-W after-edit.sh (limited public-env heuristic); R vapt-webapp F2 |
-| §4 Cookies (HttpOnly, Secure, SameSite) | A frontend-engineer; S implement-frontend; H-W after-edit.sh (`document.cookie` write heuristic); R vapt-webapp F7 |
+| §4 Cookies and client storage (HttpOnly, Secure, SameSite; no secrets in localStorage) | A frontend-engineer; S implement-frontend; H-W after-edit.sh (`document.cookie` write heuristic); R vapt-webapp F7 |
 | §5 Uploads (size, content sniff, structure, authz) | A backend-engineer; S implement-spring-service; H-W after-edit.sh (filename-validation heuristic); R vapt-spring F3 |
-| §6 Headers (HSTS, nosniff, X-Frame, CSP, Referrer) | A backend-engineer, frontend-engineer; H-W after-edit.sh (`nosniff` heuristic); R vapt-webapp F2 |
-| §7 API security (versioned, auth, rate limit, parameterized SQL) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt-spring F5 |
+| §6 Headers (HSTS, nosniff, X-Frame, CSP, Referrer; explicit CORS; no fingerprinting headers) | A backend-engineer, frontend-engineer; H-W after-edit.sh (`nosniff` heuristic); R vapt-webapp F2 |
+| §7 API security (versioned, auth, rate limit, `@Valid`, parameterized SQL, 401/403 not 200-with-error, no stack traces) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt-spring F5 |
 | §8 Production hygiene (DEBUG off, no demo routes, sourcemaps off, permit-all=false) | A backend-engineer, frontend-engineer; H-W after-edit.sh (permit-all/sourcemap heuristics); R vapt-webapp F2, vapt-spring F4 |
 | §9 Supply chain (dep scanning, SBOM) | A maintenance-engineer; S dependency-upgrade; G Verify gate (CVE check) |
 | §11 Compliance & review triggers | A requirements-analyst, security-reviewer; S spec-intake, vapt-review; G Intake gate, Verify gate |
@@ -91,7 +99,11 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Flyway migrations | A backend-engineer; S implement-spring-service; G Build gate |
 | `Encode.forJava` log sanitization | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review |
 | No empty catch; domain exceptions via `@ControllerAdvice` | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review |
-| Methods ≤ 30 lines, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-spring-service, pr-review; G Build/Verify gate |
+| Methods ≤ 30 lines (target ≤ 20), ≤ 4 parameters, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-spring-service, pr-review; G Build/Verify gate |
+| JPA (`@Enumerated(STRING)`, `@Version`, avoid N+1) | A backend-engineer; S implement-spring-service; G Build gate |
+| Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-spring-service; G Build gate |
+| Lombok: no `@AllArgsConstructor`, `@ToString`, or `@EqualsAndHashCode` on entities with lazy collections | A backend-engineer, code-reviewer; S implement-spring-service, pr-review |
+| Records and MapStruct only when the repo already uses them | A backend-engineer; S implement-spring-service |
 
 ## frontend-web.mdc
 
@@ -101,6 +113,9 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | API client: Bearer, X-Correlation-ID, traceparent, 401 handling | A frontend-engineer; S implement-frontend; G Build gate |
 | Accessibility (semantic HTML, keyboard, ARIA, reduced motion) | A frontend-engineer; S implement-frontend; G Verify gate (a11y check) |
 | XSS: sanitize/avoid innerHTML/{@html}/dangerouslySetInnerHTML | A frontend-engineer; S implement-frontend; A code-reviewer; S pr-review |
+| Loading, error, and empty states; no silent fetch failures | A frontend-engineer; S implement-frontend; G Build gate |
+| No secrets in `localStorage` | A frontend-engineer; S implement-frontend; R security-baseline §4 |
+| Forms: Zod plus the project form library | A frontend-engineer; S implement-frontend |
 
 ## ux-design.mdc (local rule)
 
@@ -124,16 +139,25 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Event schemas with eventVersion; additive evolution | A solution-architect; S contract-first-design; G Design gate |
 | Idempotent consumers (dedupe by eventId) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; G Verify gate |
 | Parameterized queries only | A backend-engineer; H-W after-edit.sh (limited heuristic); R security-baseline §7 |
+| Bean Validation (`@Valid`) on request DTOs | A backend-engineer; S implement-spring-service; G Build gate |
+| PATCH semantics documented in OpenAPI | A solution-architect; S contract-first-design; G Design gate |
+| Optimistic concurrency (ETag / `If-Match`) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
+| Pagination: offset or cursor, matching the contract | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
+| Correlation and request IDs in error payloads | A backend-engineer; S implement-spring-service; G Build gate |
+| Bounded event retries and a DLQ; never swallow failures | A backend-engineer; S implement-spring-service; G Build gate |
+| Transactional outbox when the domain write and the event commit together | A backend-engineer; S implement-spring-service; G Build gate |
 
 ## quality-and-testing.mdc
 
 | Clause | Enforcer |
 |--------|----------|
 | AAA pattern; naming conventions | A test-engineer; S quality-gate |
-| Coverage ≥ 80% backend / 70% frontend | A test-engineer; S quality-gate; G Verify gate |
-| Methods ≤ 30 lines, complexity ≤ 15 | A code-reviewer; S pr-review; G Verify gate |
+| Coverage ≥ 80% backend lines, branch coverage per JaCoCo/Sonar, 70% frontend | A test-engineer; S quality-gate; G Verify gate |
+| Methods ≤ 30 lines, complexity ≤ 15, class size < ~300 lines, duplication < ~3% | A code-reviewer; S pr-review; G Verify gate |
 | Testcontainers + Pact where repo depends | A test-engineer; S quality-gate |
 | No new high/critical CVEs | A test-engineer, maintenance-engineer; S quality-gate, dependency-upgrade; G Verify gate |
+| Tests cover happy, error, and edge paths, including every exception handler that changes behavior | A test-engineer; S quality-gate; G Verify gate |
+| Skip tests only when the user explicitly requests no tests | A test-engineer, backend/bff/frontend-engineer; S quality-gate, implement-*; R ai-agent-conduct |
 | Red–green-refactor (TDD where practical), front-loaded into Build | R workflow-orchestration; A backend/bff/frontend-engineer, test-engineer; S implement-*, quality-gate; G Build/Verify gate |
 | `mvn -B clean verify` before merge with the quality gate wired (coverage/static/CVE) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; C /build; G Build/Verify gate |
 
@@ -163,18 +187,25 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Approval stops | C /deliver; R ai-agent-conduct; CI ci/check-approvals.sh (merge-time) |
 | Critical findings route back | C /verify, /deliver; G Verify gate |
 | Gate decisions, approver, date, and evidence recorded in the existing handoff artifact | C all phase commands; R workflow-orchestration; CI ci/check-approvals.sh, ci/check-evidence.sh |
-| Merge-request readiness is intermediate; completion after human-authorized merge | C /release, /deliver; A release-manager; S release-pr; R workflow-orchestration |
+| Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /release, /deliver; A release-manager; S release-pr; R workflow-orchestration |
 | Build: green baseline before edits; wired quality gate (coverage/static/CVE fail `mvn -B clean verify`) | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
 | Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /build; S implement-spring-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-* |
 | Build evidence persisted under `docs/build/<feature>/` and referenced from approvals | R workflow-orchestration; C /build, /verify; CI ci/check-evidence.sh |
 | Design: UX spec and HTML mockups exist (flows, state matrix, per-component defaults, a11y, responsive, design-system conformance, UX acceptance criteria) | R workflow-orchestration; A ux-designer; S ux-design; C /design; G Design gate |
+| Design: threat-model notes (assets, trust boundaries, top risks) for non-trivial security | A solution-architect; S contract-first-design; C /design; G Design gate |
 | Verify: a11y check green and UX acceptance criteria covered for UI-affecting changes | R workflow-orchestration; A test-engineer; S quality-gate; C /verify; G Verify gate |
+| Intake: user story (`As a` / `I want` / `so that`) split into stable `AC-*` rows; out of scope listed separately; NFRs recorded; open questions resolved | A requirements-analyst; S spec-intake; C /intake; G Intake gate |
 | Milestone programs: manifests group user stories into incremental delivery (P0..P5); story chains + go/no-go | C /intake (story links); R workflow-orchestration; CI ci/check-approvals.sh (milestone row), ci/check-milestone.sh |
 | Change tiers (Trivial / Standard / Major); `/triage` | C /intake, /triage, /deliver; A orchestrator; R workflow-orchestration |
-| Machine-readable resume (`lastApprovedPhase`, `activePhase`, `activeStatus`) | C /status; R workflow-orchestration Phase resume; `scripts/sync-feature-state.sh`; CI ci/check-feature-state.sh (optional) |
-| Parallel features: per-feature artifacts; stop before a second writer touches a shared file | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
+| Machine-readable resume (`lastApprovedPhase`, `activePhase`, `activeStatus`, `blockedReason`) | C /status; R workflow-orchestration Phase resume; `scripts/sync-feature-state.sh`; CI ci/check-feature-state.sh (optional) |
+| Parallel features: per-feature artifacts; stop before a second writer touches a shared file; creating a branch needs explicit user authorization | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
+
+## Onboarding
+
+| Clause | Enforcer |
+|--------|----------|
 | Multi-repo workspace manifest | `docs/workspace.manifest.json`; C /onboard; A orchestrator |
 
 ## Hooks and CI guardrails (kit)

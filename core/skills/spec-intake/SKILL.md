@@ -11,7 +11,9 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 1. Read the source: Jira issue, Confluence page, or user description.
 2. Launch the `explore-researcher` subagent (Explore role — `docs/model-routing-matrix.md`) to map affected code areas.
 3. Draft `docs/requirements/<feature>.md`:
-   - **Acceptance criteria** — testable, one per row with stable IDs (`AC-1`, `AC-2`, …).
+   - **User story** — one sentence: `As a [role], I want [goal], so that [benefit].` Copy it from the milestone row when the story belongs to a program. If the sentence still contains `<...>` placeholders, or omits `so that`, stop and ask the user to supply the missing role, goal, or benefit. Do not invent them.
+   - **Acceptance criteria** — split the goal and each constraint into testable rows with stable IDs (`AC-1`, `AC-2`, …). One behavior per row.
+   - **Out of scope** — exclusions from the source, as their own list. Do not turn an exclusion into an acceptance criterion unless it is itself testable.
    - **NFRs** — performance, availability, observability targets.
    - **UX requirements** (UI-affecting changes) — WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria.
    - **Regulations** — GDPR, BSP, internal GXI as applicable.
@@ -35,4 +37,6 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 - [ ] `frontend-web.mdc`: Svelte/React decision recorded for greenfield UI.
 - [ ] UX requirements recorded for UI-affecting changes (WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria).
 - [ ] `security-baseline.mdc` §11: applicable regulations and security-review triggers identified.
+- [ ] User story is one sentence: `As a [role], I want [goal], so that [benefit].`
+- [ ] Acceptance criteria are one behavior per `AC-*` row, split from that story and its constraints; out of scope is a separate list.
 - [ ] `workflow-orchestration.mdc`: Intake gate criteria met; stopped for approval; approvals table format used.

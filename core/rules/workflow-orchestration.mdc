@@ -87,7 +87,8 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 **Brownfield baseline:** if `docs/project-profile.md` documents `known_failures` or a ratchet plan, Build may proceed only when the profile allows it and new failures are not introduced.
 
 ### Intake gate
-- Acceptance criteria (with stable IDs, e.g. AC-1), NFRs, regulations, security-review triggers, open questions resolved.
+- User story recorded as `As a [role], I want [goal], so that [benefit].`
+- Acceptance criteria (stable IDs, e.g. AC-1) split from that story and its constraints, one behavior per row; out of scope recorded separately. NFRs, regulations, security-review triggers, open questions resolved.
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate

@@ -11,12 +11,13 @@ Once `docs/requirements/<feature>.md` exists, run `sh scripts/sync-feature-state
 ## Instructions
 0. Classify **change tier** (`workflow-orchestration.mdc`): **Trivial** → `/triage` instead of full Intake; **Major** → record in the artifact and require `system-design` outputs in `/design`.
 1. Launch the `requirements-analyst` subagent with the source spec (Jira/Confluence/user description).
-2. The analyst must follow the `spec-intake` skill and produce `docs/requirements/<feature>.md` (acceptance criteria, NFRs, regulations, security-review triggers, open questions; milestone/story links when the story belongs to a milestone program — `docs/milestones/<milestone>.md`).
+2. The analyst must follow the `spec-intake` skill and produce `docs/requirements/<feature>.md`. Record the user story as `As a [role], I want [goal], so that [benefit].` Copy the milestone row when the story belongs to a program. If that sentence still contains `<...>` placeholders, or omits `so that`, stop and ask the user to supply the missing role, goal, or benefit; do not invent them. Split the goal and each constraint into `AC-1`, `AC-2`, … and keep out of scope as its own list. Also record NFRs, regulations, security-review triggers, and open questions; add milestone/story links when the story belongs to a milestone program — `docs/milestones/<milestone>.md`.
 3. For greenfield UI, ask "Svelte or React?" once and record the answer.
 4. For UI-affecting changes, record UX requirements: WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria.
 5. Resolve open questions with the user.
 6. Check the **Intake gate** (`workflow-orchestration.mdc`):
-   - Acceptance criteria, NFRs, and regulations recorded.
+   - User story recorded as `As a [role], I want [goal], so that [benefit].`
+   - Acceptance criteria split from that story and its constraints (`AC-1`, `AC-2`, …), with out of scope listed separately. NFRs and regulations recorded.
    - Open questions resolved.
    - Security-review triggers identified.
    - For UI-affecting changes: UX requirements recorded.
