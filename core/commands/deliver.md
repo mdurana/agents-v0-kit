@@ -17,19 +17,19 @@ Before each transition, verify the previous handoff artifact exists, its evidenc
 - **Standard** — pipeline below.
 
 ## Pipeline
-1. **Intake** — launch `requirements-analyst` (skill: `spec-intake`).
-   - Gate: criteria, NFRs, regulations recorded; open questions resolved.
+1. **Intake** — launch `requirements-analyst` (skill: `spec-intake`). Run any helper brief from this session (`workflow-orchestration.mdc` Helper agents).
+   - Gate: criteria, NFRs, regulations recorded; open questions resolved; one surface unless `Vertical slice: yes`; at most `AC-8`.
    - **STOP → user approves → continue.**
-2. **Design** — launch `solution-architect` (skills: `contract-first-design`, `system-design` when Major) and `ux-designer` when UI-affecting.
-   - Gate: OpenAPI + event schemas (`eventVersion`); one error envelope per surface; ADR; Mermaid diagrams. When UI-affecting: UX spec plus static HTML mockups, with a component-default row for every interactive control (`ux-design.mdc`).
+2. **Design** — launch `solution-architect` (skills: `contract-first-design`, `system-design` when Major) and `ux-designer` when UI-affecting. Run helper briefs (`schema-author`, `docs-author`) from this session.
+   - Gate: feature draft `docs/design/<feature>/openapi.yaml` + event schemas (`eventVersion`); the org catalog is unchanged; one error envelope per surface; ADR; Mermaid diagrams. When UI-affecting: UX spec plus static HTML mockups, with a component-default row for every interactive control (`ux-design.mdc`).
    - **STOP → user approves → continue.**
 3. **Build** — launch `backend-engineer` / `bff-engineer` / `frontend-engineer` (skills: `implement-spring-service`, `implement-bff`, `implement-frontend`).
-   - Confirm a green baseline and wired quality gate before edits; agents work red–green per behavior unit and persist `docs/build/<feature>/` evidence.
-   - Gate: compiles; `mvn -B clean verify`/frontend green with quality plugins (coverage/static/CVE); contract-conformance diff clean; new behavior covered by tests; methods ≤ 30 lines; every endpoint auth+authz; correlation/tracing wired; DTOs only; Flyway migrations; no secrets; bounded fix attempts respected.
+   - Read `docs/requirements/<feature>.phase-result.md` when it exists. Confirm a green baseline on the full verify command. Write `docs/build/<feature>/plan.md` with one row per approved `AC-*`. Merge the approved feature draft into the org catalog before other edits. The red–green loop uses the profile's fast verify command when that cell is a real command. The second red result for the same test goes to `debug-investigator` before attempt three. Persist `docs/build/<feature>/` evidence, including attempt cards.
+   - Gate: full `mvn -B clean verify`/frontend verify green with quality plugins (coverage/static/CVE); contract-conformance diff clean; new behavior covered by tests; methods ≤ 30 lines; every endpoint auth+authz; correlation/tracing wired; DTOs only; Flyway migrations; no secrets; bounded fix attempts respected.
    - **STOP → user approves → continue.**
-4. **Verify** — launch `test-engineer` (skill: `quality-gate`) → `security-reviewer` (skill: `vapt-review`) → `code-reviewer` (skill: `pr-review`).
-   - Gate: coverage ≥ 80%/70%; no new high/critical CVEs; VAPT F1–F7 no Critical; code-review no Critical.
-   - On Critical: route back to Build/Maintain, then re-enter Verify.
+4. **Verify** — launch `test-engineer` (skill: `quality-gate`) first. Then launch `security-reviewer` (skill: `vapt-review`) and `code-reviewer` (skill: `pr-review`) together. Wait for both. Gather one Critical list. Run a `schema-author` brief from this session. The P4 SLO story follows `slo-evidence`.
+   - Gate: coverage ≥ 80%/70%; no new high/critical CVEs; VAPT F1–F7 no Critical; code-review no Critical; P4 SLO rows measured or waived.
+   - On a gathered Critical: route back to Build/Maintain, then re-enter Verify.
    - **STOP → user approves → continue.**
 5. **Release** — launch `release-manager` (skill: `release-pr`).
    - Open the merge request only when the user explicitly requests it. **GitLab (default):** `glab mr create` with `.gitlab/merge_request_templates/default.md`. **GitHub:** `gh pr create` with `.github/pull_request_template.md`. Commit and push require their own explicit authorization.

@@ -9,7 +9,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 
 ## Steps
 1. Identify what changed: behavior (API/events/auth) or topology (services/ports/dependencies).
-2. Launch the `docs-author` subagent to draft doc updates from the diff.
+2. Write `docs/maintain/<feature>/helper-brief.md` (`helper: docs-author`) to draft doc updates from the diff. Do not launch the helper (`workflow-orchestration.mdc` Helper agents). Review the draft the main session brings back.
 3. Update:
    - `README.md` — build/run/test/CI commands.
    - `docs/architecture.md` — system context.

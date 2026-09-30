@@ -3,6 +3,10 @@
 ## Goal
 Security, performance, and reliability hardening with integrated `/verify` on manifest scope.
 
+## SLO evidence
+
+P4 `verify` and `release` require `docs/design/system/slo-evidence.md` (`slo-evidence` skill). `ci/check-milestone.sh` reads that path from this manifest. Every filled row in `docs/design/system/nfr-slo.md` is `measured` (command and an output file) or `waiver` (reason, approver, date).
+
 ## Stories
 
 | Story ID | User story | Feature artifact | Status | Dependency |

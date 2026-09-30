@@ -9,7 +9,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 
 ## Steps
 1. Read the source: Jira issue, Confluence page, or user description.
-2. Launch the `explore-researcher` subagent (Explore role — `docs/model-routing-matrix.md`) to map affected code areas.
+2. Write `docs/requirements/<feature>.helper-brief.md` when the repo needs mapping (`helper: explore-researcher`, `workflow-orchestration.mdc` Helper agents). Do not launch the helper. Continue after the main session returns its result.
 3. Draft `docs/requirements/<feature>.md`:
    - **User story** — one sentence: `As a [role], I want [goal], so that [benefit].` Copy it from the milestone row when the story belongs to a program. If the sentence still contains `<...>` placeholders, or omits `so that`, stop and ask the user to supply the missing role, goal, or benefit. Do not invent them.
    - **Acceptance criteria** — split the goal and each constraint into testable rows with stable IDs (`AC-1`, `AC-2`, …). One behavior per row.
@@ -28,8 +28,13 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 
      Append one row per approved phase; record evidence paths in each phase row's Artifacts column — Build: `docs/build/<feature>/...`; Verify: `docs/verify/<feature>/...`.
 4. If greenfield UI, ask "Svelte or React?" once and record the answer.
-5. Resolve open questions with the user.
-6. Present the Intake gate result and wait for approval before Design.
+5. Apply the **story-size budget** before the gate (`workflow-orchestration.mdc`):
+   - Record `Surfaces:` as `backend`, `bff`, or `frontend`.
+   - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
+   - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. Write `## Proposed split` with extra milestone rows (story sentence, surface, dependency) and stop until the user approves the split. After approval, this artifact keeps the first slice; each other row is its own feature.
+   - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria.
+6. Resolve open questions with the user.
+7. Present the Intake gate result and wait for approval before Design.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report.
@@ -39,4 +44,5 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 - [ ] `security-baseline.mdc` §11: applicable regulations and security-review triggers identified.
 - [ ] User story is one sentence: `As a [role], I want [goal], so that [benefit].`
 - [ ] Acceptance criteria are one behavior per `AC-*` row, split from that story and its constraints; out of scope is a separate list.
+- [ ] Story size: one surface unless `Vertical slice: yes`; at most `AC-8`. Oversized stories stop on `## Proposed split`.
 - [ ] `workflow-orchestration.mdc`: Intake gate criteria met; stopped for approval; approvals table format used.

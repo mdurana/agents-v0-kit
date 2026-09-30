@@ -17,6 +17,7 @@
 | Backend verify | <!-- e.g. ./mvnw -B clean verify --> |
 | Backend verify (fast, no OWASP) | <!-- e.g. ./mvnw -B clean verify -P!ci-security --> |
 | Frontend verify | <!-- e.g. npm run verify --> |
+| Frontend verify (fast) | <!-- e.g. npm test — red–green loop; the gate still uses Frontend verify --> |
 | Lint | <!-- optional --> |
 | Local run | <!-- e.g. ./scripts/run-local-container.sh --> |
 

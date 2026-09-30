@@ -9,25 +9,30 @@ Build phase playbook for the `backend-engineer` agent (`workflow-orchestration.m
 
 ## Steps
 1. Read the Design artifacts (OpenAPI, event schemas, ADR) and existing repo.
-2. **Baseline:** run the Backend verify command from `docs/project-profile.md` (directory profile in `project-delivery-core.mdc`) before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put code under that backend root.
+2. **Baseline:** run the full Backend verify command from `docs/project-profile.md` (directory profile in `project-delivery-core.mdc`) before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put code under that backend root.
 3. **Wire the quality gate** if missing (`maven/quality-plugins.xml`: JaCoCo/Checkstyle/SpotBugs/OWASP bound to `verify`; `maven/contract-conformance.xml` when OpenAPI is generated; ArchUnit where wired) — unwired tooling makes `mvn clean verify` compile-only.
-4. Work **red–green (TDD where practical)** per behavior unit: failing test first, then implement until green (`quality-and-testing.mdc`).
-5. Implement layers: Controller (`@Valid`, DTOs) → Service (`@Transactional(readOnly=true)` default) → Repository → Domain.
-6. Add `@PreAuthorize` on **every** admin/mutation controller method.
-7. Auth/upload/RBAC changes ship with their VAPT-required tests in the same diff.
-8. Add Flyway migrations for all schema changes.
-9. Wire correlation ID (`X-Correlation-ID` + MDC) and `traceparent` (W3C Trace Context).
-10. Sanitize log values with `Encode.forJava`; no PII/secrets/tokens in logs.
-11. For uploads: non-empty check, explicit size limit, magic-byte sniff + structure parse, extension allowlist supplemental, `@PreAuthorize`.
-12. For logout: blacklist JWT + purge session state; blacklist fail-closed.
-13. Use parameterized queries/JPA named parameters only.
-14. Run the Backend verify command from `docs/project-profile.md` with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt.
-15. Persist evidence to `docs/build/<feature>/build-report.md` (command, result, per-criterion file:line evidence) and `docs/build/<feature>/build-output.txt` (raw output; no secrets).
+4. When `docs/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog (`openapi/api-v1.yaml`, or the catalog path in the profile) before other implementation edits. Stop if that catalog file is already modified by another feature. Copy event schemas from `docs/design/<feature>/events/` to the event-schema path in the profile when that path is set. A story with no draft records N/A in the build report.
+5. Before the first implementation edit, write `docs/build/<feature>/plan.md` with one row per approved `AC-*` (AC, Status `pending`/`done`/`blocked`, Test). Do not add, delete, or rewrite AC rows.
+6. Work **red–green (TDD where practical)** per plan row: failing test first, then implement until green (`quality-and-testing.mdc`). Mark the row `done` and name the test only after that unit's fast command is green. Each loop run uses `Backend verify (fast, no OWASP)` when that cell is a real command. An empty cell or a placeholder comment means the loop uses the full Backend verify command. Append a command-result card (Command, Exit, Attempt, Failing test, Location). The next attempt must not read `build-output.txt`. The second red result for the same test writes `docs/build/<feature>/failure-brief.md` (`helper: debug-investigator`) and returns. Attempt three applies that note. A third red result stops.
+7. Implement layers: Controller (`@Valid`, DTOs) → Service (`@Transactional(readOnly=true)` default) → Repository → Domain.
+8. Add `@PreAuthorize` on **every** admin/mutation controller method.
+9. Auth/upload/RBAC changes ship with their VAPT-required tests in the same diff.
+10. Add Flyway migrations for all schema changes.
+11. Wire correlation ID (`X-Correlation-ID` + MDC) and `traceparent` (W3C Trace Context).
+12. Sanitize log values with `Encode.forJava`; no PII/secrets/tokens in logs.
+13. For uploads: non-empty check, explicit size limit, magic-byte sniff + structure parse, extension allowlist supplemental, `@PreAuthorize`.
+14. For logout: blacklist JWT + purge session state; blacklist fail-closed.
+15. Use parameterized queries/JPA named parameters only.
+16. Run the full Backend verify command from `docs/project-profile.md` once for the Build gate (`mvn -B clean verify` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
+17. Persist evidence to `docs/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
 
 ## Rule-compliance checklist
 - [ ] `java-spring-backend.mdc`: constructor injection; `@Transactional(readOnly=true)`; `@Enumerated(STRING)`; no N+1; DTOs only; `Encode.forJava`; no empty catch; methods ≤ 30 lines.
 - [ ] `quality-and-testing.mdc`: red–green per behavior unit; methods ≤ 30 lines; cognitive complexity ≤ 15; coverage targets on changed code.
-- [ ] Baseline green before the first edit; quality gate wired and executed in `mvn -B clean verify`.
+- [ ] `docs/build/<feature>/plan.md` has one row per approved `AC-*`; done rows name a test.
+- [ ] Baseline green before the first edit; red–green loop uses `Backend verify (fast, no OWASP)` when that cell is a real command; quality gate executed once in `mvn -B clean verify`.
+- [ ] Attempt cards recorded; `build-output.txt` not read back. Second failure of the same test uses `failure-brief.md`.
+- [ ] Approved feature draft merged into the org catalog, or N/A recorded.
 - [ ] Contract conformance diff clean (or recorded N/A reason); ArchUnit layer rules where wired.
 - [ ] `vapt-spring.mdc` F1: logout blacklists JWT + purges session; fail-closed.
 - [ ] `vapt-spring.mdc` F3: uploads validated server-side (size, content, structure, authz).

@@ -82,7 +82,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 
 You can approve intake for a second feature while the first feature’s build is still waiting on you, then start design for the second feature. Each feature has its own requirements and design notes.
 
-The second feature must not change a file the first one is already changing. Those shared files include the project profile, the API contract, architecture notes, the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it.
+The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it.
 
 ---
 
@@ -123,7 +123,7 @@ The AI **must not** skip ahead without your OK. Each gate ends with a short repo
 
 | You should see            | What it means                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| API / contract summary    | What systems talk to each other (not code — interfaces).                                                      |
+| API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
 | ADR (if needed)           | Short decision record for big choices (e.g. sync vs async).                                                   |
 | UI stack (if new screens) | Team may ask **Svelte or React** once — pick what product/engineering agreed.                                 |
@@ -178,7 +178,7 @@ You usually **do not** review code line by line. Trust this gate for “engineer
 | UX / accessibility check | Automated accessibility scan green; UX criteria tested (for UI changes). |
 
 
-If anything is **Critical**, the AI should fix and re-run verify — you approve again when Critical items are gone.
+Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone.
 
 **You might say:**  
 

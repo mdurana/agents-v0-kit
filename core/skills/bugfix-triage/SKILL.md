@@ -9,12 +9,12 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 
 ## Steps
 1. Reproduce the bug; capture the failing test or runtime trace.
-2. Launch the `explore-researcher` subagent to locate the responsible code.
-3. Send runtime failures/stack traces to the `debug-investigator` subagent; re-inject the fix.
+2. Write `docs/maintain/<feature>/helper-brief.md` (`helper: explore-researcher`) to locate the responsible code. Do not launch the helper (`workflow-orchestration.mdc` Helper agents).
+3. For a runtime failure or stack trace, write the same brief with `helper: debug-investigator`, then apply the fix from the result the main session brings back.
 4. Apply the **smallest correct diff**; match naming, types, and abstractions. No drive-by refactors.
 5. Add/adjust tests covering the bug and the edge path.
 6. If the fix touches auth/sessions/routes/controllers/uploads/deployment security config, route to Verify (VAPT checklist).
-7. Run `mvn -B clean verify` or the frontend script with bounded fix attempts (≤ 3 per failure); on exhaustion stop and report the blocker.
+7. Red–green attempts use the profile's fast verify command when that cell is a real command. Then run `mvn -B clean verify` or the full frontend verify command once, with bounded fix attempts (≤ 3 per failure); on exhaustion stop and report the blocker.
 8. Do not commit or push without explicit user approval.
 
 ## Rule-compliance checklist

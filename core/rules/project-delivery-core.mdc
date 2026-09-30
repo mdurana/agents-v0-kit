@@ -32,7 +32,7 @@ Greenfield repos use one profile. Record it in `docs/project-profile.md` under *
 
 The repo root holds `docs/`, `ci/`, and `openapi/` only. Application source does not live there: no root `src/`, `pom.xml`, or `package.json`. `/onboard` may record `.` when a legacy repo already has source at the root.
 
-Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
+Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
 
 ## Cross-cutting (all services)
 

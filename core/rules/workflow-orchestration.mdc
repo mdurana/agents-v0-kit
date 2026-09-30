@@ -41,7 +41,7 @@ Once `docs/requirements/<feature>.md` exists, the phase command runs `sh scripts
 
 Each feature has its own `docs/requirements/<feature>.md`, `docs/requirements/<feature>.state.json`, `docs/design/<feature>/`, `docs/build/<feature>/`, and `docs/verify/<feature>/`. Phases of different features may proceed in one checkout only when they do not write the same shared file.
 
-Shared files: `docs/project-profile.md`, `openapi/api-v1.yaml`, `docs/architecture.md`, `docs/network.md`, `README.md`, and build or CI files (`pom.xml`, `package.json`, `maven/`, `.gitlab-ci.yml`, `.github/`). Ordinary feature work does not rewrite `docs/project-profile.md`. A layout, verify-command, or ratchet change is its own change.
+Shared files: `docs/project-profile.md`, the OpenAPI catalog (`openapi/api-v1.yaml` unless the profile names another file), `docs/architecture.md`, `docs/network.md`, `README.md`, and build or CI files (`pom.xml`, `package.json`, `maven/`, `.gitlab-ci.yml`, `.github/`). Ordinary feature work does not rewrite `docs/project-profile.md`. A layout, verify-command, or ratchet change is its own change. A feature contract draft under `docs/design/<feature>/` is not a shared file. Design writes that draft. Build merges the approved draft into the catalog.
 
 Intake and Design for a second feature may write only that feature's requirements, state, and `docs/design/<feature>/` paths. Stop before editing a shared file when `git status` shows it is already modified, or when another feature's state file has `activeStatus` `in_progress`, `awaiting_approval`, or `blocked` for a phase that writes that file.
 
@@ -49,7 +49,7 @@ Before `/build`, `/verify`, `/release`, or `/maintain`, stop if `git status` sho
 
 `/status` and phase commands use the feature name the user gives. When the user does not name one, list the state files and ask. Do not assume the newest `*.state.json` is the feature they mean.
 
-**Milestone programs:** `docs/milestones/<milestone>.md` manifests group user stories (P0 skeleton, P1 contracts, P2 MVP, P3 features, P4 hardening, P5 readiness). Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `ci/check-approvals.sh` + `ci/check-milestone.sh`.
+**Milestone programs:** `docs/milestones/<milestone>.md` manifests group user stories (P0 skeleton, P1 contracts, P2 MVP, P3 features, P4 hardening, P5 readiness). Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `ci/check-approvals.sh` + `ci/check-milestone.sh`. A P4 manifest that names `docs/design/system/slo-evidence.md` passes `verify` and `release` only when that file records a measurement or a waiver for every filled row in `docs/design/system/nfr-slo.md` (`slo-evidence` skill). For a milestone, record each story as passed or blocked from its own state file. Do not merge those checkouts. Creating a branch still needs explicit user authorization.
 
 ## Change tiers
 
@@ -60,6 +60,49 @@ Pick the lightest tier that fits; record the tier in the handoff artifact.
 | **Trivial** | Docs-only, typos, dependency patch with no behavior change | `/triage` → `/maintain` → Verify (abbreviated) when security surface unchanged |
 | **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design; milestone manifest row |
+
+## Helper agents
+
+Phase agents do not launch helper agents. Helpers are `explore-researcher`, `schema-author`, `debug-investigator`, and `docs-author`. The phase agent writes a helper brief and returns. The main session, or the orchestrator, launches the named helper and passes its result into the next launch of that phase agent. Launch each brief once. If the same brief is written again with the same `ask`, stop and report the loop.
+
+| Phase | Brief |
+|-------|--------|
+| Intake | `docs/requirements/<feature>.helper-brief.md` |
+| Design | `docs/design/<feature>/helper-brief.md` |
+| Verify | `docs/verify/<feature>/helper-brief.md` |
+| Maintain | `docs/maintain/<feature>/helper-brief.md` |
+
+```text
+helper: schema-author
+outputs:
+  - docs/design/<feature>/openapi.yaml
+return:
+  - paths written
+  - risks
+ask: <one paragraph naming the files and the rules to follow>
+```
+
+The helper returns only the `return:` fields. Do not present the phase gate while a helper brief is still on disk. Delete the brief after the helper's result is back with the phase agent.
+
+## Phase result
+
+When a phase reaches `awaiting_approval` or `blocked`, write `docs/requirements/<feature>.phase-result.md` before stopping. The next phase agent reads that file and the requirements artifact. Overwrite the file when the phase changes. It is per feature and is not a shared file.
+
+```text
+phase: build
+status: awaiting_approval
+artifacts:
+  - docs/build/<feature>/build-report.md
+  - docs/build/<feature>/plan.md
+blockers:
+  - none
+```
+
+`status` is `awaiting_approval` or `blocked`. One blocker per line.
+
+## Command results
+
+Each verify attempt appends a card to `docs/build/<feature>/build-report.md`. The card columns are Command, Exit, Attempt, Failing test, and Location (`file:line`). The raw log may stay in CI or in `build-output.txt`. The next attempt must not read `build-output.txt`.
 
 ## Conduct model (from `ai-agent-conduct.mdc`)
 
@@ -72,7 +115,7 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 | Intake | `/intake` | `requirements-analyst` | `spec-intake` | `docs/requirements/<feature>.md` (acceptance criteria, NFRs incl. UX for UI, regulations, `Delivery approvals`) |
 | Design | `/design` | `solution-architect`, `ux-designer` | `contract-first-design`, `ux-design` | OpenAPI + events, ADR, diagrams, `docs/design/<feature>/ux-spec.md`, `docs/design/<feature>/mockups/` |
 | Build | `/build` | `backend-engineer` / `bff-engineer` / `frontend-engineer` | `implement-*` | Code + migrations + tests; `docs/build/<feature>/` evidence |
-| Verify | `/verify` | `test-engineer` → `security-reviewer` → `code-reviewer` | `quality-gate`, `vapt-review`, `pr-review` | `docs/verify/<feature>/` reports |
+| Verify | `/verify` | `test-engineer`, then `security-reviewer` and `code-reviewer` together | `quality-gate`, `vapt-review`, `pr-review` | `docs/verify/<feature>/` reports |
 | Maintain | `/maintain` | `maintenance-engineer` | `bugfix-triage`, `dependency-upgrade`, `doc-sync`, `characterization-tests`, `migration-safety` | Fix + docs; approval to re-enter Verify |
 | Release | `/release` | `release-manager` | `release-pr` | Merge request ready; completion after human merge |
 
@@ -89,15 +132,20 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 ### Intake gate
 - User story recorded as `As a [role], I want [goal], so that [benefit].`
 - Acceptance criteria (stable IDs, e.g. AC-1) split from that story and its constraints, one behavior per row; out of scope recorded separately. NFRs, regulations, security-review triggers, open questions resolved.
+- **Story size.** One primary surface, recorded as `Surfaces: backend`, `Surfaces: bff`, or `Surfaces: frontend`. At most eight acceptance criteria (`AC-1` through `AC-8`). A story that needs more than one surface, more than one bounded context, or more than eight criteria does not pass this gate. The analyst writes `## Proposed split` (extra milestone rows: story sentence, surface, dependency) and stops until the user approves the split. `Vertical slice: yes` is recorded only when the user asks for one journey across surfaces; that story may list more than one surface and still has at most eight criteria.
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- Contracts, ADR, diagrams; UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component.
+- Feature contract draft at `docs/design/<feature>/openapi.yaml`, event schemas under `docs/design/<feature>/events/` with `eventVersion`, ADR, diagrams. The org catalog (`openapi/api-v1.yaml`, or the path in the profile) is unchanged at this gate. UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component. API-backed component rows name an operation in that feature draft.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate
-- **Baseline green** before first edit (commands from `docs/project-profile.md`); stop on pre-existing failure unless profile documents an approved exception.
-- Build/test green with quality tooling wired per repo (`maven/quality-plugins.xml` for Java — run OWASP Dependency-Check in CI if local verify is too slow).
+- **Baseline green** before first edit (the full `Backend verify` / `Frontend verify` command from `docs/project-profile.md`); stop on pre-existing failure unless profile documents an approved exception.
+- **Build plan** at `docs/build/<feature>/plan.md` before the first implementation edit. One row per approved `AC-*` from the requirements artifact. Columns: AC, Status (`pending`, `done`, or `blocked`), Test. A green unit sets that row to `done` and names the test. The next unit starts only after that. Do not add, delete, or rewrite AC rows.
+- **Red–green loop** uses `Backend verify (fast, no OWASP)` or `Frontend verify (fast)` when that cell is a real command. An empty cell or a placeholder comment means the loop uses the full verify command. The gate still runs the full command once, with the quality plugins (coverage, static analysis, CVE). OWASP Dependency-Check stays on that full command and in CI when the fast cell omits it. Each attempt appends a command-result card. The next attempt must not read `build-output.txt`.
+- **Second failure.** The second red result for the same test writes `docs/build/<feature>/failure-brief.md` (`helper: debug-investigator`) and returns. The main session launches `debug-investigator`. Attempt three applies that note. A third red result stops. A different failing test starts its own count.
+- When `docs/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before other implementation edits. Stop when the catalog is already modified by another feature. A story with no draft records N/A in the build report.
+- Build/test green with quality tooling wired per repo (`maven/quality-plugins.xml` for Java — the fast loop may skip OWASP; the gate command does not).
 - Red–green tests for new behavior; VAPT-required tests in the same diff when applicable.
 - Contract conformance and ArchUnit where wired; methods ≤ 30 lines; auth+authz; correlation/tracing; DTOs only; Flyway; no secrets.
 - UX spec implemented for UI changes: component defaults, layout matching the approved mockups, API client only for operations named on those rows.
@@ -105,7 +153,9 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 - **Build evidence** under `docs/build/<feature>/` (`build-report.md` with `commit:` line; optional `build-output.txt` — prefer CI artifacts for raw logs).
 
 ### Verify gate
+- `test-engineer` finishes first and may change tests. Then `security-reviewer` and `code-reviewer` run together. Each writes only its own report (`vapt-checklist.md`, `review-notes.md`). Wait for both, including when one finds a Critical item. Gather one Critical list into `docs/requirements/<feature>.phase-result.md`, then route back to Build or Maintain.
 - Quality, security (VAPT), UX (axe-core + UX AC tests), code review — no Critical findings.
+- The P4 SLO story writes `docs/design/system/slo-evidence.md` (`slo-evidence`): each filled NFR/SLO row is `measured` (command plus an output file) or `waiver` (reason, approver, date).
 - Evidence under `docs/verify/<feature>/` with `commit:` in each report header; tests added during Verify are committed before stamping, so every report names the same commit.
 - N/A only with recorded reason; applicable unchecked VAPT = Critical.
 

@@ -81,6 +81,116 @@ for a in $artifacts; do
   checked=$((checked + 1))
 done
 
+check_slo_evidence() {
+  grep -Fq 'docs/design/system/slo-evidence.md' "$manifest" || return 0
+  case "$phase" in
+    verify|release) ;;
+    *) return 0 ;;
+  esac
+  ev="docs/design/system/slo-evidence.md"
+  if [ ! -f "$ev" ]; then
+    printf 'FAIL: SLO evidence file missing: %s (slo-evidence skill)\n' "$ev" >&2
+    return 1
+  fi
+  slo_fail=0
+  # awk prints one result line per evidence row:
+  # ok, bad-kind, bad-fields, bad-path, missing-file. Measured files are
+  # checked in the shell so the test does not depend on awk's system().
+  parsed="$(awk -F'|' '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    /^[[:space:]]*\|/ {
+      if ($0 ~ /---/) next
+      surface = trim($2)
+      if (surface == "" || surface == "Surface") next
+      kind = tolower(trim($3))
+      cmd = trim($4)
+      out = trim($5)
+      date = trim($6)
+      n++
+      if (kind != "measured" && kind != "waiver") {
+        printf "bad-kind\t%s\t%s\n", surface, kind
+        next
+      }
+      if (cmd == "" || out == "" || date !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) {
+        printf "bad-fields\t%s\n", surface
+        next
+      }
+      if (kind == "measured" && (out ~ /(^|\/)\.\.(\/|$)/ || out ~ /^\//)) {
+        printf "bad-path\t%s\t%s\n", surface, out
+        next
+      }
+      printf "%s\t%s\t%s\n", kind, surface, out
+    }
+    END { if (n == 0) print "empty" }
+  ' "$ev")"
+  case "$parsed" in
+    empty|"")
+      printf 'FAIL: %s has no SLO evidence rows\n' "$ev" >&2
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$parsed" | while IFS= read -r line; do
+    kind="${line%%	*}"
+    rest="${line#*	}"
+    surface="${rest%%	*}"
+    out="${rest#*	}"
+    case "$kind" in
+      bad-kind)
+        printf 'FAIL: SLO row "%s" kind must be measured or waiver (got "%s")\n' "$surface" "$out" >&2
+        echo fail >>"$slo_mark"
+        ;;
+      bad-fields)
+        printf 'FAIL: SLO row "%s" needs a command or reason, an output or approver, and a YYYY-MM-DD date\n' "$surface" >&2
+        echo fail >>"$slo_mark"
+        ;;
+      bad-path)
+        printf 'FAIL: SLO output path must be a repo-relative file without "..": %s\n' "$out" >&2
+        echo fail >>"$slo_mark"
+        ;;
+      measured)
+        if [ ! -f "$out" ]; then
+          printf 'FAIL: SLO output file missing for "%s": %s\n' "$surface" "$out" >&2
+          echo fail >>"$slo_mark"
+        fi
+        ;;
+      waiver) ;;
+    esac
+  done
+  nfr="docs/design/system/nfr-slo.md"
+  if [ -f "$nfr" ]; then
+    awk -F'|' '
+      function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+      /^[[:space:]]*\|/ {
+        if ($0 ~ /---/) next
+        name = trim($2)
+        if (name == "" || name == "Surface" || name == "Tier") next
+        rest = ""
+        for (i = 3; i <= NF; i++) rest = rest $i
+        gsub(/[ \t|]/, "", rest)
+        if (rest != "") print name
+      }
+    ' "$nfr" | while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      if ! printf '%s\n' "$parsed" | awk -F'	' -v n="$name" '$2 == n { found = 1 } END { exit !found }'; then
+        printf 'FAIL: filled NFR/SLO row "%s" has no row in %s\n' "$name" "$ev" >&2
+        echo fail >>"$slo_mark"
+      fi
+    done
+  fi
+  if [ -f "$slo_mark" ]; then
+    rm -f "$slo_mark"
+    slo_fail=1
+  fi
+  return "$slo_fail"
+}
+
+slo_mark="$(mktemp)"
+rm -f "$slo_mark"
+if ! check_slo_evidence; then
+  missing=1
+fi
+rm -f "$slo_mark"
+
 if [ "$checked" -eq 0 ] && [ "$missing" -eq 0 ]; then
   printf 'FAIL: no concrete story artifact paths in %s (all rows are dynamic or empty)\n' "$manifest" >&2
   exit 1

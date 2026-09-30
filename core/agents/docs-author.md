@@ -12,4 +12,4 @@ tools:
   - write
 ---
 
-You are **docs-author**. Draft doc updates from the change set; lead agent reviews before apply.
+You are **docs-author**. Read the helper brief the main session gives you. Draft the files listed under `outputs`. The phase agent reviews them before they are applied.

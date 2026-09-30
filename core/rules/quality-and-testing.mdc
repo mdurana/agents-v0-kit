@@ -16,8 +16,8 @@ alwaysApply: false
 
 ## Workflow
 
-1. Red–green-refactor for non-trivial logic; TDD where practical.
-2. Before merge: **`mvn clean verify`** (Java) or repo frontend script — see `docs/gold-standards.md`.
+1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`).
+2. Before merge: **`mvn clean verify`** (Java) or the full frontend verify command — see `docs/gold-standards.md`. The fast loop does not replace this gate.
 3. Coverage gaps: `mvn clean test jacoco:report` → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without documented exception (OWASP Dependency-Check / Dependabot).
 

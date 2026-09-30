@@ -12,13 +12,14 @@ Verify phase playbook for the `test-engineer` agent (`workflow-orchestration.mdc
 2. Write tests: Arrange–Act–Assert; naming `methodName_scenario_expectedOutcome` (Java) or `should_expectation_whenCondition` (frontend) — match existing suite style.
 3. Cover happy, error, and edge paths; every `@ExceptionHandler`/catch that changes behavior.
 4. Use Testcontainers for integration (API+DB+messaging) and Pact for BFF↔service contracts where the repo already depends on them.
-5. Launch the `schema-author` subagent for single-file unit test creation and mock data when helpful.
-6. Run `mvn -B clean verify` (Java) or the frontend script.
+5. When a single-file unit test or mock data should be drafted by `schema-author`, write `docs/verify/<feature>/helper-brief.md` (`helper: schema-author`) and return. Do not launch the helper (`workflow-orchestration.mdc` Helper agents).
+6. Run the full `mvn -B clean verify` (Java) or the full frontend verify command from `docs/project-profile.md`. This is the gate command, not the fast red–green loop.
 7. Generate JaCoCo report for changed backend/frontend code; confirm coverage ≥ 80% backend / 70% frontend.
 8. Run OWASP Dependency-Check; confirm no new high/critical CVEs (document exceptions).
 9. Add the VAPT-required tests (User A logout → User B login; renamed wrong-type file → 400; restricted role → 403; idempotent consumer dedupe).
 10. For UI-affecting changes: run the automated accessibility check (axe-core) on changed routes of the built UI, not on the Design HTML mockups; confirm no serious/critical violations; map each UX acceptance criterion from `docs/design/<feature>/ux-spec.md` to a test of the built UI, including component defaults that the criterion names; persist the UX report to `docs/verify/<feature>/ux-report.md` (violations with severity, UX acceptance criteria status).
-11. Persist the test report to `docs/verify/<feature>/test-report.md` — build status, coverage numbers, CVE scan results, documented exceptions.
+11. When this story is the P4 SLO story, or the requirements artifact cites `docs/design/system/nfr-slo.md`, follow `slo-evidence` and write `docs/design/system/slo-evidence.md` before the gate.
+12. Persist the test report to `docs/verify/<feature>/test-report.md` — build status, coverage numbers, CVE scan results, documented exceptions.
 
 ## Rule-compliance checklist
 - [ ] `quality-and-testing.mdc`: AAA; naming; coverage ≥ 80%/70%; methods ≤ 30 lines; cognitive complexity ≤ 15; no new high/critical CVEs.
@@ -26,4 +27,5 @@ Verify phase playbook for the `test-engineer` agent (`workflow-orchestration.mdc
 - [ ] `api-and-events.mdc`: idempotent consumer tests.
 - [ ] UX spec: for UI-affecting changes, a11y check green (no serious/critical violations), UX acceptance criteria covered; UX report persisted to `docs/verify/<feature>/ux-report.md`.
 - [ ] Mocks: external I/O only; domain tests deterministic.
+- [ ] P4 SLO story: `docs/design/system/slo-evidence.md` records a measurement or a waiver for every filled NFR/SLO row (`slo-evidence`).
 - [ ] `workflow-orchestration.mdc`: Verify gate (quality) criteria met; report persisted to `docs/verify/<feature>/test-report.md`.

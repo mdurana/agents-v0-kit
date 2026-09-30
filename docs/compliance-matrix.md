@@ -188,19 +188,28 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Critical findings route back | C /verify, /deliver; G Verify gate |
 | Gate decisions, approver, date, and evidence recorded in the existing handoff artifact | C all phase commands; R workflow-orchestration; CI ci/check-approvals.sh, ci/check-evidence.sh |
 | Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /release, /deliver; A release-manager; S release-pr; R workflow-orchestration |
-| Build: green baseline before edits; wired quality gate (coverage/static/CVE fail `mvn -B clean verify`) | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
+| Build: green baseline before edits; red–green loop may use the profile fast verify command; the gate still runs full `mvn -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
 | Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /build; S implement-spring-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-* |
+| Build: `docs/build/<feature>/plan.md` has one row per approved `AC-*`; rows are not added or rewritten | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
+| Build: second red result of the same test writes `failure-brief.md`; `debug-investigator` runs before attempt three | R workflow-orchestration; C /build; A backend/bff/frontend-engineer, debug-investigator; S implement-* |
+| Build: each verify attempt records a command-result card; the next attempt does not read `build-output.txt` | R workflow-orchestration; C /build; A backend/bff/frontend-engineer; S implement-* |
+| Phase result file `docs/requirements/<feature>.phase-result.md` is the handoff the next phase reads | R workflow-orchestration; A orchestrator; C /intake, /design, /build, /verify, /maintain, /release |
+| Verify: `test-engineer` first; `security-reviewer` and `code-reviewer` together; one gathered Critical list | R workflow-orchestration; A orchestrator, security-reviewer, code-reviewer; C /verify, /deliver; G Verify gate |
 | Build evidence persisted under `docs/build/<feature>/` and referenced from approvals | R workflow-orchestration; C /build, /verify; CI ci/check-evidence.sh |
+| Design: feature contract draft at `docs/design/<feature>/openapi.yaml`; org catalog unchanged until Build merges it | R workflow-orchestration; A solution-architect; S contract-first-design; C /design; G Design gate |
 | Design: UX spec and HTML mockups exist (flows, state matrix, per-component defaults, a11y, responsive, design-system conformance, UX acceptance criteria) | R workflow-orchestration; A ux-designer; S ux-design; C /design; G Design gate |
 | Design: threat-model notes (assets, trust boundaries, top risks) for non-trivial security | A solution-architect; S contract-first-design; C /design; G Design gate |
 | Verify: a11y check green and UX acceptance criteria covered for UI-affecting changes | R workflow-orchestration; A test-engineer; S quality-gate; C /verify; G Verify gate |
 | Intake: user story (`As a` / `I want` / `so that`) split into stable `AC-*` rows; out of scope listed separately; NFRs recorded; open questions resolved | A requirements-analyst; S spec-intake; C /intake; G Intake gate |
+| Intake: one primary surface unless `Vertical slice: yes`; at most `AC-8`; oversized stories stop on `## Proposed split` | A requirements-analyst; S spec-intake; C /intake; R workflow-orchestration; G Intake gate |
 | Milestone programs: manifests group user stories into incremental delivery (P0..P5); story chains + go/no-go | C /intake (story links); R workflow-orchestration; CI ci/check-approvals.sh (milestone row), ci/check-milestone.sh |
+| P4 SLO rows close with `docs/design/system/slo-evidence.md`: each filled row is measured or waived | A test-engineer; S slo-evidence; C /verify; R workflow-orchestration; CI ci/check-milestone.sh (verify/release when the manifest names the file) |
 | Change tiers (Trivial / Standard / Major); `/triage` | C /intake, /triage, /deliver; A orchestrator; R workflow-orchestration |
 | Machine-readable resume (`lastApprovedPhase`, `activePhase`, `activeStatus`, `blockedReason`) | C /status; R workflow-orchestration Phase resume; `scripts/sync-feature-state.sh`; CI ci/check-feature-state.sh (optional) |
-| Parallel features: per-feature artifacts; stop before a second writer touches a shared file; creating a branch needs explicit user authorization | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
+| Parallel features: per-feature artifacts; feature contract drafts under `docs/design/<feature>/` are not shared; stop before a second writer touches a shared file; creating a branch needs explicit user authorization | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
+| Helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`) are launched from the main session off a helper brief, not from inside a phase agent | R workflow-orchestration Helper agents; A orchestrator; C /intake, /design, /verify, /maintain |
 
 ## Onboarding
 
