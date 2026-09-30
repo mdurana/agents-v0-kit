@@ -1,0 +1,49 @@
+# Milestone: <P0/P1/P2...> — <name>
+
+> Program manifest for a delivery milestone — e.g. P0 Platform Skeleton, P1 Contracts
+> & Data Models, P2 MVP/Core Features, P3 Other Features 1..N, P4 Hardening, P5
+> Release Readiness. Each user story runs the standard gated chain (Intake → Design
+> → Build → Verify → Release) with approvals recorded in its own feature artifact;
+> this manifest groups the stories, orders them, and records the milestone go/no-go.
+> (`workflow-orchestration.mdc`)
+
+## Goal
+
+<one paragraph: what this milestone delivers and its definition of done>
+
+## Scope
+
+- In: <...>
+- Out: <...>
+
+## Dependencies
+
+<ordering, e.g. "P1 depends on the P0 skeleton merged; story P2-B depends on P2-A's contracts">
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency |
+|----------|-----------|------------------|--------|------------|
+| <P2-A> | <as a user, I want ...> | docs/requirements/<feature>.md | planned | — |
+
+> Conventions:
+> - Each linked feature artifact records `Milestone: <Pn-name>` and `Story: <story-id>`
+>   under its title (`spec-intake` skill) for traceability.
+> - Status is prose (planned / in-flight / done); the machine check is evidence-based:
+>   `ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
+>   exist and record the phase approval — build/verify also require the recorded evidence
+>   paths to exist (`ci/check-evidence.sh`).
+> - Rows with placeholder paths (`<...>`) or no path are skipped — a milestone go/no-go
+>   passes only when every story row has a concrete, approved artifact.
+> - Hardening/readiness milestones: run `/verify` once more with this manifest's linked
+>   changes as the integrated scope before the milestone approval.
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| milestone | <this manifest, story artifacts> | <name> | Approved | <date> |
+
+> The `milestone` row is the go/no-go decision, verified at merge by
+> `ci/check-approvals.sh <manifest> milestone`; the per-story approvals are verified
+> by `ci/check-milestone.sh <manifest> verify`.

@@ -1,0 +1,29 @@
+<!--
+  OWASP Dependency-Check for CI only — merge into a Maven profile (e.g. ci-security)
+  and run: ./mvnw -B clean verify -Pci-security
+  Keep fast local verify without this profile (workflow-orchestration.mdc / project-profile.md).
+-->
+<profile>
+  <id>ci-security</id>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>10.0.4</version>
+        <configuration>
+          <failBuildOnCVSS>7</failBuildOnCVSS>
+          <suppressionFiles>
+            <suppressionFile>${maven.multiModuleProjectDirectory}/maven/dependency-check-suppressions.xml</suppressionFile>
+          </suppressionFiles>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</profile>

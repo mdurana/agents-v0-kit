@@ -1,0 +1,25 @@
+# Delivery artifacts — require owner review before merge (pair with branch protection).
+# Replace @your-team with a real GitLab group before setting GITLAB_TOKEN.
+# Code Owner approval must cover /.gitlab-ci.yml so a merge request cannot rewrite that job.
+/docs/requirements/ @your-team
+/docs/milestones/ @your-team
+/docs/build/ @your-team
+/docs/verify/ @your-team
+/ci/ @your-team
+/.github/workflows/ @your-team
+/.gitlab-ci.yml @your-team
+/.gitlab/ @your-team
+/.cursor/hooks.json @your-team
+/.cursor/hooks/ @your-team
+/.cursor/rules/ @your-team
+/.cursor/agents/ @your-team
+/.claude/settings.json @your-team
+/.claude/hooks/ @your-team
+/.claude/agents/ @your-team
+/.claude/rules/ @your-team
+/.kilo/kilo.json @your-team
+/.kilo/agent/ @your-team
+/.kilo/rules/ @your-team
+/AGENTS.md @your-team
+/CLAUDE.md @your-team
+/CODEOWNERS @your-team

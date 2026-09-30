@@ -1,0 +1,92 @@
+# Org-aligned ignore list (security-baseline.mdc §3: secrets in vault/env only — never in git).
+# Seeded by scripts/install.sh when the target repo has no .gitignore yet.
+
+# --- Secrets and credentials (never commit) ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+credentials.json
+*credentials*.json
+secrets.yaml
+secrets.yml
+**/application-local.yml
+**/application-local.yaml
+**/application-secrets.yml
+**/application-secrets.yaml
+.npmrc
+.pypirc
+
+# --- OS and editors ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# --- Java / Spring Boot ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.gradle/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+# Delivery evidence under docs/build/ is committed (workflow-orchestration.mdc Build evidence)
+!docs/build/
+!docs/build/**
+.svelte-kit/
+.output/
+.vercel/
+.nuxt/
+.next/
+coverage/
+*.tsbuildinfo
+
+# --- Agent hook audit (local; never commit) ---
+.cursor/hooks/audit.jsonl
+.claude/hooks/audit.jsonl
+
+# --- Logs and dumps ---
+*.log
+logs/
+*.hprof
+*.dump
+
+# --- Test and quality tool output (local reports; CI publishes artifacts) ---
+dependency-check-report.html
+**/site/jacoco/
+.scannerwork/
+.sonar/
+*.lcov
+
+# --- Package managers (lockfiles are committed; caches are not) ---
+.npm/
+.yarn/
+.pnpm-store/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# --- Misc ---
+*.orig
+*.rej

@@ -1,0 +1,107 @@
+---
+description: Java/Spring Boot implementation — style, layers, JPA, REST, logging, exceptions, modern Java
+globs: "**/*.java"
+alwaysApply: false
+---
+
+# Java and Spring Boot
+
+Quality thresholds: **`quality-and-testing.mdc`**. API/HTTP semantics: **`api-and-events.mdc`**. Security: **`security-baseline.mdc`**.
+
+## Principles
+
+SOLID; DRY/KISS/YAGNI; composition over inheritance; explicit dependencies. **Guard clauses** to limit nesting; `Optional` at boundaries where the codebase already does; **empty collections**, not `null`.
+
+## Source layout
+
+Paths are relative to the Spring root in `docs/project-profile.md` (`backend/` for profile `service` and `app`, `bff/` when that module is the Spring root). Directory profiles: `project-delivery-core.mdc`. Do not add `src/` at the repo root.
+
+- **Packages** under the application base: `api`, `service`, `repository`, `domain`.
+- **Flyway:** `src/main/resources/db/migration`.
+- **Tests:** `src/test/java`.
+
+## Naming and structure
+
+| Kind | Convention |
+|------|------------|
+| Packages | lowercase, dotted; ≤ ~4 segments |
+| Types | `*Controller`, `*Service`, `*Repository`, `*Request`, `*Response`, `*Dto`, `*Exception`, `*Mapper` |
+| Methods | `find*`, `create*`, `validate*`, `handle*`, `to*` |
+| Constants | `UPPER_SNAKE_CASE` |
+
+- **Formatting:** 4 spaces; K&R braces; ≤ ~120 cols.
+- **Imports:** no wildcards; order: `java.*`, `javax.*`, third-party, `org.springframework.*`, company packages.
+
+## Class and method size
+
+- Classes: **< 300 lines**; split by responsibility.
+- Methods: **≤ 20** target, **≤ 30** max; **≤ 4 parameters** — use request DTOs beyond that.
+- Cognitive complexity: see **`quality-and-testing.mdc`**.
+
+## Modern Java (when aligned with repo)
+
+- **Java 21+:** virtual threads for I/O-heavy workloads only after verifying JPA/driver/thread-local compatibility.
+- **Records** for immutable DTOs when adopted consistently.
+- **MapStruct** (or project mapper standard) for DTO ↔ entity — avoid hand-drifting mapping logic.
+
+## Spring
+
+- **DI:** constructor injection (`@RequiredArgsConstructor` where used project-wide).
+- **Transactions:** `@Transactional(readOnly = true)` default at service layer; override for writes.
+- **JPA:** `@Enumerated(STRING)`; `@Version`; `@CreatedDate` / `@LastModifiedDate` if enabled; avoid N+1 (`JOIN FETCH`, `@EntityGraph`, projections).
+- **Migrations:** all schema changes via **Flyway** (or repo migrator — do not split conventions).
+
+## REST layer
+
+- Controllers delegate to services; HTTP mapping and validation triggers only — no business rules.
+- Status codes and DTO mapping consistent with `GlobalExceptionHandler`.
+- URLs: `/api/v1/{resource}`; **201** create, **204** no body where appropriate.
+- **DTOs only** — never expose entities.
+
+```java
+@GetMapping("/users/{id}")
+public ResponseEntity<UserResponse> getUser(@PathVariable @Positive Long id) {
+  return userRepo.findById(id)
+    .map(ResponseEntity::ok)
+    .orElse(ResponseEntity.notFound().build());
+}
+
+@PostMapping
+public Response create(@Valid @RequestBody CreateRequest req) {
+  return service.create(req);
+}
+```
+
+## Logging (CWE-117)
+
+SLF4J parameterized messages; sanitize dynamic values:
+
+```java
+import org.owasp.encoder.Encode;
+log.info("Processing topic={}", Encode.forJava(message.getTopic()));
+```
+
+No PII, secrets, or tokens in logs.
+
+## Exceptions
+
+- No empty `catch`; preserve cause on rethrow.
+- Domain-specific exceptions via `@ControllerAdvice` — not generic types leaking to clients.
+
+```java
+try {
+  return repo.findById(id);
+} catch (DataAccessException e) {
+  log.error("Failed to fetch entity id={}", id, e);
+  throw new ServiceException("Unable to retrieve entity", e);
+}
+```
+
+## Lombok
+
+- DTOs: `@Data` / `@Value`, `@Builder` when clarity improves.
+- Avoid `@AllArgsConstructor` on entities; avoid `@ToString` / `@EqualsAndHashCode` on entities with lazy collections unless project standard accounts for it.
+
+## Performance (when justified)
+
+- Pagination for large datasets; `@Cacheable` for frequent reads; `@Async` for non-blocking side effects.

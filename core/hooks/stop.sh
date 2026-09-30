@@ -1,0 +1,49 @@
+#!/bin/sh
+# stop.sh — evidence-based reminder; at most one followup per repo per 6 hours.
+set -eu
+
+. "$(dirname "$0")/lib.sh"
+
+stamp_file=""
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  gd="$(git rev-parse --git-dir 2>/dev/null)"
+  stamp_file="$gd/agents-v0-stop-reminder"
+else
+  stamp_file=".cursor/hooks/.stop-reminder-stamp"
+fi
+
+now="$(date +%s)"
+if [ -f "$stamp_file" ]; then
+  last="$(cat "$stamp_file" 2>/dev/null || echo 0)"
+  if [ "$now" -lt "$((last + 21600))" ]; then
+    exit 0
+  fi
+fi
+
+payload="$(cat || true)"
+haystack="$payload"
+transcript="$(printf '%s' "$payload" | hook_json_string_field transcript_path)"
+if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+  haystack="$(tail -c 8000 "$transcript" 2>/dev/null || printf '%s' "$payload")"
+fi
+printf '%s' "$haystack" | grep -Eqi 'mvn|npm|vitest|jest|gradle|pytest|coverage|docs/build/|docs/verify/' && exit 0
+
+reminder=""
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  changed="$(git status --porcelain 2>/dev/null | grep -Ev '[[:space:]]([^/]*[/ ])*[^/]*\.(md|mdc|markdown|txt|adoc|json)$' || true)"
+  if [ -n "$changed" ]; then
+    reminder="Uncommitted code changes detected. Run the project quality gate (docs/project-profile.md), persist Build/Verify evidence with commit: lines, and sync docs."
+    printf 'REMINDER: %s\n' "$reminder" >&2
+  fi
+fi
+
+if [ -n "$reminder" ]; then
+  printf '%s' "$now" >"$stamp_file"
+  hook_audit_log "stop" "" "reminder" "$reminder"
+  # Cursor stop: followup can loop; stderr only unless KIT_STOP_FOLLOWUP=1
+  if [ "${KIT_STOP_FOLLOWUP:-0}" = "1" ]; then
+    hook_emit_stop_followup "$reminder"
+  fi
+fi
+
+exit 0

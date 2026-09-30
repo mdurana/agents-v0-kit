@@ -1,0 +1,30 @@
+---
+description: UI/UX design — HTML mockups, UX spec, per-component defaults, screen state matrix, WCAG 2.1 AA
+globs: "**/docs/design/**,**/*.svelte,**/*.tsx"
+alwaysApply: false
+---
+
+# UI/UX design (UX spec)
+
+Companion to `frontend-web.mdc` and `architecture-and-diagrams.mdc`. Produced in Design, implemented in Build, audited in Verify.
+
+## UX spec (`docs/design/<feature>/ux-spec.md`)
+
+Produced by `ux-designer` (skill `ux-design`) when the change affects a UI surface:
+
+- **User flows** — Mermaid per primary task.
+- **Screen inventory + state matrix** — loading, error, empty, success per data surface, each linked to a mockup.
+- **HTML mockups** — static files under `docs/design/<feature>/mockups/`. One file per screen state. No API calls. Layout, hierarchy, labels, and visible controls live here.
+- **Component defaults** — every interactive component: name, screen, mockup, OpenAPI operation when it calls the API, default behavior, and an override column. Shared components are defined once; screen rows reference that name.
+- **Accessibility (WCAG 2.1 AA)** — keyboard, focus, modals, ARIA, contrast, reduced motion, touch targets.
+- **Responsive + device matrix** — from Intake.
+- **Design-system conformance** — deviations via ADR.
+- **UX acceptance criteria** — testable rows mapped to a screen and a mockup (Verify covers each on the built UI).
+
+A screen is not ready when a mockup has no component row, a visible control has no row, a row links to a missing mockup, or the mockup and the row disagree. An override is applied by changing the mockup and the row together. A component that calls the API names an operation in the approved OpenAPI contract. It does not invent an endpoint. The mockup for a result (success, validation error, 401, 5xx) is static. The real client is written in Build.
+
+## Build and Verify
+
+`frontend-engineer` implements the approved spec and component defaults, and matches the linked mockups for layout. API calls live in the app, using the operation named on the component row.
+
+`test-engineer` runs axe-core on changed routes of the built UI and maps each UX acceptance criterion to a test. Results go in `docs/verify/<feature>/ux-report.md`. Mockups are not the test target.

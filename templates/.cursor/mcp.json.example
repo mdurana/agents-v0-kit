@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "github-readonly": {
+      "comment": "Example — replace with org-approved MCP server config; never commit tokens.",
+      "url": "https://example.invalid/mcp"
+    }
+  }
+}

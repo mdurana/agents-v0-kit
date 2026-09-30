@@ -1,0 +1,13 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs and local output
+*.log
+
+# Dependency/build trees (kit repo itself has none, but keep hygiene if scratch work appears)
+node_modules/
+target/
+build/
+out/
+dist/

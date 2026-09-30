@@ -1,0 +1,80 @@
+<!--
+  Maven quality plugins snippet — paste into <build><plugins> of pom.xml.
+  See quality-and-testing.mdc and docs/quality-gates.md.
+  Companion starters: maven/checkstyle.xml (Checkstyle config) +
+  maven/dependency-check-suppressions.xml (CVE suppressions starter),
+  maven/contract-conformance.xml (OpenAPI diff vs the approved
+  contract) and maven/archunit/LayerRulesTest.java (layer-boundary rules). The
+  Build gate requires this gate to be wired before implementation.
+  OWASP Dependency-Check is slow locally — prefer profile ci-security in CI
+  (see maven/quality-plugins-ci-security.xml) and bind the OWASP plugin only there.
+-->
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.12</version>
+  <executions>
+    <execution>
+      <id>prepare-agent</id>
+      <goals><goal>prepare-agent</goal></goals>
+    </execution>
+    <execution>
+      <id>report</id>
+      <phase>test</phase>
+      <goals><goal>report</goal></goals>
+    </execution>
+    <execution>
+      <id>check</id>
+      <goals><goal>check</goal></goals>
+      <configuration>
+        <rules>
+          <rule>
+            <element>BUNDLE</element>
+            <limits>
+              <limit>
+                <counter>LINE</counter>
+                <value>COVEREDRATIO</value>
+                <minimum>0.80</minimum>
+              </limit>
+            </limits>
+          </rule>
+        </rules>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
+
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-checkstyle-plugin</artifactId>
+  <version>3.5.0</version>
+  <configuration>
+    <configLocation>${maven.multiModuleProjectDirectory}/maven/checkstyle.xml</configLocation>
+    <failOnViolation>true</failOnViolation>
+  </configuration>
+  <executions>
+    <execution>
+      <phase>verify</phase>
+      <goals><goal>check</goal></goals>
+    </execution>
+  </executions>
+</plugin>
+
+<plugin>
+  <groupId>com.github.spotbugs</groupId>
+  <artifactId>spotbugs-maven-plugin</artifactId>
+  <version>4.8.6.4</version>
+  <configuration>
+    <effort>Max</effort>
+    <threshold>Medium</threshold>
+    <failOnError>true</failOnError>
+  </configuration>
+  <executions>
+    <execution>
+      <phase>verify</phase>
+      <goals><goal>check</goal></goals>
+    </execution>
+  </executions>
+</plugin>
+
+<!-- OWASP: use maven/quality-plugins-ci-security.xml in CI profile instead of binding here. -->

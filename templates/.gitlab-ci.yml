@@ -1,0 +1,217 @@
+# Delivery kit CI for on-prem GitLab (default host). Mirrors templates/.github/workflows/*.
+# Mark build, delivery-gate, and the manual delivery-approval job as required.
+# Approving an MR does not re-run the pipeline. After approval, run delivery-approval.
+# GITLAB_TOKEN: project access token, read_api scope, masked, environment scope
+# "delivery-approval" (the job environment below). Do not create it as a project-wide
+# variable. Other jobs then do not receive it. Replace @your-team in CODEOWNERS and
+# turn on Code Owner approval so a merge request cannot rewrite this file.
+# ci/*.sh run from the default branch once they exist there. The first merge request,
+# before those files are on the default branch, skips the live approval check.
+
+# Secret Detection uses the GitLab analyzer (no download from github.com).
+# If that template is missing on your instance, replace the include with a vendored scanner.
+# SAST is off until ENABLE_GITLAB_SAST=1, so a missing SAST template does not block pipelines.
+include:
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+    rules:
+      - if: $ENABLE_GITLAB_SAST == "1"
+
+stages:
+  - validate
+  - test
+  - security
+  - sast
+  - delivery-gate
+
+default:
+  interruptible: true
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+build:
+  stage: test
+  image: eclipse-temurin:21-jdk
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - pom.xml
+        - backend/pom.xml
+        - bff/pom.xml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      exists:
+        - pom.xml
+        - backend/pom.xml
+        - bff/pom.xml
+  script:
+    - |
+      set -eu
+      set -o pipefail
+      repo="$(pwd)"
+      eval "$(sh ci/resolve-layout.sh)"
+      mkdir -p ci-artifacts
+      : > ci-artifacts/verify.log
+      verify_maven() {
+        root="$1"
+        [ -n "$root" ] || return 0
+        if [ ! -f "$repo/$root/pom.xml" ]; then
+          printf 'FAIL: layout root %s has no pom.xml\n' "$root" >&2
+          exit 1
+        fi
+        cd "$repo/$root"
+        if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+        $MVN -B clean verify 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
+        if grep -q '<id>ci-security</id>' pom.xml; then
+          $MVN -B verify -Pci-security 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
+        fi
+        cd "$repo"
+      }
+      verify_maven "${BACKEND_ROOT:-}"
+      verify_maven "${BFF_ROOT:-}"
+      if [ -f ci/check-known-failures.sh ]; then sh ci/check-known-failures.sh ci-artifacts/verify.log; fi
+  artifacts:
+    when: always
+    paths:
+      - ci-artifacts/
+    expire_in: 1 week
+
+frontend:
+  stage: test
+  image: node:20-bookworm
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - package.json
+        - frontend/package.json
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      exists:
+        - package.json
+        - frontend/package.json
+  script:
+    - |
+      set -eu
+      set -o pipefail
+      repo="$(pwd)"
+      eval "$(sh ci/resolve-layout.sh)"
+      root="${FRONTEND_ROOT:-}"
+      if [ -z "$root" ]; then
+        printf 'SKIP: layout has no frontend root\n'
+        exit 0
+      fi
+      if [ ! -f "$repo/$root/package.json" ]; then
+        printf 'FAIL: layout frontend root %s has no package.json\n' "$root" >&2
+        exit 1
+      fi
+      cd "$repo/$root"
+      mkdir -p "$repo/ci-artifacts"
+      npm ci
+      if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      fi
+      if [ -f "$repo/ci/check-known-failures.sh" ]; then sh "$repo/ci/check-known-failures.sh" "$repo/ci-artifacts/verify-frontend.log"; fi
+  artifacts:
+    when: always
+    paths:
+      - ci-artifacts/
+    expire_in: 1 week
+
+secret_detection:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+coverage-ratchet:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - apk add --no-cache python3
+  script:
+    - sh ci/check-coverage-ratchet.sh docs/project-profile.md
+
+delivery-metrics:
+  stage: delivery-gate
+  image: alpine:3.20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - apk add --no-cache python3
+  script:
+    - sh scripts/delivery-metrics.sh . | tee delivery-metrics.md
+  artifacts:
+    when: always
+    paths:
+      - delivery-metrics.md
+    expire_in: 2 weeks
+
+.delivery-linkage:
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - apk add --no-cache git bash curl python3
+  script:
+    - |
+      set -eu
+      if [ -z "${CI_MERGE_REQUEST_IID:-}" ]; then
+        printf 'FAIL: delivery linkage runs on merge request pipelines\n' >&2
+        exit 1
+      fi
+      git fetch origin "$CI_DEFAULT_BRANCH"
+      trusted="$(mktemp -d)"
+      if git cat-file -e "FETCH_HEAD:ci/check-delivery-linkage.sh" 2>/dev/null \
+        && git cat-file -e "FETCH_HEAD:ci/check-approver-gitlab.sh" 2>/dev/null; then
+        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh check-approver-github.sh; do
+          if git cat-file -e "FETCH_HEAD:ci/${s}" 2>/dev/null; then
+            git show "FETCH_HEAD:ci/${s}" > "${trusted}/${s}"
+            chmod +x "${trusted}/${s}"
+          fi
+        done
+      fi
+      base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
+      head="${CI_COMMIT_SHA}"
+      body_file="$(mktemp)"
+      printf '%s' "${CI_MERGE_REQUEST_DESCRIPTION:-}" >"$body_file"
+      export GITLAB_CI=1
+      if [ -f "${trusted}/check-delivery-linkage.sh" ] && [ -f "${trusted}/check-approver-gitlab.sh" ]; then
+        if [ "${REQUIRE_GITLAB_TOKEN:-0}" = "1" ] && [ -z "${GITLAB_TOKEN:-${GL_TOKEN:-}}" ]; then
+          printf 'FAIL: set GITLAB_TOKEN (read_api, masked) with environment scope delivery-approval, then run this job after the MR is approved.\n' >&2
+          exit 1
+        fi
+        sh "${trusted}/check-delivery-linkage.sh" "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
+      elif [ "${REQUIRE_GITLAB_TOKEN:-0}" = "1" ]; then
+        printf 'SKIP: ci checkers are not on %s yet. This bootstrap merge request is not checked against GitLab approvals.\n' "$CI_DEFAULT_BRANCH"
+      else
+        printf 'WARN: using merge request copies of ci scripts because they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
+        sh ci/check-delivery-linkage.sh "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
+      fi
+      rm -f "$body_file"
+
+delivery-gate:
+  extends: .delivery-linkage
+  stage: delivery-gate
+  variables:
+    CHECK_MR_APPROVER: "0"
+    REQUIRE_GITLAB_TOKEN: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+delivery-approval:
+  extends: .delivery-linkage
+  stage: delivery-gate
+  environment:
+    name: delivery-approval
+  variables:
+    CHECK_MR_APPROVER: "1"
+    REQUIRE_GITLAB_TOKEN: "1"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: false

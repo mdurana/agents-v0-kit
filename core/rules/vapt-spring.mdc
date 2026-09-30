@@ -1,0 +1,140 @@
+---
+description: VAPT guardrails for Spring Boot APIs — auth, session, access control, file uploads, API hardening
+globs: "**/*.java,**/application*.yml,**/application*.yaml"
+alwaysApply: false
+---
+
+# VAPT Guardrails — Spring Boot
+
+Apply when editing Java services, REST controllers, security config, or application YAML.
+
+---
+
+## F1 — Unauthorized Account Access (HIGH)
+
+**OWASP:** A07:2021 · **CWE:** CWE-287 · **Retest:** User A logout → User B login → all API calls show User B
+
+### MUST
+
+- Logout blacklists the current JWT and purges all server-side session state (MFA Redis keys, session cache, DB rows)
+- Trigger IdP/OAuth session end on logout when SSO is used
+- JWT blacklist checks **fail-closed** when Redis or session store is unavailable
+- Wire auth/session helpers if present — do not ship dead logout or session code paths
+- Identity for authorization derived from validated JWT `sub` — never from client headers
+
+### MUST NOT
+
+- Fail-open blacklist logic (treat unavailable store as "not blacklisted")
+- Clear sessions in DB only — also purge related Redis/cache keys
+- Ship logout that invalidates one token but leaves MFA or parallel session keys active
+
+### Required tests
+
+- Integration: User A logout → User B login → assert User B on all endpoints
+- Unit: blacklist fail-closed when Redis throws
+
+---
+
+## F6 — Multiple Active Sessions (LOW)
+
+**OWASP:** A07:2021 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
+
+### MUST
+
+- Document session policy (single-session vs multi-session) in service README or runbook
+- If single-session required: invalidate prior JWTs for same user on login (e.g. Redis `jti` registry per user)
+- If multi-session allowed: document explicitly with monitoring
+
+### MUST NOT
+
+- Assume logout on one client invalidates tokens on other devices without explicit invalidation
+
+### Required tests
+
+- New login invalidates old token (when single-session policy applies)
+
+---
+
+## F4 — Improper Access Control (MEDIUM)
+
+**OWASP:** A05:2021 · **CWE:** CWE-284 · **Retest:** Restricted role → **403** on direct admin API call
+
+### MUST
+
+- Add `@PreAuthorize` (or equivalent) on **every** admin/mutation controller method — filter-level `authenticated()` alone is insufficient
+- New controllers include role/permission annotations in the **same PR**
+- BFF validates permissions before proxying to downstream services
+- Use `app.security.permit-all=true` **local dev only** — never lab/SIT/UAT/prod
+
+### MUST NOT
+
+- Use authz bypass flags (e.g. `MethodSecurityBypass`, `@methodSecurityBypass.isEnabled()`) in shared environments
+- Trust client-supplied role headers (`X-User-Role`) or role query params
+- Add controllers without method-level authorization
+
+### Required tests
+
+- Restricted role integration test → 403 on admin endpoints
+- Confirm `permit-all` absent in non-local deployment overlays
+
+---
+
+## F3 — Insufficient File Upload Validation (MEDIUM)
+
+**OWASP:** A05:2021 · **CWE:** CWE-434 · **Retest:** Renamed wrong-type file rejected server-side (400) before processing
+
+### MUST
+
+1. Non-empty file check
+2. Explicit size limit per endpoint
+3. Content validation: magic-byte / MIME sniff (Apache Tika or equivalent)
+4. Structure validation: parse file header/structure (e.g. CSV header row) before business logic
+5. Extension allowlist — **supplemental only**, not sole check
+6. `@PreAuthorize` on admin upload endpoints
+7. Reuse shared validator utility across services
+
+### MUST NOT
+
+- Validate using `getOriginalFilename()` extension alone or client `Content-Type` alone
+- Accept upload and defer rejection to parse-only without content-type check
+- Add upload endpoints without authz in the same PR
+
+### Required tests
+
+- Renamed non-target file (e.g. `.exe` → `.csv`) → 400
+- Empty file → 400; over size limit → 400/413
+- Unauthorized role → 403
+
+---
+
+## F5 — Exposed API Calls (LOW)
+
+**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** All endpoints require auth + authz; rate limits on sensitive paths
+
+### MUST
+
+- Every endpoint protected by authentication and authorization (see F4)
+- Rate limiting on auth, admin, and upload paths
+- Sensitive identifiers in request body or headers — not URL query strings
+- Do not leak stack traces, internal hostnames, or schema details in production errors
+
+### Accept
+
+- API paths visible in client Network tab is normal for SPAs — protect endpoints, do not rely on obscurity
+
+### Required tests
+
+- Unauthenticated request → 401; unauthorized role → 403
+- Sensitive params not in query string for new endpoints
+
+---
+
+## Retest summary (Spring)
+
+| Finding | Pass criteria |
+|---------|---------------|
+| F1 | User B identity on all APIs after User A logout + User B login |
+| F4 | Restricted role → 403 on admin endpoints |
+| F3 | Renamed wrong-type file → 400 before processing |
+| F5 | Auth + authz on all endpoints; rate limits active |
+| F6 | Prior session dead on new login (if policy requires) |

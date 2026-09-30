@@ -1,0 +1,72 @@
+---
+description: REST/OpenAPI, HTTP semantics, DTO validation, idempotency, concurrency, event-driven patterns
+globs: "**/api/**/*,**/controller/**/*,**/listener/**/*,**/event/**/*,**/consumer/**/*"
+alwaysApply: false
+---
+
+# API design and event-driven behavior
+
+Default envelopes: **`project-delivery-core.mdc`**. Java implementation: **`java-spring-backend.mdc`**.
+
+## REST / HTTP
+
+- Resource URLs: `/api/v1/orders/{id}`; **201** create, **204** no-body success.
+- **DTOs only** at the edge — never JPA entities from controllers.
+- Bean Validation: `@Valid` on bodies; constraints on DTO fields; typed path/query params (`@Positive`, `@NotBlank`) — no unsafe parsing.
+- OpenAPI: `@Operation`, `@ApiResponse` where the project uses them.
+
+## Error responses — pick one per API surface
+
+| Pattern | When |
+|---------|------|
+| **RFC 7807** (`application/problem+json`: `type`, `title`, `status`, `detail`, `instance`) | Public APIs, gateways, standard problem clients |
+| **Custom envelope** (`success` / `error` — see `project-delivery-core.mdc`) | Internal platforms already standardized |
+
+Do not mix shapes on the same base path without versioning. Document in OpenAPI.
+
+## Mutations and retries
+
+- **Idempotency-Key** (or repo header) on **POST** and other non-idempotent creates/pays/cancels; persist key + outcome; replay same response within retention window.
+- **PATCH:** document semantics (Merge Patch vs JSON Patch vs custom DTO) in OpenAPI; reject unknown fields if strict.
+- **Optimistic concurrency:** **ETag** (or version) on GET; **`If-Match`** / version on writes; **412** / **409** per project convention.
+
+## Pagination
+
+- Match existing contract: offset (`page`, `limit`) **or** cursor-based for large datasets.
+- Cursor pagination: document `next_cursor`, stable ordering, opaque cursor rules.
+
+## Payload identifiers
+
+Include **correlation** and **request** IDs in error payloads when the stack supports them.
+
+## Events and messaging
+
+- **Idempotent consumers:** dedupe by `eventId` or natural key before side effects.
+- **Retries:** bounded backoff; DLQ after max failures — **never** swallow silently.
+- **Logging:** event id + hash or redacted summary — not full PII.
+
+### Schema and publishing
+
+- Payload schema (Avro, JSON Schema) with **`eventVersion`**; schema registry + compatibility rules when org requires.
+- **Evolution:** additive by default; breaking changes via new event type or versioned topic/subject.
+- **Outbox vs direct publish:** prefer **transactional outbox** when domain write and event must commit together.
+
+### Event envelope
+
+`eventId`, `eventType`, `eventVersion`, `timestamp`, `source`, `correlationId`, `data`, metadata (`idempotency_key`).
+
+```java
+@KafkaListener(topics = "orders")
+public void process(OrderEvent event) {
+  if (eventRepo.existsByEventId(event.getId())) {
+    return;
+  }
+  orderService.process(event);
+  eventRepo.saveProcessed(event.getId());
+}
+```
+
+## Security at the boundary
+
+- Parameterized queries only.
+- No secrets in logs, responses, or client-facing exception messages.

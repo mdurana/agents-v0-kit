@@ -1,0 +1,68 @@
+# Example CI wiring for the delivery approval, evidence, and milestone checks
+# (workflow-orchestration.mdc). Runs ci/check-approvals.sh, ci/check-evidence.sh,
+# and ci/check-milestone.sh (installed at the repo root by scripts/install.sh) to
+# verify that a delivery artifact's "Delivery approvals" section records an
+# explicit approval for the claimed phase, that the recorded evidence paths exist,
+# and that milestone manifests aggregate approved story artifacts before merge.
+# Re-runs on review submission so ci/check-approver-github.sh sees new approvals.
+# Adapt triggers and required phases to your branch protection policy.
+name: Delivery approvals
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Delivery artifact path, e.g. docs/requirements/my-feature.md"
+        required: true
+      phase:
+        description: "Phase to verify: intake | design | build | verify | release | milestone"
+        required: true
+        default: verify
+  pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-approvals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check dispatched artifact and phase
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_ARTIFACT: ${{ inputs.artifact }}
+          DISPATCH_PHASE: ${{ inputs.phase }}
+        run: |
+          set -eu
+          sh ci/check-approvals.sh "$DISPATCH_ARTIFACT" "$DISPATCH_PHASE"
+          if [ "$DISPATCH_PHASE" = "build" ] || [ "$DISPATCH_PHASE" = "verify" ]; then
+            sh ci/check-evidence.sh "$DISPATCH_ARTIFACT" "$DISPATCH_PHASE"
+          fi
+          if [ "$DISPATCH_PHASE" = "milestone" ]; then
+            sh ci/check-milestone.sh "$DISPATCH_ARTIFACT" verify
+          fi
+
+      - name: Link code changes to delivery artifact
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          VERIFY_STALE_BASE: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          body_file="$(mktemp)"
+          printf '%s' "$PR_BODY" >"$body_file"
+          sh ci/check-delivery-linkage.sh "$BASE_SHA" "$HEAD_SHA" "$body_file" "$PR_NUMBER"
+          rm -f "$body_file"

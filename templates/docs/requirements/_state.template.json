@@ -1,0 +1,15 @@
+{
+  "feature": "<feature-slug>",
+  "tier": "standard",
+  "lastApprovedPhase": "",
+  "activePhase": "",
+  "activeStatus": "",
+  "blockedReason": "",
+  "artifact": "docs/requirements/<feature>.md",
+  "baseCommit": "",
+  "updatedAt": "",
+  "evidence": {
+    "build": [],
+    "verify": []
+  }
+}

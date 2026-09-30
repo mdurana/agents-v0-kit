@@ -1,0 +1,84 @@
+---
+description: Canonical stack, observability, cross-cutting API/resilience, documentation and security entry points
+alwaysApply: true
+---
+
+# Project delivery core
+
+## Stack (canonical)
+
+| Layer | Default | Notes |
+|-------|---------|--------|
+| Backend | Java 17+, Spring Boot 3.x | Constructor injection; API → service → repository → domain |
+| API | OpenAPI 3.0, `/api/v1/` | Contract-first when introducing or changing APIs |
+| DB | PostgreSQL 15+ | Flyway SQL migrations |
+| Distributed SQL | YugabyteDB | Only when scale-out / HA topology requires it |
+| Messaging | Kafka / RabbitMQ / Spring Cloud Stream | When async, sagas, or loose coupling required — not by default |
+| Cache | Redis / Caffeine / Hazelcast | Redis shared; Caffeine in-process; Hazelcast when clustered cache fits |
+
+**Frontend:** Do not assume React vs Svelte. Ask once per greenfield UI: *"Svelte or React?"*
+
+Event-driven and caching: add only when requirements justify.
+
+## Directory profiles
+
+Greenfield repos use one profile. Record it in `docs/project-profile.md` under **Layout** (`Profile`, `Backend root`, `Frontend root`, `BFF root`). A filled Profile row or filled root rows win. `/onboard` records the tree it finds and does not move source onto a greenfield default. When those rows are still placeholders, use the profile that matches the files on disk.
+
+| Profile | When | Code roots |
+|---------|------|------------|
+| `service` | Spring Boot only | `backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. A BFF-only repo uses `bff/` instead of `backend/` |
+| `ui` | SvelteKit or React only | `frontend/`. SvelteKit: `src/routes/`, `src/lib/` (`components`, `features`, `services/api`, `stores`, `utils`, `types`). React: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices` |
+| `app` | Service and UI in one repo | `backend/` and `frontend/` (same trees as `service` and `ui`). Add `bff/` only when a BFF is in scope |
+
+The repo root holds `docs/`, `ci/`, and `openapi/` only. Application source does not live there: no root `src/`, `pom.xml`, or `package.json`. `/onboard` may record `.` when a legacy repo already has source at the root.
+
+Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
+
+## Cross-cutting (all services)
+
+- **Correlation ID:** propagate on every request (header + MDC/logs); return on responses when applicable.
+- **Distributed tracing:** W3C Trace Context (`traceparent`, `tracestate` if used); prefer **OpenTelemetry** aligned with platform (Jaeger, Tempo, Datadog, etc.).
+- **Structured logging:** JSON or stable key–value fields; include `traceId` / `spanId` when OTel populates MDC.
+- **Metrics:** Prometheus (or platform equivalent); RED-style signals (rate, errors, duration) for HTTP and critical dependencies.
+- **Auth:** JWT for users; S2S via `X-API-Key` or service Bearer per repo. Never log tokens or secrets.
+- **Resilience:** circuit breaker, retry with backoff, timeouts on outbound HTTP; idempotent event consumers.
+- **Health:** `/health` (and `/ready` / `/live` if the project uses them).
+
+## API envelopes (default)
+
+| Type | Shape |
+|------|------|
+| Success | `{ success, data, metadata }` — lists: `page`, `limit`, `total`, `totalPages` |
+| Error | `{ success: false, error: { code, message, details, timestamp, path, requestId } }` |
+
+For **RFC 7807** (`application/problem+json`) vs custom envelope, see `api-and-events.mdc` — pick one per API surface.
+
+## Design defaults (when not specified)
+
+- **Async** between services when requirements allow; justify synchronous calls.
+- **OpenAPI-first** for new cross-service contracts.
+- **DDD:** aggregates, value objects, repository ports in domain.
+- **Resilience details:** `api-and-events.mdc`, `architecture-and-diagrams.mdc`.
+
+## Documentation (when behavior or topology changes)
+
+- `README.md`
+- `docs/architecture.md` — system context
+- `docs/network.md` — ports and dependencies
+- `docs/diagrams/sequences/<service>.md` — non-trivial flows
+
+Authoritative references (follow repo paths if they differ):
+
+- `docs/security-standards.md` — see also `security-baseline.mdc`
+- `docs/gold-standards.md` — build, run, test, CI
+- `docs/quality-gates.md` / `docs/quality-quick-reference.md` — see `quality-and-testing.mdc`
+
+## BFF and frontends
+
+- **BFF:** aggregation, auth/session handoff, safe GET caching, rate limits, DTO mapping — **thin**; domain rules in domain services.
+- Use **Spring MVC** or **WebFlux** per existing service — do not switch reactive/MVC without an architectural decision.
+- **Admin (React)** and **client (SvelteKit):** `frontend-web.mdc`; consistent API client, correlation + trace headers, 401 handling.
+
+## OMS / order domain (when relevant)
+
+Event-driven boundaries; sagas; idempotency keys on mutating ops; separate Order, Inventory, Payment, Fulfillment contexts — implement only when the task touches that domain. Details: `architecture-and-diagrams.mdc`.

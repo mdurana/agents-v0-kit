@@ -1,0 +1,67 @@
+# Project profile
+
+> Machine- and human-readable commands for agents (`workflow-orchestration.mdc`). Update when build tooling or topology changes.
+
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Backend | <!-- e.g. Java 21, Spring Boot 3.4, Maven wrapper --> |
+| Frontend | <!-- e.g. SvelteKit / React, package manager --> |
+| Database | <!-- e.g. PostgreSQL 15, Flyway --> |
+
+## Commands
+
+| Purpose | Command |
+|---------|---------|
+| Backend verify | <!-- e.g. ./mvnw -B clean verify --> |
+| Backend verify (fast, no OWASP) | <!-- e.g. ./mvnw -B clean verify -P!ci-security --> |
+| Frontend verify | <!-- e.g. npm run verify --> |
+| Lint | <!-- optional --> |
+| Local run | <!-- e.g. ./scripts/run-local-container.sh --> |
+
+## Layout
+
+Directory profiles (`project-delivery-core.mdc`): `service` (`backend/`, or `bff/` when that is the only Spring module), `ui` (`frontend/`), `app` (`backend/` + `frontend/`, optional `bff/`). The repo root has no application `src/`. **This repo** wins when Profile is `service`, `ui`, or `app`. `/onboard` records a legacy tree (including `.`) and does not move it. `ci/resolve-layout.sh` reads the two-column rows below.
+
+| Profile | When | Code roots |
+|---------|------|------------|
+| service | Spring Boot only | `backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. Packages: `api`, `service`, `repository`, `domain`. BFF-only: `bff/` instead |
+| ui | SvelteKit or React only | `frontend/`. SvelteKit: `src/routes/`, `src/lib/`. React: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/` |
+| app | Service and UI in one repo | `backend/` and `frontend/`. `bff/` only when a BFF is in scope. `docs/`, `ci/`, `openapi/` at the repo root |
+
+| This repo | Value |
+|-----------|--------|
+| Profile | <!-- service, ui, or app --> |
+| Backend root | <!-- `backend/` or n/a --> |
+| Frontend root | <!-- `frontend/` or n/a --> |
+| BFF root | <!-- `bff/` or n/a --> |
+| OpenAPI | <!-- `openapi/api-v1.yaml` or n/a --> |
+
+## Contracts
+
+- Approved OpenAPI: <!-- path -->
+- Event schemas: <!-- path -->
+
+## Brownfield exceptions
+
+### known_failures (optional budget for ci/check-known-failures.sh)
+
+| Allowed failure count | Scope / test IDs | Owner | Remove by |
+|----------------------|------------------|-------|-----------|
+| 0 | | | |
+
+### coverage_ratchet (optional; read by quality-and-testing.mdc)
+
+| Scope | Interim minimum | Approver (Security + architecture) | Remove by |
+|-------|-----------------|------------------------------------|-----------|
+| | | | |
+
+## MCP servers (optional)
+
+<!-- Per docs/mcp-baseline.md — server name, read/write, owner -->
+
+## Delivery
+
+- Default change tier: Standard
+- Feature artifact pattern: `docs/requirements/<feature>.md`

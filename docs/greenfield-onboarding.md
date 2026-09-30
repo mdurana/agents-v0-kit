@@ -1,0 +1,88 @@
+# Greenfield onboarding (new system)
+
+Engineer checklist for starting a **new** service or app repo with the agents-v0
+delivery kit and **incremental** milestone delivery (P0 → P5).
+
+## 1. Scaffold the application (outside the kit)
+
+The kit does not run Spring Initializr or frontend CLIs for you. Create the repo with
+your team’s standard generator, then open it in Cursor/Kilo/Claude Code.
+
+| Profile | Typical bootstrap |
+|---------|-------------------|
+| `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=backend` — Java 17+, Spring Boot 3.x, Flyway if using PostgreSQL. A BFF-only repo uses `baseDir=bff` and stays thin per `project-delivery-core.mdc` |
+| `ui` | SvelteKit (`npx sv create frontend`) or React (Vite or org template) under `frontend/` |
+| `app` | Spring Initializr with `baseDir=backend`. UI under `frontend/`. Add `bff/` only when a BFF is in scope |
+
+Do not scaffold `src/`, `pom.xml`, or `package.json` at the repo root. `docs/`, `ci/`, and `openapi/` stay there.
+
+Commit the initial skeleton (or use an empty repo) before installing the kit.
+
+## 2. Install the kit and seed P0
+
+From the **agents-v0** kit repo:
+
+```bash
+./scripts/bootstrap-greenfield.sh --tool cursor --profile app /path/to/your-new-repo
+```
+
+`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/project-profile.md` when those cells are still placeholders. Use `--tool kilo`, `claude`, or `all` as needed.
+
+During P0 build stories, agents follow the **`scaffold-service`** skill (secure defaults,
+quality plugins, container starter). **Major** cross-cutting changes use **`system-design`** in `/design`.
+
+Manual equivalent:
+
+```bash
+./scripts/install.sh --tool cursor /path/to/your-new-repo
+cp /path/to/agents-v0/templates/docs/milestones/p0-platform-skeleton.md \
+   /path/to/your-new-repo/docs/milestones/
+```
+
+The manual path does not fill Layout. Set the **This repo** rows in `docs/project-profile.md`, or re-run bootstrap with `--profile`.
+
+Wire CI with the seeded `.gitlab-ci.yml` (on-prem GitLab). Set `GITLAB_TOKEN` (`read_api`, masked) on the `delivery-approval` environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Ensure `.gitignore` keeps `docs/build/` and `docs/verify/` committable.
+
+## 3. Wire quality before heavy coding
+
+Copy kit starters into the Maven build when applicable:
+
+- `maven/quality-plugins.xml` — JaCoCo, Checkstyle, SpotBugs, OWASP Dependency-Check on `verify`
+- `maven/contract-conformance.xml` — when OpenAPI is generated
+- `maven/archunit/LayerRulesTest.java` — layer boundaries
+
+See `templates/docs/quality-gates-engineering-principles.md` and
+`docs/gold-standards.md` in the target repo after install.
+
+For local container testing, copy a `docker/Dockerfile.*` starter to `Dockerfile`, then:
+
+```bash
+./scripts/run-local-container.sh
+```
+
+See `docker/README.md` in the target repo after install.
+
+## 4. Run the gated workflow per story
+
+For each row in `docs/milestones/p0-platform-skeleton.md`:
+
+1. `/intake` — paste the user story; approve Intake.
+2. `/design` — contracts/ADR only when the story needs them (P0-C may reference Maven only).
+3. `/build` — agents require a **green baseline** before edits (`/build` command).
+4. `/verify` then `/release` per story, or `/deliver` for a single story end-to-end.
+
+Record approvals in each feature artifact’s `Delivery approvals` table. CI uses
+`ci/check-approvals.sh` and `ci/check-evidence.sh`.
+
+## 5. Advance milestones
+
+After P0 go/no-go (`milestone` row approved, `check-milestone.sh` green), copy
+`docs/milestones/_template.md` to `p1-contracts-and-data-models.md`, etc., per
+[README.md](../README.md) milestone program (P1 contracts, P2 MVP, P3 features, P4
+hardening, P5 release readiness).
+
+## References
+
+- Non-engineering overview: [user-guide.md](user-guide.md)
+- Model routing: [model-routing-matrix.md](model-routing-matrix.md)
+- Brownfield / legacy repos: [brownfield-onboarding.md](brownfield-onboarding.md)

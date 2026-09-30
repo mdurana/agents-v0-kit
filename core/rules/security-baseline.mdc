@@ -1,0 +1,146 @@
+---
+description: Org security baseline — authn/authz, secrets, cookies, uploads, HTTP headers, API hardening, production hygiene, compliance
+globs: "**/*.java,**/*.ts,**/*.tsx,**/*.svelte,**/security/**/*,**/Security*.java,**/application*.yml,**/application*.yaml"
+alwaysApply: false
+---
+
+# Security baseline
+
+Baseline org standard for all services and frontends in this repository.
+
+**VAPT addendum:** `docs/security/vapt-prevention-guardrails.md` · Team rules: `vapt-spring.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc`
+
+---
+
+## 1. Authentication
+
+| Requirement | Standard |
+|-------------|----------|
+| Protocol | OAuth 2.0 / OpenID Connect (Okta) or JWT Bearer — no custom auth schemes |
+| Session model | Stateless JWT for REST APIs; document if cookie sessions are used |
+| MFA | Required for admin/backoffice portals |
+| Logout | Invalidate server-side tokens, clear client state, revoke IdP session where SSO applies |
+| Token blacklist | Fail-closed on infrastructure errors — never accept revoked tokens when Redis is unavailable |
+| Dev bypass | Static dev tokens and `permit-all` **local only** — never in lab/SIT/UAT/prod |
+
+**CSRF:** cookie sessions need CSRF tokens or SameSite + framework defaults; Bearer-only SPAs omit CSRF but must not put tokens in query strings.
+
+---
+
+## 2. Authorization
+
+| Requirement | Standard |
+|-------------|----------|
+| Model | RBAC or ABAC; least privilege |
+| Enforcement | **Server-side on every endpoint** — filter-level `authenticated()` alone is insufficient for admin APIs |
+| Annotations | `@PreAuthorize` (or equivalent) on every controller method that mutates or exposes sensitive data |
+| Client UI | Hiding nav links is **not** authorization — enforce in BFF, `+layout.server.ts`, or service layer |
+| Trust boundary | Never trust client-supplied role/permission headers or query params |
+| Bypass flags | No `MethodSecurityBypass`-style flags that disable authz in shared environments |
+
+- **Authentication vs authorization:** verify caller identity (JWT, session, mTLS) at the edge; propagate principal to services. Enforce **RBAC/ABAC** and **resource-scoped** checks in the **service that owns the data** — not only at the gateway.
+- **BOLA / IDOR:** for every `{id}` path, confirm the principal may access **that** instance (tenant/org/user scope); never trust client-supplied IDs without authorized lookup.
+
+---
+
+## 3. Secrets & Sensitive Data
+
+| Requirement | Standard |
+|-------------|----------|
+| Storage | Environment variables or secret vaults — never in code, commits, rules, or logs |
+| Client exposure | No backend URLs, API keys, RBAC matrices, or role names in client bundles |
+| Env prefixes | `PUBLIC_*` / `VITE_*` only for intentionally public values — review before merge |
+| PII in URLs | User IDs, tokens, and credentials in request **body or headers**, not query strings |
+| Logging | Sanitize dynamic log values (`Encode.forJava()` in Java; equivalent elsewhere) |
+| DB access | Least-privilege DB users per service; rotate keys per org policy |
+| Responses | `@JsonIgnore` on sensitive response fields; no secrets in error bodies, logs, or client bundles |
+
+---
+
+## 4. Cookies & Client Storage
+
+| Attribute | Session / auth cookies |
+|-----------|------------------------|
+| `HttpOnly` | **Required** |
+| `Secure` | **Required** in production |
+| `SameSite` | `Lax` or `Strict` |
+| Auth tokens | Prefer HttpOnly cookies over `localStorage` / `sessionStorage` for session identifiers |
+| Cache | Never cache user identity across logout without explicit invalidation |
+
+---
+
+## 5. File Uploads
+
+| Check | Required |
+|-------|----------|
+| Server-side validation | **Always** — client `accept=` is supplemental only |
+| Size limit | Explicit per endpoint |
+| Content validation | Magic-byte / MIME sniffing + structure parse (e.g. CSV header row) |
+| Extension allowlist | Supplemental — not sole check |
+| Authorization | `@PreAuthorize` on all admin upload endpoints |
+| Virus scan | Recommended for production (async queue) |
+
+---
+
+## 6. HTTP Security Headers
+
+| Header | Value |
+|--------|-------|
+| `Strict-Transport-Security` | `max-age=31536000` (with HTTPS) |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` or `SAMEORIGIN` |
+| `Content-Security-Policy` | Restrict script/style sources; no `'unsafe-inline'` unless justified |
+| `Referrer-Policy` | `no-referrer` or `strict-origin-when-cross-origin` |
+
+Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where configurable.
+
+**CORS:** explicit allowed origins in production; avoid `*` with credentials.
+
+**CSP / XSS:** define CSP for apps rendering HTML; restrict script sources — see `frontend-web.mdc` for XSS discipline.
+
+---
+
+## 7. API Security
+
+- Versioned paths (`/api/v1/...`)
+- Authentication on all non-health endpoints
+- Rate limiting at edge or BFF for auth, admin, and upload endpoints
+- Input validation at API boundary (`@Valid`, Bean Validation)
+- Parameterized queries / JPA named parameters only — no SQL string concatenation
+- Appropriate HTTP status codes (401/403/405/406 — not 200 with error body)
+- Do not leak stack traces, internal hostnames, or schema details in production errors
+
+---
+
+## 8. Production Hygiene
+
+- `DEBUG` off in production
+- No demo/debug routes (`/api/env-var`, `/api/echo`) in prod builds
+- Source maps disabled in production client bundles unless explicitly approved
+- `app.security.permit-all=false` in all deployed environments
+
+---
+
+## 9. Supply Chain
+
+- Dependency scanning in CI (OWASP Dependency-Check, Snyk, Dependabot) — see `quality-and-testing.mdc`
+- **SBOM** (CycloneDX/SPDX) when compliance requires; pin via lockfiles; document license policy if required
+
+---
+
+## 10. Related Documents
+
+| Document | Purpose |
+|----------|---------|
+| `docs/security/vapt-prevention-guardrails.md` | VAPT finding–mapped rules (web apps + Spring Boot) |
+| `docs/security/vapt-pr-checklist.md` | PR review checklist |
+| Team rules | `vapt-spring.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc` |
+| `docs/security/vapt-prevention-guardrails.md` | VAPT retest matrix and prevention guardrails |
+
+---
+
+## 11. Compliance & Review
+
+- Identify applicable regulations (GDPR, BSP, internal GXI policies) per system
+- Security review required for: auth changes, new upload endpoints, RBAC changes, new public routes
+- VAPT retest criteria: see `docs/security/vapt-prevention-guardrails.md` (Retest Matrix)

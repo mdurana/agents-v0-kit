@@ -1,0 +1,134 @@
+# Example build + supply-chain checks. Wire as a required check alongside delivery-approvals.yml.
+name: Build and security
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        id: layout
+        run: |
+          eval "$(sh ci/resolve-layout.sh)"
+          echo "profile=${LAYOUT_PROFILE}" >>"$GITHUB_OUTPUT"
+          echo "backend=${BACKEND_ROOT}" >>"$GITHUB_OUTPUT"
+          echo "frontend=${FRONTEND_ROOT}" >>"$GITHUB_OUTPUT"
+          echo "bff=${BFF_ROOT}" >>"$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        if: steps.layout.outputs.backend != '' || steps.layout.outputs.bff != ''
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: "**/pom.xml"
+      - name: mvn verify
+        if: steps.layout.outputs.backend != '' || steps.layout.outputs.bff != ''
+        run: |
+          repo="$(pwd)"
+          : > /tmp/verify.log
+          verify_maven() {
+            root="$1"
+            [ -n "$root" ] || return 0
+            if [ ! -f "$repo/$root/pom.xml" ]; then
+              printf 'FAIL: layout root %s has no pom.xml\n' "$root" >&2
+              exit 1
+            fi
+            cd "$repo/$root"
+            if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+            $MVN -B clean verify 2>&1 | tee -a /tmp/verify.log
+            if grep -q '<id>ci-security</id>' pom.xml; then
+              $MVN -B verify -Pci-security 2>&1 | tee -a /tmp/verify.log
+            fi
+            cd "$repo"
+          }
+          verify_maven "${{ steps.layout.outputs.backend }}"
+          verify_maven "${{ steps.layout.outputs.bff }}"
+          if [ -f ci/check-known-failures.sh ]; then sh ci/check-known-failures.sh /tmp/verify.log; fi
+
+      - name: Set up Node
+        if: steps.layout.outputs.frontend != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ steps.layout.outputs.frontend }}/package-lock.json
+      - name: npm verify
+        if: steps.layout.outputs.frontend != ''
+        run: |
+          root="${{ steps.layout.outputs.frontend }}"
+          if [ ! -f "$root/package.json" ]; then
+            printf 'FAIL: layout frontend root %s has no package.json\n' "$root" >&2
+            exit 1
+          fi
+          cd "$root"
+          npm ci
+          if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee /tmp/verify.log
+          elif grep -q '"test"' package.json; then npm test 2>&1 | tee /tmp/verify.log
+          else npm run build 2>&1 | tee /tmp/verify.log
+          fi
+          if [ -f "$GITHUB_WORKSPACE/ci/check-known-failures.sh" ]; then sh "$GITHUB_WORKSPACE/ci/check-known-failures.sh" /tmp/verify.log; fi
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect CodeQL languages
+        id: langs
+        run: |
+          eval "$(sh ci/resolve-layout.sh)"
+          langs=""
+          if [ -n "${BACKEND_ROOT:-}" ] && [ -f "${BACKEND_ROOT}/pom.xml" ]; then langs="java"; fi
+          if [ -n "${BFF_ROOT:-}" ] && [ -f "${BFF_ROOT}/pom.xml" ]; then langs="java"; fi
+          if [ -n "${FRONTEND_ROOT:-}" ] && [ -f "${FRONTEND_ROOT}/package.json" ]; then
+            langs="${langs:+$langs,}javascript-typescript"
+          fi
+          echo "languages=$langs" >>"$GITHUB_OUTPUT"
+      - name: Init CodeQL
+        if: steps.langs.outputs.languages != ''
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ steps.langs.outputs.languages }}
+          # Source-only. Java findings are weaker than a compiled CodeQL database.
+          # Use build-mode: autobuild (or a manual Maven build) when you need full Java analysis.
+          build-mode: none
+      - name: Analyze
+        if: steps.langs.outputs.languages != ''
+        uses: github/codeql-action/analyze@v3
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.21.2"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks (pinned, checksum-verified)
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/$tarball"
+          curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " $tarball\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar xzf "$tarball" gitleaks
+      - name: Secret scan (full history)
+        run: ./gitleaks detect --source . --no-banner --redact

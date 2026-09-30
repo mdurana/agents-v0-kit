@@ -1,0 +1,122 @@
+---
+description: Agentic delivery lifecycle — phases, gates, handoff artifacts, approval stops, change tiers, and milestone programs.
+alwaysApply: true
+---
+
+# Workflow orchestration
+
+This rule binds the kit's commands, agents, skills, and hooks into a single delivery lifecycle. It is `alwaysApply: true` so every agent session operates under it.
+
+Read `docs/project-profile.md` in the target repo for build/test commands, the Layout directory profile, and brownfield baseline exceptions before Build or Maintain. Profiles (`service`, `ui`, `app`) are defined in `project-delivery-core.mdc`. A filled Profile row or filled root rows win; when those rows are still placeholders, use the profile that matches the files on disk.
+
+## Lifecycle
+
+```mermaid
+flowchart LR
+  intake[Intake] -->|gate| design[Design]
+  design -->|gate| build[Build]
+  build -->|gate| verify[Verify]
+  verify -->|gate| release[Release]
+  maintain[Maintain] --> verify
+```
+
+Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. Each phase is entered via a command (`/intake`, `/design`, `/build`, `/verify`, `/maintain`, `/release`, `/onboard`, `/status`, `/triage`) or chained via `/deliver`. Resume file: `docs/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`).
+
+## Phase resume
+
+The state file separates the last approval from the phase in flight. `scripts/sync-feature-state.sh` derives `lastApprovedPhase` from `Approved` rows. It never writes an approval.
+
+| Field | Meaning |
+|-------|---------|
+| `lastApprovedPhase` | Last `Approved` row. Empty when none are approved. |
+| `activePhase` | Phase whose command was started: `intake`, `design`, `build`, `verify`, `release`, or `maintain`. |
+| `activeStatus` | `in_progress`, `awaiting_approval`, or `blocked`. |
+| `blockedReason` | One line, only when `activeStatus` is `blocked`. |
+
+Once `docs/requirements/<feature>.md` exists, the phase command runs `sh scripts/sync-feature-state.sh <artifact> --active-phase <phase> --status in_progress`. Continue from files already on disk; do not recreate them. On a red baseline, exhausted fix attempts, or a missing prerequisite, re-run with `--status blocked --reason "<one line>"` and stop. When the phase's work is ready for the user, re-run with `--status awaiting_approval` and stop. Do not add an `Approved` row until the user approves.
+
+`/status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`.
+
+## Parallel features
+
+Each feature has its own `docs/requirements/<feature>.md`, `docs/requirements/<feature>.state.json`, `docs/design/<feature>/`, `docs/build/<feature>/`, and `docs/verify/<feature>/`. Phases of different features may proceed in one checkout only when they do not write the same shared file.
+
+Shared files: `docs/project-profile.md`, `openapi/api-v1.yaml`, `docs/architecture.md`, `docs/network.md`, `README.md`, and build or CI files (`pom.xml`, `package.json`, `maven/`, `.gitlab-ci.yml`, `.github/`). Ordinary feature work does not rewrite `docs/project-profile.md`. A layout, verify-command, or ratchet change is its own change.
+
+Intake and Design for a second feature may write only that feature's requirements, state, and `docs/design/<feature>/` paths. Stop before editing a shared file when `git status` shows it is already modified, or when another feature's state file has `activeStatus` `in_progress`, `awaiting_approval`, or `blocked` for a phase that writes that file.
+
+Before `/build`, `/verify`, `/release`, or `/maintain`, stop if `git status` shows another feature's code or a shared-file edit that is not this feature's approved diff. Report the paths. Do not start the phase on that tree. Creating a branch needs explicit user authorization.
+
+`/status` and phase commands use the feature name the user gives. When the user does not name one, list the state files and ask. Do not assume the newest `*.state.json` is the feature they mean.
+
+**Milestone programs:** `docs/milestones/<milestone>.md` manifests group user stories (P0 skeleton, P1 contracts, P2 MVP, P3 features, P4 hardening, P5 readiness). Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `ci/check-approvals.sh` + `ci/check-milestone.sh`.
+
+## Change tiers
+
+Pick the lightest tier that fits; record the tier in the handoff artifact.
+
+| Tier | When | Path |
+|------|------|------|
+| **Trivial** | Docs-only, typos, dependency patch with no behavior change | `/triage` → `/maintain` → Verify (abbreviated) when security surface unchanged |
+| **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
+| **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design; milestone manifest row |
+
+## Conduct model (from `ai-agent-conduct.mdc`)
+
+Every phase follows **Reconnaissance → Plan → Execute → Verify → Report**.
+
+## Phase → agent → skill → handoff artifact
+
+| Phase | Command | Lead agent | Skill(s) | Handoff artifact |
+|-------|---------|-----------|----------|------------------|
+| Intake | `/intake` | `requirements-analyst` | `spec-intake` | `docs/requirements/<feature>.md` (acceptance criteria, NFRs incl. UX for UI, regulations, `Delivery approvals`) |
+| Design | `/design` | `solution-architect`, `ux-designer` | `contract-first-design`, `ux-design` | OpenAPI + events, ADR, diagrams, `docs/design/<feature>/ux-spec.md`, `docs/design/<feature>/mockups/` |
+| Build | `/build` | `backend-engineer` / `bff-engineer` / `frontend-engineer` | `implement-*` | Code + migrations + tests; `docs/build/<feature>/` evidence |
+| Verify | `/verify` | `test-engineer` → `security-reviewer` → `code-reviewer` | `quality-gate`, `vapt-review`, `pr-review` | `docs/verify/<feature>/` reports |
+| Maintain | `/maintain` | `maintenance-engineer` | `bugfix-triage`, `dependency-upgrade`, `doc-sync`, `characterization-tests`, `migration-safety` | Fix + docs; approval to re-enter Verify |
+| Release | `/release` | `release-manager` | `release-pr` | Merge request ready; completion after human merge |
+
+**Release semantics:** Merge-request readiness (docs, VAPT sign-off, CI green) is **not** completion. Release completes only after an authorized human merge and green CI. Opening the merge request, commits, and pushes each need explicit user approval; hooks prompt in the IDE — agents must not bypass prompts. On GitLab, run the manual `delivery-approval` job after the merge request is approved.
+
+## Gates
+
+A phase is **not complete** until its gate passes. **Stop and ask the user** before advancing.
+
+**Approval recording:** record gate decision, approver, date, evidence paths, and N/A reasons in the phase handoff artifact's `Delivery approvals` table (`| Phase | Artifacts | Approver | Decision | Date |`). Never infer approval. Decision must be an explicit positive token (`Approved`; CI accepts `approved` / `yes` / `pass`). Include `commit: <sha>` in Build/Verify artifact columns when evidence is produced.
+
+**Brownfield baseline:** if `docs/project-profile.md` documents `known_failures` or a ratchet plan, Build may proceed only when the profile allows it and new failures are not introduced.
+
+### Intake gate
+- Acceptance criteria (with stable IDs, e.g. AC-1), NFRs, regulations, security-review triggers, open questions resolved.
+- UI-affecting: UX requirements per `ux-design.mdc`.
+
+### Design gate
+- Contracts, ADR, diagrams; UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component.
+- Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
+
+### Build gate
+- **Baseline green** before first edit (commands from `docs/project-profile.md`); stop on pre-existing failure unless profile documents an approved exception.
+- Build/test green with quality tooling wired per repo (`maven/quality-plugins.xml` for Java — run OWASP Dependency-Check in CI if local verify is too slow).
+- Red–green tests for new behavior; VAPT-required tests in the same diff when applicable.
+- Contract conformance and ArchUnit where wired; methods ≤ 30 lines; auth+authz; correlation/tracing; DTOs only; Flyway; no secrets.
+- UX spec implemented for UI changes: component defaults, layout matching the approved mockups, API client only for operations named on those rows.
+- Bounded fix attempts (≤ 3 per failure); escalate when exhausted.
+- **Build evidence** under `docs/build/<feature>/` (`build-report.md` with `commit:` line; optional `build-output.txt` — prefer CI artifacts for raw logs).
+
+### Verify gate
+- Quality, security (VAPT), UX (axe-core + UX AC tests), code review — no Critical findings.
+- Evidence under `docs/verify/<feature>/` with `commit:` in each report header; tests added during Verify are committed before stamping, so every report names the same commit.
+- N/A only with recorded reason; applicable unchecked VAPT = Critical.
+
+### Release gate
+- Docs synced; MR/PR template + VAPT sign-off; CI green; `release` row recorded on the MR branch before merge.
+- On GitLab, after the MR is approved, run the manual `delivery-approval` job. It matches that approver to an Approved release or verify row. `GITLAB_TOKEN` is a masked project access token with `read_api` scope, limited to the `delivery-approval` environment.
+- Completion = authorized human merge; that merge (reviews, checks, merge commit) is the record — no follow-up commit to record it.
+
+## Approval stops
+
+`/deliver` must stop at every gate. On Critical findings, route to Build/Maintain and re-enter Verify.
+
+## Rule precedence
+
+If project files contradict a rule, **the repository wins**. Record approved per-repo exceptions in `docs/project-profile.md` and ADRs. Change org-wide kit rules only in `core/rules/*.mdc`.

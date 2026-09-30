@@ -1,0 +1,166 @@
+---
+description: VAPT guardrails for web apps — SvelteKit/SPA auth, client exposure, access control, cookies, upload UI
+globs: "**/*.svelte,**/*.tsx,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+server.ts,**/hooks.server.ts,**/hooks.server.tsx"
+alwaysApply: false
+---
+
+# VAPT Guardrails — Web Applications
+
+Apply when editing SvelteKit/React routes, hooks, server loads, or client components.
+
+---
+
+## F1 — Unauthorized Account Access (HIGH)
+
+**OWASP:** A07:2021 · **CWE:** CWE-287 · **Retest:** User A logout → User B login → UI and API calls show User B
+
+### MUST
+
+- Bind displayed user to validated JWT/server session — not cached bridge/`sessionStorage` alone
+- Clear **all** client state on logout before new login (`sessionStorage`, `localStorage`, cookies, in-memory auth)
+- Call backend logout endpoint and IdP sign-out when SSO is used
+- Wire session validation hooks/middleware if present — enable in non-local environments
+
+### MUST NOT
+
+- Cache user identity in `sessionStorage` across login/logout without explicit invalidation
+- Ship logout that clears UI only without client storage and backend token revocation
+- Disable session validation hooks in lab/SIT/UAT/prod
+
+### Required tests
+
+- User A logout → User B login → User B everywhere (UI + network calls)
+
+---
+
+## F6 — Multiple Active Sessions (LOW)
+
+**OWASP:** A07:2021 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
+
+### MUST
+
+- Align client behavior with backend session policy (document in README)
+- Do not assume one-browser logout clears sessions on other devices
+
+### Required tests
+
+- Verify session policy with backend team before VAPT retest
+
+---
+
+## F2 — Sensitive Information Exposed in Frontend (MEDIUM)
+
+**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** No config/RBAC refs in prod bundle; no unauthenticated config endpoints
+
+### MUST
+
+- Keep backend URLs, RBAC roles, and permission keys in server-only code (`+server.ts`, `hooks.server.ts`)
+- Use env without `PUBLIC_`/`VITE_` prefix for internal config
+- Production builds exclude demo/debug routes and config-leak endpoints
+- Set `X-Content-Type-Options: nosniff` (not incorrect header values)
+- Explicit `build.sourcemap: false` for production unless approved
+
+### MUST NOT
+
+- Expose server config via unauthenticated client-callable routes
+- Render internal config in production DOM via public env vars
+- Put internal hostnames or service paths in client-bundled constants without security review
+
+### Required checks
+
+- Pre-merge: grep client `src/` for roles, permissions, internal URLs
+- Pre-VAPT: inspect production bundle and Network tab
+
+---
+
+## F4 — Improper Access Control (MEDIUM)
+
+**OWASP:** A05:2021 · **CWE:** CWE-284 · **Retest:** Restricted role blocked on direct route/API access (403 or redirect)
+
+### MUST
+
+- Enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only
+- Redirect or error when user lacks permission on direct navigation
+- BFF permission check before proxying admin operations
+
+### MUST NOT
+
+- Hide nav links as the only access control
+- Trust client-side role checks without server enforcement
+
+### Required tests
+
+- Restricted role navigates directly to admin URL → blocked server-side
+
+---
+
+## F5 — Exposed API Calls (LOW)
+
+**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** All visible endpoints require auth + authz
+
+### MUST
+
+- Protect every client-visible API path with auth + authz (see F4)
+- Put sensitive identifiers in body/headers — not URL query strings
+- Rate limiting on auth and admin paths (edge or BFF)
+
+### Accept
+
+- SPA Network tab visibility is **normal** — guardrail is protect endpoints, not hide URLs
+
+### Required tests
+
+- New client-visible routes require authenticated server load or protected API
+
+---
+
+## F7 — Cookies Without HttpOnly (LOW)
+
+**OWASP:** A05:2021 · **CWE:** CWE-1004 · **Retest:** Session cookies show HttpOnly + Secure in DevTools
+
+### MUST
+
+- App-set session/auth cookies: `httpOnly: true`, `secure: true` (prod), `sameSite: 'lax'` or `'strict'`
+- Review IdP and ingress cookie settings with DevOps in deployment checklist
+
+### MUST NOT
+
+- Set auth tokens via `document.cookie` when HttpOnly cookie is appropriate
+- Ship cookie setters missing any of the three flags
+
+### Required checks
+
+- DevTools → Application → Cookies: verify flags before VAPT
+
+---
+
+## F3 — File Upload UI (MEDIUM)
+
+**OWASP:** A05:2021 · **CWE:** CWE-434 · **Retest:** Server rejects renamed wrong-type file (400)
+
+### MUST
+
+- Client upload UI calls server endpoint with proper auth headers
+- Show user-facing error when server rejects file
+
+### MUST NOT
+
+- Rely on HTML `accept` attributes or client filename checks as sole validation
+- Implement upload without matching server-side content validation (Tika + structure parse)
+
+### Required tests
+
+- Renamed wrong-type file rejected by server before processing
+
+---
+
+## Retest summary (Web app)
+
+| Finding | Pass criteria |
+|---------|---------------|
+| F1 | User B everywhere after User A logout + User B login |
+| F2 | No config leak endpoints; no RBAC/internal URLs in prod bundle |
+| F4 | Restricted role blocked on direct route/API access |
+| F5 | Visible endpoints authz-protected |
+| F7 | Session cookies HttpOnly + Secure |
+| F3 | Server rejects invalid uploads (client UI is supplemental) |

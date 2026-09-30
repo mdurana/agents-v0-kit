@@ -1,0 +1,90 @@
+---
+description: Platform architecture reference, service boundaries, BFF/OMS, and Mermaid diagram rules
+globs: docs/**/*.md,**/README.md
+alwaysApply: false
+---
+
+# Architecture and diagrams
+
+Service-specific ADRs override this file. Implementation: `java-spring-backend.mdc`, `frontend-web.mdc`, `api-and-events.mdc`.
+
+## Diagram locations
+
+| Artifact | Location |
+|----------|----------|
+| High-level system | `docs/architecture.md` |
+| Infrastructure, ports | `docs/network.md` |
+| Per-service sequences | `docs/diagrams/sequences/<service-name>.md` |
+
+## Mermaid conventions
+
+- `flowchart` / `graph` for components; `sequenceDiagram` for request/response and sagas.
+- **Node IDs:** camelCase or PascalCase; no spaces; avoid reserved words (`end`, `subgraph` as ID).
+- **Edge labels** with special chars: quote them — `-->|"retry"|`.
+- **Subgraphs** for boundaries: frontend, BFF, backend, data, messaging.
+- ≤ ~**50 nodes**; split if larger.
+- Renders in Cursor; export to Lucid/draw.io via import or converter.
+
+## Architecture principles
+
+- **Service boundaries:** database per service; versioned APIs and/or events — not shared-DB coupling.
+- **Contract-first:** OpenAPI and/or event schema before cross-service implementation.
+- **DDD:** entities with behavior; immutable value objects; aggregate consistency at root; domain events where used.
+- **Composition** over deep inheritance; explicit dependencies.
+
+---
+
+## Backend (Java Spring Boot)
+
+| Area | Mandatory |
+|------|-----------|
+| Stack | Java 17+, Spring Boot 3.x, PostgreSQL 15+, Flyway, OpenAPI 3.0, JUnit 5, Testcontainers |
+| Layers | Controllers (`@Valid`, DTOs) → Service → Repository → Domain |
+| Domain | Value objects; aggregates; domain events; repository ports in domain |
+| Security | JWT, SecurityContext, MDC correlation; permit `/health`, `/actuator`, `/v3/api-docs`, `/swagger-ui`; protect `/api/v1/**` |
+| Resilience | Resilience4j on outbound calls |
+
+## BFF (Backend-for-Frontend)
+
+| Area | Mandatory |
+|------|-----------|
+| Stack | Spring Boot 3.x, WebFlux **or** MVC per repo, Redis, Resilience4j, OpenAPI 3.0 |
+| Role | Aggregation, UI DTOs, auth/session edge, GET cache, rate limit, unified errors |
+| Clients | WebClient/RestClient: ~10s timeout, retry, breaker; `X-Correlation-ID`; service auth |
+| Pipeline | Auth → rate limit → cache (GET) / invalidation (writes) → validation → controller |
+| Rules | Thin BFF; domain logic in backend services; version BFF API independently |
+
+## Frontend stacks (summary)
+
+| Admin (React) | Client (SvelteKit) |
+|---------------|-------------------|
+| React 18+, TS, Vite, Redux/Zustand, React Query, MUI/Ant, Router v6, RHF + Zod | SvelteKit 1.x+, TS, Vite, stores, load + fetch, Tailwind, Felte + Zod |
+| Vitest + Testing Library | Vitest + Playwright for critical paths |
+
+Detail: `frontend-web.mdc`.
+
+## Integration and composition
+
+| Area | Mandatory |
+|------|-----------|
+| Principles | DB per service; OpenAPI-first; REST + events |
+| Per service | `/health`, `/ready`, `/live`; Prometheus; OpenAPI; JWT + S2S auth; tracing |
+| Headers | `Authorization`, `X-API-Key` (S2S), `X-Correlation-ID` |
+| Events | `order.created`-style names; idempotent consumers; DLQ + retry |
+| Resilience | Breaker, exponential retry, timeout outbound; BFF may aggregate in parallel |
+
+HTTP detail: `api-and-events.mdc`. Observability defaults: `project-delivery-core.mdc`.
+
+## OMS domain (reference — when relevant)
+
+| Area | Mandatory |
+|------|-----------|
+| Style | Event-driven; DB per service; sagas; idempotency keys on writes |
+| Contexts | Order, Inventory, Payment, Fulfillment, order ops |
+| Orders | `POST /api/v1/orders` with idempotency_key, customer_id, channel, items, addresses; bulk → `202` + `batch_id` |
+| Events | `ORDER_CREATED`, `ORDER_VALIDATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `ORDER_COMPLETED` |
+| Data | Optimistic locking; status history; saga compensations |
+
+## Testing pyramid
+
+Unit → integration (Testcontainers) → E2E critical paths — `quality-and-testing.mdc`.

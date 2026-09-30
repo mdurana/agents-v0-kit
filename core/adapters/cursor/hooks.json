@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/session-start.sh",
+        "timeout": 10
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-mcp.sh",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-shell.sh",
+        "failClosed": true,
+        "timeout": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "Write|Delete",
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-edit.sh",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/after-edit.sh",
+        "timeout": 30
+      }
+    ],
+    "stop": [
+      {
+        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/stop.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}

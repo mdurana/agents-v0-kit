@@ -1,0 +1,42 @@
+---
+name: implement-frontend
+description: Build phase playbook. Implement SvelteKit client or React admin — routes, loads, forms, a11y, XSS-safe content — with red–green tests.
+---
+
+# implement-frontend
+
+Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.mdc`).
+
+## Steps
+1. Read the Design artifacts — including the approved UX spec (`docs/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
+2. **Baseline:** run the Frontend verify command from `docs/project-profile.md` before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
+3. **Wire the frontend quality gate** if missing (ESLint, coverage provider with the ≥ 70% threshold, lockfile audit) — unwired tooling makes the build script compile-only.
+4. For greenfield UI, confirm the Svelte/React decision (asked once in Intake).
+5. Work **red–green (TDD where practical)** per behavior unit: failing test first, then implement until green (`quality-and-testing.mdc`).
+6. Implement routes/loads/components per `frontend-web.mdc`:
+   - SvelteKit: `src/routes/` + `src/lib/` under the frontend root; prefer `load`/server loads; `browser` guard before `localStorage`.
+   - React admin: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/slices` under the frontend root; RHF + Zod.
+   - UX spec: per-screen state matrix (loading/error/empty/success), component default behavior (honor an override when the spec records one), and layout matching the linked mockups.
+7. Wire the API client in the app, not in the mockups: call only the OpenAPI operation named on each component row; send Bearer, `X-Correlation-ID`, and `traceparent`; map success, validation error, 401, and 5xx to the states in the spec. 401 refresh/redirect per `frontend-web.mdc`.
+8. Enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.
+9. Logout: clear **all** client state (`sessionStorage`, `localStorage`, cookies, in-memory); call backend logout + IdP sign-out for SSO.
+10. Cookies: `httpOnly`, `secure` (prod), `sameSite`; no auth tokens via `document.cookie`.
+11. XSS: sanitize/avoid `innerHTML`/`{@html}`/`dangerouslySetInnerHTML`.
+12. No backend URLs/RBAC roles/permission keys in client bundles; no `PUBLIC_*`/`VITE_*` leaking internal config; `sourcemap: false` in prod.
+13. Accessibility: semantic HTML, keyboard flows, focus order, ARIA only when needed, contrast, `prefers-reduced-motion` — per the UX spec.
+14. Run the frontend build/test script with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker.
+15. Persist evidence to `docs/build/<feature>/build-report.md` (command, result, per-criterion file:line evidence) and `docs/build/<feature>/build-output.txt` (raw output; no secrets).
+
+## Rule-compliance checklist
+- [ ] `frontend-web.mdc`: structure; `load`; `browser` guard; stores; Zod forms; user-visible fetch errors.
+- [ ] `quality-and-testing.mdc`: red–green per behavior unit; frontend coverage ≥ 70% on changed code.
+- [ ] Baseline green before the first edit; frontend quality gate wired and executed in the build script.
+- [ ] `vapt-webapp.mdc` F1: validated session; clear all client state on logout; backend + IdP sign-out.
+- [ ] `vapt-webapp.mdc` F2: no config/RBAC/internal URLs in client bundle; `sourcemap: false`.
+- [ ] `vapt-webapp.mdc` F4: server-side route enforcement.
+- [ ] `vapt-webapp.mdc` F7: cookie flags; no `document.cookie` auth tokens.
+- [ ] `vapt-webapp.mdc` F3: client upload UI supplemental.
+- [ ] `frontend-web.mdc` (XSS): sanitize/avoid dangerous HTML sinks.
+- [ ] UX spec: state matrix, component defaults, mockup layout, accessibility, and design-system conformance implemented. API calls use named OpenAPI operations only.
+- [ ] Build evidence persisted under `docs/build/<feature>/`; fix attempts bounded.
+- [ ] `workflow-orchestration.mdc`: Build gate criteria met.

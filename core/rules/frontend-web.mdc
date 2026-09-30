@@ -1,0 +1,70 @@
+---
+description: SvelteKit client + React admin — structure, data loading, forms, auth client, a11y, XSS-safe content
+globs: "**/*.svelte,**/*.tsx,**/routes/**/+page.svelte,**/routes/**/+layout.svelte,**/routes/**/+error.svelte,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+page.ts,**/routes/**/+layout.ts,**/routes/**/+server.ts"
+alwaysApply: false
+---
+
+# Frontend web (SvelteKit + React admin)
+
+Testing: **`quality-and-testing.mdc`**. Security headers/XSS policy: **`security-baseline.mdc`**.
+
+## Shared client concerns
+
+- **API base URL** from config; send **Bearer**, **X-Correlation-ID**, and **traceparent** (when client participates in tracing) on outbound calls.
+- **401:** refresh or redirect to login — match existing utilities; no secrets in plain `localStorage` without established pattern.
+- **UX:** loading, error, empty states; lazy routes where supported.
+
+## Accessibility (WCAG-oriented)
+
+- Semantic HTML (`button`, `nav`/`main`, heading hierarchy); do not rely on color alone.
+- **Keyboard:** full flows without pointer; visible focus; trap focus only in modals, restore on close.
+- **ARIA:** native elements first; add `aria-*` only when semantics incomplete (`aria-expanded`, `aria-live` for async status).
+- **Motion:** respect `prefers-reduced-motion`.
+
+## XSS and untrusted HTML
+
+- Treat server and URL input as untrusted; **sanitize** or **avoid** `innerHTML` / `{@html}` / `dangerouslySetInnerHTML` unless allow-listed or passed through maintained sanitizer policy.
+- CSP per `security-baseline.mdc` and `docs/security-standards.md`.
+
+## SvelteKit (client)
+
+Paths below are under `frontend/` (profiles `ui` and `app`). See `project-delivery-core.mdc`. Do not add `src/` at the repo root.
+
+- **Structure:** `src/routes/` (`+page.svelte`, `+page.server.ts`, `+layout.svelte`); `src/lib/` (`components`, `features`, `services/api`, `stores`, `utils`, `types`).
+- **Data:** prefer `load` / server loads; `browser` guard before `localStorage`.
+- **State:** stores for cross-cutting state; `$:` derivations (Svelte 4) or runes if migrated.
+- **Forms:** Zod + project form library (Felte or other).
+- **Errors:** user-visible feedback on failed fetch — no silent failures.
+
+```svelte
+<!-- BAD: unhandled promise chain -->
+<script>
+  let data;
+  fetch('/api/data').then(r => r.json()).then(d => data = d);
+</script>
+
+<!-- GOOD -->
+<script>
+  let data = null;
+  let error = null;
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error(res.statusText);
+    data = await res.json();
+  } catch (e) {
+    error = e;
+    console.error('Fetch failed', e);
+  }
+</script>
+```
+
+## React admin
+
+- **Stack:** React 18+, TypeScript, Vite (or CRA if legacy), Router v6, React Query, Redux Toolkit or Zustand per repo.
+- **Structure:** under the same UI root: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices`.
+- **Forms:** React Hook Form + Zod (or existing pattern).
+- Functional components + hooks; explicit types; no empty `catch`.
+
+## Globs note
+
+Extend globs with `**/src/**/*.ts` scoped to UI packages if you edit many non-route TS modules (hooks, shared clients).

@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: <service> API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /<resource>:
+    get:
+      summary: List <resource>
+      operationId: list<resource>
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paged list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>ListResponse' }
+    post:
+      summary: Create <resource>
+      operationId: create<resource>
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/<Resource>CreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>Response' }
+  /<resource>/{id}:
+    get:
+      summary: Get <resource> by id
+      operationId: get<resource>
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: Found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>Response' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+components:
+  schemas:
+    <Resource>:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        # ...fields
+    <Resource>CreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+    <Resource>Response:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/<Resource>' }
+    <Resource>ListResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/<Resource>' }
+        metadata:
+          type: object
+          properties:
+            page: { type: integer }
+            limit: { type: integer }
+            total: { type: integer }
+            totalPages: { type: integer }
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            timestamp: { type: string, format: date-time }
+            path: { type: string }
+            requestId: { type: string }

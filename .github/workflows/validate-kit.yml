@@ -1,0 +1,19 @@
+name: Validate kit
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shellcheck (errors only)
+        run: shellcheck -S error core/hooks/*.sh templates/ci/*.sh templates/scripts/*.sh scripts/*.sh
+      - name: Validate agents-v0 kit
+        run: sh scripts/validate-kit.sh

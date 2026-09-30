@@ -1,0 +1,28 @@
+# Quality gates
+
+> CI quality thresholds. (`quality-and-testing.mdc`)
+
+## Coverage
+
+| Area | Minimum | CI / stretch |
+|------|---------|--------------|
+| Backend lines | 80% | 90% where gates require |
+| Backend branches | JaCoCo / Sonar rules | |
+| Frontend | 70% | raise if CI gate exists |
+
+## Complexity and size (Java)
+
+| Metric | Limit |
+|--------|-------|
+| Cognitive complexity | ≤ 15 / method |
+| Method length | target ≤ 20, max ≤ 30 lines |
+| Class size | < ~300 lines |
+| Duplication | < ~3% (Sonar) |
+
+## Tooling
+
+JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check, plus the OpenAPI contract diff (`maven/contract-conformance.xml`) and ArchUnit layer rules (`maven/archunit/LayerRulesTest.java`) where wired.
+
+## CVE policy
+
+No new high/critical CVEs without a documented exception. SBOM (CycloneDX/SPDX) when compliance requires (`security-baseline.mdc` §9).
