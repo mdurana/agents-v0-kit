@@ -67,9 +67,11 @@ Pick the lightest tier that fits; record the tier in the handoff artifact.
 
 | Tier | When | Path |
 |------|------|------|
-| **Trivial** | Docs-only, typos, dependency patch with no behavior change | `/triage` → `/maintain` → Verify (abbreviated) when security surface unchanged |
+| **Trivial** | Docs-only or version-only dependency bump, when `ci/classify-change.sh` says eligible and a person confirms | `/triage` → `/maintain` → abbreviated Verify (`/verify`) |
 | **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design; milestone manifest row |
+
+A fix, CVE patch, upgrade, or hotfix is recorded in `docs/maintain/<id>/note.md` (`Maintain-Note:` in the MR) with `Tier: trivial | standard | emergency`; trivial and emergency need a person's confirmation. Emergency may merge before Verify and owes it by its `Follow-up verify due` date. A maintenance change never borrows a feature artifact.
 
 ## Helper agents
 
@@ -79,6 +81,7 @@ A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fi
 
 | Phase | Brief |
 |-------|--------|
+| Onboard | `docs/onboarding/<module>.helper-brief.md` |
 | Plan | `docs/design/system/<program>.helper-brief.md` |
 | Intake | `docs/requirements/<feature>.helper-brief.md` |
 | Design | `docs/design/<feature>/helper-brief.md` |
@@ -132,7 +135,7 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- Feature contract draft at `docs/design/<feature>/openapi.yaml`, event schemas under `docs/design/<feature>/events/` with `eventVersion`, ADR, diagrams. The org catalog (`openapi/api-v1.yaml`, or the path in the profile) is unchanged at this gate. UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component. API-backed component rows name an operation in that feature draft.
+- Feature contract draft at `docs/design/<feature>/openapi.yaml`, event schemas under `docs/design/<feature>/events/` with `eventVersion`, `design.md` (traceability, data, authorization, failure modes), ADR, diagrams, and a `design-reviewer` review with no open Critical. The approved design is pinned (`design.lock`); a later change is an amendment. The org catalog (`openapi/api-v1.yaml`, or the path in the profile) is unchanged at this gate. UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component. API-backed component rows name an operation in that feature draft.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate
@@ -155,10 +158,10 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 - N/A only with recorded reason; applicable unchecked VAPT = Critical.
 
 ### Release gate
-- Docs synced; MR/PR template + VAPT sign-off; CI green; `release` row recorded on the MR branch before merge.
+- Docs synced; MR/PR template + VAPT sign-off; CI green; `release` row (Approver = the GitLab username that approves the MR) recorded on the MR branch before merge.
 - On GitLab, after the MR is approved, run the manual `delivery-approval` job. It matches that approver to an Approved release or verify row. `GITLAB_TOKEN` is a masked project access token with `read_api` scope, limited to the `delivery-approval` environment.
 - Completion = authorized human merge; that merge (reviews, checks, merge commit) is the record — no follow-up commit to record it.
-- When `docs/project-profile.md` has a **Deploy** table, `release-deploy` runs after the merge: one explicit user authorization, a smoke check, and a rollback command per environment, in promotion order. Completion is the last environment's passing smoke check.
+- When `docs/project-profile.md` has a **Deploy** table, `release-deploy` runs after the merge: one explicit user authorization, a smoke check, and a rollback command per environment, in promotion order. Deployment is complete at the last passing smoke check; its records go in a docs-only follow-up MR, never a commit to the default branch.
 
 ## Approval stops
 

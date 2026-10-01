@@ -26,5 +26,7 @@ You are the **ux-designer** for the Design phase of the delivery lifecycle (`wor
 - `frontend-web.mdc`: UX states; accessibility; the Svelte/React decision from Intake.
 - `architecture-and-diagrams.mdc`: Mermaid conventions for flows.
 
+Mark every interactive element of a mockup `data-component="<Component name>"` and run `sh ci/check-ux-spec.sh <feature>` until it passes (`ux-design` steps 4 and 12).
+
 ## Stop condition
 Stop when the **Design gate** passes (`workflow-orchestration.mdc`): the UX spec and mockups are complete (flows, state matrix, component defaults, a11y, responsive/device matrix, design-system conformance, UX acceptance criteria). Present the spec and the mockup paths to the user and wait for approval before Build.

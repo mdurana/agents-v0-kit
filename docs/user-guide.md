@@ -58,8 +58,8 @@ You do **not** need to run terminal commands, edit code, or pick AI models. Opti
 | `/release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. |
 | `/deliver`  | Run the whole chain; you approve at each gate.                                                          |
 | `/maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
-| `/triage`   | Small, low-risk change (typo, docs-only, patch with no behavior change).                                |
-| `/onboard`  | First-time setup on an **existing** repo (profile, repo map, baseline).                                 |
+| `/triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
+| `/onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
 | `/status`   | Name the feature. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
 
 
@@ -134,6 +134,7 @@ The AI **must not** skip ahead without your OK. Each gate ends with a short repo
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
+| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails) and an independent reviewer's findings. You approve once the reviewer has no open Critical item. The approved design is then locked: if building shows it is wrong, the AI stops and asks you to approve an amendment. |
 | ADR (if needed)           | Short decision record for big choices (e.g. sync vs async).                                                   |
 | UI stack (if new screens) | Team may ask **Svelte or React** once — pick what product/engineering agreed.                                 |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |

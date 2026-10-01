@@ -7,7 +7,13 @@ description: Program planning. Decompose a large goal into a context map, milest
 You are entering **program planning** (`workflow-orchestration.mdc` Program planning). Use it when the goal is larger than one story: a new platform, a multi-service change, or any Major-tier program. A single story goes straight to `/intake`.
 
 ## Prerequisite
-Read `docs/project-profile.md` and `docs/repo-map.md` when they exist. A brownfield repo runs `/onboard` first. If the profile's Layout is still a placeholder on a greenfield repo, record the profile with the user before planning.
+Read `docs/project-profile.md` and `docs/repo-map.md` when they exist. A brownfield repo needs an `Approved` `onboard` row in `docs/onboarding/report.md` (run `/onboard` first); its as-is `docs/design/system/context-map.md` is the starting point. If the profile's Layout is still a placeholder on a greenfield repo, record the profile with the user before planning.
+
+## Resume
+Continue from the context map and the milestone manifests already on disk; do not recreate them. A program has no per-feature state file (`workflow-orchestration.mdc` Program planning).
+
+## Collision
+Planning writes shared files (the milestone manifests, `docs/design/system/`, ADRs). Stop before editing one that `git status` already shows modified by a feature in flight, and ask which checkout owns it.
 
 ## Instructions
 1. Launch the `program-planner` subagent with the goal (Jira epic, Confluence page, or user description).

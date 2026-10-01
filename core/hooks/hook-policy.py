@@ -341,6 +341,29 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             return "block", "gh pr merge requires explicit human authorization."
         if sub == "release" and "create" in parts[2:]:
             return "ask", "gh release create requires explicit user approval."
+        if sub == "pr" and "review" in parts[2:] and any(x in parts for x in ("--approve", "-a")):
+            return "block", "approving a pull request is a human act, not an agent action."
+
+    if bin0 == "glab":
+        pairs = set(zip(parts[1:], parts[2:]))
+        joined = " ".join(parts[1:])
+        if ("mr", "merge") in pairs:
+            return "block", "glab mr merge requires explicit human authorization."
+        if ("mr", "approve") in pairs:
+            return "block", "approving a merge request is a human act, not an agent action."
+        if "api" in parts[1:3]:
+            if re.search(r"/(merge|approve)\b", joined):
+                return "block", "merging or approving a merge request through glab api is blocked."
+            mutating = any(x in parts for x in ("-f", "-F", "--field", "--raw-field", "--input"))
+            for i, tok in enumerate(parts[:-1]):
+                if tok in ("-X", "--method") and parts[i + 1].upper() != "GET":
+                    mutating = True
+            if mutating:
+                return "ask", "a state-changing glab api call requires explicit user approval."
+        if pairs & {("mr", "create"), ("mr", "update"), ("mr", "close"), ("mr", "reopen"), ("mr", "delete"),
+                    ("ci", "run"), ("ci", "trigger"), ("ci", "retry"), ("release", "create"), ("release", "delete"),
+                    ("variable", "set"), ("variable", "update"), ("variable", "delete")}:
+            return "ask", "this glab command changes the merge request, pipeline, release, or CI variables; it requires explicit user approval."
 
     if bin0 == "git":
         sub = _git_subcommand(parts)
@@ -361,6 +384,11 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             return "block", "git clean with -f/-x is not allowed."
         if sub == "checkout" and "--" in parts:
             return "ask", "git checkout -- may discard work; requires approval."
+        if sub == "tag":
+            args = parts[parts.index("tag") + 1:] if "tag" in parts else []
+            listing = not [a for a in args if not a.startswith("-")] or any(a in ("-l", "--list") for a in args)
+            if not listing:
+                return "ask", "creating, moving, or deleting a git tag requires explicit user approval."
         if sub == "restore" and "--staged" not in parts and "--" in parts:
             return "ask", "git restore may discard work; requires approval."
         branch_msg = "creating a branch or worktree requires explicit user authorization."
@@ -476,9 +504,13 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.kilo/kilo\.json$"),
     re.compile(r"(^|/)\.kilo/agent/"),
     re.compile(r"(^|/)\.kilo/rules/"),
+    # Phase procedures and gate checklists live in commands and skills; an agent must not rewrite them.
+    re.compile(r"(^|/)\.cursor/(commands|skills)/"),
+    re.compile(r"(^|/)\.claude/(commands|skills)/"),
+    re.compile(r"(^|/)\.kilo/(command|skills)/"),
     # Every CI gate script: a new check is protected without editing this list.
     re.compile(r"(^|/)ci/[^/]+\.sh$"),
-    re.compile(r"(^|/)scripts/(check-attempt-budget|feature-worktree)\.sh$"),
+    re.compile(r"(^|/)scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree)\.sh$"),
     re.compile(r"(^|/)\.github/workflows/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),

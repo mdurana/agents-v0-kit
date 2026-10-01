@@ -8,6 +8,10 @@
 # A live GitLab/GitHub approval may match the Approver on an Approved release row or an Approved verify row.
 # Set CHECK_MR_APPROVER=0 to skip that live match (GitLab runs it in the manual delivery-approval job).
 #
+# A bug fix, CVE patch, dependency bump, or hotfix names "Maintain-Note: docs/maintain/<id>/note.md"
+# instead (or adds a new note in the diff). The note's Tier decides the checks: trivial (classifier-
+# eligible, abbreviated Verify), standard (full Verify, size-bounded), emergency (rollback and a
+# follow-up Verify due date; the Verify row may come after the merge).
 # Exit 0 when no app code changed, or linkage + phase approval present; 1 otherwise.
 
 set -eu
@@ -130,6 +134,101 @@ for m in $milestones; do
   fi
 done
 
+# Onboarding report: an onboard approval row that changes needs the approval and its evidence.
+if git diff "$from" "$head" -- docs/onboarding/report.md 2>/dev/null | grep -Eqi '^\+[^+].*\|[[:space:]]*onboard[[:space:]]*\|'; then
+  sh "$here/check-approvals.sh" docs/onboarding/report.md onboard || exit 1
+  sh "$here/check-evidence.sh" docs/onboarding/report.md onboard || exit 1
+fi
+
+# Maintenance note (Maintain-Note: docs/maintain/<id>/note.md): a bug fix, CVE patch, dependency
+# bump, or hotfix has its own approvals and evidence instead of borrowing a feature artifact.
+note=""
+if [ -n "$body_file" ] && [ -f "$body_file" ]; then
+  note="$(grep -Ei '^[[:space:]]*\*{0,2}Maintain-Note:\*{0,2}[[:space:]]*docs/maintain/' "$body_file" | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/^[*[:space:]]*//;s/[[:space:]]*$//')"
+fi
+if [ -z "$note" ]; then
+  note="$(git diff --name-only --diff-filter=A "$from" "$head" -- 'docs/maintain/*/note.md' 2>/dev/null | head -n1 || true)"
+fi
+
+# note_field <file> <Field>: the value after "Field:", trimmed and lower-cased.
+note_field() {
+  grep -Ei "^[[:space:]]*$2:[[:space:]]*" "$1" | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]]*$//' | tr 'A-Z' 'a-z'
+}
+
+# note_section_text <file> <heading regex>: the section's lines without comments or blanks.
+note_section_text() {
+  awk '/^##[[:space:]]+'"$2"'/ { f = 1; next } /^#/ { f = 0 } f' "$1" | grep -Ev '<!--|-->|^[[:space:]]*$' || true
+}
+
+note_fail() {
+  printf 'FAIL: maintenance note %s: %s\n' "$1" "$2" >&2
+  exit 1
+}
+
+check_maintain_note() {
+  n="$1"
+  review_id="${2:-}"
+  [ -f "$n" ] || note_fail "$n" "file not found"
+  tier="$(note_field "$n" "Tier")"
+  case "$tier" in
+    trivial | standard | emergency) ;;
+    *) note_fail "$n" "Tier must be trivial, standard, or emergency (got \"$tier\")" ;;
+  esac
+  sh "$here/check-approvals.sh" "$n" maintain || exit 1
+  case "$tier" in
+    trivial | emergency)
+      confirmed="$(note_field "$n" "Tier confirmed by")"
+      case "$confirmed" in
+        '' | '<'*) note_fail "$n" "Tier $tier needs \"Tier confirmed by: <name> on <date>\" (a person agrees to the tier)" ;;
+      esac
+      ;;
+  esac
+  phases="verify"
+  case "$tier" in
+    trivial)
+      sh "$here/classify-change.sh" "$from" "$head" --require-trivial >/dev/null || exit 1
+      sh "$here/check-approvals.sh" "$n" verify || exit 1
+      sh "$here/check-evidence.sh" "$n" verify || exit 1
+      ;;
+    standard)
+      sh "$here/classify-change.sh" "$from" "$head" --max-lines "${MAINTAIN_MAX_LINES:-800}" >/dev/null || exit 1
+      sh "$here/check-approvals.sh" "$n" verify || exit 1
+      sh "$here/check-evidence.sh" "$n" verify || exit 1
+      ;;
+    emergency)
+      due="$(note_field "$n" "Follow-up verify due")"
+      printf '%s' "$due" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || note_fail "$n" "Tier emergency needs \"Follow-up verify due: YYYY-MM-DD\""
+      [ -n "$(note_section_text "$n" '[Rr]ollback')" ] || note_fail "$n" "Tier emergency needs a Rollback section"
+      sh "$here/classify-change.sh" "$from" "$head" --max-lines "${MAINTAIN_EMERGENCY_MAX_LINES:-300}" >/dev/null || exit 1
+      phases="maintain"
+      ;;
+  esac
+  [ "${CHECK_MR_APPROVER:-1}" != "0" ] || return 0
+  check_approver_binding "$n" "$phases" "$review_id"
+}
+
+if [ -n "$note" ]; then
+  if [ -n "$req_docs" ] || { [ -n "$artifact" ] && [ -n "$body_file" ] && grep -Eqi '^[[:space:]]*\*{0,2}Feature-Artifact:' "$body_file" 2>/dev/null; }; then
+    note_fail "$note" "a maintenance change does not also carry a feature artifact; use one or the other"
+  fi
+  check_maintain_note "$note" "$pr_number"
+  printf 'OK: maintenance change governed by %s (Tier %s)\n' "$note" "$(note_field "$note" "Tier")"
+  exit 0
+fi
+
+# The design the user approved is still the design (design.lock), and the Build plan is real: every
+# AC has a row, every done row names an existing test with a red card first (check-build-plan.sh).
+# REQUIRE_DESIGN_LOCK=0 and REQUIRE_BUILD_PLAN=0 turn those off.
+feature_design_and_plan() {
+  slug="$(basename "$1" .md)"
+  if [ -d "docs/design/$slug" ] && [ "${REQUIRE_DESIGN_LOCK:-1}" != "0" ]; then
+    sh "$here/check-design.sh" "$slug" --verify-lock || exit 1
+  fi
+  if [ "${REQUIRE_BUILD_PLAN:-1}" != "0" ]; then
+    sh "$here/check-build-plan.sh" "$slug" --complete || exit 1
+  fi
+}
+
 if [ -z "$code_files" ]; then
   if [ -n "$req_docs" ]; then
     for f in $req_docs; do
@@ -139,6 +238,7 @@ if [ -z "$code_files" ]; then
   if [ -n "$build_docs" ] && [ -n "$artifact" ] && [ -f "$artifact" ]; then
     sh "$here/check-approvals.sh" "$artifact" build || exit 1
     sh "$here/check-evidence.sh" "$artifact" build || exit 1
+    feature_design_and_plan "$artifact"
   fi
   if [ -n "$verify_docs" ] && [ -n "$artifact" ] && [ -f "$artifact" ]; then
     sh "$here/check-approvals.sh" "$artifact" verify || exit 1
@@ -154,10 +254,18 @@ if [ -z "$artifact" ] || [ ! -f "$artifact" ]; then
   exit 1
 fi
 
+# A feature artifact is evidence for this change only when this change carries evidence. Borrowing an
+# old feature's approvals for a bug fix or upgrade is what Maintain-Note is for.
+if [ -z "$build_docs" ] && [ -z "$verify_docs" ] && [ "${ALLOW_ARTIFACT_WITHOUT_EVIDENCE:-0}" != "1" ]; then
+  printf 'FAIL: code changed but this change carries no docs/build or docs/verify evidence for %s. A fix or upgrade uses "Maintain-Note: docs/maintain/<id>/note.md" instead (ALLOW_ARTIFACT_WITHOUT_EVIDENCE=1 skips this check).\n' "$artifact" >&2
+  exit 1
+fi
+
 sh "$here/check-approvals.sh" "$artifact" build || exit 1
 bind_recorded_reviewer "$artifact" "$pr_number"
 if [ -n "$build_docs" ] || [ -n "$verify_docs" ]; then
   sh "$here/check-evidence.sh" "$artifact" build || exit 1
+  feature_design_and_plan "$artifact"
 fi
 if [ -n "$verify_docs" ]; then
   sh "$here/check-approvals.sh" "$artifact" verify || exit 1

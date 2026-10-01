@@ -9,6 +9,8 @@
 # blocked active phase is kept. awaiting_approval is cleared once that phase is Approved.
 # With flags, set the phase in flight. Status is in_progress, awaiting_approval, or blocked.
 # blocked requires --reason. This script never writes an approval.
+# Other artifacts: docs/onboarding/report.md keeps docs/onboarding/state.json (phase "onboard");
+# docs/maintain/<id>/note.md keeps docs/maintain/<id>/state.json (phases "maintain", "verify").
 
 set -eu
 
@@ -60,6 +62,12 @@ fi
 
 slug="$(basename "$art" .md)"
 state="docs/requirements/${slug}.state.json"
+# /onboard keeps its own state beside its report: docs/onboarding/state.json (phase "onboard").
+# A maintenance note keeps its state beside it: docs/maintain/<id>/state.json (phases "maintain", "verify").
+case "$art" in
+  docs/onboarding/* | */docs/onboarding/*) state="docs/onboarding/state.json" ;;
+  docs/maintain/* | */docs/maintain/*) state="$(dirname "$art")/state.json" ;;
+esac
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
@@ -82,8 +90,16 @@ import time
 
 art = os.environ["HOOK_ART"]
 out = os.environ["HOOK_STATE_JSON"]
-phases = ["intake", "design", "build", "verify", "release"]
-active_phases = phases + ["maintain"]
+rel_art = art.replace("\\", "/")
+onboarding = "docs/onboarding/" in rel_art
+maintain_note = "docs/maintain/" in rel_art
+if onboarding:
+    phases = ["onboard"]
+elif maintain_note:
+    phases = ["maintain", "verify"]
+else:
+    phases = ["intake", "design", "build", "verify", "release"]
+active_phases = phases if (onboarding or maintain_note) else phases + ["maintain"]
 statuses = {"in_progress", "awaiting_approval", "blocked"}
 positive = re.compile(r"^(approved|approve|yes|pass)\b", re.I)
 
@@ -149,7 +165,9 @@ else:
         blocked_reason = ""
 
 data = {
-    "feature": os.environ.get("HOOK_SLUG", ""),
+    "feature": ("onboarding" if onboarding
+                else os.path.basename(os.path.dirname(rel_art)) if maintain_note
+                else os.environ.get("HOOK_SLUG", "")),
     "tier": tier,
     "lastApprovedPhase": last_approved,
     "activePhase": active_phase,

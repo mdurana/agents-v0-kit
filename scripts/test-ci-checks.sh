@@ -229,6 +229,39 @@ printf 'package com.acme;\nclass A {\nint x;\nint y;\n}\n' > "$m/src/main/java/c
 expect_fail "gate metrics: diff coverage 50% fails the default 80%" "$tmp" env DIFF_BASE="$diff_base" sh "$CI/check-gate-metrics.sh" "$m"
 expect_pass "gate metrics: diff coverage 50% passes MIN_DIFF_LINE_PCT=40" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=40 sh "$CI/check-gate-metrics.sh" "$m"
 
+# --- check-layout-roots.sh ---------------------------------------------------
+d="$tmp/roots-unknown"
+mkdir -p "$d/app"
+: > "$d/app/pom.xml"
+expect_fail "layout roots: a pom outside every known root fails" "$d" sh "$CI/check-layout-roots.sh"
+
+d="$tmp/roots-profile"
+mkdir -p "$d/app" "$d/docs"
+: > "$d/app/pom.xml"
+printf '| This repo | Value |\n|---|---|\n| Backend root | app |\n' > "$d/docs/project-profile.md"
+expect_pass "layout roots: a profile row that names the module passes" "$d" sh "$CI/check-layout-roots.sh"
+
+d="$tmp/roots-backend"
+mkdir -p "$d/backend"
+: > "$d/backend/pom.xml"
+expect_pass "layout roots: backend/ is detected" "$d" sh "$CI/check-layout-roots.sh"
+
+d="$tmp/roots-services"
+mkdir -p "$d/services/order"
+: > "$d/services/order/pom.xml"
+expect_pass "layout roots: services/*/ is detected" "$d" sh "$CI/check-layout-roots.sh"
+
+d="$tmp/roots-frontend-only"
+mkdir -p "$d/frontend"
+printf '{}\n' > "$d/frontend/package.json"
+expect_pass "layout roots: a repo with no JVM module passes" "$d" sh "$CI/check-layout-roots.sh"
+
+d="$tmp/roots-ignored"
+mkdir -p "$d/frontend/node_modules/x"
+printf '{}\n' > "$d/frontend/package.json"
+: > "$d/frontend/node_modules/x/pom.xml"
+expect_pass "layout roots: node_modules is not scanned" "$d" sh "$CI/check-layout-roots.sh"
+
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2
   exit 1

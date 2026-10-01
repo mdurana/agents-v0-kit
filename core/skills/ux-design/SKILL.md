@@ -11,7 +11,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 1. Read the Intake artifact (`docs/requirements/<feature>.md`): acceptance criteria, UX requirements (WCAG 2.1 AA target, device/browser matrix, design-system reference), and the recorded Svelte/React decision. Read the feature draft `docs/design/<feature>/openapi.yaml` when the UI calls an API.
 2. Inventory the screens affected by the acceptance criteria; map each criterion to a screen.
 3. For each screen write the **state matrix** — loading, error, empty, success (`frontend-web.mdc` UX clause) — with the trigger for each state and the mockup file for that state.
-4. Write **static HTML mockups** under `docs/design/<feature>/mockups/`. One file per screen state (for example `list-empty.html`, `create-error.html`). HTML and CSS only. No fetch, no API client, no secrets. Show layout, hierarchy, labels, and every interactive control.
+4. Write **static HTML mockups** under `docs/design/<feature>/mockups/`. One file per screen state (for example `list-empty.html`, `create-error.html`). HTML and CSS only. Every interactive element (link, button, input, select, textarea, summary, or an element with role button, link, tab, menuitem, checkbox, or switch) carries `data-component="<Component name>"`, the same name as its row in the component table. No fetch, no API client, no secrets. Show layout, hierarchy, labels, and every interactive control.
 5. Draw **user flows** as Mermaid flowcharts (`architecture-and-diagrams.mdc` conventions); one flow per primary task.
 6. Write **component defaults** in the UX spec. One row per interactive component:
    - **Component** and **Screen**. A shared component (the same Delete control on two screens) is defined once; other rows reference that name.
@@ -24,7 +24,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 9. Record **design-system conformance**: tokens/components reused; any deviation gets an ADR reference.
 10. Write **UX acceptance criteria**: testable, one per row, mapped screen → mockup → criterion (the Verify audit maps each to a test of the built UI).
 11. Record N/A determinations (no-UI surface) with the reason. A no-UI story has no mockups and no component table; say so.
-12. Check that every mockup control has a component row, every row links to a mockup that exists, and the mockup and the row describe the same control. If they disagree, fix both before the gate.
+12. Run `sh ci/check-ux-spec.sh <feature>`: every mockup control has a component row, every row links to a mockup that exists and contains that component, API-backed rows name a draft operation, and no mockup calls the API. Fix both sides until it passes. The script cannot judge that a row and its control describe the same thing, so read each row against its mockup as well.
 13. Persist the spec to `docs/design/<feature>/ux-spec.md` and the mockups beside it. Stop for the Design gate. Present the spec and the mockup paths. Do not start Build.
 
 ## Rule-compliance checklist

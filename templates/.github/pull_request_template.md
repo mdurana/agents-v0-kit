@@ -3,6 +3,8 @@
 <!-- One-line description of the change. -->
 
 **Feature-Artifact:** docs/requirements/&lt;feature&gt;.md
+<!-- A bug fix, CVE patch, dependency bump, or hotfix replaces that line with: **Maintain-Note:** docs/maintain/&lt;id&gt;/note.md (not both). -->
+
 <!-- Required when this PR changes application code (ci/check-delivery-linkage.sh). -->
 
 ## Changed files

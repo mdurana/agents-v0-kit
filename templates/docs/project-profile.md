@@ -56,6 +56,15 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 |-------------|----------------|-------------|------------------|
 | | | | |
 
+## Release (optional; read by `/release`)
+
+| Release | Value |
+|---------|-------|
+| Release owner | <!-- GitLab or GitHub username allowed to tag and publish --> |
+| Version file | <!-- e.g. pom.xml (project.version) or package.json; blank when the tag is the version --> |
+| Tag format | <!-- e.g. v{version} --> |
+| Changelog | <!-- e.g. CHANGELOG.md; blank when none --> |
+
 ## Brownfield exceptions
 
 ### known_failures (optional budget for ci/check-known-failures.sh)

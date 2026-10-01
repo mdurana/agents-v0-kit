@@ -6,8 +6,9 @@
 #
 # Usage: sh check-approvals.sh <requirements-artifact> <phase>
 #   <requirements-artifact>  e.g. docs/requirements/my-feature.md
-#   <phase>                  plan | intake | design | build | verify | release | maintain | milestone
-#                            (plan: a milestone manifest's program-planning approval)
+#   <phase>                  onboard | plan | intake | design | build | verify | release | maintain | milestone
+#                            (plan: a milestone manifest's program-planning approval;
+#                             onboard: docs/onboarding/report.md, the /onboard approval)
 #
 # Exit codes: 0 = approval recorded; 1 = missing artifact, section, or approval.
 # This script checks workflow approvals only — gate evidence (tests, VAPT,
@@ -23,9 +24,9 @@ if [ -z "$art" ] || [ -z "$phase" ]; then
   exit 1
 fi
 case "$phase" in
-  plan|intake|design|build|verify|release|maintain|milestone) ;;
+  onboard|plan|intake|design|build|verify|release|maintain|milestone) ;;
   *)
-    printf 'FAIL: unknown phase "%s" (expected plan|intake|design|build|verify|release|maintain|milestone)\n' "$phase" >&2
+    printf 'FAIL: unknown phase "%s" (expected onboard|plan|intake|design|build|verify|release|maintain|milestone)\n' "$phase" >&2
     exit 1
     ;;
 esac

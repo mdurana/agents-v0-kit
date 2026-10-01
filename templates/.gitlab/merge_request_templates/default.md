@@ -3,7 +3,8 @@
 <!-- One-line description of the change. -->
 
 **Feature-Artifact:** docs/requirements/<feature>.md
-<!-- Required when this MR changes application code (ci/check-delivery-linkage.sh). -->
+<!-- Required when this MR changes application code (ci/check-delivery-linkage.sh). A bug fix, CVE patch, dependency bump, or hotfix replaces the line above with: **Maintain-Note:** docs/maintain/<id>/note.md -->
+<!-- Do not give both. A fix does not borrow a feature artifact's approvals. -->
 
 ## Changed files
 

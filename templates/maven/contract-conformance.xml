@@ -1,27 +1,63 @@
 <!--
-  OpenAPI contract-conformance snippet — paste into <build><plugins> of pom.xml,
-  next to maven/quality-plugins.xml. Generates the runtime OpenAPI from the running
-  app, then diffs it against the approved contract; an incompatible change fails
-  `mvn -B clean verify` (workflow-orchestration.mdc Build gate).
-  Adjust paths, versions, and the apiDocsUrl port per service. N/A with a recorded
-  reason when the service generates no spec. Keep the approved contract under
-  version control (e.g. openapi/api-v1.yaml).
+  OpenAPI contract-conformance snippet — paste into <build><plugins> of pom.xml, next to
+  maven/quality-plugins.xml. `mvn -B clean verify` boots the service, downloads its runtime
+  OpenAPI, and diffs it against the approved catalog in BOTH directions
+  (workflow-orchestration.mdc Build gate):
+    1. approved -> generated: fails when the service dropped or broke something the catalog promises;
+    2. generated -> approved: fails when the service exposes something the catalog does not list
+       (an undocumented extra endpoint is a removal when read in this direction).
+  N/A with a recorded reason when the service generates no spec.
 
-  The approved contract is read from the property kit.openapi.catalog. Add to the pom:
-    one service in the repo:
-      <properties><kit.openapi.catalog>${project.basedir}/openapi/api-v1.yaml</kit.openapi.catalog></properties>
+  Add to the pom (properties):
+    <kit.openapi.catalog>${project.basedir}/openapi/api-v1.yaml</kit.openapi.catalog>
+    one service in the repo: as above.
     several services (Profile Layout lists Service roots), each with its own catalog
     openapi/<service>-v1.yaml at the repo root, where <service> is the last segment of the
     service root:
-      <properties><kit.openapi.catalog>${project.basedir}/../../openapi/order-v1.yaml</kit.openapi.catalog></properties>
+      <kit.openapi.catalog>${project.basedir}/../../openapi/order-v1.yaml</kit.openapi.catalog>
+    <kit.openapi.port>8089</kit.openapi.port>      a free port for the test boot
+    <kit.openapi.profile>openapi</kit.openapi.profile>
+
+  The service must start without external infrastructure under the Spring profile named by
+  kit.openapi.profile (for example an application-openapi.yml that uses an in-memory database and
+  disables the message broker and the identity provider calls). If it cannot, generate the spec in a
+  Testcontainers integration test instead and point oldSpec/newSpec at that file.
+
+  Versions are examples. springdoc-openapi-maven-plugin must match the springdoc-openapi version in
+  the service (check the plugin's compatibility table: the 1.x line pairs with Spring Boot 2, the 2.x
+  line with Spring Boot 3). This snippet was written against those plugins' documented
+  configuration and has not been run against your service: run it once before relying on it.
 -->
+
+<plugin>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-maven-plugin</artifactId>
+  <configuration>
+    <jvmArguments>-Dserver.port=${kit.openapi.port}</jvmArguments>
+    <profiles>
+      <profile>${kit.openapi.profile}</profile>
+    </profiles>
+  </configuration>
+  <executions>
+    <execution>
+      <id>start-for-openapi</id>
+      <phase>pre-integration-test</phase>
+      <goals><goal>start</goal></goals>
+    </execution>
+    <execution>
+      <id>stop-after-openapi</id>
+      <phase>post-integration-test</phase>
+      <goals><goal>stop</goal></goals>
+    </execution>
+  </executions>
+</plugin>
 
 <plugin>
   <groupId>org.springdoc</groupId>
   <artifactId>springdoc-openapi-maven-plugin</artifactId>
   <version>1.5</version>
   <configuration>
-    <apiDocsUrl>http://localhost:8080/v3/api-docs</apiDocsUrl>
+    <apiDocsUrl>http://localhost:${kit.openapi.port}/v3/api-docs</apiDocsUrl>
     <outputFileName>openapi.json</outputFileName>
     <outputDir>${project.build.directory}</outputDir>
   </configuration>
@@ -38,17 +74,28 @@
   <groupId>org.openapitools</groupId>
   <artifactId>openapi-diff-maven-plugin</artifactId>
   <version>2.1.0</version>
-  <configuration>
-    <oldSpec>${kit.openapi.catalog}</oldSpec>
-    <newSpec>${project.build.directory}/openapi.json</newSpec>
-    <failOnIncompatible>true</failOnIncompatible>
-    <failOnChanged>false</failOnChanged>
-  </configuration>
   <executions>
     <execution>
-      <id>diff-against-approved</id>
+      <id>approved-to-generated</id>
       <phase>verify</phase>
       <goals><goal>diff</goal></goals>
+      <configuration>
+        <oldSpec>${kit.openapi.catalog}</oldSpec>
+        <newSpec>${project.build.directory}/openapi.json</newSpec>
+        <failOnIncompatible>true</failOnIncompatible>
+        <failOnChanged>false</failOnChanged>
+      </configuration>
+    </execution>
+    <execution>
+      <id>generated-to-approved</id>
+      <phase>verify</phase>
+      <goals><goal>diff</goal></goals>
+      <configuration>
+        <oldSpec>${project.build.directory}/openapi.json</oldSpec>
+        <newSpec>${kit.openapi.catalog}</newSpec>
+        <failOnIncompatible>true</failOnIncompatible>
+        <failOnChanged>false</failOnChanged>
+      </configuration>
     </execution>
   </executions>
 </plugin>

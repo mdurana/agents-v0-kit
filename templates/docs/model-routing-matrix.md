@@ -39,23 +39,25 @@ flowchart TD
 
 ## Critical units
 
-The Build role is a fast, inexpensive model. Some units are where a wrong answer is costly: authentication and authorization, uploads, public routes, sagas, and event consumers. A unit is **critical** when the requirements artifact lists a security-review trigger for it, or when the story implements a saga or a consumer (`implement-messaging`). `/build` launches the build agent for a critical unit with the **Build (critical)** row: pass the Plan-role model ID for the tool as the model override of that launch. The agent file is unchanged. Other units stay on the Build role.
+The Build role is a fast, inexpensive model. Some units are where a wrong answer is costly: authentication and authorization, uploads, public routes, sagas, and event consumers. A unit is **critical** when the requirements artifact lists a security-review trigger for it, or when the story implements a saga or a consumer (`implement-messaging`). `/build` launches the build agent for a critical unit, and `/maintain` the maintenance agent for a fix that touches one, with the **Build (critical)** row: pass the Plan-role model ID for the tool as the model override of that launch. The agent file is unchanged. Other units stay on the Build role.
 
 ## Independence of the reviewers
 
-A reviewer should not be the model that wrote the code. In Cursor and Kilo the Review role is stronger than the Build role. In Claude Code every Build role is `sonnet`, so the Review role is `opus`; `security-reviewer` and `code-reviewer` carry `model_claude: opus`. The test author (`test-engineer`) stays on the Build role; the Review role judges its tests in the code review.
+A reviewer should not be the model that wrote the code. In Cursor and Kilo the Review role is stronger than the Build role. In Claude Code every Build role is `sonnet`, so the Review role is `opus`; `security-reviewer`, `code-reviewer`, and `design-reviewer` carry `model_claude: opus`. The test author (`test-engineer`) stays on the Build role; the Review role judges its tests in the code review.
 
-## Kit agent mapping (17 agents)
+## Kit agent mapping (19 agents)
 
 
 | Kit agent            | Role    | `model:` (cursor)        | `model_kilo:`                        | `model_claude:` |
 | -------------------- | ------- | ------------------------ | ------------------------------------ | --------------- |
 | program-planner      | Plan    | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `sonnet`        |
+| codebase-documenter  | Plan    | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `sonnet`        |
 | requirements-analyst | Plan    | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `sonnet`        |
 | solution-architect   | Plan    | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `sonnet`        |
 | ux-designer          | Plan    | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `sonnet`        |
 | security-reviewer    | Review  | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `opus`          |
 | code-reviewer        | Review  | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `opus`          |
+| design-reviewer      | Review  | `claude-sonnet-5-5-high` | `anthropic/claude-sonnet-5.5`        | `opus`          |
 | backend-engineer     | Build   | `composer-2.5`           | `z-ai/glm-5.3-flash`                 | `sonnet`        |
 | bff-engineer         | Build   | `composer-2.5`           | `z-ai/glm-5.3-flash`                 | `sonnet`        |
 | frontend-engineer    | Build   | `composer-2.5`           | `z-ai/glm-5.3-flash`                 | `sonnet`        |

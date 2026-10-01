@@ -12,7 +12,7 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 2. Confirm the merged commit: CI is green on the default branch and the image or artifact tag names that commit.
 3. For each environment, in table order:
    - Ask the user to authorize deploying to that environment. One authorization covers one environment. Hooks ask before publish and deploy commands; do not bypass them.
-   - Run the row's deploy command, then its smoke check. Save the command, exit code, and output summary to `docs/release/<feature>/deploy-<environment>.md` (start with `commit:`). No secrets in the file.
+   - Run the row's deploy command, then its smoke check. Save the command, exit code, and output summary to `docs/release/<feature>/deploy-<environment>.md` (start with `commit:`) in the working tree, or in the release issue. No secrets in the file. The merge is done and the default branch takes no direct commit: commit these records only in a separate docs-only follow-up merge request, which needs its own authorization.
    - On a failed smoke check, run the rollback command, save that output too, and stop. Do not promote to the next environment.
 4. A change that touches a migration, an auth model, or a public route ships behind a feature flag that is off by default, or as an expand/contract migration (`migration-safety`). Record the flag name, its default, and who turns it on in the deploy record.
 5. Rollback rehearsal: before the first production deploy of a service, confirm the rollback command ran successfully once in a lower environment. Record the date.

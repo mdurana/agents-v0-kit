@@ -1,46 +1,31 @@
 # Architecture
 
 > System context for this service. Update when topology changes (`architecture-and-diagrams.mdc`).
+> Brownfield: `/onboard` rewrites this file as-is. Every statement cites code (`path/File.java:42`) or says `UNVERIFIED`. Delete each `TEMPLATE:` line once it is replaced.
 
 ## Context
 
-<!-- One paragraph: what this system is and who uses it. -->
+<!-- TEMPLATE: one paragraph — what this system is and who uses it. -->
 
 ## Containers
 
-<!-- Mermaid flowchart of services, BFF, frontends, data, messaging. -->
+<!-- TEMPLATE: replace with a Mermaid flowchart of the services, BFF, frontends, data stores, and messaging that exist. Draw only what the code and config show. -->
 
 ```mermaid
 flowchart LR
-  subgraph fe [Frontend]
-    client[SvelteKit client]
-    admin[React admin]
-  end
-  bff[BFF]
-  subgraph be [Backend]
-    svc[Service]
-  end
-  db[(PostgreSQL)]
-  cache[(Redis)]
-  client --> bff
-  admin --> bff
-  bff --> svc
-  svc --> db
-  svc --> cache
+  %% TEMPLATE: replace this placeholder
+  placeholder[Describe the real containers]
 ```
 
 ## Service boundaries
 
 | Service | Owns | DB | API |
 |---------|------|----|----|
-| <!-- e.g. order-service --> | <!-- Order aggregate --> | <!-- order_db --> | <!-- /api/v1/orders --> |
+| <!-- TEMPLATE: e.g. order-service --> | <!-- Order aggregate --> | <!-- order_db --> | <!-- /api/v1/orders --> |
 
 ## Cross-cutting
 
-- Correlation ID: `X-Correlation-ID` (header + MDC).
-- Tracing: W3C Trace Context (`traceparent`), OpenTelemetry.
-- Auth: JWT for users; S2S via `X-API-Key` or service Bearer.
-- Health: `/health`, `/ready`, `/live`.
+<!-- TEMPLATE: how correlation ID, tracing, logging, auth, and health work in this system today, each with a citation. Kit defaults for new work: X-Correlation-ID header + MDC, W3C Trace Context (traceparent), JWT for users and X-API-Key or service Bearer for S2S, /health /ready /live. -->
 
 ## ADRs
 

@@ -236,6 +236,7 @@ ci/check-approver-gitlab.sh
 ci/check-coverage-ratchet.sh
 ci/check-gate-metrics.sh
 ci/check-event-schemas.sh
+ci/check-layout-roots.sh
 docs/compliance-matrix.md
 docs/model-routing-matrix.md
 docs/user-guide.md
@@ -252,6 +253,26 @@ scripts/sync-feature-state.sh
 scripts/delivery-metrics.sh
 scripts/feature-worktree.sh
 scripts/check-attempt-budget.sh
+scripts/discover-codebase.sh
+scripts/check-onboarding-docs.sh
+docs/onboarding/_report.template.md
+docs/onboarding/_module.template.md
+docs/maintain/_note.template.md
+ci/classify-change.sh
+ci/check-openapi.sh
+ci/check-design.sh
+ci/check-design-contracts.sh
+ci/check-ux-spec.sh
+ci/check-build-plan.sh
+ci/check-endpoint-auth.sh
+ci/check-frontend-calls.sh
+docs/design/_design.template.md
+docs/design/_amendments.template.md
+scripts/render-mr-body.sh
+scripts/release-notes.sh
+CHANGELOG.md
+docs/architecture.md
+docs/network.md
 ci/check-feature-state.sh
 "
   copy_template_file() {
@@ -259,7 +280,7 @@ ci/check-feature-state.sh
     dest="$t/$rel"
     overwrite=0
     if [ "$UPDATE" = 1 ]; then
-        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/mcp-baseline.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-github.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh ci/check-gate-metrics.sh ci/check-event-schemas.sh scripts/check-attempt-budget.sh .gitlab-ci.yml .gitlab/merge_request_templates/default.md .github/workflows/delivery-approvals.yml .github/workflows/build-and-security.yml; do
+        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/mcp-baseline.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-github.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh ci/check-gate-metrics.sh ci/check-event-schemas.sh ci/check-layout-roots.sh scripts/check-attempt-budget.sh scripts/generate-repo-map.sh scripts/collect-dependency-graphs.sh scripts/discover-codebase.sh scripts/check-onboarding-docs.sh scripts/sync-feature-state.sh scripts/delivery-metrics.sh docs/onboarding/_report.template.md docs/onboarding/_module.template.md docs/maintain/_note.template.md ci/classify-change.sh ci/check-openapi.sh ci/check-design.sh ci/check-design-contracts.sh ci/check-ux-spec.sh ci/check-build-plan.sh ci/check-endpoint-auth.sh ci/check-frontend-calls.sh docs/design/_design.template.md docs/design/_amendments.template.md scripts/render-mr-body.sh scripts/release-notes.sh .gitlab-ci.yml .gitlab/merge_request_templates/default.md .github/workflows/delivery-approvals.yml .github/workflows/build-and-security.yml; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi

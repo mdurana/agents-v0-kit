@@ -25,9 +25,9 @@ if [ -z "$art" ] || [ -z "$phase" ]; then
   exit 1
 fi
 case "$phase" in
-  intake|design|build|verify|release) ;;
+  onboard|intake|design|build|verify|release) ;;
   *)
-    printf 'FAIL: unknown phase "%s" (expected intake|design|build|verify|release)\n' "$phase" >&2
+    printf 'FAIL: unknown phase "%s" (expected onboard|intake|design|build|verify|release)\n' "$phase" >&2
     exit 1
     ;;
 esac
@@ -59,7 +59,7 @@ check_path() {
   fi
   if [ -e "$p" ]; then
     case "$p" in
-      */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md|*/e2e-report.md)
+      */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md|*/e2e-report.md|docs/onboarding/report.md)
         if ! grep -Eqi '^commit:[[:space:]]*[0-9a-f]{7,40}' "$p" 2>/dev/null; then
           printf 'FAIL: report missing commit: line (workflow-orchestration.mdc): %s\n' "$p" >&2
           missing=1

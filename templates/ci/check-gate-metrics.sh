@@ -18,6 +18,7 @@
 #   MIN_DIFF_LINE_PCT=<n>  diff coverage minimum (default 80)
 #   REQUIRE_CVE_REPORT=1   fail when dependency-check-report.json is missing
 #   GATE_METRICS_OUT=<f>   JSON summary path (default <module-root>/target/gate-metrics.json)
+#   GATE_REPORT_ONLY=1     measure and write the summary, but exit 0 (brownfield onboarding baseline)
 #
 # Exit 0 when every measured gate passes; 1 otherwise.
 
@@ -182,8 +183,12 @@ with open(out, "w", encoding="utf-8") as handle:
     handle.write("\n")
 
 if failures:
+    report_only = env("GATE_REPORT_ONLY") == "1"
     for item in failures:
-        print(f"FAIL: {item}", file=sys.stderr)
+        print(f"{'WARN' if report_only else 'FAIL'}: {item}", file=sys.stderr)
+    if report_only:
+        print(f"REPORT-ONLY: measured {root}; no gate applied (summary: {out})")
+        raise SystemExit(0)
     raise SystemExit(1)
 print(f"OK: gate metrics for {root} (summary: {out})")
 PY

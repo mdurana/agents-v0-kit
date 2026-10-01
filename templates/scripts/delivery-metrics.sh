@@ -114,6 +114,31 @@ if effort_rows:
 else:
     print("| - | - | - | - | - | - |")
 
+print("\n## Maintenance notes\n")
+print("| Id | Tier | Maintain approved | Verify approved | Follow-up verify due | Status |")
+print("|----|------|-------------------|-----------------|----------------------|--------|")
+note_rows = 0
+today = dt.date.today()
+for note in sorted(glob.glob("docs/maintain/*/note.md")):
+    text = open(note, encoding="utf-8").read()
+    tier_m = re.search(r"^\s*Tier:\s*(\w+)", text, re.I | re.M)
+    due_m = re.search(r"^\s*Follow-up verify due:\s*(\d{4}-\d{2}-\d{2})", text, re.I | re.M)
+    tier = tier_m.group(1).lower() if tier_m else "?"
+    rows = approvals(note)
+    due = dt.date.fromisoformat(due_m.group(1)) if due_m else None
+    verified = "verify" in rows
+    status = "done" if verified else ("in progress" if "maintain" not in rows else "awaiting verify")
+    if tier == "emergency" and not verified and due and today > due:
+        status = f"OVERDUE by {(today - due).days} day(s)"
+    note_rows += 1
+    print(
+        f"| `{os.path.basename(os.path.dirname(note))}` | {tier} | "
+        f"{rows['maintain'].isoformat() if 'maintain' in rows else '-'} | "
+        f"{rows['verify'].isoformat() if verified else '-'} | {due.isoformat() if due else '-'} | {status} |"
+    )
+if not note_rows:
+    print("| - | - | - | - | - | - |")
+
 print("\n## Hook decisions (local audit log)\n")
 counts = {}
 for log in (".cursor/hooks/audit.jsonl", ".claude/hooks/audit.jsonl"):

@@ -5,6 +5,11 @@
 /docs/milestones/ @your-team
 /docs/build/ @your-team
 /docs/verify/ @your-team
+/docs/maintain/ @your-team
+# Architecture: the approved design, the decisions, and the contract catalog need an architecture owner.
+/docs/design/ @your-team
+/docs/adr/ @your-team
+/openapi/ @your-team
 /ci/ @your-team
 /.github/workflows/ @your-team
 /.gitlab-ci.yml @your-team
@@ -20,6 +25,13 @@
 /.kilo/kilo.json @your-team
 /.kilo/agent/ @your-team
 /.kilo/rules/ @your-team
+# Phase procedures and gate checklists. Kilo has no edit hook, so review is the control there.
+/.cursor/commands/ @your-team
+/.cursor/skills/ @your-team
+/.claude/commands/ @your-team
+/.claude/skills/ @your-team
+/.kilo/command/ @your-team
+/.kilo/skills/ @your-team
 /AGENTS.md @your-team
 /CLAUDE.md @your-team
 /CODEOWNERS @your-team

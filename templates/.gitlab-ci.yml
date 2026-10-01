@@ -68,6 +68,7 @@ build:
       set -o pipefail
       repo="$(pwd)"
       eval "$(sh ci/resolve-layout.sh)"
+      sh ci/check-layout-roots.sh
       mkdir -p ci-artifacts
       : > ci-artifacts/verify.log
       verify_maven() {
@@ -126,6 +127,7 @@ gate-metrics:
       set -eu
       repo="$(pwd)"
       eval "$(sh ci/resolve-layout.sh)"
+      sh ci/check-layout-roots.sh
       gate="ci/check-gate-metrics.sh"
       if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
         git fetch origin "$CI_DEFAULT_BRANCH"
@@ -174,6 +176,65 @@ event-schema-compat:
         check="${trusted}/check-event-schemas.sh"
       fi
       sh "$check" "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-origin/$CI_DEFAULT_BRANCH}" "$CI_COMMIT_SHA"
+
+# Design and contract checks. The ci/ scripts come from the default branch when it has them, so a
+# merge request cannot rewrite the checks that judge it.
+.trusted-ci: &trusted_ci |
+  git fetch origin "$CI_DEFAULT_BRANCH"
+  CI_DIR=ci
+  if git cat-file -e "FETCH_HEAD:ci/check-design.sh" 2>/dev/null; then
+    rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci
+    git archive FETCH_HEAD ci | tar -x -C /tmp/trusted-ci
+    CI_DIR=/tmp/trusted-ci/ci
+  else
+    printf 'WARN: using the merge request copy of ci/ scripts; they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
+  fi
+
+design-contract:
+  stage: validate
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - docs/design/*/openapi.yaml
+        - docs/design/*/design.lock
+        - docs/design/*/ux-spec.md
+  before_script:
+    - apk add --no-cache git python3 py3-yaml
+  script:
+    - *trusted_ci
+    - sh "$CI_DIR/check-design-contracts.sh"
+
+endpoint-auth:
+  stage: validate
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - "**/*.java"
+  before_script:
+    - apk add --no-cache git python3
+  script:
+    - *trusted_ci
+    - sh "$CI_DIR/check-endpoint-auth.sh" "$(git merge-base "origin/$CI_DEFAULT_BRANCH" HEAD)" HEAD
+
+frontend-calls:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - openapi/*.yaml
+        - openapi/*.json
+  before_script:
+    - apk add --no-cache git python3 py3-yaml
+  script:
+    - *trusted_ci
+    - sh "$CI_DIR/check-frontend-calls.sh"
 
 # Runs when the project has a Playwright config. Put the dev server in the config's webServer block.
 e2e:
@@ -315,7 +376,7 @@ delivery-metrics:
       trusted="$(mktemp -d)"
       if git cat-file -e "FETCH_HEAD:ci/check-delivery-linkage.sh" 2>/dev/null \
         && git cat-file -e "FETCH_HEAD:ci/check-approver-gitlab.sh" 2>/dev/null; then
-        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh check-approver-github.sh; do
+        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh check-approver-github.sh classify-change.sh check-design.sh check-build-plan.sh; do
           if git cat-file -e "FETCH_HEAD:ci/${s}" 2>/dev/null; then
             git show "FETCH_HEAD:ci/${s}" > "${trusted}/${s}"
             chmod +x "${trusted}/${s}"

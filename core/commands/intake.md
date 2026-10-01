@@ -6,7 +6,14 @@ description: Intake phase. Turn a Jira/Confluence spec into the requirements art
 
 You are entering the **Intake** phase of the delivery lifecycle (`workflow-orchestration.mdc`).
 
+## Resume
 Once `docs/requirements/<feature>.md` exists, run `sh scripts/sync-feature-state.sh docs/requirements/<feature>.md --active-phase intake --status in_progress`. If this phase is already `in_progress` or `blocked`, continue from that file; do not recreate it. On a blocker, re-run with `--status blocked --reason "<one line>"` and stop. When the gate is ready for the user, re-run with `--status awaiting_approval` and stop. Do not add an `Approved` row until the user approves (`workflow-orchestration.mdc` Phase resume).
+
+## Prerequisite
+Brownfield: when `docs/onboarding/report.md` exists, its `Delivery approvals` table must record an `Approved` `onboard` row. When application source exists, `docs/project-profile.md` still has placeholder verify commands, and no onboarding report exists, stop and run `/onboard` first. Do not infer the onboarding approval. A story that belongs to a milestone manifest also needs every story named in its Dependency column to have an `Approved` Verify row in its own artifact; otherwise stop and report the first unmet dependency (`ci/check-milestone.sh` enforces this at Build).
+
+## Collision
+While another feature is in flight in this checkout, write only `docs/requirements/<feature>.md`, its state file, and the feature's helper brief. Stop before editing a shared file (`workflow-orchestration.mdc` Parallel features) when `git status` shows it is already modified, and record `--status blocked` with that reason.
 
 ## Instructions
 0. Classify **change tier** (`workflow-orchestration.mdc`): **Trivial** → `/triage` instead of full Intake; **Major** → record in the artifact and require `system-design` outputs in `/design`.
@@ -19,7 +26,7 @@ Once `docs/requirements/<feature>.md` exists, run `sh scripts/sync-feature-state
 7. Check the **Intake gate** (`workflow-orchestration.mdc`):
    - User story recorded as `As a [role], I want [goal], so that [benefit].`
    - Acceptance criteria split from that story and its constraints (`AC-1`, `AC-2`, …), with out of scope listed separately. NFRs and regulations recorded.
-   - Story size: `Surfaces:` is one of `backend`, `bff`, or `frontend`, unless `Vertical slice: yes`. At most `AC-8`. No open `## Proposed split`.
+   - Story size: `Surfaces:` is one of `backend`, `bff`, or `frontend`, unless `Vertical slice: yes`. When the profile lists `Service roots`, a backend or BFF story also records `Service root:`. At most `AC-8`. No open `## Proposed split`.
    - Open questions resolved.
    - Security-review triggers identified.
    - For UI-affecting changes: UX requirements recorded.

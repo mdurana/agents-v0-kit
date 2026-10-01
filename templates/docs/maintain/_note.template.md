@@ -1,0 +1,42 @@
+# Maintenance note: <title>
+
+> Copy to `docs/maintain/<id>/note.md`. `<id>` is the issue key or a slug (lowercase letters, digits, hyphens). The id is also the folder name for this change's evidence: `docs/build/<id>/build-report.md` (attempt cards), `docs/verify/<id>/`. Put the merge request line `Maintain-Note: docs/maintain/<id>/note.md` in the description.
+
+Id: <id>
+Tier: <trivial | standard | emergency>
+Tier confirmed by: <name of the person who agreed to this tier, in chat> on <YYYY-MM-DD>
+Type: <bug | cve | dependency | refactor | docs | migration>
+Trigger: <issue, alert, or incident link>
+Follow-up verify due: <YYYY-MM-DD; Tier emergency only, delete the line otherwise>
+
+Tier rules (`workflow-orchestration.mdc` Change tiers):
+- **trivial** — `sh ci/classify-change.sh <base> --require-trivial` passes: docs only, or version numbers only in build files and lockfiles; no security surface, schema, major bump, or delivery artifact. Needs "Tier confirmed by". Verify is the abbreviated Verify.
+- **standard** — any other fix or upgrade within `MAINTAIN_MAX_LINES` source lines (default 800). Full Verify. A larger change is a feature: use `/intake`.
+- **emergency** — a production incident. Needs "Tier confirmed by", a rollback below, and "Follow-up verify due". The change may merge before Verify; Verify is owed by that date.
+
+## Scope
+
+<!-- TEMPLATE: the files or areas this change touches and why. -->
+
+## Acceptance
+
+<!-- TEMPLATE: what "done" means, checkable.
+  bug: expected versus actual, and the test that reproduces it. That test fails before the fix.
+  cve: the CVE IDs that must be gone from the scan, and the scan command.
+  dependency: each dependency from version -> to version, and the release notes you read.
+-->
+
+## Security surface
+
+<!-- TEMPLATE: paste the output of `sh ci/classify-change.sh <base>` (class, security-surface, schema, major-bump, trivial-eligible). A security surface means the full Verify with the VAPT checklist. -->
+
+## Rollback
+
+<!-- TEMPLATE: how to undo this change (revert commit, redeploy the previous artifact, feature flag, migration down). Required for emergency. -->
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| maintain | docs/maintain/&lt;id&gt;/note.md, docs/build/&lt;id&gt;/build-report.md | | | |
+| verify | docs/verify/&lt;id&gt;/test-report.md | | | |

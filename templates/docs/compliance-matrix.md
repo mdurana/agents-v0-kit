@@ -206,6 +206,29 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Intake: one primary surface unless `Vertical slice: yes`; at most `AC-8`; oversized stories stop on `## Proposed split` | A requirements-analyst; S spec-intake; C /intake; R workflow-orchestration; G Intake gate |
 | Milestone programs: manifests group user stories into incremental delivery (P0..P5); story chains + go/no-go | C /intake (story links); R workflow-orchestration; CI ci/check-approvals.sh (milestone row), ci/check-milestone.sh |
 | P4 SLO rows close with `docs/design/system/slo-evidence.md`: each filled row is measured or waived | A test-engineer; S slo-evidence; C /verify; R workflow-orchestration; CI ci/check-milestone.sh (verify/release when the manifest names the file) |
+| Contract draft is valid and compatible: OpenAPI 3.0, `/api/v1`, unique operationIds, security, Idempotency-Key on POST, one error envelope, no breaking change to the catalog | A solution-architect; S contract-first-design; C /design; G Design gate; CI ci/check-openapi.sh (lint, compat), ci/check-design-contracts.sh |
+| Design is complete and traceable: every AC mapped, an authorization row per operation, data model, failure modes, observability, rollout, ADR with alternatives | A solution-architect; S contract-first-design; C /design; G Design gate; CI ci/check-design.sh |
+| Independent design review; no open Critical before the design is approved and pinned | A design-reviewer; C /design; G Design gate; `ci/check-design.sh --pin` |
+| Approved design is pinned (`design.lock`); a later change needs an Approved amendment row | C /design (Amending an approved design), /build; CI ci/check-design.sh --verify-lock, ci/check-delivery-linkage.sh |
+| UX spec and mockups agree (`data-component` on every control, a row per control, operations exist in the draft, no API call in a mockup) | A ux-designer; S ux-design; C /design; CI ci/check-ux-spec.sh |
+| Architecture owners review `docs/design/`, `docs/adr/`, and the `openapi/` catalog | CODEOWNERS |
+| The catalog merge is proven: the catalog contains every operation and component of the approved draft | C /build; S implement-*; CI ci/check-openapi.sh merged |
+| Build plan is real: one row per AC, each done row names an existing test with a red card first | C /build; S implement-*; CI ci/check-build-plan.sh (via ci/check-delivery-linkage.sh) |
+| No new Spring endpoint without a security annotation (`@PermitAll` marks a public one) | C /build; S implement-spring-service; CI ci/check-endpoint-auth.sh |
+| The frontend calls only operations the catalog lists | C /build; S implement-frontend; CI ci/check-frontend-calls.sh |
+| Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /build; `maven/contract-conformance.xml` |
+| `/deliver` runs the phase commands in order and holds no phase detail of its own; resumes from the state file; a reopened phase is marked `Re-opened` until re-approved | C /deliver; A orchestrator; R workflow-orchestration |
+| Merge and approval of a merge request are human acts on the default host: `glab mr merge`, `glab mr approve`, and merge/approve through `glab api` are blocked; `glab mr create`, `glab ci trigger`, state-changing `glab api`, and `git tag` ask | H-B / H-ask pre-shell.sh; hook-policy.py shell; Kilo kilo.json |
+| Local dry run of the delivery gate before the push; the MR description is rendered from the evidence | C /release; S release-pr; `scripts/render-mr-body.sh`; CI ci/check-delivery-linkage.sh |
+| Release approver is the GitLab username that approves the MR; the manual `delivery-approval` job is played by a person or with explicit authorization | C /release; S release-pr; CI ci/check-approver-gitlab.sh |
+| CI fix loop is capped at three rounds; a code fix re-enters Verify | C /release; S release-pr |
+| Deployment records never go straight to the default branch (docs-only follow-up MR or release issue) | C /release; S release-deploy; R workflow-orchestration Release gate |
+| Changelog and release notes come from approved stories; the release owner picks the version and tags | C /release; `scripts/release-notes.sh`; `docs/project-profile.md` Release rows |
+| Maintenance record: every fix, CVE patch, upgrade, or hotfix has `docs/maintain/<id>/note.md` with its own `maintain` and `verify` rows and evidence; it never borrows a feature artifact | A maintenance-engineer; S bugfix-triage, dependency-upgrade, doc-sync; C /maintain, /verify; CI ci/check-delivery-linkage.sh (`Maintain-Note`; a feature artifact needs build or verify evidence in the same change) |
+| Trivial lane is qualified by the diff (docs-only or version-only, no security surface, schema, major bump, or delivery artifact; size-bounded) and confirmed by a person | C /triage, /maintain; CI ci/classify-change.sh, ci/check-delivery-linkage.sh |
+| Abbreviated Verify (Tier trivial): test-engineer only, full verify command, gate metrics, CVE re-scan | C /verify; A test-engineer; S quality-gate |
+| Emergency tier: person-confirmed, rollback recorded, Verify owed by `Follow-up verify due` (OVERDUE in the metrics) | C /maintain; CI ci/check-delivery-linkage.sh; `scripts/delivery-metrics.sh` |
+| Maintenance discipline: baseline first, failing test before the fix, attempt budget, critical-unit model, dependency graph diff | C /maintain; A maintenance-engineer; S bugfix-triage, dependency-upgrade; `scripts/check-attempt-budget.sh`; R docs/model-routing-matrix.md |
 | Change tiers (Trivial / Standard / Major); `/triage` | C /intake, /triage, /deliver; A orchestrator; R workflow-orchestration |
 | Machine-readable resume (`lastApprovedPhase`, `activePhase`, `activeStatus`, `blockedReason`) | C /status; R workflow-orchestration Phase resume; `scripts/sync-feature-state.sh`; CI ci/check-feature-state.sh (optional) |
 | Parallel features: per-feature artifacts; feature contract drafts under `docs/design/<feature>/` are not shared; stop before a second writer touches a shared file; creating a branch needs explicit user authorization | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
@@ -226,14 +249,19 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 
 | Clause | Enforcer |
 |--------|----------|
-| Multi-repo workspace manifest | `docs/workspace.manifest.json`; C /onboard; A orchestrator |
+| Multi-repo workspace manifest | `docs/workspace.manifest.json`; C /onboard; A codebase-documenter, orchestrator |
+| Existing codebase documented as-is: baseline numbers, inventories, module documents, architecture, network, context map, inherited ADR, flows | A codebase-documenter; S onboard-discovery; C /onboard; G Onboard gate; `scripts/discover-codebase.sh`, `scripts/generate-repo-map.sh`, `scripts/collect-dependency-graphs.sh` |
+| Onboarding documents cite real code, carry the commit they describe, and leave no template line | `scripts/check-onboarding-docs.sh`; C /onboard; G Onboard gate |
+| No secret value in onboarding output (configuration by key name only); literal secrets reported by key | A codebase-documenter; `scripts/discover-codebase.sh`; R security-baseline |
+| Onboarding approval (`onboard` row) recorded and bound to its evidence; `/intake` and `/plan` wait for it | C /onboard, /intake, /plan; A orchestrator; CI ci/check-approvals.sh (onboard), ci/check-evidence.sh, ci/check-delivery-linkage.sh |
 
 ## Hooks and CI guardrails (kit)
 
 | Control | Enforcer |
 |---------|----------|
 | Shell deny/ask (git, secrets, rm, kubectl, protected-path shell writes) | H-B pre-shell.sh; hook-policy.py; Kilo kilo.json |
-| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path |
+| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, commands and skills, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path; CODEOWNERS (the control on Kilo, which has no edit hook) |
+| A green build means the checks ran: a JVM module with no resolved root fails CI | CI ci/check-layout-roots.sh (build and gate-metrics jobs) |
 | Delivery/milestone artifact edits (human gate) | H-ask pre-edit.sh; hook-policy.py path |
 | MCP tools (per-server allow/ask/block; unlisted servers ask) | H-ask pre-mcp.sh; hook-policy.py mcp; `mcp-policy.json` |
 | Session context (profile, repo map, state) | session-start.sh |

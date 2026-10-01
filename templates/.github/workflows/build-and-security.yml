@@ -37,6 +37,9 @@ jobs:
           echo "bff=${BFF_ROOT}" >>"$GITHUB_OUTPUT"
           echo "services=${SERVICE_ROOTS}" >>"$GITHUB_OUTPUT"
 
+      - name: Layout covers every JVM module
+        run: sh ci/check-layout-roots.sh
+
       - name: Set up Java
         if: steps.layout.outputs.backend != '' || steps.layout.outputs.bff != '' || steps.layout.outputs.services != ''
         uses: actions/setup-java@v4
@@ -128,6 +131,34 @@ jobs:
           fi
           if [ -f "$check" ]; then
             sh "$check" "$BASE_SHA" "$HEAD_SHA"
+          fi
+
+  design-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+      - name: Design, endpoint authorization, and frontend call checks
+        run: |
+          # Run the ci/ scripts from the pull request's base so the pull request cannot rewrite its own checks.
+          ci_dir=ci
+          if git cat-file -e "${BASE_SHA}:ci/check-design.sh" 2>/dev/null; then
+            mkdir -p /tmp/trusted-ci
+            git archive "$BASE_SHA" ci | tar -x -C /tmp/trusted-ci
+            ci_dir=/tmp/trusted-ci/ci
+          fi
+          if [ -f "$ci_dir/check-design-contracts.sh" ]; then sh "$ci_dir/check-design-contracts.sh"; fi
+          if [ -f "$ci_dir/check-endpoint-auth.sh" ] && git ls-files '*.java' | grep -q .; then
+            sh "$ci_dir/check-endpoint-auth.sh" "$(git merge-base "$BASE_SHA" HEAD)" HEAD
+          fi
+          if [ -f "$ci_dir/check-frontend-calls.sh" ] && ls openapi/*.yaml openapi/*.json >/dev/null 2>&1; then
+            sh "$ci_dir/check-frontend-calls.sh"
           fi
 
   e2e:

@@ -5,7 +5,7 @@ description: Database migration playbook. Flyway baseline, expand/contract, back
 
 # migration-safety
 
-Schema changes on brownfield or production-bound services.
+Schema changes on brownfield or production-bound services. Used by `/build` (`implement-spring-service` step 10) for every new migration and by `/maintain` for schema fixes. The design's data-model section (`design.md`) states the migration shape; Build follows it.
 
 ## Steps
 1. Prefer **expand/contract**: additive migration first; deploy; backfill; then contract in a later release.

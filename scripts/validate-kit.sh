@@ -126,6 +126,8 @@ for ref in $(grep -rhoE '`[a-z-]+\.mdc`' core/rules core/agents core/commands co
   [ -f "core/rules/$ref" ] || err "kit content references missing rule $ref"
 done
 for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/rules core/agents core/commands core/skills | tr -d '`' | sort -u); do
+  # Outputs that /onboard writes in the target repo are not seeded templates.
+  case "$ref" in docs/onboarding/report.md|docs/adr/0000-inherited-decisions.md|docs/discovery/*) continue ;; esac
   [ -f "$ref" ] || [ -f "templates/$ref" ] || err "referenced doc missing (seed templates/$ref): $ref"
 done
 
@@ -242,6 +244,14 @@ grep -Fq 'pull_request_review' templates/.github/workflows/delivery-approvals.ym
 sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
 [ -f scripts/test-ci-checks.sh ] || err "scripts/test-ci-checks.sh missing"
 sh scripts/test-ci-checks.sh || err "scripts/test-ci-checks.sh failed"
+[ -f scripts/test-onboard.sh ] || err "scripts/test-onboard.sh missing"
+sh scripts/test-onboard.sh || err "scripts/test-onboard.sh failed"
+[ -f scripts/test-maintain.sh ] || err "scripts/test-maintain.sh missing"
+sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
+[ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
+sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
+[ -f scripts/test-release.sh ] || err "scripts/test-release.sh missing"
+sh scripts/test-release.sh || err "scripts/test-release.sh failed"
 grep -Fq 'git status --porcelain' core/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
@@ -407,6 +417,126 @@ grep -Fq 'kit.maven.dir' templates/maven/quality-plugins.xml || err "maven quali
 grep -Fq 'kit.openapi.catalog' templates/maven/contract-conformance.xml || err "contract-conformance must read kit.openapi.catalog (per-service catalog)"
 grep -Fq 'Service verify' templates/docs/project-profile.md || err "project-profile template lacks the Service verify rows"
 grep -Fq 'FETCH_HEAD:ci/check-gate-metrics.sh' templates/.gitlab-ci.yml || err "gate-metrics job must run the script from the default branch"
+[ -f templates/ci/check-layout-roots.sh ] || err "templates/ci/check-layout-roots.sh missing"
+grep -Fq 'ci/check-layout-roots.sh' scripts/install.sh || err "install.sh does not seed ci/check-layout-roots.sh"
+grep -Fq 'check-layout-roots.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fail when a JVM module resolves no root"
+grep -Fq 'check-layout-roots.sh' templates/.github/workflows/build-and-security.yml || err "GitHub build workflow must fail when a JVM module resolves no root"
+for dir in '\.cursor/(commands|skills)' '\.claude/(commands|skills)' '\.kilo/(command|skills)'; do
+  grep -Fq "$dir" core/hooks/hook-policy.py || err "hook-policy must protect $dir (phase procedures and gate checklists)"
+done
+for dir in /.cursor/commands/ /.cursor/skills/ /.claude/commands/ /.claude/skills/ /.kilo/command/ /.kilo/skills/; do
+  grep -Fq "$dir @" templates/CODEOWNERS || err "CODEOWNERS must cover $dir"
+done
+# Onboarding: layout-aware, cited, verified, gated.
+for onboard_file in templates/scripts/discover-codebase.sh templates/scripts/check-onboarding-docs.sh templates/docs/onboarding/_report.template.md templates/docs/onboarding/_module.template.md; do
+  [ -f "$onboard_file" ] || err "required onboarding file missing: $onboard_file"
+done
+grep -Fq 'codebase-documenter' core/commands/onboard.md || err "/onboard must launch the codebase-documenter"
+grep -Fq 'check-onboarding-docs.sh' core/commands/onboard.md || err "/onboard gate must run check-onboarding-docs.sh"
+grep -Fq 'check-onboarding-docs.sh' core/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run check-onboarding-docs.sh"
+grep -Fq 'discover-codebase.sh' core/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run discover-codebase.sh"
+grep -Fq 'UNVERIFIED' core/agents/codebase-documenter.md || err "codebase-documenter must mark unknowns UNVERIFIED"
+grep -Fq 'onboard' templates/ci/check-approvals.sh || err "check-approvals must accept the onboard phase"
+grep -Fq 'onboard' templates/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the onboard approval"
+grep -Fq 'docs/onboarding/report.md' core/commands/intake.md || err "/intake must wait for the onboard approval on a brownfield repo"
+grep -Fq 'docs/onboarding/report.md' core/commands/plan.md || err "/plan must wait for the onboard approval on a brownfield repo"
+grep -Fq 'check-onboarding-docs' core/hooks/hook-policy.py || err "hook-policy must protect scripts/check-onboarding-docs.sh"
+for onboard_script in discover-codebase.sh check-onboarding-docs.sh; do
+  grep -Fq "scripts/$onboard_script" scripts/install.sh || err "install.sh does not seed scripts/$onboard_script"
+done
+if grep -q 'TEMPLATE:' templates/docs/architecture.md && ! grep -q 'Brownfield' templates/docs/architecture.md; then err "architecture.md template must say /onboard replaces it"; fi
+# Maintenance lane: own record, tier confirmed by a person, classifier-qualified, CI-checked.
+for maintain_file in templates/ci/classify-change.sh templates/docs/maintain/_note.template.md; do
+  [ -f "$maintain_file" ] || err "required maintenance file missing: $maintain_file"
+done
+grep -Fq 'Maintain-Note' templates/ci/check-delivery-linkage.sh || err "check-delivery-linkage must accept a Maintain-Note"
+grep -Fq 'classify-change.sh' templates/ci/check-delivery-linkage.sh || err "check-delivery-linkage must run the classifier for a trivial note"
+grep -Fq 'classify-change.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fetch classify-change.sh from the default branch"
+grep -Fq 'Maintain-Note' templates/.gitlab/merge_request_templates/default.md || err "merge request template must offer Maintain-Note"
+grep -Fq 'Maintain-Note' templates/.github/pull_request_template.md || err "pull request template must offer Maintain-Note"
+grep -Fq 'docs/maintain/' templates/CODEOWNERS || err "CODEOWNERS must cover docs/maintain/"
+grep -Fq 'Tier confirmed by' templates/docs/maintain/_note.template.md || err "maintenance note template must require a confirmed tier"
+grep -Fq 'Abbreviated Verify' core/commands/verify.md || err "/verify must define the abbreviated Verify"
+grep -Fq 'classify-change.sh' core/commands/triage.md || err "/triage must qualify a change with the classifier"
+grep -Fq 'classify-change.sh' core/commands/maintain.md || err "/maintain must classify the result"
+grep -Fq 'check-attempt-budget.sh' core/commands/maintain.md || err "/maintain must use the attempt budget"
+grep -Fq 'docs/maintain/<id>/note.md' core/agents/maintenance-engineer.md || err "maintenance-engineer must work from the maintenance note"
+grep -Fq 'graph' core/skills/dependency-upgrade/SKILL.md || err "dependency-upgrade must diff the dependency graph"
+grep -Fq 'check-onboarding-docs.sh' core/skills/doc-sync/SKILL.md || err "doc-sync must re-check onboarding citations"
+grep -Fq 'maintain' templates/scripts/sync-feature-state.sh || err "sync-feature-state must handle maintenance notes"
+for maintain_script in classify-change.sh; do
+  grep -Fq "ci/$maintain_script" scripts/install.sh || err "install.sh does not seed ci/$maintain_script"
+done
+grep -Fq '_note.template.md' scripts/install.sh || err "install.sh does not seed the maintenance note template"
+# Design and Build: mechanical checks, an independent review, a pinned design, a real plan.
+for design_file in check-openapi.sh check-design.sh check-design-contracts.sh check-ux-spec.sh check-build-plan.sh check-endpoint-auth.sh check-frontend-calls.sh; do
+  [ -f "templates/ci/$design_file" ] || err "required Design/Build check missing: templates/ci/$design_file"
+  grep -Fq "ci/$design_file" scripts/install.sh || err "install.sh does not seed ci/$design_file"
+done
+for design_file in docs/design/_design.template.md docs/design/_amendments.template.md; do
+  [ -f "templates/$design_file" ] || err "required design template missing: templates/$design_file"
+  grep -Fq "$design_file" scripts/install.sh || err "install.sh does not seed $design_file"
+done
+grep -Fq 'design-reviewer' core/commands/design.md || err "/design must launch the design-reviewer"
+grep -Fq 'Amending an approved design' core/commands/design.md || err "/design must define the design amendment path"
+grep -Fq 'check-design.sh' core/commands/design.md || err "/design gate must run check-design.sh"
+grep -Fq 'check-openapi.sh' core/commands/design.md || err "/design gate must run check-openapi.sh"
+grep -Fq 'verify-lock' core/commands/build.md || err "/build must verify the design lock"
+grep -Fq 'check-build-plan.sh' core/commands/build.md || err "/build gate must run check-build-plan.sh"
+grep -Fq 'check-endpoint-auth.sh' core/commands/build.md || err "/build gate must run check-endpoint-auth.sh"
+grep -Fq 'check-frontend-calls.sh' core/commands/build.md || err "/build gate must run check-frontend-calls.sh"
+grep -Fq 'ci/check-openapi.sh merged' core/commands/build.md || err "/build must prove the catalog merge"
+grep -Fq 'feature_design_and_plan' templates/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the design lock and the build plan"
+grep -Fq 'check-design-contracts.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run the design checks"
+grep -Fq 'check-design-contracts.sh' templates/.github/workflows/build-and-security.yml || err "GitHub build workflow must run the design checks"
+grep -Fq 'check-endpoint-auth.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-endpoint-auth.sh"
+grep -Fq 'check-frontend-calls.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-frontend-calls.sh"
+grep -Fq 'spring-boot-maven-plugin' templates/maven/contract-conformance.xml || err "contract-conformance must start the service it reads the spec from"
+grep -Fq 'generated-to-approved' templates/maven/contract-conformance.xml || err "contract-conformance must also diff generated against approved (undocumented endpoints)"
+grep -Fq '/docs/design/' templates/CODEOWNERS || err "CODEOWNERS must cover docs/design/"
+grep -Fq '/openapi/' templates/CODEOWNERS || err "CODEOWNERS must cover openapi/"
+grep -Fq 'data-component' core/skills/ux-design/SKILL.md || err "ux-design must require data-component on mockup controls"
+grep -Fq 'migration-safety' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service must follow migration-safety for migrations"
+grep -Fq 'design-reviewer' docs/model-routing-matrix.md || err "routing matrix lacks the design-reviewer"
+# Release and /deliver: thin chain, human merge enforced on the default host, dry run, versioned notes.
+for release_file in templates/scripts/render-mr-body.sh templates/scripts/release-notes.sh templates/CHANGELOG.md; do
+  [ -f "$release_file" ] || err "required release file missing: $release_file"
+done
+for release_script in render-mr-body.sh release-notes.sh; do
+  grep -Fq "scripts/$release_script" scripts/install.sh || err "install.sh does not seed scripts/$release_script"
+done
+grep -Fq 'CHANGELOG.md' scripts/install.sh || err "install.sh does not seed CHANGELOG.md"
+grep -Fq 'bin0 == "glab"' core/hooks/hook-policy.py || err "hook-policy must cover glab (merge and approve are human acts)"
+grep -Fq 'sub == "tag"' core/hooks/hook-policy.py || err "hook-policy must ask before creating a git tag"
+grep -Fq 'glab mr approve' core/adapters/kilo/kilo.json || err "kilo permissions must deny glab mr approve"
+grep -Fq 'render-mr-body.sh' core/commands/release.md || err "/release must render the MR description from the evidence"
+grep -Fq 'check-delivery-linkage.sh' core/commands/release.md || err "/release must dry-run the delivery gate locally"
+grep -Fq 'GitLab username' core/commands/release.md || err "/release must record the GitLab username as the release Approver"
+grep -Fq 'glab ci trigger delivery-approval' core/commands/release.md || err "/release must say how the delivery-approval job is played"
+grep -Fq 'three rounds' core/commands/release.md || err "/release must cap the CI fix loop"
+grep -Fq 'docs-only follow-up' core/commands/release.md || err "/release must keep deploy records off the default branch"
+grep -Fq 'release-notes.sh' core/commands/release.md || err "/release must produce release notes"
+for phase_command in intake design build verify release; do
+  grep -Fq "\`/$phase_command\`" core/commands/deliver.md || err "/deliver must run /$phase_command rather than restate it"
+done
+grep -Fq 'Re-opened' core/commands/deliver.md || err "/deliver must define re-entry after a Critical"
+grep -Fq 'Claude Code' core/commands/deliver.md || err "/deliver must state the fallback when subagents cannot launch subagents"
+if [ "$(wc -l < core/commands/deliver.md | tr -d ' ')" -gt 60 ]; then err "/deliver has grown past 60 lines: it should point at the phase commands, not restate them"; fi
+grep -Fq '## Maintenance change' core/commands/release.md || err "/release must handle a maintenance note"
+grep -Fq 'GitLab username' core/commands/verify.md || err "/verify must record the GitLab username as the approver"
+grep -Fq 'GitLab username' core/commands/maintain.md || err "/maintain must record the GitLab username as the approver"
+grep -Fq 'docs/maintain/*/state.json' core/commands/status.md || err "/status must read maintenance state files"
+grep -Fq 'check-design.sh' core/commands/status.md || err "/status must report a drifted design lock"
+grep -Fq 'check-gate-metrics.sh' core/commands/verify.md || err "/verify must run the machine checks CI runs"
+grep -Fq 'Service root:' core/commands/intake.md || err "/intake gate must record Service root for a multi-service repo"
+grep -Fq 'Dependency column' core/commands/intake.md || err "/intake must check milestone story order"
+for cmd in onboard plan; do
+  grep -Fq '## Collision' "core/commands/$cmd.md" || err "/$cmd must stop on a shared-file collision"
+done
+for cmd in design build verify; do
+  grep -Fq 'Re-opened' "core/commands/$cmd.md" || err "/$cmd must say what a Re-opened approval row means"
+done
+grep -Fq 'Release owner' templates/docs/project-profile.md || err "project-profile template lacks the Release rows"
 # Always-on context budget: the rules every session loads must not creep past this size.
 always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc AGENTS.md | wc -c | tr -d ' ')"
 [ "$always_on_bytes" -le 32000 ] || err "always-on rules are $always_on_bytes bytes (limit 32000): move detail into a command, agent, or skill"
