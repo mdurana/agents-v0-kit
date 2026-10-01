@@ -4,7 +4,7 @@ Maps every org rule clause to the agent, skill, hook, or gate that covers it. It
 
 Legend: **A** = agent instruction/review, **S** = skill checklist, **H-B** = blocking hook, **H-W** = warning hook, **G** = human-approved gate, **C** = command workflow check, **CI** = CI-side blocking check script, **R** = rule. A/S/C/R describe prompted or manual review, not deterministic enforcement. Gates require recorded evidence and approval; N/A is allowed only for an unaffected surface and never for an applicable Critical VAPT item.
 
-Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude Code (`.claude/settings.json` PreToolUse/PostToolUse/Stop). Kilo Code has no hook runtime — the same contract is enforced via `kilo.json` `permission.bash` (deny/ask patterns) and the CI checks.
+Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionStart, beforeShellExecution, preToolUse, afterFileEdit, stop). CI checks enforce the same contract at merge time.
 
 ## project-delivery-core.mdc
 
@@ -41,9 +41,9 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Prompt efficiency (Context → Task → Constraints; scope vague requests) | All agents (system prompt) |
 | Shell: non-interactive, bounded | A all agents; R ai-agent-conduct |
 | Ask user only when blocked | R workflow-orchestration (approval stops); all agents |
-| Do not commit unless asked | A release-manager; S release-pr; H-B pre-shell.sh (asks on git commit/push; denies force-push/hard reset, `gh pr merge`, destructive git clean; no env/command bypass) |
+| Do not commit unless asked | A release-manager; S release-pr; H-B pre-shell.sh (asks on git commit/push; denies force-push/hard reset, destructive git clean; no env/command bypass) |
 | No force-push/hard reset | H-B pre-shell.sh; S release-pr |
-| MR creation via glab (GitLab default) or PR via gh | A release-manager; S release-pr; C /release |
+| MR creation via **`glab`**, only when the user requests it | A release-manager; S release-pr; C /release |
 | Rule precedence: repository wins | R workflow-orchestration; `docs/project-profile.md`, ADRs |
 
 ## security-baseline.mdc
@@ -87,7 +87,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 
 | Clause | Enforcer |
 |--------|----------|
-| Full PR checklist with sign-off | A security-reviewer, code-reviewer, release-manager; S vapt-review, pr-review, release-pr; .github/pull_request_template.md; G Release gate |
+| Full MR checklist with sign-off | A security-reviewer, code-reviewer, release-manager; S vapt-review, pr-review, release-pr; `.gitlab/merge_request_templates/default.md`; G Release gate |
 | Critical = merge blocker | G Verify gate, Release gate |
 
 ## java-spring-backend.mdc
@@ -218,7 +218,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | The frontend calls only operations the catalog lists | C /build; S implement-frontend; CI ci/check-frontend-calls.sh |
 | Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /build; `maven/contract-conformance.xml` |
 | `/deliver` runs the phase commands in order and holds no phase detail of its own; resumes from the state file; a reopened phase is marked `Re-opened` until re-approved | C /deliver; A orchestrator; R workflow-orchestration |
-| Merge and approval of a merge request are human acts on the default host: `glab mr merge`, `glab mr approve`, and merge/approve through `glab api` are blocked; `glab mr create`, `glab ci trigger`, state-changing `glab api`, and `git tag` ask | H-B / H-ask pre-shell.sh; hook-policy.py shell; Kilo kilo.json |
+| Merge and approval of a merge request are human acts on the default host: `glab mr merge`, `glab mr approve`, and merge/approve through `glab api` are blocked; `glab mr create`, `glab ci trigger`, state-changing `glab api`, and `git tag` ask | H-B / H-ask pre-shell.sh; hook-policy.py shell |
 | Local dry run of the delivery gate before the push; the MR description is rendered from the evidence | C /release; S release-pr; `scripts/render-mr-body.sh`; CI ci/check-delivery-linkage.sh |
 | Release approver is the GitLab username that approves the MR; the manual `delivery-approval` job is played by a person or with explicit authorization | C /release; S release-pr; CI ci/check-approver-gitlab.sh |
 | CI fix loop is capped at three rounds; a code fix re-enters Verify | C /release; S release-pr |
@@ -235,7 +235,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`) are launched from the main session off a helper brief, not from inside a phase agent | R workflow-orchestration Helper agents; A orchestrator; C /intake, /design, /verify, /maintain |
 | Program planning: `/plan` writes the context map and milestone manifests; the Plan gate is a `plan` row | A program-planner, orchestrator; S system-design, program-planning; C /plan; R workflow-orchestration Program planning; CI ci/check-approvals.sh (plan), ci/check-delivery-linkage.sh |
 | Story order: a build-approved story needs a Verify approval on every story it depends on | R workflow-orchestration Plan gate; A orchestrator; CI ci/check-milestone.sh (`MILESTONE_ORDER=0` disables) |
-| One worktree and branch per feature; creating it needs explicit authorization | R workflow-orchestration Worktree per feature; `scripts/feature-worktree.sh`; H-ask pre-shell.sh; Kilo kilo.json |
+| One worktree and branch per feature; creating it needs explicit authorization | R workflow-orchestration Worktree per feature; `scripts/feature-worktree.sh`; H-ask pre-shell.sh; hook-policy.py shell |
 | Batch approval of Intake and Design for named, low-risk stories (one row per story artifact) | R workflow-orchestration Batch approval; A orchestrator; CI ci/check-approvals.sh (per artifact) |
 | Phase attempt budget: total failed attempts per phase are capped | R workflow-orchestration Phase attempt budget; C /build; S implement-*; `scripts/check-attempt-budget.sh` |
 | Verify numbers read from machine output: executed tests, diff coverage, unsuppressed HIGH/CRITICAL CVEs | R workflow-orchestration Verify gate; CI ci/check-gate-metrics.sh |
@@ -259,14 +259,15 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 
 | Control | Enforcer |
 |---------|----------|
-| Shell deny/ask (git, secrets, rm, kubectl, protected-path shell writes) | H-B pre-shell.sh; hook-policy.py; Kilo kilo.json |
-| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, commands and skills, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path; CODEOWNERS (the control on Kilo, which has no edit hook) |
+| Shell deny/ask (git, secrets, rm, kubectl, protected-path shell writes) | H-B pre-shell.sh; hook-policy.py |
+| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, commands and skills, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path; CODEOWNERS |
 | A green build means the checks ran: a JVM module with no resolved root fails CI | CI ci/check-layout-roots.sh (build and gate-metrics jobs) |
 | Delivery/milestone artifact edits (human gate) | H-ask pre-edit.sh; hook-policy.py path |
-| MCP tools (per-server allow/ask/block; unlisted servers ask) | H-ask pre-mcp.sh; hook-policy.py mcp; `mcp-policy.json` |
+| `git rebase`, `git merge`, `git cherry-pick`, `git revert`, and `git stash pop/drop/clear` ask first | H-ask pre-shell.sh; hook-policy.py shell |
+| Local pre-push gate (linkage, design contracts, build plan, endpoint auth) | `scripts/check-delivery-gate-local.sh` |
 | Session context (profile, repo map, state) | session-start.sh |
 | PR code ↔ feature artifact linkage | CI ci/check-delivery-linkage.sh |
-| Verify approval bound to a human GitHub reviewer named in the Approver column | CI ci/check-approver-github.sh (re-runs on `pull_request_review`) |
+| Verify approval bound to a human GitLab approver named in the Approver column | CI ci/check-approver-gitlab.sh (manual `delivery-approval` job) |
 | Release or verify approval bound to a human GitLab approver named on either row | CI ci/check-approver-gitlab.sh from the default branch (manual `.gitlab-ci.yml` job `delivery-approval`; `GITLAB_TOKEN` is `read_api` and scoped to that job's environment) |
 | Evidence `commit:` + staleness vs PR head | CI ci/check-evidence.sh |
 | Build failures cannot be masked by log piping | CI build-and-security.yml (`pipefail` default shell) |
@@ -274,7 +275,5 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Brownfield coverage ratchet | R quality-and-testing; CI ci/check-coverage-ratchet.sh; docs/project-profile.md `coverage_ratchet` |
 | Secret scan (full history, pinned + checksum-verified gitleaks) | CI build-and-security.yml |
 | Delivery and hook metrics (approved gates, failed attempts, blocked features per feature) | scripts/delivery-metrics.sh |
-| Branch, worktree, or `feature-worktree.sh` creation asks first | H-ask pre-shell.sh; hook-policy.py shell; Kilo kilo.json |
+| Branch, worktree, or `feature-worktree.sh` creation asks first | H-ask pre-shell.sh; hook-policy.py shell |
 | Behavior tests for the template CI scripts | scripts/test-ci-checks.sh (run by validate-kit.sh) |
-
-**Kilo Code limits:** Kilo has no hook runtime, so protected-path edits, delivery-artifact edit prompts, MCP policy, and session context are **not** enforced there. Kilo relies on `kilo.json` bash patterns, agent `tools:` maps (reviewers without `write`/`bash` stay read-only), CODEOWNERS, and the CI checks above.

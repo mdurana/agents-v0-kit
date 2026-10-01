@@ -69,7 +69,6 @@ hook_audit_log() {
   decision="$3"
   detail="$4"
   logdir=".cursor/hooks"
-  [ -d "$logdir" ] || logdir=".claude/hooks"
   logfile="$logdir/audit.jsonl"
   mkdir -p "$logdir" 2>/dev/null || return 0
   HOOK_AUDIT_EVENT="$event" HOOK_AUDIT_SUBJECT="$subject" HOOK_AUDIT_DECISION="$decision" HOOK_AUDIT_DETAIL="$detail" \
@@ -100,40 +99,22 @@ hook_emit_additional_context() {
   HOOK_CONTEXT_TEXT="$text" python3 -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
 if not text.strip():
     raise SystemExit(0)
-if flavor == "claude":
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": text,
-        }
-    }))
-else:
-    print(json.dumps({"additional_context": text}))
+print(json.dumps({"additional_context": text}))
 ' 2>/dev/null || true
 }
 
-# Session start context (Cursor sessionStart / Claude SessionStart).
+# Session start context (Cursor sessionStart).
 hook_emit_session_context() {
   text="$1"
   [ -n "$text" ] || return 0
   HOOK_CONTEXT_TEXT="$text" python3 -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
 if not text.strip():
     raise SystemExit(0)
-if flavor == "claude":
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": text,
-        }
-    }))
-else:
-    print(json.dumps({"additional_context": text}))
+print(json.dumps({"additional_context": text}))
 ' 2>/dev/null || true
 }
 
@@ -144,59 +125,34 @@ hook_emit_stop_followup() {
   HOOK_FOLLOWUP_TEXT="$text" python3 -c '
 import json, os
 text = os.environ.get("HOOK_FOLLOWUP_TEXT", "")
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
 if not text.strip():
     raise SystemExit(0)
-if flavor == "claude":
-    print(json.dumps({"followup_message": text}))
-else:
-    print(json.dumps({"followup_message": text}))
+print(json.dumps({"followup_message": text}))
 ' 2>/dev/null || true
 }
 
-# Emit the platform-specific "ask" response for a pre-shell guardrail.
-# Cursor: permission JSON. Claude Code: hookSpecificOutput PreToolUse decision.
-# Kilo Code does not run hooks — kilo.json permissions handle ask/deny.
+# Emit the platform-specific "ask" response for a pre-shell guardrail (Cursor permission JSON).
 hook_shell_permission_ask() {
   user_message="$1"
   agent_message="$2"
   HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" python3 -c '
 import json, os
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
 user = os.environ.get("HOOK_USER_MESSAGE", "")
 agent = os.environ.get("HOOK_AGENT_MESSAGE", "")
-if flavor == "claude":
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "ask",
-            "permissionDecisionReason": user,
-        }
-    }))
-else:
-    print(json.dumps({"permission": "ask", "user_message": user, "agent_message": agent}))
+print(json.dumps({"permission": "ask", "user_message": user, "agent_message": agent}))
 ' || true
 }
 
-# Emit allow for Cursor permission hooks (beforeShellExecution / beforeMCPExecution / preToolUse).
+# Emit allow for Cursor permission hooks (beforeShellExecution / preToolUse).
 # Exit 0 without valid JSON is treated as invalid under failClosed and blocks the tool.
 hook_shell_permission_allow() {
   HOOK_ALLOW_AGENT_MESSAGE="${1:-}" python3 -c '
 import json, os
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
 agent = os.environ.get("HOOK_ALLOW_AGENT_MESSAGE", "")
-if flavor == "claude":
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "allow",
-        }
-    }))
-else:
-    out = {"permission": "allow"}
-    if agent.strip():
-        out["agent_message"] = agent
-    print(json.dumps(out))
+out = {"permission": "allow"}
+if agent.strip():
+    out["agent_message"] = agent
+print(json.dumps(out))
 ' || true
 }
 

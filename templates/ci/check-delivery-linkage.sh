@@ -1,11 +1,11 @@
 #!/bin/sh
-# check-delivery-linkage.sh — PRs that change application code must reference a feature artifact.
+# check-delivery-linkage.sh — merge requests that change application code must reference a feature artifact.
 #
-# Usage: sh check-delivery-linkage.sh <base-sha> <head-sha> [<pr-body-file>] [<pr-number>]
-# Reads Feature-Artifact: docs/requirements/<feature>.md from the MR/PR body (markdown bold allowed)
+# Usage: sh check-delivery-linkage.sh <base-sha> <head-sha> [<mr-body-file>] [<mr-iid>]
+# Reads Feature-Artifact: docs/requirements/<feature>.md from the MR body (markdown bold allowed)
 # or infers it from changed docs.
 # Phase required: intake for docs-only artifact MRs; build approval in the artifact for app code.
-# A live GitLab/GitHub approval may match the Approver on an Approved release row or an Approved verify row.
+# A live GitLab approval may match the Approver on an Approved release row or an Approved verify row.
 # Set CHECK_MR_APPROVER=0 to skip that live match (GitLab runs it in the manual delivery-approval job).
 #
 # A bug fix, CVE patch, dependency bump, or hotfix names "Maintain-Note: docs/maintain/<id>/note.md"
@@ -44,29 +44,21 @@ fi
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
-# Bind a phase approval to a human MR/PR review (GitLab default; GitHub when in Actions).
+# Bind a phase approval to a human GitLab MR review.
 check_approver_binding() {
   artifact="$1"
   phase="$2"
   review_id="${3:-}"
   review_ref="${CI_MERGE_REQUEST_IID:-$review_id}"
   [ -n "$review_ref" ] || return 0
-  if [ -n "${CI_MERGE_REQUEST_IID:-}" ] || [ "${GITLAB_CI:-}" = "true" ] || [ "${GITLAB_CI:-}" = "1" ]; then
-    if [ -f "$here/check-approver-gitlab.sh" ]; then
+  if [ -f "$here/check-approver-gitlab.sh" ]; then
+    if [ -n "${CI_MERGE_REQUEST_IID:-}" ] || [ "${GITLAB_CI:-}" = "true" ] || [ "${GITLAB_CI:-}" = "1" ]; then
+      sh "$here/check-approver-gitlab.sh" "$artifact" "$phase" "$review_ref" || exit 1
+      return 0
+    fi
+    if [ -n "${GLAB_TOKEN:-}" ] || [ -n "${GITLAB_TOKEN:-}" ] || [ -n "${CI_JOB_TOKEN:-}" ]; then
       sh "$here/check-approver-gitlab.sh" "$artifact" "$phase" "$review_ref" || exit 1
     fi
-    return 0
-  fi
-  if [ -n "${GITHUB_ACTIONS:-}" ] && [ -f "$here/check-approver-github.sh" ] && [ -n "$review_id" ]; then
-    sh "$here/check-approver-github.sh" "$artifact" "$phase" "$review_id" || exit 1
-    return 0
-  fi
-  if [ -f "$here/check-approver-gitlab.sh" ] && { [ -n "${GLAB_TOKEN:-}" ] || [ -n "${GITLAB_TOKEN:-}" ] || [ -n "${CI_JOB_TOKEN:-}" ]; }; then
-    sh "$here/check-approver-gitlab.sh" "$artifact" "$phase" "$review_ref" || exit 1
-    return 0
-  fi
-  if [ -f "$here/check-approver-github.sh" ] && [ -n "${GH_TOKEN:-}" ] && [ -n "$review_id" ]; then
-    sh "$here/check-approver-github.sh" "$artifact" "$phase" "$review_id" || exit 1
   fi
 }
 
@@ -106,7 +98,7 @@ review_phases() {
     fi
   done
   if [ -z "$found" ]; then
-    printf 'FAIL: record an Approved release or verify row naming the MR/PR reviewer. The build Approver is not compared to that review.\n' >&2
+    printf 'FAIL: record an Approved release or verify row naming the MR reviewer. The build Approver is not compared to that review.\n' >&2
     return 1
   fi
   printf '%s\n' "$found"

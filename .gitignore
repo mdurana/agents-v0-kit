@@ -1,6 +1,7 @@
 # OS junk
 .DS_Store
 Thumbs.db
+.vscode/
 
 # Logs and local output
 *.log

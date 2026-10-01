@@ -3,7 +3,7 @@
 #
 # Usage: sh scripts/delivery-metrics.sh [repo-root] > docs/delivery-metrics.md
 # Reads docs/requirements/*.md "Delivery approvals" tables (phase dates → cycle time)
-# and .cursor/hooks/audit.jsonl / .claude/hooks/audit.jsonl (allow/ask/block counts).
+# and .cursor/hooks/audit.jsonl (allow/ask/block counts).
 
 set -eu
 root="${1:-.}"
@@ -141,7 +141,7 @@ if not note_rows:
 
 print("\n## Hook decisions (local audit log)\n")
 counts = {}
-for log in (".cursor/hooks/audit.jsonl", ".claude/hooks/audit.jsonl"):
+for log in (".cursor/hooks/audit.jsonl",):
     if not os.path.isfile(log):
         continue
     with open(log, encoding="utf-8") as f:

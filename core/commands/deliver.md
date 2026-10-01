@@ -32,7 +32,7 @@ Run **one story** through **Intake → Design → Build → Verify → Release**
 - **A flaw in the approved design** found in Build or Verify is an amendment (`/design` Amending an approved design), not an in-place edit.
 
 ## Who runs it
-Prefer launching the `orchestrator` subagent, which follows this file. If your tool does not let a subagent launch subagents (Claude Code does not), the main session runs the phases and launches every agent and helper itself, following the same commands. Helpers always run from the main session, never from a phase agent (`workflow-orchestration.mdc` Helper agents).
+Prefer launching the `orchestrator` subagent, which follows this file. If subagents cannot launch subagents in your session, the main session runs the phases and launches every agent and helper itself, following the same commands. Helpers always run from the main session, never from a phase agent (`workflow-orchestration.mdc` Helper agents).
 
 ## After release
 Fixes, patches, upgrades, and hotfixes use `/maintain` (or `/triage`): each has its own maintenance note and approvals, and routes to Verify.

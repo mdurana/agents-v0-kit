@@ -1,5 +1,4 @@
-# Delivery kit CI for on-prem GitLab (default host). Mirrors templates/.github/workflows/*.
-# Mark build, delivery-gate, and the manual delivery-approval job as required.
+# Delivery kit CI for on-prem GitLab. Mark build, delivery-gate, and the manual delivery-approval job as required.
 # Approving an MR does not re-run the pipeline. After approval, run delivery-approval.
 # GITLAB_TOKEN: project access token, read_api scope, masked, environment scope
 # "delivery-approval" (the job environment below). Do not create it as a project-wide
@@ -34,10 +33,12 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Testcontainers (quality-and-testing.mdc) needs a Docker daemon. The dind service below
-# needs a runner that allows privileged jobs. On a runner that mounts the host socket,
-# delete `services` and the DOCKER_* / TESTCONTAINERS_* variables and mount /var/run/docker.sock.
-# A project with no Testcontainers tests can delete them too.
+# Testcontainers (quality-and-testing.mdc) needs a Docker daemon.
+# Default: docker:27-dind. That service needs a runner that allows privileged jobs.
+# When privileged jobs are forbidden, delete `services` and the DOCKER_* / TESTCONTAINERS_*
+# variables below and mount /var/run/docker.sock on the job (host Docker). Confirm the choice
+# with sh scripts/verify-gitlab-ci-prereqs.sh before the first pipeline.
+# A project with no Testcontainers tests can delete the Docker block too.
 build:
   stage: test
   image: eclipse-temurin:21-jdk
@@ -49,6 +50,11 @@ build:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
     TESTCONTAINERS_HOST_OVERRIDE: docker
+    MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  cache:
+    key: "maven-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
@@ -240,6 +246,12 @@ frontend-calls:
 e2e:
   stage: e2e
   image: mcr.microsoft.com/playwright:v1.48.0-jammy
+  variables:
+    npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  cache:
+    key: "npm-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .npm/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
@@ -289,6 +301,12 @@ perf:
 frontend:
   stage: test
   image: node:20-bookworm
+  variables:
+    npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  cache:
+    key: "npm-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .npm/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
@@ -376,7 +394,7 @@ delivery-metrics:
       trusted="$(mktemp -d)"
       if git cat-file -e "FETCH_HEAD:ci/check-delivery-linkage.sh" 2>/dev/null \
         && git cat-file -e "FETCH_HEAD:ci/check-approver-gitlab.sh" 2>/dev/null; then
-        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh check-approver-github.sh classify-change.sh check-design.sh check-build-plan.sh; do
+        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh classify-change.sh check-design.sh check-build-plan.sh; do
           if git cat-file -e "FETCH_HEAD:ci/${s}" 2>/dev/null; then
             git show "FETCH_HEAD:ci/${s}" > "${trusted}/${s}"
             chmod +x "${trusted}/${s}"

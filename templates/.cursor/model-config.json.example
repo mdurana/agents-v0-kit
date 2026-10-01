@@ -1,0 +1,9 @@
+{
+  "plan": "claude-sonnet-5-5-high",
+  "build": "composer-2.5",
+  "review": "claude-sonnet-5-5-high",
+  "explore": "composer-2.5",
+  "debug": "grok-4.7-xhigh",
+  "schemas": "composer-2.5",
+  "docs": "composer-2.5"
+}

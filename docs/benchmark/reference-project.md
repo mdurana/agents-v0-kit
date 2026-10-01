@@ -67,7 +67,7 @@ Copy this block into `docs/benchmark/results/<YYYY-MM-DD>-<kit-version>.md`.
 ```text
 Kit version: <VERSION>
 Tool and models: <tool; plan/build/review/debug model IDs>
-CI host: <GitLab | GitHub>
+CI host: GitLab
 Stories finished: <n>/12   Blocked: <n> (<story: reason>, ...)
 Approved gates per story: <avg>   Re-approvals per story: <avg>
 Failed attempts per story: <avg>  Max in one story: <n>

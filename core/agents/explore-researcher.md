@@ -3,8 +3,6 @@ name: explore-researcher
 description: Fast repo exploration for Intake and triage. Maps code areas, conventions, and risks. Launched from the main session per the helper brief.
 model: composer-2.5
 mode: subagent
-model_kilo: z-ai/glm-5.3-flash
-model_claude: haiku
 tools:
   - read
   - grep

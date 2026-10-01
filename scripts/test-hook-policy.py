@@ -6,7 +6,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POLICY = os.path.join(ROOT, "core", "hooks", "hook-policy.py")
@@ -24,12 +23,6 @@ def shell(cmd: str) -> str:
 
 def path(p: str) -> str:
     return _run("path", {"HOOK_PATH": p})
-
-
-def mcp(tool: str, server: str = "", policy: str = "") -> str:
-    env = {"HOOK_MCP_TOOL": tool, "HOOK_MCP_SERVER": server}
-    env["HOOK_MCP_POLICY"] = policy or os.path.join(ROOT, "core", "hooks", "mcp-policy.json")
-    return _run("mcp", env)
 
 
 SHELL_CASES = [
@@ -92,10 +85,10 @@ SHELL_CASES = [
     # Protected paths via shell
     ("echo x > .cursor/hooks.json", "block"),
     ("sed -i s/a/b/ .cursor/hooks/pre-shell.sh", "block"),
-    ("cp evil.sh .claude/hooks/pre-shell.sh", "block"),
+    ("cp evil.sh .cursor/hooks/pre-shell.sh", "block"),
     ("rm .cursor/hooks.json", "block"),
     ("cp /tmp/x.sh ci/check-gate-metrics.sh", "block"),
-    ("echo skip > .claude/skills/quality-gate/SKILL.md", "block"),
+    ("echo skip > .cursor/skills/quality-gate/SKILL.md", "block"),
     ("rm .cursor/commands/build.md", "block"),
     ("echo exit 0 > ci/check-event-schemas.sh", "block"),
     ("python3 -c \"open('.cursor/hooks.json','w').write('{}')\"", "block"),
@@ -104,10 +97,6 @@ SHELL_CASES = [
     # Publish / deploy
     ("npm publish", "ask"),
     ("docker push img", "ask"),
-    ("gh pr merge 12 --squash", "block"),
-    ("gh release create v1", "ask"),
-    ("gh pr review 12 --approve", "block"),
-    ("gh pr review 12 --comment", "allow"),
     # glab: the default host. Merge and approve are human acts.
     ("glab mr merge 12", "block"),
     ("glab -R group/proj mr merge 12 --squash", "block"),
@@ -130,6 +119,15 @@ SHELL_CASES = [
     ("git tag", "allow"),
     ("git tag -l", "allow"),
     ("git tag --list 'v1*'", "allow"),
+    ("git rebase origin/main", "ask"),
+    ("git merge feature/x", "ask"),
+    ("git cherry-pick abcdef", "ask"),
+    ("git revert HEAD", "ask"),
+    ("git stash pop", "ask"),
+    ("git stash drop", "ask"),
+    ("git stash clear", "ask"),
+    ("git stash list", "allow"),
+    ("git stash push", "allow"),
     # Benign
     ("ls -la", "allow"),
     ("mvn -B clean verify", "allow"),
@@ -144,10 +142,6 @@ PATH_CASES = [
     ("AGENTS.md", "block"),
     (".cursor/commands/build.md", "block"),
     (".cursor/skills/implement-bff/SKILL.md", "block"),
-    (".claude/commands/verify.md", "block"),
-    (".claude/skills/quality-gate/SKILL.md", "block"),
-    (".kilo/command/build.md", "block"),
-    (".kilo/skills/vapt-review/SKILL.md", "block"),
     ("docs/design/x/ux-spec.md", "allow"),
     ("ci/check-gate-metrics.sh", "block"),
     ("ci/check-event-schemas.sh", "block"),
@@ -179,25 +173,7 @@ def main() -> int:
     for p, want in PATH_CASES:
         check(path(p), want, f"path {p}")
 
-    # MCP: bundled policy (github/gitlab allowlists). Unlisted servers use default "ask".
-    check(mcp("list_issues", "github"), "allow", "mcp github list")
-    check(mcp("create_pull_request", "github"), "ask", "mcp github create")
-    check(mcp("merge_pull_request", "github"), "block", "mcp github merge")
-    check(mcp("mcp__github__get_file_contents"), "allow", "mcp claude-style github get")
-    check(mcp("execute_sql", "postgres"), "ask", "mcp unlisted execute asks")
-    check(mcp("list_tables", "postgres"), "ask", "mcp unlisted list asks")
-    check(mcp("prod_delete_cluster", "infra"), "ask", "mcp unlisted delete asks")
-    check(mcp("api_get_project", "gitlab"), "allow", "mcp gitlab api_get")
-    check(mcp("api_create_issue", "gitlab"), "ask", "mcp gitlab api_create asks")
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-        json.dump({"default": "ask", "servers": {}}, f)
-        strict = f.name
-    try:
-        check(mcp("list_things", "unknown", strict), "ask", "mcp strict default")
-    finally:
-        os.unlink(strict)
-
-    total = len(SHELL_CASES) + len(PATH_CASES) + 10
+    total = len(SHELL_CASES) + len(PATH_CASES)
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

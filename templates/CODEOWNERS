@@ -11,27 +11,12 @@
 /docs/adr/ @your-team
 /openapi/ @your-team
 /ci/ @your-team
-/.github/workflows/ @your-team
 /.gitlab-ci.yml @your-team
 /.gitlab/ @your-team
 /.cursor/hooks.json @your-team
 /.cursor/hooks/ @your-team
 /.cursor/rules/ @your-team
 /.cursor/agents/ @your-team
-/.claude/settings.json @your-team
-/.claude/hooks/ @your-team
-/.claude/agents/ @your-team
-/.claude/rules/ @your-team
-/.kilo/kilo.json @your-team
-/.kilo/agent/ @your-team
-/.kilo/rules/ @your-team
-# Phase procedures and gate checklists. Kilo has no edit hook, so review is the control there.
 /.cursor/commands/ @your-team
 /.cursor/skills/ @your-team
-/.claude/commands/ @your-team
-/.claude/skills/ @your-team
-/.kilo/command/ @your-team
-/.kilo/skills/ @your-team
-/AGENTS.md @your-team
-/CLAUDE.md @your-team
 /CODEOWNERS @your-team

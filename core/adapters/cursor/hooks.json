@@ -7,13 +7,6 @@
         "timeout": 10
       }
     ],
-    "beforeMCPExecution": [
-      {
-        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-mcp.sh",
-        "failClosed": true,
-        "timeout": 15
-      }
-    ],
     "beforeShellExecution": [
       {
         "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-shell.sh",

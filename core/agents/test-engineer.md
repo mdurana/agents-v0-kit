@@ -3,8 +3,6 @@ name: test-engineer
 description: Verify phase. Writes/runs tests (JUnit5+Mockito+AssertJ, Vitest), Testcontainers, Pact; checks coverage and CVEs. Use first in /verify.
 model: composer-2.5
 mode: subagent
-model_kilo: z-ai/glm-5.3-flash
-model_claude: sonnet
 tools:
   - read
   - grep

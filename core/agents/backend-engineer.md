@@ -3,8 +3,6 @@ name: backend-engineer
 description: Build phase. Implements Spring Boot services — controllers, services, repositories, Flyway migrations — with red–green tests. Use in /build.
 model: composer-2.5
 mode: subagent
-model_kilo: z-ai/glm-5.3-flash
-model_claude: sonnet
 tools:
   - read
   - grep

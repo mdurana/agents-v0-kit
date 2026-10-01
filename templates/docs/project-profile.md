@@ -60,7 +60,7 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 
 | Release | Value |
 |---------|-------|
-| Release owner | <!-- GitLab or GitHub username allowed to tag and publish --> |
+| Release owner | <!-- GitLab username allowed to tag and publish --> |
 | Version file | <!-- e.g. pom.xml (project.version) or package.json; blank when the tag is the version --> |
 | Tag format | <!-- e.g. v{version} --> |
 | Changelog | <!-- e.g. CHANGELOG.md; blank when none --> |
@@ -79,9 +79,13 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 |-------|-----------------|------------------------------------|-----------|
 | | | | |
 
-## MCP servers (optional)
+## Endpoint authorization
 
-<!-- Per docs/mcp-baseline.md — server name, read/write, owner -->
+Spring (`*.java`, `@*Mapping`, `@PreAuthorize` / `@PermitAll`) is built in. Add a row to scan another stack. Columns: Stack, Suffix (`.py`), Marker (file must match this regex, or `(any)`), Mapping (regex; group 1 is the verb, group 2 the path), Security (regex near the mapping). Separate columns with ` | `. A pipe inside a regex has no spaces around it.
+
+| Stack | Suffix | Marker | Mapping | Security |
+|-------|--------|--------|---------|----------|
+| | | | | |
 
 ## Delivery
 

@@ -2,7 +2,7 @@
 
 You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and **approve each phase** before work continues. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit: **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). The workflow runs identically in Cursor, Kilo Code, and Claude Code — the gates, approvals, and evidence are the same; only the command palette and agent menus differ per tool.
+This guide matches the workflow in this kit: **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
 
 ---
 
@@ -207,7 +207,7 @@ Tests finish first. The security checklist and the code review are prepared toge
 | You should see | What it means                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
 | Docs updated   | README / architecture notes for what changed.                                                              |
-| Merge request  | Ready for engineering merge (CI green). On GitLab this is a merge request. On GitHub it is a pull request. |
+| Merge request  | Ready for engineering merge (CI green). |
 | VAPT sign-off  | Security checklist in the merge request description.                                                       |
 
 
@@ -282,7 +282,7 @@ Make the portal better.
 | **VAPT**               | Security review against a standard checklist (auth, permissions, data exposure, etc.).                            |
 | **BFF**                | A thin layer between screens and backend services — you rarely need to care unless integration is discussed.      |
 | **API / OpenAPI**      | A contract describing how systems exchange data — like a menu of allowed operations.                              |
-| **Merge request (MR)** | The packaged change engineers merge on GitLab after checks pass. GitHub calls the same thing a pull request (PR). |
+| **Merge request (MR)** | The packaged change engineers merge on GitLab after checks pass. |
 | **Critical finding**   | Must be fixed before release; not optional.                                                                       |
 
 
@@ -292,7 +292,7 @@ Make the portal better.
 
 ## What the AI will not do without you
 
-- **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor/Claude; approve only when you intended that action (e.g. Release).  
+- **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
 - **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
 - **Skip gates** on `/deliver` — you approve each phase. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  

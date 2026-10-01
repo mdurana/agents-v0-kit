@@ -1,8 +1,8 @@
 # Agentic Delivery Workflow Kit (agents-v0)
 
-A **vendor-neutral** agentic delivery kit for **Cursor AI**, **Kilo Code**, and **Claude Code**. One vendor-neutral core (`core/`), three per-tool adapters installed by `scripts/install.sh`, one shared set of gates, approvals, evidence contracts, and CI checks.
+An agentic delivery kit for **Cursor**. One core (`core/`) installs into `.cursor/` via `scripts/install.sh`, with shared gates, approvals, evidence contracts, and CI checks.
 
-The kit helps agents build and maintain enterprise-grade systems — Spring Boot services, BFFs, SvelteKit/React frontends — through a gated lifecycle: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. The map of every command, record, and check is [docs/agents-v0-kit.md](docs/agents-v0-kit.md). Every gate stops for explicit user approval; approval is never inferred; evidence is persisted and checked by CI at merge. The default host is on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`). GitHub Actions and `gh` remain the other supported host.
+The kit helps agents build and maintain enterprise-grade systems — Spring Boot services, BFFs, SvelteKit/React frontends — through a gated lifecycle: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. The map of every command, record, and check is [docs/agents-v0-kit.md](docs/agents-v0-kit.md). Every gate stops for explicit user approval; approval is never inferred; evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
 
 A feature’s progress is `docs/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). `lastApprovedPhase` comes only from an `Approved` row. `activePhase` plus `activeStatus` (`in_progress`, `awaiting_approval`, or `blocked`) is the phase in flight. `/status <feature>` reads that file: `in_progress` or `blocked` runs the same phase again from files already on disk; `awaiting_approval` waits and does not start the next phase. The user names the feature. The newest state file is not assumed to be the one they mean.
 
@@ -13,44 +13,37 @@ Different features may proceed in one checkout only while each writes its own `d
 
 | Path                 | Purpose                                                                                                                                                                                                                                                                                 |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AGENTS.md`          | Always-on instructions (loaded natively by Kilo Code; seeded as `CLAUDE.md` for Claude Code; Cursor gets the full rules via `.cursor/rules/`)                                                                                                                                           |
-| `core/rules/*.mdc`   | Org delivery rules (+ `ux-design`) — single source of truth; installed per tool adapter                                                                                                                                                                                                 |
-| `core/agents/*.md`   | 19 subagents (program planner, codebase documenter, design reviewer, phase leads + explore/debug/schema/docs helpers) with tri-platform `model:` frontmatter                                                                                                                                                                                   |
-| `core/commands/*.md` | 11 entry points (`/plan`, `/intake` … `/deliver`, `/onboard`, `/status`, `/triage`) with `description` frontmatter                                                                                                                                                                               |
-| `core/skills/`       | 23 playbooks in the standard `SKILL.md` format (identical for all three tools)                                                                                                                                                                                                          |
-| `core/hooks/`        | Shared guardrails: `pre-shell.sh`, `pre-edit.sh`, `pre-mcp.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`, `mcp-policy.json` (per-server MCP allow/ask/block, seeded once)                                                                                       |
-| `core/adapters/`     | Per-tool configs: `cursor/hooks.json`, `claude/settings.json`, `kilo/kilo.json`                                                                                                                                                                                                         |
-| `docs/`              | `agents-v0-kit.md` (the map), `user-guide.md`, `compliance-matrix.md`, `model-routing-matrix.md`                                                                                                                                                                                                  |
-| `templates/`         | Project starters: GitLab CI (`.gitlab-ci.yml`) and merge request template (default host), GitHub workflow examples, docs, Maven quality snippets, OpenAPI, `docker-compose.yml` + `docker/` Dockerfile starters, `scripts/run-local-container.sh` (Podman/Docker Compose), ignore files |
+| `AGENTS.md`          | Kit lifecycle summary (reference; Cursor loads rules from `.cursor/rules/`)                                                                                                                                                                                                             |
+| `core/rules/*.mdc`   | Org delivery rules (+ `ux-design`) — single source of truth; installed to `.cursor/rules/org/`                                                                                                                                                                                          |
+| `core/agents/*.md`   | 19 subagents with Cursor `model:` frontmatter                                                                                                                                                                                                                                           |
+| `core/commands/*.md` | 11 entry points (`/plan`, `/intake` … `/deliver`, `/onboard`, `/status`, `/triage`) with `description` frontmatter                                                                                                                                                                      |
+| `core/skills/`       | 23 playbooks in the standard `SKILL.md` format                                                                                                                                                                                                                                          |
+| `core/hooks/`        | Guardrails: `pre-shell.sh`, `pre-edit.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`                                                                                                                                           |
+| `core/adapters/`     | Cursor `hooks.json`                                                                                                                                                                                                                                                                    |
+| `docs/`              | `agents-v0-kit.md` (the map), `user-guide.md`, `compliance-matrix.md`, `model-routing-matrix.md`                                                                                                                                                                                      |
+| `templates/`         | Project starters: GitLab CI, docs, Maven quality snippets, OpenAPI, Docker starters, `.cursorignore`                                                                                                                                                          |
 | `scripts/`           | `install.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `audit-brownfield-baseline.sh`                                                                                                                                                                                              |
 
+## Cursor install surface
 
-
-
-## What each tool gets
-
-
-| Concern                          | Cursor                                   | Kilo Code                                                  | Claude Code                                                                     |
-| -------------------------------- | ---------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Always-on rules                  | `.cursor/rules/*.mdc` (`alwaysApply`)    | `AGENTS.md` + `.kilo/rules/` via `instructions`            | `CLAUDE.md` + `@.claude/rules/` imports                                         |
-| Phase commands                   | `.cursor/commands/`                      | `.kilo/command/`                                           | `.claude/commands/`                                                             |
-| Subagents                        | `.cursor/agents/` (`model:`)             | `.kilo/agent/` (`mode: subagent`, `model: provider/model`) | `.claude/agents/` (`model: sonnet/sonnet/...`)                                    |
-| Skills                           | `.cursor/skills/`                        | `.kilo/skills/`                                            | `.claude/skills/`                                                               |
-| Git/secret guardrails            | `hooks.json` + `pre-shell.sh` (deny/ask) | `kilo.json` `permission.bash` (deny/ask patterns)          | `settings.json` PreToolUse + `pre-shell.sh` (deny/ask via `permissionDecision`) |
-| Agent context ignores            | `.cursorignore`                          | `.kiloignore`                                              | `.claudeignore`                                                                 |
-| Edit warnings / stop reminder    | `after-edit.sh` / `stop.sh` hooks        | CI checks + gate commands                                  | `PostToolUse` / `Stop` hooks                                                    |
-| Session context / MCP guardrails | `session-start.sh`, `pre-mcp.sh`         | —                                                          | `SessionStart` / `mcp__*` PreToolUse                                            |
-
-
-
+| Concern                          | Location |
+| -------------------------------- | -------- |
+| Always-on rules                  | `.cursor/rules/org/*.mdc` (`alwaysApply` where set) |
+| Phase commands                   | `.cursor/commands/` |
+| Subagents                        | `.cursor/agents/` (`model:`) |
+| Skills                           | `.cursor/skills/` |
+| Git/secret guardrails            | `.cursor/hooks.json` + `pre-shell.sh` (deny/ask) |
+| Agent context ignores            | `.cursorignore` |
+| Edit warnings / stop reminder    | `after-edit.sh` / `stop.sh` |
+| Session context                  | `session-start.sh` |
 
 ## Onboarding
 
 
 | Scenario                       | Script / doc                                                                                                                                                                                               |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New repo (greenfield)**      | Scaffold into `backend/`, `frontend/`, or `bff/` (no application `src/` at the repo root), then `./scripts/bootstrap-greenfield.sh --tool cursor --profile service` (or `ui`, or `app`) `/path/to/target-repo` — see [docs/greenfield-onboarding.md](docs/greenfield-onboarding.md) |
-| **Existing repo (brownfield)** | `./scripts/install.sh` then `./scripts/audit-brownfield-baseline.sh /path/to/target-repo` — see [docs/brownfield-onboarding.md](docs/brownfield-onboarding.md)                                             |
+| **New repo (greenfield)**      | Scaffold into `backend/`, `frontend/`, or `bff/` (no application `src/` at the repo root), then `./scripts/bootstrap-greenfield.sh --profile service` (or `ui`, or `app`) `/path/to/target-repo` — see [docs/greenfield-onboarding.md](docs/greenfield-onboarding.md) |
+| **Existing repo (brownfield)** | `./scripts/install.sh /path/to/target-repo` then `./scripts/audit-brownfield-baseline.sh /path/to/target-repo` — see [docs/brownfield-onboarding.md](docs/brownfield-onboarding.md) |
 
 
 
@@ -58,23 +51,20 @@ Different features may proceed in one checkout only while each writes its own `d
 ## Install
 
 ```bash
-# install for one tool or all three (default: all; minimal templates)
-./scripts/install.sh --tool cursor /path/to/target-repo
+# install into a target repo (minimal templates)
+./scripts/install.sh /path/to/target-repo
 # greenfield / full starters (maven, docker, openapi, …):
-./scripts/install.sh --tool cursor --with-starters /path/to/target-repo
-./scripts/install.sh --tool kilo /path/to/target-repo
-./scripts/install.sh --tool claude /path/to/target-repo
-./scripts/install.sh --tool all /path/to/target-repo
+./scripts/install.sh --with-starters /path/to/target-repo
 
 # after kit changes: sync docs -> templates/, validate, refresh kit-managed files
 ./scripts/install.sh --update /path/to/target-repo
 ```
 
-Seeded only when missing (never clobbered): `README.md`, `AGENTS.md`, `CLAUDE.md`, `.kilo/kilo.json`, `.claude/settings.json`, and all project templates. Always refreshed on `--update`: rules, agents, commands, skills, hooks, adapter configs, reference docs, `ci/*.sh`.
+Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`.
 
 ## Model routing
 
-The kit routes by **role** — Plan / Build / Review / Explore / Debug / Schemas / Docs — with one row per platform in `docs/model-routing-matrix.md`. Agent frontmatter carries all three IDs; adapters emit the tool's own. Provider-qualified Kilo IDs are examples: adapt them to your `kilo.json` providers.
+The kit routes by **role** — Plan / Build / Review / Explore / Debug / Schemas / Docs — with Cursor model IDs in `docs/model-routing-matrix.md`. Agent frontmatter carries `model:` for subagent launches.
 
 ## Milestone delivery
 
@@ -105,10 +95,10 @@ Milestone programs (P0 Platform Skeleton, P1 Contracts & Data Models, P2 MVP/Cor
 ./scripts/validate-kit.sh --target /path/to/target   # also validate an installed target
 ```
 
-Kit checks: rule frontmatter, cross-references, all eleven commands, README counts, tri-platform agent model fields against the routing matrix, adapter configs, `AGENTS.md`, required template artifacts, docs↔templates parity, hook classifications, evidence contracts (Build/Verify), and shell syntax. Target checks: adapter trees per installed tool, entry files (`README.md`, `AGENTS.md`, `CLAUDE.md`), CI scripts and exec bits, seeded docs, the merge-request and pull-request template evidence contract, and the `!docs/build/` ignore negations. Unexpected arguments are rejected with a usage error; a nonexistent `--target` fails immediately. Model availability in each tool is not verified.
+Kit checks: rule frontmatter, cross-references, all eleven commands, README counts, agent `model:` fields against the routing matrix, Cursor adapter config, required template artifacts, docs↔templates parity, hook classifications, evidence contracts (Build/Verify), and shell syntax. Target checks: `.cursor/` tree, CI scripts and exec bits, seeded docs, MR/PR template evidence contract, and `!docs/build/` ignore negations. Model availability in Cursor is not verified.
 
 On a target GitLab project, scope `GITLAB_TOKEN` (`read_api`, masked) to the `delivery-approval` environment, replace `@your-team` in `CODEOWNERS`, and set `ENABLE_GITLAB_SAST=1` only when that GitLab provides the SAST template. See [docs/greenfield-onboarding.md](docs/greenfield-onboarding.md).
 
 ## Compliance
 
-See `docs/compliance-matrix.md` — every rule clause mapped to the enforcing agent, skill, hook, gate, or CI check. Hook rows apply to Cursor and Claude Code; Kilo Code enforces the same contract via `kilo.json` permissions and CI.
+See `docs/compliance-matrix.md` — every rule clause mapped to the enforcing agent, skill, hook, gate, or CI check. Hook rows apply to Cursor; GitLab CI enforces the merge contract.

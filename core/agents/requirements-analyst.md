@@ -3,8 +3,6 @@ name: requirements-analyst
 description: Intake phase. Turns Jira/Confluence specs into acceptance criteria, NFRs, and a regulation list. Use first in /deliver.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep

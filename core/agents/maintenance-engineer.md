@@ -3,8 +3,6 @@ name: maintenance-engineer
 description: Maintain phase. Bug triage, CVE/dependency upgrades, refactors, doc drift, recorded in a maintenance note. Smallest diff, no drive-by changes. Use in /maintain.
 model: composer-2.5
 mode: subagent
-model_kilo: z-ai/glm-5.3-flash
-model_claude: sonnet
 tools:
   - read
   - grep

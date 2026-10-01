@@ -6,7 +6,7 @@ delivery kit and **incremental** milestone delivery (P0 → P5).
 ## 1. Scaffold the application (outside the kit)
 
 The kit does not run Spring Initializr or frontend CLIs for you. Create the repo with
-your team’s standard generator, then open it in Cursor/Kilo/Claude Code.
+your team’s standard generator, then open it in Cursor.
 
 | Profile | Typical bootstrap |
 |---------|-------------------|
@@ -23,10 +23,10 @@ Commit the initial skeleton (or use an empty repo) before installing the kit.
 From the **agents-v0** kit repo:
 
 ```bash
-./scripts/bootstrap-greenfield.sh --tool cursor --profile app /path/to/your-new-repo
+./scripts/bootstrap-greenfield.sh --profile app /path/to/your-new-repo
 ```
 
-`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/project-profile.md` when those cells are still placeholders. Use `--tool kilo`, `claude`, or `all` as needed.
+`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/project-profile.md` when those cells are still placeholders.
 
 During P0 build stories, agents follow the **`scaffold-service`** skill (secure defaults,
 quality plugins, container starter). **Major** cross-cutting changes use **`system-design`** in `/design`.
@@ -34,14 +34,14 @@ quality plugins, container starter). **Major** cross-cutting changes use **`syst
 Manual equivalent:
 
 ```bash
-./scripts/install.sh --tool cursor /path/to/your-new-repo
+./scripts/install.sh /path/to/your-new-repo
 cp /path/to/agents-v0/templates/docs/milestones/p0-platform-skeleton.md \
    /path/to/your-new-repo/docs/milestones/
 ```
 
 The manual path does not fill Layout. Set the **This repo** rows in `docs/project-profile.md`, or re-run bootstrap with `--profile`.
 
-Wire CI with the seeded `.gitlab-ci.yml` (on-prem GitLab). Set `GITLAB_TOKEN` (`read_api`, masked) on the `delivery-approval` environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Ensure `.gitignore` keeps `docs/build/` and `docs/verify/` committable.
+Wire CI with the seeded `.gitlab-ci.yml` (on-prem GitLab). Protect the default branch (merge requests only; no direct push) and turn on Code Owner approval for `.gitlab-ci.yml`, `ci/`, and `.cursor/`. Set `GITLAB_TOKEN` (`read_api`, masked) on the protected `delivery-approval` environment only, and replace `@your-team` in `CODEOWNERS`. Check the token and the Docker runner choice with `sh scripts/verify-gitlab-ci-prereqs.sh` (`GITLAB_HOST`, `GITLAB_PROJECT_ID`). The build job uses privileged Docker-in-Docker and caches `.m2/repository`; the frontend and e2e jobs cache `.npm/`. When privileged jobs are forbidden, follow the `/var/run/docker.sock` comment on the build job. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Install PyYAML (`pip install pyyaml`) so local OpenAPI checks run. Before pushing a feature branch, run `sh scripts/check-delivery-gate-local.sh <feature>`. To run that gate on every push, copy `hooks/pre-push` to `.git/hooks/pre-push` and mark it executable. To remap Cursor models, copy `templates/.cursor/model-config.json.example` to `.cursor/model-config.json` and re-run install. Ensure `.gitignore` keeps `docs/build/` and `docs/verify/` committable.
 
 ## 3. Wire quality before heavy coding
 

@@ -2,7 +2,7 @@
 # bootstrap-greenfield.sh — install agents-v0 into a new repo and seed the P0 milestone manifest.
 #
 # Usage:
-#   bootstrap-greenfield.sh [--tool cursor|kilo|claude|all] [--profile service|ui|app] <target-repo>
+#   bootstrap-greenfield.sh [--profile service|ui|app] <target-repo>
 #
 # Prerequisite: scaffold the application (Spring Initializr, create-svelte, etc.) so
 # <target-repo> exists. See docs/greenfield-onboarding.md.
@@ -11,21 +11,19 @@
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
-TOOL="all"
 PROFILE=""
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--tool cursor|kilo|claude|all] [--profile service|ui|app] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--profile service|ui|app] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --tool)
-      [ $# -ge 2 ] || usage
-      TOOL="$2"
-      shift 2
+      printf 'error: --tool is removed; bootstrap installs Cursor only\n' >&2
+      exit 1
       ;;
     --profile)
       [ $# -ge 2 ] || usage
@@ -41,14 +39,6 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
-
-case "$TOOL" in
-  cursor|kilo|claude|all) ;;
-  *)
-    printf 'error: unknown tool: %s\n' "$TOOL" >&2
-    usage
-    ;;
-esac
 
 case "$PROFILE" in
   ''|service|ui|app) ;;
@@ -66,7 +56,7 @@ esac
 
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
-"$KIT/scripts/install.sh" --tool "$TOOL" --with-starters "$TARGET_ABS"
+"$KIT/scripts/install.sh" --with-starters "$TARGET_ABS"
 
 mkdir -p "$TARGET_ABS/docs/milestones"
 for m in p0-platform-skeleton p1-contracts-and-data-models p2-mvp-core-features p3-feature-expansion p4-hardening p5-release-readiness; do

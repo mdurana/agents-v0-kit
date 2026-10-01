@@ -3,8 +3,6 @@ name: codebase-documenter
 description: Onboard phase. Documents an existing codebase as-is — profile, baseline, inventories, module docs, architecture, flows — with cited evidence. Use in /onboard.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep

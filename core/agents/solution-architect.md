@@ -3,8 +3,6 @@ name: solution-architect
 description: Design phase. Produces OpenAPI/event contracts, ADRs, and Mermaid diagrams. Use after Intake in /deliver.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep

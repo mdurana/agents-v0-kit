@@ -2,7 +2,7 @@
 
 Engineer's map of the agents-v0 delivery kit: the workflow, the records, and what is actually checked. Approvers use [user-guide.md](user-guide.md). This file describes the kit as installed; each phase command (`core/commands/`) is the procedure, and this page is how the pieces fit.
 
-The kit is vendor-neutral. `scripts/install.sh` copies one core into Cursor, Kilo Code, and Claude Code. Gates, approvals, and CI checks are the same in all three. The default git host is on-prem GitLab (`glab`). GitHub (`gh`) is the other supported host.
+The kit targets **Cursor**. `scripts/install.sh` copies the core into `.cursor/`. Gates, approvals, and CI checks are documented here. Git hosting is on-prem GitLab (`glab`, `.gitlab-ci.yml`).
 
 ## Workflow
 
@@ -140,7 +140,7 @@ The merge is the completion of the change. When the profile has a Deploy table, 
 
 ## Onboarding an existing repo
 
-`/onboard` does not move source and does not invent a future design. It runs the baseline, then `scripts/generate-repo-map.sh`, `scripts/collect-dependency-graphs.sh`, and `scripts/discover-codebase.sh`. The discovery files under `docs/discovery/` list endpoints, entities, migrations, messaging, configuration key names, frontend routes, and a security snapshot. Values of secrets are never written.
+`/onboard` does not move source and does not invent a future design. It runs the baseline, then `scripts/generate-repo-map.sh`, `scripts/collect-dependency-graphs.sh`, and `scripts/discover-codebase.sh`. The discovery files under `docs/discovery/` list endpoints, entities, migrations, messaging, configuration key names, frontend routes, and a security snapshot. When FastAPI, Express, Nest, or Go routers are present, `docs/discovery/endpoint-stacks.md` proposes rows for **Endpoint authorization** and, if that table is still empty, copies them into `docs/project-profile.md` for a person to confirm. Values of secrets are never written.
 
 Each module gets `docs/onboarding/modules/<module>.md`. Every statement cites `path/File.java:42` or says `UNVERIFIED`. `scripts/check-onboarding-docs.sh` rejects a citation that does not resolve and any leftover `TEMPLATE:` line. Architecture, network, the context map, inherited decisions, and the flows the user names are written as they are. `/intake` and `/plan` wait for the `onboard` row.
 
@@ -169,7 +169,7 @@ The model is chosen by role. The matrix is `docs/model-routing-matrix.md`.
 | Plan | Planning, requirements, architecture, UX, orchestration | the stronger model |
 | Build | Implementation, tests, maintenance, release | the fast model |
 | Build (critical) | Auth, uploads, public routes, sagas, consumers | the Plan model, passed for that launch |
-| Review | Design review, security review, code review | the stronger model. On Claude Code, `opus`, so the reviewer is not the builder |
+| Review | Design review, security review, code review | the stronger model (same Cursor ID as Plan) |
 | Explore, Debug, Schemas, Docs | Repo mapping, a failing test, contracts, doc drafts | fast, except Debug |
 
 Phase agents do not launch other agents. They write a helper brief and return. The main session launches `explore-researcher`, `schema-author`, `debug-investigator`, or `docs-author`, and passes the result back. The same brief a second time is a loop, and the session stops.
@@ -182,7 +182,7 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 |--------|--------|
 | `check-approvals.sh` | The named phase has an explicit approval |
 | `check-evidence.sh` | Recorded evidence exists, has `commit:`, and is not stale |
-| `check-approver-gitlab.sh` / `check-approver-github.sh` | The Approver matches a human who approved the merge request |
+| `check-approver-gitlab.sh` | The Approver matches a human who approved the merge request |
 | `check-milestone.sh` | Every story in a manifest has the phase approval, in dependency order |
 | `check-design.sh` | The design is complete, and still matches its lock |
 | `check-openapi.sh` | The contract lints, is compatible, and was merged |
@@ -201,24 +201,24 @@ On GitLab the gate scripts are read from the default branch, so a merge request 
 
 ## Hooks
 
-Cursor and Claude Code run the hook scripts. They block force-push, hard reset, recursive delete, reading secret files, edits to `ci/*.sh`, and edits to the installed commands, skills, agents, and rules. They block `glab mr merge`, `glab mr approve`, and `gh pr merge`. They ask before commit, push, a new branch or worktree, `glab mr create`, `git tag`, and a mutating `glab api` call. `after-edit.sh` warns on common VAPT mistakes. It does not pass or fail them. Kilo has no hook runtime. The same denials are in `kilo.json`, and the rest is CI plus `CODEOWNERS`.
+Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, hard reset, recursive delete, reading secret files, edits to `ci/*.sh`, and edits to the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, a new branch or worktree, `glab mr create`, `git tag`, and a mutating `glab api` call. `after-edit.sh` warns on common VAPT mistakes. CI and `CODEOWNERS` enforce the merge contract.
 
 ## Rules and skills
 
-Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`, plus `AGENTS.md`. Their combined size is capped at 32 KB. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review. Kilo and Claude Code load every rule.
+Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
 
 Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
 
 ## Install
 
 ```bash
-./scripts/install.sh --tool cursor /path/to/repo
-./scripts/install.sh --tool all --with-starters /path/to/repo
+./scripts/install.sh /path/to/repo
+./scripts/install.sh --with-starters /path/to/repo
 ./scripts/install.sh --update /path/to/repo
 ./scripts/validate-kit.sh
 ```
 
-`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. Without it, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite a project's `AGENTS.md`, profile, or templates that the project already has.
+`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. Without it, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist.
 
 A new repo starts with `scripts/bootstrap-greenfield.sh` ([greenfield-onboarding.md](greenfield-onboarding.md)). An existing repo starts with install, then `/onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)).
 

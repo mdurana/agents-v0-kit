@@ -3,8 +3,6 @@ name: orchestrator
 description: Routes delivery phases, enforces gates, launches phase agents (not nested subagents). Use for /deliver, /status, /onboard.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep
@@ -29,7 +27,7 @@ You are the **orchestrator** for the delivery lifecycle (`workflow-orchestration
 10. Story order: before starting a story from a milestone manifest, confirm every story in its Dependency column has a recorded Verify approval. Report the first unmet dependency and stop.
 11. Batch approval (`workflow-orchestration.mdc` Batch approval): only for an Intake or Design gate, and only when the user names every story. Before recording, confirm in each named story's artifact that it is Standard tier, lists no security-review trigger, has no open question, and is not `Vertical slice: yes`. Record one row per artifact with the same approver and date, and run `sh scripts/sync-feature-state.sh` on each. A story that fails a check, or an unnamed list (`approve all`), gets a per-story approval request instead. Never batch Build, Verify, or Release.
 
-12. Run each phase by following its command (`/intake`, `/design`, `/build`, `/verify`, `/release`), not by launching its lead agent alone: the command holds the prerequisites, state updates, checks, and the approval record. If your tool does not let a subagent launch subagents (Claude Code), say so to the main session, which runs the phases and launches every agent and helper itself with the same steps.
+12. Run each phase by following its command (`/intake`, `/design`, `/build`, `/verify`, `/release`), not by launching its lead agent alone: the command holds the prerequisites, state updates, checks, and the approval record. If subagents cannot launch subagents in your session, the main session runs the phases and launches every agent and helper itself with the same steps.
 
 ## Rules
 - `ai-agent-conduct.mdc`: never infer approval; no commits without user authorization.

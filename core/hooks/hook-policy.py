@@ -32,32 +32,6 @@ SCRIPT_WRITE_HINT = re.compile(
     re.I,
 )
 
-# MCP: explicit mutating verbs (word-boundary); default deny unknown mutators via ask list extension
-MCP_MUTATE_VERBS = frozenset(
-    {
-        "create",
-        "update",
-        "delete",
-        "write",
-        "merge",
-        "deploy",
-        "publish",
-        "execute",
-        "run",
-        "send",
-        "transition",
-        "add",
-        "remove",
-        "insert",
-        "upsert",
-        "patch",
-        "put",
-        "post",
-    }
-)
-MCP_READ_SAFE = frozenset({"list", "get", "read", "search", "fetch", "describe", "show"})
-
-
 def _json_out(action: Action, message: str = "") -> None:
     print(json.dumps({"action": action, "message": message}), end="")
 
@@ -335,15 +309,6 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if bin0 == "find" and "-delete" in parts:
         return "ask", "find -delete removes files; requires explicit user approval."
 
-    if bin0 == "gh":
-        sub = parts[1] if len(parts) > 1 else ""
-        if sub == "pr" and "merge" in parts[2:]:
-            return "block", "gh pr merge requires explicit human authorization."
-        if sub == "release" and "create" in parts[2:]:
-            return "ask", "gh release create requires explicit user approval."
-        if sub == "pr" and "review" in parts[2:] and any(x in parts for x in ("--approve", "-a")):
-            return "block", "approving a pull request is a human act, not an agent action."
-
     if bin0 == "glab":
         pairs = set(zip(parts[1:], parts[2:]))
         joined = " ".join(parts[1:])
@@ -398,6 +363,13 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             return "ask", branch_msg
         if sub == "switch" and any(x in parts for x in ("-c", "-C", "--create")):
             return "ask", branch_msg
+        if sub in ("rebase", "merge", "cherry-pick", "revert"):
+            return "ask", f"git {sub} rewrites or combines history; requires explicit user approval."
+        if sub == "stash":
+            args = parts[parts.index("stash") + 1 :] if "stash" in parts else []
+            op = next((a for a in args if not a.startswith("-")), "")
+            if op in ("pop", "drop", "clear"):
+                return "ask", "git stash pop, drop, or clear can discard work; requires explicit user approval."
 
     return "allow", ""
 
@@ -497,17 +469,7 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/hooks/"),
     re.compile(r"(^|/)\.cursor/rules/"),
     re.compile(r"(^|/)\.cursor/agents/"),
-    re.compile(r"(^|/)\.claude/settings\.json$"),
-    re.compile(r"(^|/)\.claude/hooks/"),
-    re.compile(r"(^|/)\.claude/agents/"),
-    re.compile(r"(^|/)\.claude/rules/"),
-    re.compile(r"(^|/)\.kilo/kilo\.json$"),
-    re.compile(r"(^|/)\.kilo/agent/"),
-    re.compile(r"(^|/)\.kilo/rules/"),
-    # Phase procedures and gate checklists live in commands and skills; an agent must not rewrite them.
     re.compile(r"(^|/)\.cursor/(commands|skills)/"),
-    re.compile(r"(^|/)\.claude/(commands|skills)/"),
-    re.compile(r"(^|/)\.kilo/(command|skills)/"),
     # Every CI gate script: a new check is protected without editing this list.
     re.compile(r"(^|/)ci/[^/]+\.sh$"),
     re.compile(r"(^|/)scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree)\.sh$"),
@@ -517,7 +479,6 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)CODEOWNERS$"),
     re.compile(r"(^|/)core/hooks/"),
     re.compile(r"(^|/)AGENTS\.md$"),
-    re.compile(r"(^|/)CLAUDE\.md$"),
 ]
 
 
@@ -551,72 +512,6 @@ def classify_path(path: str) -> Tuple[Action, str]:
     return "allow", ""
 
 
-def _mcp_split(tool: str, server: str) -> Tuple[str, str]:
-    """Claude names MCP tools mcp__<server>__<tool>; Cursor passes server separately."""
-    m = re.match(r"^mcp__([^_]+(?:_[^_]+)*?)__(.+)$", tool)
-    if m and not server:
-        return m.group(1), m.group(2)
-    return server, tool
-
-
-def _load_mcp_policy() -> Optional[dict]:
-    path = os.environ.get("HOOK_MCP_POLICY") or os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "mcp-policy.json"
-    )
-    if not os.path.isfile(path):
-        return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _mcp_policy_decision(policy: dict, server: str, tool: str) -> Optional[Tuple[Action, str]]:
-    import fnmatch
-
-    servers = policy.get("servers") or {}
-    entry = servers.get(server) if server else None
-    if entry is None:
-        default = policy.get("default", "heuristic")
-        if default in ("allow", "ask", "block"):
-            return default, f"MCP default policy ({default}) for unlisted server {server or '?'}: {tool}"
-        return None
-    t = tool.lower()
-    for key, action in (("block", "block"), ("allow", "allow"), ("ask", "ask")):
-        for pat in entry.get(key, []):
-            if fnmatch.fnmatch(t, pat.lower()):
-                return action, f"MCP policy {server}/{pat} → {action}: {tool}"
-    fallback = entry.get("default", "ask")
-    return fallback, f"MCP policy {server} default → {fallback}: {tool}"
-
-
-def classify_mcp(tool: str, server: str = "") -> Tuple[Action, str]:
-    server, tool = _mcp_split(tool, server)
-    policy = _load_mcp_policy()
-    if policy is not None:
-        decision = _mcp_policy_decision(policy, server, tool)
-        if decision is not None:
-            return decision
-    return classify_mcp_tool(tool)
-
-
-def classify_mcp_tool(tool: str) -> Tuple[Action, str]:
-    t = tool.lower()
-    if not t:
-        return "allow", ""
-    if re.search(r"\b(production|prod-env|prod_cluster)\b", t):
-        return "block", f"MCP tool blocked for production safety: {tool}"
-    tokens = re.split(r"[_\-.]+", t)
-    if "delete" in tokens and "undelete" not in tokens:
-        return "block", f"MCP destructive tool blocked: {tool}"
-    for tok in tokens:
-        if tok in MCP_MUTATE_VERBS:
-            return "ask", f"MCP tool may mutate external state: {tool}"
-    if any(tok in MCP_READ_SAFE for tok in tokens):
-        return "allow", ""
-    if re.search(r"(create|update|write|merge|deploy|publish|execute|send)", t):
-        return "ask", f"MCP tool may mutate external state: {tool}"
-    return "allow", ""
-
-
 def main() -> int:
     if len(sys.argv) < 2:
         _json_out("block", "hook-policy: missing mode")
@@ -631,12 +526,6 @@ def main() -> int:
             action, message = "block", (
                 "Refusing commands that may print secrets or environment variables."
             )
-        _json_out(action, message)
-        return 0
-    if mode == "mcp":
-        tool = os.environ.get("HOOK_MCP_TOOL", "")
-        server = os.environ.get("HOOK_MCP_SERVER", "")
-        action, message = classify_mcp(tool, server)
         _json_out(action, message)
         return 0
     if mode == "path":

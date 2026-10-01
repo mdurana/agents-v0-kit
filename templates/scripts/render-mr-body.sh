@@ -1,10 +1,10 @@
 #!/bin/sh
-# render-mr-body.sh — build the merge request / pull request description from the evidence.
+# render-mr-body.sh — build the merge request description from the evidence.
 #
 # Usage: sh scripts/render-mr-body.sh <feature> [--base <ref>] [--template <file>]
 #        sh scripts/render-mr-body.sh --note docs/maintain/<id>/note.md [--base <ref>] [--template <file>]
 # Prints the description on stdout. Start from the repository's template
-# (.gitlab/merge_request_templates/default.md, else .github/pull_request_template.md) and:
+# (.gitlab/merge_request_templates/default.md) and:
 #   - sets the Feature-Artifact (or Maintain-Note) line that ci/check-delivery-linkage.sh reads;
 #   - fills the Summary from the user story (or the note title);
 #   - lists the changed files when --base is given (git diff --name-status <ref>...HEAD);
@@ -54,10 +54,10 @@ def read(path):
         return None
 
 
-template = template or next((p for p in (".gitlab/merge_request_templates/default.md", ".github/pull_request_template.md") if os.path.isfile(p)), None)
+template = template or (".gitlab/merge_request_templates/default.md" if os.path.isfile(".gitlab/merge_request_templates/default.md") else None)
 body = read(template) if template else None
 if body is None:
-    print("FAIL: no MR/PR template found (pass --template)", file=sys.stderr)
+    print("FAIL: no merge request template found (pass --template)", file=sys.stderr)
     raise SystemExit(1)
 
 if note:

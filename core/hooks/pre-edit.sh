@@ -42,26 +42,13 @@ if [ "$action" = "block" ]; then
   HOOK_DENY_MSG="$message" python3 -c '
 import json, os
 msg = os.environ.get("HOOK_DENY_MSG", "")
-flavor = os.environ.get("KIT_HOOK_FLAVOR", "cursor")
-if flavor == "claude":
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": msg}}))
-else:
-    print(json.dumps({"permission": "deny", "user_message": msg}))
+print(json.dumps({"permission": "deny", "user_message": msg}))
 '
   exit 2
 fi
 
 if [ "$action" = "ask" ]; then
-  # Cursor accepts "ask" for preToolUse but does not enforce it, so allow there and
-  # rely on after-edit.sh context + CI approver binding; Claude Code prompts the user.
-  if [ "${KIT_HOOK_FLAVOR:-cursor}" = "claude" ]; then
-    hook_audit_log "path" "$path" "ask" "$message"
-    agent_msg="ASK: $message"
-    user_msg="$message Approve only if a human authorized this change."
-    printf '%s\n' "$agent_msg" >&2
-    hook_shell_permission_ask "$user_msg" "$agent_msg"
-    exit 0
-  fi
+  # Cursor accepts "ask" for preToolUse but does not enforce it; rely on after-edit context + CI.
   hook_audit_log "path" "$path" "allow-flagged" "$message"
 fi
 

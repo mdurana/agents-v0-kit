@@ -6,9 +6,9 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 ## 1. Install the kit
 
 ```bash
-./scripts/install.sh --tool cursor /path/to/existing-repo
+./scripts/install.sh /path/to/existing-repo
 # Optional Maven/docker/OpenAPI starters (copies full templates/ tree):
-# ./scripts/install.sh --tool cursor --with-starters /path/to/existing-repo
+# ./scripts/install.sh --with-starters /path/to/existing-repo
 ```
 
 Then run `/onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
@@ -23,6 +23,7 @@ codebase as it is today, with every statement cited to code or marked `UNVERIFIE
 | Inventories: endpoints with authorization annotation, entities, migrations, messaging, scheduled work, outbound clients, configuration **key names**, frontend routes, CI and deploy files, tests | `docs/discovery/*.txt` |
 | Baseline numbers and proposed `known_failures` / `coverage_ratchet` rows | `docs/discovery/baseline.md` |
 | Security baseline snapshot (triage list; nothing is fixed) | `docs/discovery/security-baseline.md` |
+| Proposed non-Spring endpoint rows (FastAPI, Express, Nest, Go) | `docs/discovery/endpoint-stacks.md` |
 | As-is architecture, network, context map, inherited decisions, flows you name | `docs/architecture.md`, `docs/network.md`, `docs/design/system/context-map.md`, `docs/adr/0000-inherited-decisions.md`, `docs/diagrams/sequences/` |
 
 Checks you can run yourself: `sh scripts/discover-codebase.sh` (refresh the inventories) and `sh scripts/check-onboarding-docs.sh` (every citation resolves; no template line left; every document names its commit). Lists are capped (`DISCOVER_MAX`, default 500) and say so when they are cut. No secret value is ever written; configuration appears by key name.
@@ -30,7 +31,7 @@ Record the directory layout in the profile **This repo** table (Profile `service
 
 Org rules are installed to `.cursor/rules/org/` and refreshed on `install.sh --update`.
 
-The install seeds `.gitlab-ci.yml`. If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Scope `GITLAB_TOKEN` (`read_api`, masked) to the `delivery-approval` environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. See [greenfield-onboarding.md](greenfield-onboarding.md).
+The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch and the `delivery-approval` environment. Scope `GITLAB_TOKEN` (`read_api`, masked) to that environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Optional: `cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push` runs the local delivery gate when the branch name matches `docs/requirements/<feature>.md`. See [greenfield-onboarding.md](greenfield-onboarding.md).
 
 ## 2. Audit the baseline (do this before `/build` or `/maintain`)
 

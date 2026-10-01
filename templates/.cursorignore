@@ -62,4 +62,3 @@ Thumbs.db
 
 # Hook audit (local only)
 .cursor/hooks/audit.jsonl
-.claude/hooks/audit.jsonl

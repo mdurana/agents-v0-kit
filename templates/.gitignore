@@ -30,6 +30,7 @@ Thumbs.db
 *~
 .idea/
 *.iml
+.vscode/
 .project
 .classpath
 .settings/
@@ -64,7 +65,6 @@ coverage/
 
 # --- Agent hook audit (local; never commit) ---
 .cursor/hooks/audit.jsonl
-.claude/hooks/audit.jsonl
 
 # --- Logs and dumps ---
 *.log

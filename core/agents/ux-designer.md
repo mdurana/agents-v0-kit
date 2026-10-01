@@ -3,8 +3,6 @@ name: ux-designer
 description: Design phase. Produces static HTML mockups and the UX spec — flows, screen state matrix, per-component default behavior, accessibility, responsive/device matrix, design-system conformance, UX acceptance criteria. Use in /design for UI-affecting changes.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep

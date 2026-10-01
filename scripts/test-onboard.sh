@@ -100,6 +100,15 @@ printf '{}\n' > "$r/frontend/package.json"
 : > "$r/frontend/src/routes/orders/+page.svelte"
 printf '<Route path="/orders" element={x} />\nfetch("/api/v1/orders");\n' > "$r/frontend/src/App.tsx"
 printf 'FROM eclipse-temurin:21\n' > "$r/Dockerfile"
+mkdir -p "$o/api"
+cat > "$o/api/routes.py" <<'EOF'
+from fastapi import APIRouter, Depends
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return {}
+EOF
 
 # --- discover-codebase.sh ----------------------------------------------------
 expect_pass "discover-codebase runs on the fixture" "$r" sh scripts/discover-codebase.sh
@@ -119,6 +128,7 @@ has "config: environment reference name" "$d/config.txt" "DB_URL"
 lacks "config: no secret value is printed" "$d/config.txt" "hunter2"
 lacks "security baseline: no secret value is printed" "$d/security-baseline.md" "hunter2"
 has "security baseline: permit-all finding" "$d/security-baseline.md" "permit-all"
+has "endpoint stacks: FastAPI row proposed" "$d/endpoint-stacks.md" "| fastapi | .py |"
 has "frontend: SvelteKit route" "$d/frontend.txt" "SvelteKit route /orders"
 has "frontend: React route" "$d/frontend.txt" "React route /orders"
 has "frontend: API call" "$d/frontend.txt" "API call /api/v1/orders"

@@ -3,8 +3,6 @@ name: design-reviewer
 description: Design phase. Independent review of the design — contract, authorization, data, failure modes, UX — before the Design gate. Read-only except its own report. Use in /design.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: opus
 tools:
   - read
   - grep

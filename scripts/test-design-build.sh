@@ -2,8 +2,7 @@
 # test-design-build.sh — behavior tests for the Design and Build checks (no network).
 # Covers: ci/check-openapi.sh, ci/check-design.sh (checks, pin, lock, amendments),
 # ci/check-ux-spec.sh, ci/check-build-plan.sh, ci/check-endpoint-auth.sh, ci/check-frontend-calls.sh.
-# Run by validate-kit.sh. Needs git and python3; the OpenAPI and frontend-call cases need PyYAML
-# and are skipped (with a notice) when it is missing.
+# Run by validate-kit.sh. Needs git, python3, and PyYAML (pip install pyyaml).
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +15,6 @@ python3 -c 'import yaml' >/dev/null 2>&1 && HAVE_YAML=1
 
 pass() { printf 'ok: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1" >&2; status=1; }
-skip() { printf 'skip: %s (PyYAML not installed)\n' "$1"; }
 # run <expect pass|fail> <description> <dir> <command...>
 run() {
   want="$1"; desc="$2"; dir="$3"; shift 3
@@ -25,7 +23,11 @@ run() {
   if [ -n "${TEST_VERBOSE:-}" ] && [ "$want" = fail ]; then grep '^FAIL' "$tmp/out.txt" | sed 's/^/    | /'; fi
 }
 yaml_run() {
-  if [ "$HAVE_YAML" = 1 ]; then run "$@"; else skip "$2"; fi
+  if [ "$HAVE_YAML" = 1 ]; then
+    run "$@"
+  else
+    fail "$2 (PyYAML is required: pip install pyyaml, or apk add py3-yaml)"
+  fi
 }
 sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
 git_c() { git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
@@ -314,6 +316,33 @@ run fail "endpoint auth: a new unannotated endpoint fails" "$e" sh "$CI/check-en
 sedi 's|  @GetMapping("/{id}")|  @PermitAll\n  @GetMapping("/{id}")|' "$e/src/main/java/com/acme/OrderController.java"
 run pass "endpoint auth: @PermitAll marks a public endpoint on purpose" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 if (cd "$e" && sh "$CI/check-endpoint-auth.sh" --list .) | grep -Fq "GET /api/v1/orders/legacy  NO-ANNOTATION"; then pass "endpoint auth: --list prints the same rows as discovery"; else fail "endpoint auth: --list prints the same rows as discovery"; fi
+mkdir -p "$e/docs" "$e/api"
+cat > "$e/docs/project-profile.md" <<'EOF'
+## Endpoint authorization
+
+| Stack | Suffix | Marker | Mapping | Security |
+|-------|--------|--------|---------|----------|
+| fastapi | .py | APIRouter | @(?:router)\.(get|post)\(\s*["']([^"']+) | require_role|Depends\( |
+EOF
+cat > "$e/api/routes.py" <<'EOF'
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return {}
+EOF
+(cd "$e" && git add docs/project-profile.md api/routes.py)
+run fail "endpoint auth: a profile stack flags a new unannotated route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+cat > "$e/api/routes.py" <<'EOF'
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return require_role()
+EOF
+run pass "endpoint auth: a profile stack accepts a secured route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 
 # --- ci/check-frontend-calls.sh ----------------------------------------------
 f="$tmp/frontend"

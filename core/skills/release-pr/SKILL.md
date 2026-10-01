@@ -1,6 +1,6 @@
 ---
 name: release-pr
-description: Release phase playbook. Dry-run the delivery gate locally, render the MR/PR description from the evidence, open it (glab/GitLab or gh/GitHub), run a bounded CI fix loop, and stop for the human merge.
+description: Release phase playbook. Dry-run the delivery gate locally, render the merge-request description from the evidence, open it with glab, run a bounded CI fix loop, and stop for the human merge.
 ---
 
 # release-pr
@@ -9,20 +9,20 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 
 ## Steps
 1. Confirm Release gate inputs: docs synced, Verify gate passed (no Critical findings), the changelog entry added when the profile names a changelog (`sh scripts/release-notes.sh docs/requirements/<feature>.md --include-unreleased --insert CHANGELOG.md`).
-2. **Dry run locally.** Render the description: `sh scripts/render-mr-body.sh <feature> --base origin/<default-branch> > <body-file>` (or `--note docs/maintain/<id>/note.md`). It sets the `Feature-Artifact:` or `Maintain-Note:` line, copies the VAPT result rows and commit stamps from the evidence, and leaves the checkboxes for a reviewer. Then run `CHECK_MR_APPROVER=0 sh ci/check-delivery-linkage.sh origin/<default-branch> HEAD <body-file>` and fix what it reports. Evidence older than the code (`commit:` stale) goes back through Verify; do not re-stamp a report to make it pass.
-3. Open the merge request/PR only when explicitly requested; commit/push need separate authorization. **GitLab (default):** `glab mr create` with the rendered body (`--description "$(cat <body-file>)"`). **GitHub:** `gh pr create --body-file <body-file>`. After the user authorizes git write, run the command and approve the IDE `beforeShellExecution` prompt from `pre-shell.sh` — never use env-var or command-prefix bypasses.
+2. **Dry run locally.** For a feature, run `sh scripts/check-delivery-gate-local.sh <feature> --base origin/<default-branch>`. It renders the description (`Feature-Artifact:`, VAPT rows, commit stamps, reviewer checkboxes left unticked) and runs linkage, design contracts, the build plan, and endpoint authorization. A maintenance note uses `sh scripts/render-mr-body.sh --note docs/maintain/<id>/note.md --base origin/<default-branch>` and `CHECK_MR_APPROVER=0 sh ci/check-delivery-linkage.sh`. Fix what the checks report. Evidence older than the code (`commit:` stale) goes back through Verify; do not re-stamp a report to make it pass.
+3. Open the merge request only when explicitly requested; commit/push need separate authorization. Run `glab mr create` with the rendered body (`--description "$(cat <body-file>)"`). After the user authorizes git write, run the command and approve the IDE `beforeShellExecution` prompt from `pre-shell.sh` — never use env-var or command-prefix bypasses.
 4. Run the **CI fix loop**, at most three rounds:
-   - Read failing checks (`glab ci status` / pipeline jobs, or `gh pr checks` on GitHub).
+   - Read failing checks (`glab ci status` / pipeline jobs).
    - Route fixes to the responsible agent (backend/bff/frontend/test). A code fix re-enters Verify.
    - Push with its own authorization; re-run. After three rounds record `blocked` and escalate to the user.
-5. **Release row.** Ask for the **GitLab username** of the person who will approve the merge request (on GitHub, their login) and record it as the Approver of the `release` row. CI matches it to the real approval; a display name fails the final job.
+5. **Release row.** Ask for the **GitLab username** of the person who will approve the merge request and record it as the Approver of the `release` row. CI matches it to the real approval; a display name fails the final job.
 6. After a person approves the MR, the manual `delivery-approval` job is played by a person, or by you with the user's explicit authorization (`glab ci trigger delivery-approval`). `GITLAB_TOKEN` is `read_api`, masked, and scoped to the `delivery-approval` environment. The job accepts the release or verify approver.
-7. Publish a status report (use the Atlassian `generate-status-report` skill if connected).
+7. Publish a status report in the phase result and the merge-request description.
 8. Never merge or approve the merge request, and do not commit, push, force-push, or hard reset without explicit user approval. The version and the tag belong to the release owner; propose the semantic version from the change.
 9. Report merge-request readiness with CI green and stop for an authorized human merge; confirm the merge and CI green before reporting the change released. Deployment records, if any, go through `release-deploy`.
 
 ## Rule-compliance checklist
-- [ ] `ai-agent-conduct.mdc`: no commits/force-push without approval; MR via `glab` or PR via `gh`; no merge, no approval by an agent.
+- [ ] `ai-agent-conduct.mdc`: no commits/force-push without approval; MR via `glab` when requested; no merge, no approval by an agent.
 - [ ] `vapt-pr-review.mdc`: merge request template with VAPT sign-off; any applicable unchecked item flagged Critical.
 - [ ] `project-delivery-core.mdc`: docs synced.
 - [ ] `code-review.mdc`: no Critical findings before merge.

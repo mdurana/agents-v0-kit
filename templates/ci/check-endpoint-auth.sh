@@ -1,15 +1,17 @@
 #!/bin/sh
-# check-endpoint-auth.sh — a new Spring endpoint is explicitly authorized or explicitly public.
+# check-endpoint-auth.sh — a new endpoint is explicitly authorized or explicitly public.
 #
 # Usage:
 #   sh ci/check-endpoint-auth.sh <base> [<head>]   fail on a mapping the change adds without a security annotation
 #   sh ci/check-endpoint-auth.sh --list [<root>...]  print every mapping: file:line  VERB /path  annotated|NO-ANNOTATION
 #
-# A mapping counts as annotated when its own annotations, or its controller class, carry
-# @PreAuthorize, @PostAuthorize, @Secured, @RolesAllowed, @PermitAll, or @DenyAll. A deliberately
-# public endpoint says so with @PermitAll. Authorization enforced only in configuration
-# (SecurityFilterChain matchers) is not seen here: add the annotation, or keep the rule in code
-# review. The same scan feeds scripts/discover-codebase.sh (keep the two in step).
+# Spring (*.java) is built in: a mapping counts as annotated when its own annotations, or its
+# controller class, carry @PreAuthorize, @PostAuthorize, @Secured, @RolesAllowed, @PermitAll, or
+# @DenyAll. A deliberately public endpoint says so with @PermitAll. Authorization enforced only in
+# configuration (SecurityFilterChain matchers) is not seen here.
+# Other stacks: add a row under "## Endpoint authorization" in docs/project-profile.md
+# (Stack, Suffix, Marker, Mapping, Security). Spring stays the built-in scanner; those rows add
+# file types. The Spring scan feeds scripts/discover-codebase.sh (keep the two in step).
 # <head> omitted compares <base> with the working tree.
 
 set -eu
@@ -78,16 +80,92 @@ def git(*a):
     return proc.returncode, proc.stdout
 
 
+def profile_stacks():
+    """Extra stacks from docs/project-profile.md. Spring stays built in."""
+    path = "docs/project-profile.md"
+    if not os.path.isfile(path):
+        return []
+    text = open(path, encoding="utf-8", errors="replace").read()
+    heading = "## Endpoint authorization"
+    if heading not in text:
+        return []
+    section = text.split(heading, 1)[1].split("\n## ", 1)[0]
+    stacks = []
+    for line in section.splitlines():
+        if not line.startswith("|"):
+            continue
+        # Split on " | " so a regex may contain "|" (for example get|post).
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split(" | ")]
+        if len(cells) < 5:
+            continue
+        stack, suffix, marker_re, mapping, security = cells[:5]
+        low = stack.lower()
+        if low in ("stack", "") or set(stack) <= set("-: "):
+            continue
+        if low == "spring" or mapping in ("", "(built-in)"):
+            continue
+        if not suffix.startswith("."):
+            continue
+        if marker_re in ("", "—", "-", "(any)"):
+            marker_re = ""
+        stacks.append((suffix, marker_re, mapping, security, stack))
+    return stacks
+
+
+STACKS = profile_stacks()
+
+
+def extra_endpoints(lines, spec):
+    _suffix, marker_re, mapping, security, _stack = spec
+    blob = "\n".join(lines)
+    if marker_re:
+        try:
+            if not re.search(marker_re, blob):
+                return
+        except re.error:
+            return
+    try:
+        mapping_re = re.compile(mapping)
+        security_re = re.compile(security)
+    except re.error:
+        return
+    file_secured = any(security_re.search(ln) for ln in lines[:40])
+    for i, ln in enumerate(lines):
+        match = mapping_re.search(ln)
+        if not match:
+            continue
+        window = lines[max(0, i - 12): i + 9]
+        ok = file_secured or any(security_re.search(w) for w in window)
+        verb = match.group(1).upper() if match.lastindex and match.group(1) else "ANY"
+        route = match.group(2) if match.lastindex and match.lastindex >= 2 and match.group(2) else match.group(0)
+        yield i + 1, verb, route.strip(" '\"")[:120], ok
+
+
+def scan_file(path, lines):
+    if path.endswith(".java"):
+        yield from endpoints(lines)
+    for spec in STACKS:
+        if path.endswith(spec[0]):
+            yield from extra_endpoints(lines, spec)
+
+
+def watched(path):
+    if path.endswith(".java"):
+        return True
+    return any(path.endswith(spec[0]) for spec in STACKS)
+
+
 if args[0] == "--list":
     roots = args[1:] or ["."]
     for root in roots:
         for dirpath, dirs, names in os.walk(root):
             dirs[:] = sorted(d for d in dirs if d not in SKIP)
             for name in sorted(names):
-                if name.endswith(".java"):
-                    path = os.path.normpath(os.path.join(dirpath, name))
-                    for line_no, verb, full, ok in endpoints(read_lines(path)):
-                        print(f"{path}:{line_no}  {verb} {full}  {'annotated' if ok else 'NO-ANNOTATION'}")
+                path = os.path.normpath(os.path.join(dirpath, name))
+                if not watched(path):
+                    continue
+                for line_no, verb, full, ok in scan_file(path, read_lines(path)):
+                    print(f"{path}:{line_no}  {verb} {full}  {'annotated' if ok else 'NO-ANNOTATION'}")
     raise SystemExit(0)
 
 base = args[0]
@@ -98,18 +176,19 @@ if code != 0:
     print(f"FAIL: git diff {' '.join(span)} failed", file=sys.stderr)
     raise SystemExit(1)
 failures, checked = [], 0
-for path in [p for p in out.splitlines() if p.endswith(".java")]:
+for path in [p for p in out.splitlines() if watched(p)]:
     if head:
         _c, text = git("show", f"{head}:{path}")
     else:
         text = "\n".join(read_lines(path))
     c2, old = git("show", f"{base}:{path}")
-    before = {(v, p) for _n, v, p, _ok in endpoints(old.splitlines())} if c2 == 0 else set()
-    for line_no, verb, full, ok in endpoints(text.splitlines()):
+    before = {(v, p) for _n, v, p, _ok in scan_file(path, old.splitlines())} if c2 == 0 else set()
+    hint = ("(@PreAuthorize/@Secured/@RolesAllowed, or @PermitAll when it is public on purpose)"
+            if path.endswith(".java") else "(docs/project-profile.md Endpoint authorization)")
+    for line_no, verb, full, ok in scan_file(path, text.splitlines()):
         checked += 1
         if not ok and (verb, full) not in before:
-            failures.append(f"{path}:{line_no}  {verb} {full} has no security annotation "
-                            f"(@PreAuthorize/@Secured/@RolesAllowed, or @PermitAll when it is public on purpose)")
+            failures.append(f"{path}:{line_no}  {verb} {full} has no security annotation {hint}")
 if failures:
     for item in failures:
         print(f"FAIL: {item}", file=sys.stderr)

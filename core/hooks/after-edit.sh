@@ -26,11 +26,11 @@ $line"
 }
 
 # Delivery artifacts: approvals must reflect a real human decision (CI binds the
-# Approver column to a GitLab MR or GitHub PR review via ci/check-approver-gitlab.sh / ci/check-approver-github.sh).
+# Approver column to a GitLab MR approval via ci/check-approver-gitlab.sh).
 case "$path" in
   *docs/requirements/*.md|*docs/milestones/*.md)
     if grep -Eqi '^\|[^|]*\|[^|]*\|[^|]*\|[[:space:]]*(approved|approve|yes|pass)' "$path"; then
-      hook_emit_additional_context "Kit hook (after-edit): $path records gate approvals. Only record an Approved row after the user explicitly approved in chat, and name that person in the Approver column — CI requires a matching GitLab MR or GitHub PR approval."
+      hook_emit_additional_context "Kit hook (after-edit): $path records gate approvals. Only record an Approved row after the user explicitly approved in chat, and name that person in the Approver column — CI requires a matching GitLab merge request approval."
     fi
     exit 0
     ;;

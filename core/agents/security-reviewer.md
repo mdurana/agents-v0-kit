@@ -3,8 +3,6 @@ name: security-reviewer
 description: Verify phase. Runs the VAPT F1–F7 checklist and marks any applicable unchecked item as Critical. Use in /verify.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: opus
 tools:
   - read
   - grep

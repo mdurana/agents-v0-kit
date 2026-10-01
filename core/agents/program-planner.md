@@ -3,8 +3,6 @@ name: program-planner
 description: Plan phase for programs. Decomposes a large goal into a context map, milestone manifests, and a dependency-ordered story graph. Use first in /plan.
 model: claude-sonnet-5-5-high
 mode: subagent
-model_kilo: anthropic/claude-sonnet-5.5
-model_claude: sonnet
 tools:
   - read
   - grep
