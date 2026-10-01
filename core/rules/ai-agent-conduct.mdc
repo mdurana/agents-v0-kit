@@ -44,7 +44,7 @@ alwaysApply: true
 
 - **Do not commit** unless the user asked.
 - Avoid destructive git (`push --force`, hard reset) unless explicitly requested.
-- PR creation via **`gh`** when user requests it.
+- MR creation via **`glab`** (GitLab, the default host) or PR creation via **`gh`** (GitHub), only when the user requests it.
 
 ## Prompt efficiency
 

@@ -8,6 +8,15 @@
   Build gate requires this gate to be wired before implementation.
   OWASP Dependency-Check is slow locally — prefer profile ci-security in CI
   (see maven/quality-plugins-ci-security.xml) and bind the OWASP plugin only there.
+
+  Shared config folder. These snippets read it from the property kit.maven.dir. Add to
+  each pom.xml that uses them:
+    single module, or Maven run from the repo root (the default):
+      <properties><kit.maven.dir>${maven.multiModuleProjectDirectory}/maven</kit.maven.dir></properties>
+    one service per module under services/<name>/ (Profile Layout lists Service roots),
+    built with its own pom.xml, so every service shares the one repo-level maven/ folder:
+      <properties><kit.maven.dir>${project.basedir}/../../maven</kit.maven.dir></properties>
+  Change ../../ to match the depth of the module.
 -->
 <plugin>
   <groupId>org.jacoco</groupId>
@@ -49,7 +58,7 @@
   <artifactId>maven-checkstyle-plugin</artifactId>
   <version>3.5.0</version>
   <configuration>
-    <configLocation>${maven.multiModuleProjectDirectory}/maven/checkstyle.xml</configLocation>
+    <configLocation>${kit.maven.dir}/checkstyle.xml</configLocation>
     <failOnViolation>true</failOnViolation>
   </configuration>
   <executions>

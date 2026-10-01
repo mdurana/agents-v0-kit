@@ -12,7 +12,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 |--------|----------|
 | Canonical stack (Spring Boot 3.x, PostgreSQL, Flyway, OpenAPI) | A backend-engineer; S implement-spring-service; G Build gate |
 | Frontend: ask Svelte or React once | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
-| Directory profiles (service, ui, app) | R project-delivery-core; `docs/project-profile.md`; C /onboard; CI ci/resolve-layout.sh |
+| Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/project-profile.md`; C /onboard; CI ci/resolve-layout.sh |
 | Correlation ID propagation | A backend-engineer, bff-engineer, frontend-engineer; S implement-spring-service, implement-bff, implement-frontend; G Build gate |
 | Distributed tracing (traceparent/OTel) | A backend-engineer, bff-engineer, frontend-engineer; G Build gate |
 | Structured logging | A backend-engineer; S implement-spring-service |
@@ -43,7 +43,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Ask user only when blocked | R workflow-orchestration (approval stops); all agents |
 | Do not commit unless asked | A release-manager; S release-pr; H-B pre-shell.sh (asks on git commit/push; denies force-push/hard reset, `gh pr merge`, destructive git clean; no env/command bypass) |
 | No force-push/hard reset | H-B pre-shell.sh; S release-pr |
-| PR creation via gh | A release-manager; S release-pr; C /release |
+| MR creation via glab (GitLab default) or PR via gh | A release-manager; S release-pr; C /release |
 | Rule precedence: repository wins | R workflow-orchestration; `docs/project-profile.md`, ADRs |
 
 ## security-baseline.mdc
@@ -210,6 +210,17 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Machine-readable resume (`lastApprovedPhase`, `activePhase`, `activeStatus`, `blockedReason`) | C /status; R workflow-orchestration Phase resume; `scripts/sync-feature-state.sh`; CI ci/check-feature-state.sh (optional) |
 | Parallel features: per-feature artifacts; feature contract drafts under `docs/design/<feature>/` are not shared; stop before a second writer touches a shared file; creating a branch needs explicit user authorization | R workflow-orchestration Parallel features; C /status, /design, /build, /verify, /release, /maintain |
 | Helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`) are launched from the main session off a helper brief, not from inside a phase agent | R workflow-orchestration Helper agents; A orchestrator; C /intake, /design, /verify, /maintain |
+| Program planning: `/plan` writes the context map and milestone manifests; the Plan gate is a `plan` row | A program-planner, orchestrator; S system-design, program-planning; C /plan; R workflow-orchestration Program planning; CI ci/check-approvals.sh (plan), ci/check-delivery-linkage.sh |
+| Story order: a build-approved story needs a Verify approval on every story it depends on | R workflow-orchestration Plan gate; A orchestrator; CI ci/check-milestone.sh (`MILESTONE_ORDER=0` disables) |
+| One worktree and branch per feature; creating it needs explicit authorization | R workflow-orchestration Worktree per feature; `scripts/feature-worktree.sh`; H-ask pre-shell.sh; Kilo kilo.json |
+| Batch approval of Intake and Design for named, low-risk stories (one row per story artifact) | R workflow-orchestration Batch approval; A orchestrator; CI ci/check-approvals.sh (per artifact) |
+| Phase attempt budget: total failed attempts per phase are capped | R workflow-orchestration Phase attempt budget; C /build; S implement-*; `scripts/check-attempt-budget.sh` |
+| Verify numbers read from machine output: executed tests, diff coverage, unsuppressed HIGH/CRITICAL CVEs | R workflow-orchestration Verify gate; CI ci/check-gate-metrics.sh |
+| Event schemas evolve additively and record `eventVersion` | R api-and-events; A solution-architect; S contract-first-design; CI ci/check-event-schemas.sh |
+| Messaging: outbox, idempotent consumers, DLQ, saga compensations, with tests | A backend-engineer; S implement-messaging; G Build gate |
+| E2E journeys, consumer-driven contract pairs, resilience cases, k6 SLO measurements | A test-engineer; S e2e-perf-testing, slo-evidence; C /verify; G Verify gate; CI ci/check-milestone.sh (`SLO_ALLOW_WAIVERS=0`) |
+| Deployment per environment: own authorization, smoke check, rollback (when the profile has a Deploy table) | A release-manager; S release-deploy; C /release; R workflow-orchestration Release gate |
+| Critical units (security triggers, sagas, consumers) run on the Plan-role model; reviewers are independent of the builder | R docs/model-routing-matrix.md; C /build |
 
 ## Onboarding
 
@@ -222,7 +233,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Control | Enforcer |
 |---------|----------|
 | Shell deny/ask (git, secrets, rm, kubectl, protected-path shell writes) | H-B pre-shell.sh; hook-policy.py; Kilo kilo.json |
-| Protected path edits (hooks, CI, agents, rules, entry files) | H-B pre-edit.sh; hook-policy.py path |
+| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path |
 | Delivery/milestone artifact edits (human gate) | H-ask pre-edit.sh; hook-policy.py path |
 | MCP tools (per-server allow/ask/block; unlisted servers ask) | H-ask pre-mcp.sh; hook-policy.py mcp; `mcp-policy.json` |
 | Session context (profile, repo map, state) | session-start.sh |
@@ -234,6 +245,8 @@ Tool note: hook rows (H-B/H-W) run on Cursor (`.cursor/hooks.json`) and Claude C
 | Brownfield test failure budget | CI ci/check-known-failures.sh; docs/project-profile.md |
 | Brownfield coverage ratchet | R quality-and-testing; CI ci/check-coverage-ratchet.sh; docs/project-profile.md `coverage_ratchet` |
 | Secret scan (full history, pinned + checksum-verified gitleaks) | CI build-and-security.yml |
-| Delivery and hook metrics | scripts/delivery-metrics.sh |
+| Delivery and hook metrics (approved gates, failed attempts, blocked features per feature) | scripts/delivery-metrics.sh |
+| Branch, worktree, or `feature-worktree.sh` creation asks first | H-ask pre-shell.sh; hook-policy.py shell; Kilo kilo.json |
+| Behavior tests for the template CI scripts | scripts/test-ci-checks.sh (run by validate-kit.sh) |
 
 **Kilo Code limits:** Kilo has no hook runtime, so protected-path edits, delivery-artifact edit prompts, MCP policy, and session context are **not** enforced there. Kilo relies on `kilo.json` bash patterns, agent `tools:` maps (reviewers without `write`/`bash` stay read-only), CODEOWNERS, and the CI checks above.

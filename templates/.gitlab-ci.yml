@@ -22,6 +22,8 @@ stages:
   - test
   - security
   - sast
+  - e2e
+  - perf
   - delivery-gate
 
 default:
@@ -32,20 +34,34 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Testcontainers (quality-and-testing.mdc) needs a Docker daemon. The dind service below
+# needs a runner that allows privileged jobs. On a runner that mounts the host socket,
+# delete `services` and the DOCKER_* / TESTCONTAINERS_* variables and mount /var/run/docker.sock.
+# A project with no Testcontainers tests can delete them too.
 build:
   stage: test
   image: eclipse-temurin:21-jdk
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_HOST_OVERRIDE: docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
         - pom.xml
         - backend/pom.xml
         - bff/pom.xml
+        - services/*/pom.xml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
         - pom.xml
         - backend/pom.xml
         - bff/pom.xml
+        - services/*/pom.xml
   script:
     - |
       set -eu
@@ -71,12 +87,143 @@ build:
       }
       verify_maven "${BACKEND_ROOT:-}"
       verify_maven "${BFF_ROOT:-}"
+      for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
       if [ -f ci/check-known-failures.sh ]; then sh ci/check-known-failures.sh ci-artifacts/verify.log; fi
   artifacts:
     when: always
     paths:
       - ci-artifacts/
+      - "**/target/site/jacoco/jacoco.xml"
+      - "**/target/surefire-reports/TEST-*.xml"
+      - "**/target/failsafe-reports/TEST-*.xml"
+      - "**/target/dependency-check-report.json"
     expire_in: 1 week
+
+# Reads the build artifacts (JaCoCo, Surefire, OWASP JSON) instead of trusting numbers an
+# agent wrote into a report. Diff coverage is measured on merge requests.
+gate-metrics:
+  stage: security
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - pom.xml
+        - backend/pom.xml
+        - bff/pom.xml
+        - services/*/pom.xml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      exists:
+        - pom.xml
+        - backend/pom.xml
+        - bff/pom.xml
+        - services/*/pom.xml
+  before_script:
+    - apk add --no-cache git python3
+  script:
+    - |
+      set -eu
+      repo="$(pwd)"
+      eval "$(sh ci/resolve-layout.sh)"
+      gate="ci/check-gate-metrics.sh"
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        git fetch origin "$CI_DEFAULT_BRANCH"
+        export DIFF_BASE="origin/$CI_DEFAULT_BRANCH"
+        # Run the gate script from the default branch so a merge request cannot rewrite its own check.
+        if git cat-file -e "FETCH_HEAD:ci/check-gate-metrics.sh" 2>/dev/null; then
+          trusted="$(mktemp -d)"
+          git show "FETCH_HEAD:ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
+          gate="${trusted}/check-gate-metrics.sh"
+        else
+          printf 'WARN: using the merge request copy of ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
+        fi
+      fi
+      for root in ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
+        export REQUIRE_CVE_REPORT=0
+        if grep -q '<id>ci-security</id>' "$repo/$root/pom.xml"; then export REQUIRE_CVE_REPORT=1; fi
+        sh "$gate" "$repo/$root"
+      done
+  artifacts:
+    when: always
+    paths:
+      - "**/target/gate-metrics.json"
+    expire_in: 1 week
+
+# Contract and event checks that do not need the application to run.
+event-schema-compat:
+  stage: validate
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - ci/check-event-schemas.sh
+  before_script:
+    - apk add --no-cache git python3
+  script:
+    - |
+      set -eu
+      git fetch origin "$CI_DEFAULT_BRANCH"
+      check="ci/check-event-schemas.sh"
+      # Run the check from the default branch so a merge request cannot rewrite its own check.
+      if git cat-file -e "FETCH_HEAD:ci/check-event-schemas.sh" 2>/dev/null; then
+        trusted="$(mktemp -d)"
+        git show "FETCH_HEAD:ci/check-event-schemas.sh" > "${trusted}/check-event-schemas.sh"
+        check="${trusted}/check-event-schemas.sh"
+      fi
+      sh "$check" "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-origin/$CI_DEFAULT_BRANCH}" "$CI_COMMIT_SHA"
+
+# Runs when the project has a Playwright config. Put the dev server in the config's webServer block.
+e2e:
+  stage: e2e
+  image: mcr.microsoft.com/playwright:v1.48.0-jammy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - frontend/playwright.config.ts
+        - frontend/playwright.config.js
+        - playwright.config.ts
+        - playwright.config.js
+  script:
+    - |
+      set -eu
+      eval "$(sh ci/resolve-layout.sh)"
+      cd "${FRONTEND_ROOT:-.}"
+      npm ci
+      npx playwright test
+  artifacts:
+    when: always
+    paths:
+      - "**/playwright-report/"
+    expire_in: 1 week
+
+# k6 scripts under perf/*.js. Manual on a merge request so a slow run never blocks the pipeline;
+# attach the summary as the `measured` output of a P4 slo-evidence row (skill: e2e-perf-testing).
+perf:
+  stage: perf
+  image:
+    name: grafana/k6:0.54.0
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      exists:
+        - perf/*.js
+      when: manual
+      allow_failure: true
+  script:
+    - |
+      set -eu
+      mkdir -p ci-artifacts
+      for f in perf/*.js; do
+        k6 run --summary-export "ci-artifacts/k6-$(basename "$f" .js).json" "$f"
+      done
+  artifacts:
+    when: always
+    paths:
+      - ci-artifacts/
+    expire_in: 2 weeks
 
 frontend:
   stage: test

@@ -15,7 +15,7 @@ on:
         description: "Delivery artifact path, e.g. docs/requirements/my-feature.md"
         required: true
       phase:
-        description: "Phase to verify: intake | design | build | verify | release | milestone"
+        description: "Phase to verify: plan | intake | design | build | verify | release | milestone"
         required: true
         default: verify
   pull_request:

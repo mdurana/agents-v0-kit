@@ -29,7 +29,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
      Append one row per approved phase; record evidence paths in each phase row's Artifacts column — Build: `docs/build/<feature>/...`; Verify: `docs/verify/<feature>/...`.
 4. If greenfield UI, ask "Svelte or React?" once and record the answer.
 5. Apply the **story-size budget** before the gate (`workflow-orchestration.mdc`):
-   - Record `Surfaces:` as `backend`, `bff`, or `frontend`.
+   - Record `Surfaces:` as `backend`, `bff`, or `frontend`. When `docs/project-profile.md` lists `Service roots`, also record `Service root: <root>` for a backend or BFF story. A story that needs two service roots is two stories.
    - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
    - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. Write `## Proposed split` with extra milestone rows (story sentence, surface, dependency) and stop until the user approves the split. After approval, this artifact keeps the first slice; each other row is its own feature.
    - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria.

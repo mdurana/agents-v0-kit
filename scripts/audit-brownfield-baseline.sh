@@ -167,6 +167,7 @@ if [ -f ci/resolve-layout.sh ]; then
   printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
   audit_root "${BACKEND_ROOT:-}"
   audit_root "${BFF_ROOT:-}"
+  for svc in ${SERVICE_ROOTS:-}; do audit_root "$svc"; done
   audit_root "${FRONTEND_ROOT:-}"
 else
   audit_root "."

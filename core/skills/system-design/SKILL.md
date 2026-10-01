@@ -14,7 +14,7 @@ Run for **Major** change tier (`workflow-orchestration.mdc`) or greenfield progr
 4. Threat-model notes in `docs/design/system/threat-model.md` — assets, trust boundaries, top STRIDE risks, mitigations (no full STRIDE grid required).
 5. Deployment topology in `docs/network.md` + sequence diagrams for critical flows.
 6. ADR for non-trivial choices (`docs/adr/`).
-7. **Stop** for approval before feature-level `/design` contracts.
+7. **Stop** for approval before feature-level `/design` contracts. When this skill runs inside `/plan`, the Plan gate is that stop; `program-planning` continues from these outputs.
 
 ## Rule-compliance checklist
 - [ ] `architecture-and-diagrams.mdc`, `security-baseline.mdc` §11 triggers addressed.

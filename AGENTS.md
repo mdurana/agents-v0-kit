@@ -11,6 +11,7 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 | Phase | Command | Lead agent | Skills | Handoff artifact |
 |-------|---------|-----------|--------|------------------|
 | Onboard (brownfield) | `/onboard` | orchestrator | — | `docs/project-profile.md`, as-is architecture/network |
+| Plan (program, more than one story) | `/plan` | program-planner | system-design, program-planning | `docs/design/system/context-map.md`, `docs/milestones/<milestone>.md` (`plan` row in `Delivery approvals`) |
 | Intake | `/intake` | requirements-analyst | spec-intake | `docs/requirements/<feature>.md` (AC IDs, NFRs, regulations, `Delivery approvals`) |
 | Design | `/design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, `docs/design/<feature>/ux-spec.md`, `docs/design/<feature>/mockups/` |
 | Build | `/build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/build/<feature>/` with `commit:` in reports |

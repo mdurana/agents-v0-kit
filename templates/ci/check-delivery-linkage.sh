@@ -121,6 +121,9 @@ bind_recorded_reviewer() {
 # Milestone manifests: go/no-go only when the milestone approval row changes
 milestones="$(git diff --name-only "$from" "$head" -- 'docs/milestones/*.md' 2>/dev/null || true)"
 for m in $milestones; do
+  if git diff "$from" "$head" -- "$m" | grep -Eqi '^\+[^+].*\|[[:space:]]*plan[[:space:]]*\|'; then
+    sh "$here/check-approvals.sh" "$m" plan || exit 1
+  fi
   if git diff "$from" "$head" -- "$m" | grep -Eqi '\|[[:space:]]*milestone[[:space:]]*\|'; then
     sh "$here/check-approvals.sh" "$m" milestone || exit 1
     sh "$here/check-milestone.sh" "$m" verify || exit 1

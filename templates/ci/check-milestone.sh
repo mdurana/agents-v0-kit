@@ -7,6 +7,11 @@
 # (<...>) or no path are skipped: a milestone go/no-go passes only when every
 # story row carries a concrete, approved artifact.
 #
+# A P4 manifest that names docs/design/system/slo-evidence.md accepts a waiver by default;
+# SLO_ALLOW_WAIVERS=0 requires every row to be measured.
+# Story order is checked too: a build-approved story fails when a story named in its
+# Dependency column has no verify approval (MILESTONE_ORDER=0 disables that check).
+#
 # Usage: sh check-milestone.sh <manifest> <phase>
 #   <manifest>  e.g. docs/milestones/p2-mvp-core-features.md
 #   <phase>     intake | design | build | verify | release
@@ -81,6 +86,55 @@ for a in $artifacts; do
   checked=$((checked + 1))
 done
 
+# Story order: a story with a build approval needs a verify approval on every story
+# it names in the Dependency column. Tokens that are not story IDs of this manifest
+# (milestone names such as P1, or a dash) are prose and are skipped.
+# MILESTONE_ORDER=0 turns the check off.
+has_approval() {
+  sh "$here/check-approvals.sh" "$1" "$2" >/dev/null 2>&1
+}
+
+check_story_order() {
+  [ "${MILESTONE_ORDER:-1}" != "0" ] || return 0
+  rows="$(printf '%s\n' "$section" | awk -F'|' '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    /---/ { next }
+    /Story [Ii][Dd]/ { next }
+    /^[[:space:]]*\|/ {
+      id = trim($2); art = trim($4); dep = trim($6)
+      if (id != "") printf "%s^%s^%s\n", id, art, dep
+    }')"
+  ids="$(printf '%s\n' "$rows" | awk -F'^' '{ print $1 }')"
+  order_fail=0
+  while IFS='^' read -r sid sart sdep; do
+    [ -n "$sid" ] || continue
+    case "$sart" in ''|*'<'*|*'>'*) continue ;; esac
+    [ -f "$sart" ] || continue
+    has_approval "$sart" build || continue
+    for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
+      printf '%s\n' "$ids" | grep -Fxq "$dep" || continue
+      dart="$(printf '%s\n' "$rows" | awk -F'^' -v d="$dep" '$1 == d { print $2; exit }')"
+      case "$dart" in ''|*'<'*|*'>'*)
+        printf 'FAIL: story %s is build-approved but its dependency %s has no concrete artifact\n' "$sid" "$dep" >&2
+        order_fail=1
+        continue
+        ;;
+      esac
+      if [ ! -f "$dart" ] || ! has_approval "$dart" verify; then
+        printf 'FAIL: story %s is build-approved but its dependency %s has no verify approval (%s)\n' "$sid" "$dep" "$dart" >&2
+        order_fail=1
+      fi
+    done
+  done <<EOF
+$rows
+EOF
+  return "$order_fail"
+}
+
+if ! check_story_order; then
+  missing=1
+fi
+
 check_slo_evidence() {
   grep -Fq 'docs/design/system/slo-evidence.md' "$manifest" || return 0
   case "$phase" in
@@ -153,7 +207,12 @@ check_slo_evidence() {
           echo fail >>"$slo_mark"
         fi
         ;;
-      waiver) ;;
+      waiver)
+        if [ "${SLO_ALLOW_WAIVERS:-1}" = "0" ]; then
+          printf 'FAIL: SLO row "%s" is a waiver and SLO_ALLOW_WAIVERS=0 requires a measurement\n' "$surface" >&2
+          echo fail >>"$slo_mark"
+        fi
+        ;;
     esac
   done
   nfr="docs/design/system/nfr-slo.md"

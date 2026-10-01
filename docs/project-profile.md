@@ -16,6 +16,8 @@
 |---------|---------|
 | Backend verify | <!-- e.g. ./mvnw -B clean verify --> |
 | Backend verify (fast, no OWASP) | <!-- e.g. ./mvnw -B clean verify -P!ci-security --> |
+| Service verify | <!-- multi-service repos only; {root} = the story's Service root, e.g. ./mvnw -B -f {root}/pom.xml clean verify --> |
+| Service verify (fast, no OWASP) | <!-- e.g. ./mvnw -B -f {root}/pom.xml clean verify -P!ci-security --> |
 | Frontend verify | <!-- e.g. npm run verify --> |
 | Frontend verify (fast) | <!-- e.g. npm test — red–green loop; the gate still uses Frontend verify --> |
 | Lint | <!-- optional --> |
@@ -37,12 +39,22 @@ Directory profiles (`project-delivery-core.mdc`): `service` (`backend/`, or `bff
 | Backend root | <!-- `backend/` or n/a --> |
 | Frontend root | <!-- `frontend/` or n/a --> |
 | BFF root | <!-- `bff/` or n/a --> |
-| OpenAPI | <!-- `openapi/api-v1.yaml` or n/a --> |
+| Service roots | <!-- comma-separated roots for a multi-service repo, e.g. `services/order, services/inventory`, or n/a --> |
+| OpenAPI | <!-- `openapi/api-v1.yaml`; multi-service repos use `openapi/<service>-v1.yaml` per service, or n/a --> |
+| Phase attempt budget | <!-- total failed verify attempts per phase before blocked; default 8 --> |
 
 ## Contracts
 
 - Approved OpenAPI: <!-- path -->
 - Event schemas: <!-- path -->
+
+## Deploy (optional; read by the `release-deploy` skill)
+
+One row per environment, in promotion order. Leave empty when the merge is the end of delivery.
+
+| Environment | Deploy command | Smoke check | Rollback command |
+|-------------|----------------|-------------|------------------|
+| | | | |
 
 ## Brownfield exceptions
 

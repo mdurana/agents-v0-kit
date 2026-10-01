@@ -59,7 +59,7 @@ check_path() {
   fi
   if [ -e "$p" ]; then
     case "$p" in
-      */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md)
+      */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md|*/e2e-report.md)
         if ! grep -Eqi '^commit:[[:space:]]*[0-9a-f]{7,40}' "$p" 2>/dev/null; then
           printf 'FAIL: report missing commit: line (workflow-orchestration.mdc): %s\n' "$p" >&2
           missing=1

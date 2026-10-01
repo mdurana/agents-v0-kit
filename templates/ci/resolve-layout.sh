@@ -5,8 +5,12 @@
 #
 # Reads the two-column "This repo" rows under ## Layout. When Profile is
 # service, ui, or app, those rows win. Otherwise detect pom.xml / package.json
-# under backend/, frontend/, and bff/. A root pom.xml or package.json is a legacy
-# tree only; greenfield profiles never put source at the repo root.
+# under backend/, frontend/, and bff/, and JVM modules under services/*/. A root
+# pom.xml or package.json is a legacy tree only; greenfield profiles never put
+# source at the repo root.
+# Output variables: LAYOUT_PROFILE, BACKEND_ROOT, FRONTEND_ROOT, BFF_ROOT, and
+# SERVICE_ROOTS (space-separated; one entry per deployable service when the repo
+# holds more than one, e.g. "services/order services/inventory").
 # Profiles: project-delivery-core.mdc.
 set -eu
 
@@ -69,6 +73,28 @@ emit() {
   printf "BACKEND_ROOT='%s'\n" "$2"
   printf "FRONTEND_ROOT='%s'\n" "$3"
   printf "BFF_ROOT='%s'\n" "$4"
+  printf "SERVICE_ROOTS='%s'\n" "${5:-}"
+}
+
+# Comma-separated list of relative roots, printed space-separated.
+normalize_list() {
+  v="$1"
+  if is_na "$v"; then
+    return 0
+  fi
+  list="$(printf '%s\n' "$v" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  res=""
+  while IFS= read -r item; do
+    [ -n "$item" ] || continue
+    out="$(safe_root "$item")" || {
+      printf 'FAIL: layout root is not a relative path: %s\n' "$item" >&2
+      exit 1
+    }
+    res="${res:+$res }$out"
+  done <<EOF
+$list
+EOF
+  printf '%s\n' "$res"
 }
 
 has_jvm() {
@@ -92,11 +118,13 @@ profile="$(cell Profile || true)"
 backend="$(cell "Backend root" || true)"
 frontend="$(cell "Frontend root" || true)"
 bff="$(cell "BFF root" || true)"
+services="$(cell "Service roots" || true)"
 
 if is_placeholder "$profile"; then profile=""; fi
 if is_placeholder "$backend"; then backend=""; fi
 if is_placeholder "$frontend"; then frontend=""; fi
 if is_placeholder "$bff"; then bff=""; fi
+if is_placeholder "$services"; then services=""; fi
 
 case "$profile" in
   service | ui | app) ;;
@@ -105,22 +133,32 @@ esac
 
 if [ -n "$profile" ]; then
   case "$profile" in
-    service) [ -n "$backend" ] || [ -n "$bff" ] || backend="backend" ;;
+    service) [ -n "$backend" ] || [ -n "$bff" ] || [ -n "$services" ] || backend="backend" ;;
     ui) [ -n "$frontend" ] || frontend="frontend" ;;
     app)
-      [ -n "$backend" ] || backend="backend"
+      [ -n "$backend" ] || [ -n "$services" ] || backend="backend"
       [ -n "$frontend" ] || frontend="frontend"
       ;;
   esac
 fi
 
-if [ -n "$profile" ] || [ -n "$backend" ] || [ -n "$frontend" ] || [ -n "$bff" ]; then
+if [ -n "$profile" ] || [ -n "$backend" ] || [ -n "$frontend" ] || [ -n "$bff" ] || [ -n "$services" ]; then
   backend="$(normalize "$backend")"
   frontend="$(normalize "$frontend")"
   bff="$(normalize "$bff")"
-  emit "$profile" "$backend" "$frontend" "$bff"
+  services="$(normalize_list "$services")"
+  emit "$profile" "$backend" "$frontend" "$bff" "$services"
   exit 0
 fi
+
+# No profile: list JVM modules under services/*/ (one deployable service each).
+auto_services=""
+for d in services/*/; do
+  [ -d "$d" ] || continue
+  if has_jvm "${d%/}"; then
+    auto_services="${auto_services:+$auto_services }${d%/}"
+  fi
+done
 
 if has_jvm backend; then
   backend="backend"
@@ -132,6 +170,14 @@ if has_jvm backend; then
     frontend=""
   fi
   if has_jvm bff; then bff="bff"; else bff=""; fi
+elif [ -n "$auto_services" ]; then
+  if [ -f frontend/package.json ]; then
+    profile="app"
+    frontend="frontend"
+  else
+    profile="service"
+  fi
+  if has_jvm bff; then bff="bff"; fi
 elif [ -f frontend/package.json ]; then
   profile="ui"
   frontend="frontend"
@@ -143,4 +189,8 @@ elif has_jvm . || [ -f package.json ]; then
   if [ -f package.json ]; then frontend="."; fi
 fi
 
-emit "$profile" "$backend" "$frontend" "$bff"
+# services/*/ modules are listed only when they are the backend tree: a repo with
+# backend/ keeps that as its one backend root.
+if has_jvm backend; then auto_services=""; fi
+
+emit "$profile" "$backend" "$frontend" "$bff" "$auto_services"

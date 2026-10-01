@@ -129,10 +129,11 @@ for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/rules core/agents cor
   [ -f "$ref" ] || [ -f "templates/$ref" ] || err "referenced doc missing (seed templates/$ref): $ref"
 done
 
-# 3. Commands: all seven exist; workflow rule references the phases; evidence contracts.
-for command in intake design build verify maintain release deliver status onboard triage; do
+# 3. Commands: every phase command exists; workflow rule references the phases; evidence contracts.
+for command in plan intake design build verify maintain release deliver status onboard triage; do
   [ -f "core/commands/$command.md" ] || err "missing /$command command"
 done
+grep -Fq '`/plan`' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /plan"
 grep -Fq 'docs/requirements/<feature>.md' core/commands/intake.md || err "/intake does not name its requirements artifact"
 grep -Fq 'docs/build/' core/commands/build.md || err "/build does not name persisted build evidence paths"
 grep -Fq 'docs/verify/' core/commands/verify.md || err "/verify does not name persisted evidence paths"
@@ -145,7 +146,10 @@ for f in core/agents/*.md; do
   grep -Eq '^mode:[[:space:]]*subagent' "$f" || err "$f: missing mode: subagent"
   grep -Eq '^model:[[:space:]]*[a-z0-9.-]+$' "$f" || err "$f: missing cursor model"
   grep -Eq '^model_kilo:[[:space:]]*[a-z0-9/_.-]+$' "$f" || err "$f: missing kilo model"
-  grep -Eq '^model_claude:[[:space:]]*(sonnet|sonnet|haiku|inherit)[[:space:]]*$' "$f" || err "$f: missing claude model"
+  grep -Eq '^model_claude:[[:space:]]*(opus|sonnet|haiku|inherit)[[:space:]]*$' "$f" || err "$f: missing claude model"
+  # The routing matrix row must carry the same Claude alias as the agent file.
+  cm="$(grep -E '^model_claude:' "$f" | head -n1 | sed 's/^model_claude:[[:space:]]*//; s/[[:space:]]*$//')"
+  grep -E "\\|[[:space:]]*${name}[[:space:]]*\\|" docs/model-routing-matrix.md | grep -Fq "\`$cm\`" || err "$name claude model $cm does not match its routing-matrix row"
   grep -Fqr -- "$name" core/commands core/agents core/skills || err "$name is not referenced by a command, agent, or skill"
 done
 
@@ -236,6 +240,8 @@ grep -Fq 'pull_request_review' templates/.github/workflows/delivery-approvals.ym
 [ -f scripts/test-hooks.sh ] || err "scripts/test-hooks.sh missing"
 [ -f scripts/test-hook-policy.py ] || err "scripts/test-hook-policy.py missing"
 sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
+[ -f scripts/test-ci-checks.sh ] || err "scripts/test-ci-checks.sh missing"
+sh scripts/test-ci-checks.sh || err "scripts/test-ci-checks.sh failed"
 grep -Fq 'git status --porcelain' core/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
@@ -247,7 +253,7 @@ grep -Fq 'the repository wins' AGENTS.md || err "AGENTS.md does not state rule p
 grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.md into target workspaces"
 
 # 11. Required template artifacts + docs/templates parity.
-for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/.github/pull_request_template.md templates/docs/architecture.md templates/docs/network.md templates/docs/project-profile.md templates/docs/requirements/_state.template.json templates/CODEOWNERS templates/ci/check-approvals.sh templates/ci/check-evidence.sh templates/ci/check-milestone.sh templates/ci/check-delivery-linkage.sh templates/ci/check-approver-github.sh templates/ci/check-approver-gitlab.sh templates/ci/check-coverage-ratchet.sh templates/ci/check-known-failures.sh templates/ci/resolve-layout.sh templates/docs/milestones/_template.md templates/docs/milestones/p0-platform-skeleton.md templates/docs/milestones/p1-contracts-and-data-models.md templates/docs/milestones/p2-mvp-core-features.md templates/docs/milestones/p3-feature-expansion.md templates/docs/milestones/p4-hardening.md templates/docs/milestones/p5-release-readiness.md templates/docs/repo-map.md templates/docs/workspace.manifest.json templates/docs/mcp-baseline.md templates/scripts/generate-repo-map.sh templates/scripts/collect-dependency-graphs.sh templates/scripts/sync-feature-state.sh templates/scripts/delivery-metrics.sh templates/ci/check-feature-state.sh templates/.cursor/mcp.json.example templates/docs/greenfield-onboarding.md templates/docs/brownfield-onboarding.md templates/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md templates/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml templates/.github/workflows/delivery-approvals.yml templates/.github/workflows/build-and-security.yml templates/maven/checkstyle.xml templates/maven/dependency-check-suppressions.xml templates/maven/quality-plugins-ci-security.xml templates/maven/contract-conformance.xml templates/maven/archunit/LayerRulesTest.java templates/docs/design/ux-spec.md templates/docs/design/system/context-map.md templates/docs/design/system/nfr-slo.md templates/docs/design/system/threat-model.md templates/docs/design/system/slo-evidence.md; do
+for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/.github/pull_request_template.md templates/docs/architecture.md templates/docs/network.md templates/docs/project-profile.md templates/docs/requirements/_state.template.json templates/CODEOWNERS templates/ci/check-approvals.sh templates/ci/check-evidence.sh templates/ci/check-milestone.sh templates/ci/check-delivery-linkage.sh templates/ci/check-approver-github.sh templates/ci/check-approver-gitlab.sh templates/ci/check-coverage-ratchet.sh templates/ci/check-known-failures.sh templates/ci/resolve-layout.sh templates/ci/check-gate-metrics.sh templates/ci/check-event-schemas.sh templates/scripts/feature-worktree.sh templates/scripts/check-attempt-budget.sh templates/docs/milestones/_template.md templates/docs/milestones/p0-platform-skeleton.md templates/docs/milestones/p1-contracts-and-data-models.md templates/docs/milestones/p2-mvp-core-features.md templates/docs/milestones/p3-feature-expansion.md templates/docs/milestones/p4-hardening.md templates/docs/milestones/p5-release-readiness.md templates/docs/repo-map.md templates/docs/workspace.manifest.json templates/docs/mcp-baseline.md templates/scripts/generate-repo-map.sh templates/scripts/collect-dependency-graphs.sh templates/scripts/sync-feature-state.sh templates/scripts/delivery-metrics.sh templates/ci/check-feature-state.sh templates/.cursor/mcp.json.example templates/docs/greenfield-onboarding.md templates/docs/brownfield-onboarding.md templates/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md templates/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml templates/.github/workflows/delivery-approvals.yml templates/.github/workflows/build-and-security.yml templates/maven/checkstyle.xml templates/maven/dependency-check-suppressions.xml templates/maven/quality-plugins-ci-security.xml templates/maven/contract-conformance.xml templates/maven/archunit/LayerRulesTest.java templates/docs/design/ux-spec.md templates/docs/design/system/context-map.md templates/docs/design/system/nfr-slo.md templates/docs/design/system/threat-model.md templates/docs/design/system/slo-evidence.md templates/ci/check-gate-metrics.sh templates/ci/check-event-schemas.sh templates/scripts/feature-worktree.sh templates/scripts/check-attempt-budget.sh; do
   [ -f "$artifact" ] || err "required artifact template missing: $artifact"
 done
 for doc in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/mcp-baseline.md; do
@@ -348,6 +354,69 @@ grep -Fq 'P0-D' templates/docs/milestones/p0-platform-skeleton.md || err "P0 mil
 grep -Fq 'TDD' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service lacks the red–green (TDD) requirement"
 grep -Fq 'bounded' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service lacks bounded fix attempts"
 grep -Fq 'docs/build/' core/agents/backend-engineer.md || err "backend-engineer does not persist build evidence"
+
+# 17. Consistency between prose and the files it describes (catches drift).
+agent_count="$(ls core/agents/*.md | wc -l | tr -d ' ')"
+command_count="$(ls core/commands/*.md | wc -l | tr -d ' ')"
+skill_count="$(ls -d core/skills/*/ | wc -l | tr -d ' ')"
+grep -Fq "$agent_count subagents" README.md || err "README.md must say $agent_count subagents"
+grep -Fq "$command_count entry points" README.md || err "README.md must say $command_count entry points"
+grep -Fq "$skill_count playbooks" README.md || err "README.md must say $skill_count playbooks"
+grep -Fq "($agent_count agents)" docs/model-routing-matrix.md || err "routing matrix must say ($agent_count agents)"
+for f in core/agents/*.md; do
+  name="$(basename "$f" .md)"
+  grep -Eq "^\\|[[:space:]]*${name}[[:space:]]*\\|" docs/model-routing-matrix.md || err "$name has no row in the agent mapping of docs/model-routing-matrix.md"
+done
+# Every skill named as `(skill: x)` or `(skills: x, y)` in a command or agent exists.
+for ref in $(grep -rhoE '\(skills?: [^)]*\)' core/commands core/agents | grep -oE '`[a-z-]+`' | tr -d '`' | sort -u); do
+  [ -f "core/skills/$ref/SKILL.md" ] || err "a command or agent names skill $ref, which does not exist"
+done
+# Every engineer agent defers to the loop in its implement-* skill instead of restating it.
+grep -Fq 'implement-spring-service` step 6' core/agents/backend-engineer.md || err "backend-engineer must defer to implement-spring-service step 6"
+grep -Fq 'implement-bff` step 6' core/agents/bff-engineer.md || err "bff-engineer must defer to implement-bff step 6"
+grep -Fq 'implement-frontend` step 6' core/agents/frontend-engineer.md || err "frontend-engineer must defer to implement-frontend step 6"
+for f in core/skills/implement-spring-service/SKILL.md core/skills/implement-bff/SKILL.md core/skills/implement-frontend/SKILL.md; do
+  grep -Fq 'check-attempt-budget.sh' "$f" || err "$f must run the phase attempt budget check"
+done
+# The default host is GitLab: the conduct rule must not name gh alone.
+grep -Fq 'glab' core/rules/ai-agent-conduct.mdc || err "ai-agent-conduct.mdc must name glab (GitLab is the default host)"
+
+# 18. Scale contracts: planning, ordering, multi-service layout, machine-read gates, budgets.
+grep -Fq 'Program planning' core/rules/workflow-orchestration.mdc || err "workflow rule lacks Program planning"
+grep -Fq 'Worktree per feature' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the worktree-per-feature convention"
+grep -Fq 'Batch approval' core/rules/workflow-orchestration.mdc || err "workflow rule lacks batch approval"
+grep -Fq 'Phase attempt budget' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the phase attempt budget"
+grep -Fq 'check-gate-metrics' core/rules/workflow-orchestration.mdc || err "workflow rule does not name the machine-read gate metrics"
+grep -Fq '`/plan`' core/agents/orchestrator.md || err "orchestrator does not route /plan"
+grep -Fq 'program-planning' core/agents/program-planner.md || err "program-planner does not follow program-planning"
+grep -Fq 'check_story_order' templates/ci/check-milestone.sh || err "check-milestone does not enforce story order"
+grep -Fq 'SERVICE_ROOTS' templates/ci/resolve-layout.sh || err "resolve-layout does not print SERVICE_ROOTS"
+grep -Fq 'SERVICE_ROOTS' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build each service root"
+grep -Fq 'SERVICE_ROOTS' templates/.github/workflows/build-and-security.yml || err "GitHub build workflow must build each service root"
+grep -Fq 'services/*/pom.xml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml build rules must include services/*/pom.xml"
+grep -Fq 'check-gate-metrics.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-gate-metrics.sh"
+grep -Fq 'check-gate-metrics.sh' templates/.github/workflows/build-and-security.yml || err "GitHub build workflow must run check-gate-metrics.sh"
+grep -Fq 'check-event-schemas.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-event-schemas.sh"
+grep -Fq 'docker:' templates/.gitlab-ci.yml || err ".gitlab-ci.yml build job needs a Docker daemon for Testcontainers"
+grep -Fq 'Service roots' templates/docs/project-profile.md || err "project-profile template lacks the Service roots row"
+grep -Fq 'Phase attempt budget' templates/docs/project-profile.md || err "project-profile template lacks the Phase attempt budget row"
+grep -Fq 'Deploy' templates/docs/project-profile.md || err "project-profile template lacks the Deploy table"
+grep -Fq '"worktree"' core/hooks/hook-policy.py || err "hook-policy must ask before creating a worktree"
+grep -Fq 'ci/[^/]+' core/hooks/hook-policy.py || err "hook-policy must protect every ci/*.sh script, not a named list"
+grep -Fq 'kit.maven.dir' templates/maven/quality-plugins.xml || err "maven quality snippets must read kit.maven.dir (per-service config)"
+grep -Fq 'kit.openapi.catalog' templates/maven/contract-conformance.xml || err "contract-conformance must read kit.openapi.catalog (per-service catalog)"
+grep -Fq 'Service verify' templates/docs/project-profile.md || err "project-profile template lacks the Service verify rows"
+grep -Fq 'FETCH_HEAD:ci/check-gate-metrics.sh' templates/.gitlab-ci.yml || err "gate-metrics job must run the script from the default branch"
+# Always-on context budget: the rules every session loads must not creep past this size.
+always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc AGENTS.md | wc -c | tr -d ' ')"
+[ "$always_on_bytes" -le 32000 ] || err "always-on rules are $always_on_bytes bytes (limit 32000): move detail into a command, agent, or skill"
+grep -Fq 'worktree' core/adapters/kilo/kilo.json || err "kilo permissions must ask before creating a worktree"
+for ci_script in check-gate-metrics.sh check-event-schemas.sh; do
+  grep -Fq "ci/$ci_script" scripts/install.sh || err "install.sh does not seed ci/$ci_script"
+done
+for sc_script in feature-worktree.sh check-attempt-budget.sh; do
+  grep -Fq "scripts/$sc_script" scripts/install.sh || err "install.sh does not seed scripts/$sc_script"
+done
 
 if [ "$TARGET_MODE" = 1 ]; then
   validate_target "$TARGET_DIR"

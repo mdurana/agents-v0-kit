@@ -5,8 +5,8 @@
 <!--
   Org-aligned Checkstyle configuration.
   Seeded to <repo>/maven/checkstyle.xml; the quality-plugins snippet references
-  it via ${maven.multiModuleProjectDirectory}/maven/checkstyle.xml — works for
-  single- and multi-module projects without edits. If the repo already maintains
+  it via ${kit.maven.dir}/checkstyle.xml. Define kit.maven.dir in each pom as
+  described in maven/quality-plugins.xml (single module, or one module per service). If the repo already maintains
   its own config, point configLocation there instead — the repository wins.
   Mirrors quality-and-testing.mdc (methods <= 30 lines) and java-spring-backend.mdc
   (naming, no empty catch). CyclomaticComplexity approximates the cognitive

@@ -61,6 +61,59 @@ for art in sorted(glob.glob("docs/requirements/*.md")):
     dates = ", ".join(f"{p} {rows[p].isoformat()}" for p in done)
     print(f"| `{os.path.basename(art)[:-3]}` | {last} | {span} | {dates} |")
 
+def failed_cards(report):
+    """Command-result cards (Command, Exit, Attempt, ...) whose Exit is not 0."""
+    failed, total, inside = 0, 0, False
+    with open(report, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip().startswith("|"):
+                inside = False
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) >= 2 and cells[0].lower() == "command" and cells[1].lower() == "exit":
+                inside = True
+                continue
+            if not inside or set("".join(cells)) <= set("-: "):
+                continue
+            total += 1
+            if cells[1].isdigit() and cells[1] != "0":
+                failed += 1
+    return failed, total
+
+
+print("\n## Delivery effort\n")
+print("| Feature | Approved gates | Failed attempts / cards | Active phase | Status | Blocked reason |")
+print("|---------|----------------|-------------------------|--------------|--------|----------------|")
+effort_rows = []
+for art in sorted(glob.glob("docs/requirements/*.md")):
+    rows = approvals(art)
+    slug = os.path.basename(art)[:-3]
+    if slug.endswith(".phase-result") or not rows:
+        continue
+    state = {}
+    state_path = f"docs/requirements/{slug}.state.json"
+    if os.path.isfile(state_path):
+        try:
+            state = json.load(open(state_path, encoding="utf-8"))
+        except ValueError:
+            state = {}
+    report = f"docs/build/{slug}/build-report.md"
+    failed, total = failed_cards(report) if os.path.isfile(report) else (0, 0)
+    effort_rows.append((slug, len([p for p in PHASES if p in rows]), failed, total, state))
+    print(
+        f"| `{slug}` | {effort_rows[-1][1]} | {failed} / {total} | {state.get('activePhase') or '-'} "
+        f"| {state.get('activeStatus') or '-'} | {state.get('blockedReason') or ''} |"
+    )
+if effort_rows:
+    n = len(effort_rows)
+    blocked = sum(1 for r in effort_rows if r[4].get("activeStatus") == "blocked")
+    print(
+        f"\n{n} feature(s); {sum(r[1] for r in effort_rows) / n:.1f} approved gates and "
+        f"{sum(r[2] for r in effort_rows) / n:.1f} failed attempts per feature; {blocked} blocked."
+    )
+else:
+    print("| - | - | - | - | - | - |")
+
 print("\n## Hook decisions (local audit log)\n")
 counts = {}
 for log in (".cursor/hooks/audit.jsonl", ".claude/hooks/audit.jsonl"):

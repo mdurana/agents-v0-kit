@@ -4,7 +4,7 @@ description: Chain the full delivery lifecycle with a stop for user approval at 
 
 # /deliver
 
-Chain the full delivery lifecycle: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. Prefer launching the `orchestrator` subagent to run phases sequentially (helpers run from the main session, not from nested subagents). For **Trivial** tier use `/triage` instead of full Intake. For **Major** tier include `system-design` in Design and `ux-designer` when UI-affecting.
+Chain the full delivery lifecycle: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A goal larger than one story starts with `/plan`; `/deliver` then runs one story of the approved manifest, in dependency order. Prefer launching the `orchestrator` subagent to run phases sequentially (helpers run from the main session, not from nested subagents). For **Trivial** tier use `/triage` instead of full Intake. For **Major** tier include `system-design` in Design and `ux-designer` when UI-affecting.
 
 ## Rules
 Follow `workflow-orchestration.mdc`, including Phase resume and Parallel features. Stop at **every gate** and wait for user approval before advancing. Do not auto-advance. An `in_progress` or `blocked` state resumes that same phase; it does not approve it. A second feature in this checkout must not write a shared file another feature already has dirty.
@@ -24,11 +24,10 @@ Before each transition, verify the previous handoff artifact exists, its evidenc
    - Gate: feature draft `docs/design/<feature>/openapi.yaml` + event schemas (`eventVersion`); the org catalog is unchanged; one error envelope per surface; ADR; Mermaid diagrams. When UI-affecting: UX spec plus static HTML mockups, with a component-default row for every interactive control (`ux-design.mdc`).
    - **STOP → user approves → continue.**
 3. **Build** — launch `backend-engineer` / `bff-engineer` / `frontend-engineer` (skills: `implement-spring-service`, `implement-bff`, `implement-frontend`).
-   - Read `docs/requirements/<feature>.phase-result.md` when it exists. Confirm a green baseline on the full verify command. Write `docs/build/<feature>/plan.md` with one row per approved `AC-*`. Merge the approved feature draft into the org catalog before other edits. The red–green loop uses the profile's fast verify command when that cell is a real command. The second red result for the same test goes to `debug-investigator` before attempt three. Persist `docs/build/<feature>/` evidence, including attempt cards.
-   - Gate: full `mvn -B clean verify`/frontend verify green with quality plugins (coverage/static/CVE); contract-conformance diff clean; new behavior covered by tests; methods ≤ 30 lines; every endpoint auth+authz; correlation/tracing wired; DTOs only; Flyway migrations; no secrets; bounded fix attempts respected.
+   - Follow `/build` (prerequisite, baseline, plan, loop, evidence) and the Build gate in `workflow-orchestration.mdc`. Do not restate them here.
    - **STOP → user approves → continue.**
 4. **Verify** — launch `test-engineer` (skill: `quality-gate`) first. Then launch `security-reviewer` (skill: `vapt-review`) and `code-reviewer` (skill: `pr-review`) together. Wait for both. Gather one Critical list. Run a `schema-author` brief from this session. The P4 SLO story follows `slo-evidence`.
-   - Gate: coverage ≥ 80%/70%; no new high/critical CVEs; VAPT F1–F7 no Critical; code-review no Critical; P4 SLO rows measured or waived.
+   - Follow `/verify` and the Verify gate in `workflow-orchestration.mdc`.
    - On a gathered Critical: route back to Build/Maintain, then re-enter Verify.
    - **STOP → user approves → continue.**
 5. **Release** — launch `release-manager` (skill: `release-pr`).

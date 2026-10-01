@@ -50,6 +50,7 @@ You do **not** need to run terminal commands, edit code, or pick AI models. Opti
 
 | Command     | When to use it                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `/plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/intake`. |
 | `/intake`   | Turn a idea or ticket into clear requirements and open questions.                                       |
 | `/design`   | After intake is approved — APIs, data flows, and architecture decisions.                                |
 | `/build`    | After design is approved — actual software is written.                                                  |
@@ -82,7 +83,15 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 
 You can approve intake for a second feature while the first feature’s build is still waiting on you, then start design for the second feature. Each feature has its own requirements and design notes.
 
-The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it.
+The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it. The usual way is one working folder per feature: engineering runs `scripts/feature-worktree.sh <feature>` once you have said yes, and each feature then builds in its own folder without touching the others.
+
+## Big goals: plan first
+
+When the goal is larger than one story, start with `/plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the five gates in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
+
+With many small stories you can approve the Intake or Design gate for several of them in one message, but only by naming each one, for example `Approved: Design for P2-A, P2-B, P2-C`. That is available only for ordinary stories with no security triggers and no open questions. Build, Verify, and Release are always approved one story at a time. "Approve all" does not count.
+
+The AI also stops by itself when one phase has failed too many times in total (default 8 failed attempts). It reports what blocked it; engineering decides whether to raise the limit.
 
 ---
 
@@ -313,7 +322,7 @@ Make the portal better.
 
 ```text
 1. Open Cursor chat in the project.
-2. /deliver + paste Jira/spec (or /intake only). Name the feature if more than one is open.
+2. Big goal: /plan first. Then /deliver + paste Jira/spec (or /intake only). Name the feature if more than one is open.
 3. Answer questions when asked.
 4. At each gate: read summary → Approved OR list changes.
 5. If the chat stopped mid-phase: /status <feature> → run the same phase command again.

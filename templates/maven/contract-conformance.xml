@@ -6,6 +6,14 @@
   Adjust paths, versions, and the apiDocsUrl port per service. N/A with a recorded
   reason when the service generates no spec. Keep the approved contract under
   version control (e.g. openapi/api-v1.yaml).
+
+  The approved contract is read from the property kit.openapi.catalog. Add to the pom:
+    one service in the repo:
+      <properties><kit.openapi.catalog>${project.basedir}/openapi/api-v1.yaml</kit.openapi.catalog></properties>
+    several services (Profile Layout lists Service roots), each with its own catalog
+    openapi/<service>-v1.yaml at the repo root, where <service> is the last segment of the
+    service root:
+      <properties><kit.openapi.catalog>${project.basedir}/../../openapi/order-v1.yaml</kit.openapi.catalog></properties>
 -->
 
 <plugin>
@@ -31,7 +39,7 @@
   <artifactId>openapi-diff-maven-plugin</artifactId>
   <version>2.1.0</version>
   <configuration>
-    <oldSpec>${project.basedir}/openapi/api-v1.yaml</oldSpec>
+    <oldSpec>${kit.openapi.catalog}</oldSpec>
     <newSpec>${project.build.directory}/openapi.json</newSpec>
     <failOnIncompatible>true</failOnIncompatible>
     <failOnChanged>false</failOnChanged>

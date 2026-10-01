@@ -2,6 +2,8 @@
   OWASP Dependency-Check for CI only — merge into a Maven profile (e.g. ci-security)
   and run: ./mvnw -B clean verify -Pci-security
   Keep fast local verify without this profile (workflow-orchestration.mdc / project-profile.md).
+  The suppression file is read from kit.maven.dir; define that property in the pom as
+  described in maven/quality-plugins.xml.
 -->
 <profile>
   <id>ci-security</id>
@@ -13,8 +15,13 @@
         <version>10.0.4</version>
         <configuration>
           <failBuildOnCVSS>7</failBuildOnCVSS>
+          <!-- JSON is read by ci/check-gate-metrics.sh (target/dependency-check-report.json). -->
+          <formats>
+            <format>HTML</format>
+            <format>JSON</format>
+          </formats>
           <suppressionFiles>
-            <suppressionFile>${maven.multiModuleProjectDirectory}/maven/dependency-check-suppressions.xml</suppressionFile>
+            <suppressionFile>${kit.maven.dir}/dependency-check-suppressions.xml</suppressionFile>
           </suppressionFiles>
         </configuration>
         <executions>

@@ -23,6 +23,7 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
    - **Helpers.** If `docs/verify/<feature>/helper-brief.md` exists, launch the helper it names (`schema-author` unless the brief says otherwise) from this session. Pass the result into a second launch of `test-engineer`. Delete the brief after that result is back. Launch each brief once (`workflow-orchestration.mdc` Helper agents).
    - Run the full `mvn -B clean verify` / full frontend verify command for changed code; confirm coverage ≥ 80% backend / 70% frontend.
    - When this story is the P4 SLO story, or the requirements artifact cites `docs/design/system/nfr-slo.md`, follow `slo-evidence` and write `docs/design/system/slo-evidence.md`.
+   - For an integration story, a vertical slice, a P2 journey, or a P4 story, follow `e2e-perf-testing` and persist `docs/verify/<feature>/e2e-report.md`.
    - Run OWASP Dependency-Check; no new high/critical CVEs without a documented exception.
    - For UI-affecting changes: run the automated accessibility check (axe-core) on changed routes of the built UI, not on the Design HTML mockups; confirm no serious/critical violations; cover each UX acceptance criterion from `docs/design/<feature>/ux-spec.md` with a test of the built UI; persist the UX report to `docs/verify/<feature>/ux-report.md` (violations with severity and file:line, UX acceptance criteria status).
    - Persist the test report to `docs/verify/<feature>/test-report.md` (build status, coverage numbers, CVE scan results, documented exceptions).

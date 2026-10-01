@@ -38,6 +38,10 @@
 >   `ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
 >   exist and record the phase approval — build/verify also require the recorded evidence
 >   paths to exist (`ci/check-evidence.sh`).
+> - Dependency lists story IDs of this manifest, comma-separated (`P2-A, P2-B`). A
+>   build-approved story fails `ci/check-milestone.sh` until each story it names has a
+>   `verify` approval. Milestone names (`P1`) and a dash are prose and are not checked.
+>   `/plan` writes these rows (`program-planning` skill).
 > - Rows with placeholder paths (`<...>`) or no path are skipped — a milestone go/no-go
 >   passes only when every story row has a concrete, approved artifact.
 > - Hardening/readiness milestones: run `/verify` once more with this manifest's linked
@@ -47,8 +51,10 @@
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
+| plan | <this manifest, docs/design/system/context-map.md> | <name> | Approved | <date> |
 | milestone | <this manifest, story artifacts> | <name> | Approved | <date> |
 
-> The `milestone` row is the go/no-go decision, verified at merge by
+> The `plan` row is the `/plan` approval, verified at merge by
+> `ci/check-approvals.sh <manifest> plan`. The `milestone` row is the go/no-go decision, verified at merge by
 > `ci/check-approvals.sh <manifest> milestone`; the per-story approvals are verified
 > by `ci/check-milestone.sh <manifest> verify`.

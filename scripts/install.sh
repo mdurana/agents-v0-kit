@@ -234,6 +234,8 @@ ci/check-delivery-linkage.sh
 ci/check-approver-github.sh
 ci/check-approver-gitlab.sh
 ci/check-coverage-ratchet.sh
+ci/check-gate-metrics.sh
+ci/check-event-schemas.sh
 docs/compliance-matrix.md
 docs/model-routing-matrix.md
 docs/user-guide.md
@@ -248,6 +250,8 @@ scripts/generate-repo-map.sh
 scripts/collect-dependency-graphs.sh
 scripts/sync-feature-state.sh
 scripts/delivery-metrics.sh
+scripts/feature-worktree.sh
+scripts/check-attempt-budget.sh
 ci/check-feature-state.sh
 "
   copy_template_file() {
@@ -255,7 +259,7 @@ ci/check-feature-state.sh
     dest="$t/$rel"
     overwrite=0
     if [ "$UPDATE" = 1 ]; then
-        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/mcp-baseline.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-github.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh .gitlab-ci.yml .gitlab/merge_request_templates/default.md .github/workflows/delivery-approvals.yml .github/workflows/build-and-security.yml; do
+        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/mcp-baseline.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-github.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh ci/check-gate-metrics.sh ci/check-event-schemas.sh scripts/check-attempt-budget.sh .gitlab-ci.yml .gitlab/merge_request_templates/default.md .github/workflows/delivery-approvals.yml .github/workflows/build-and-security.yml; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi

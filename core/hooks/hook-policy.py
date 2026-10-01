@@ -319,6 +319,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
         r"\bgradle\s+.*\bpublish\b", low
     ):
         return "ask", "artifact deploy/publish requires explicit user approval."
+    if re.search(r"^(?:(?:sh|bash|dash)\s+)?\S*feature-worktree\.sh\b", low):
+        return "ask", "creating a feature branch and worktree requires explicit user authorization."
 
     try:
         parts = shlex.split(seg, posix=True)
@@ -361,6 +363,13 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             return "ask", "git checkout -- may discard work; requires approval."
         if sub == "restore" and "--staged" not in parts and "--" in parts:
             return "ask", "git restore may discard work; requires approval."
+        branch_msg = "creating a branch or worktree requires explicit user authorization."
+        if sub == "worktree" and "add" in parts[1:]:
+            return "ask", branch_msg
+        if sub == "checkout" and any(x in parts for x in ("-b", "-B")):
+            return "ask", branch_msg
+        if sub == "switch" and any(x in parts for x in ("-c", "-C", "--create")):
+            return "ask", branch_msg
 
     return "allow", ""
 
@@ -467,9 +476,9 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.kilo/kilo\.json$"),
     re.compile(r"(^|/)\.kilo/agent/"),
     re.compile(r"(^|/)\.kilo/rules/"),
-    re.compile(
-        r"(^|/)ci/check-(approvals|evidence|milestone|delivery-linkage|known-failures|approver-github|approver-gitlab|coverage-ratchet)\.sh$"
-    ),
+    # Every CI gate script: a new check is protected without editing this list.
+    re.compile(r"(^|/)ci/[^/]+\.sh$"),
+    re.compile(r"(^|/)scripts/(check-attempt-budget|feature-worktree)\.sh$"),
     re.compile(r"(^|/)\.github/workflows/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),
