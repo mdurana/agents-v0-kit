@@ -330,4 +330,4 @@ Make the portal better.
 6. After go-live: /maintain + describe the issue.
 ```
 
-For technical setup, model routing, and compliance mapping, see [README.md](../README.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md), [brownfield-onboarding.md](brownfield-onboarding.md).
+For technical setup, model routing, and compliance mapping, see [README.md](../README.md). The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md), [brownfield-onboarding.md](brownfield-onboarding.md).

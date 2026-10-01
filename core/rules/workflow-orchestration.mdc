@@ -21,7 +21,7 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A program of more than one story starts with **Plan** (`/plan`, below). Each phase is entered via a command (`/plan`, `/intake`, `/design`, `/build`, `/verify`, `/maintain`, `/release`, `/onboard`, `/status`, `/triage`) or chained via `/deliver`. Resume file: `docs/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`).
+Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A program of more than one story starts with **Plan** (`/plan`, below). Each phase is entered via a command (`/plan`, `/intake`, `/design`, `/build`, `/verify`, `/maintain`, `/release`, `/onboard`, `/status`, `/triage`) or chained via `/deliver`. Resume file: `docs/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0-kit.md`.
 
 ## Program planning
 
