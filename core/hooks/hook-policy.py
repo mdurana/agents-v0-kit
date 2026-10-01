@@ -472,8 +472,12 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/(commands|skills)/"),
     # Every CI gate script: a new check is protected without editing this list.
     re.compile(r"(^|/)ci/[^/]+\.sh$"),
-    re.compile(r"(^|/)scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree)\.sh$"),
-    re.compile(r"(^|/)\.github/workflows/"),
+    re.compile(
+        r"(^|/)scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree|"
+        r"check-delivery-gate-local|verify-gitlab-ci-prereqs|delivery-metrics|export-audit-pack)\.sh$"
+    ),
+    re.compile(r"(^|/)hooks/pre-push$"),
+    re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),
     re.compile(r"(^|/)CODEOWNERS$"),

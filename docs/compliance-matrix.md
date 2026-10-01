@@ -270,10 +270,13 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Verify approval bound to a human GitLab approver named in the Approver column | CI ci/check-approver-gitlab.sh (manual `delivery-approval` job) |
 | Release or verify approval bound to a human GitLab approver named on either row | CI ci/check-approver-gitlab.sh from the default branch (manual `.gitlab-ci.yml` job `delivery-approval`; `GITLAB_TOKEN` is `read_api` and scoped to that job's environment) |
 | Evidence `commit:` + staleness vs PR head | CI ci/check-evidence.sh |
-| Build failures cannot be masked by log piping | CI build-and-security.yml (`pipefail` default shell) |
+| Build failures cannot be masked by log piping | CI `.gitlab-ci.yml` (`set -o pipefail` in build/verify job scripts) |
 | Brownfield test failure budget | CI ci/check-known-failures.sh; docs/project-profile.md |
 | Brownfield coverage ratchet | R quality-and-testing; CI ci/check-coverage-ratchet.sh; docs/project-profile.md `coverage_ratchet` |
-| Secret scan (full history, pinned + checksum-verified gitleaks) | CI build-and-security.yml |
+| Secret scan | CI `.gitlab-ci.yml` (`Security/Secret-Detection.gitlab-ci.yml` include) |
 | Delivery and hook metrics (approved gates, failed attempts, blocked features per feature) | scripts/delivery-metrics.sh |
+| Optional compliance audit manifest (SHA-256 of delivery evidence) | scripts/export-audit-pack.sh |
+| AsyncAPI contract lint (when `docs/design/<feature>/asyncapi.yaml` exists) | CI ci/check-asyncapi.sh; ci/check-design-contracts.sh |
+| Private/air-gapped CI container pulls | `.gitlab-ci.yml` variable `CI_IMAGE_PREFIX`; docs/project-profile.md |
 | Branch, worktree, or `feature-worktree.sh` creation asks first | H-ask pre-shell.sh; hook-policy.py shell |
 | Behavior tests for the template CI scripts | scripts/test-ci-checks.sh (run by validate-kit.sh) |

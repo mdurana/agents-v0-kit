@@ -28,6 +28,11 @@ stages:
 default:
   interruptible: true
 
+# Air-gapped or private registry mirrors: set CI_IMAGE_PREFIX (e.g. registry.example.com/)
+# in GitLab CI/CD variables or docs/project-profile.md guidance. Empty = pull from public hubs.
+variables:
+  CI_IMAGE_PREFIX: ""
+
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -41,9 +46,9 @@ workflow:
 # A project with no Testcontainers tests can delete the Docker block too.
 build:
   stage: test
-  image: eclipse-temurin:21-jdk
+  image: ${CI_IMAGE_PREFIX}eclipse-temurin:21-jdk
   services:
-    - name: docker:27-dind
+    - name: ${CI_IMAGE_PREFIX}docker:27-dind
       alias: docker
       command: ["--tls=false"]
   variables:
@@ -110,7 +115,7 @@ build:
 # agent wrote into a report. Diff coverage is measured on merge requests.
 gate-metrics:
   stage: security
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   variables:
     GIT_DEPTH: "0"
   rules:
@@ -161,7 +166,7 @@ gate-metrics:
 # Contract and event checks that do not need the application to run.
 event-schema-compat:
   stage: validate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   variables:
     GIT_DEPTH: "0"
   rules:
@@ -198,7 +203,7 @@ event-schema-compat:
 
 design-contract:
   stage: validate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   variables:
     GIT_DEPTH: "0"
   rules:
@@ -215,7 +220,7 @@ design-contract:
 
 endpoint-auth:
   stage: validate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   variables:
     GIT_DEPTH: "0"
   rules:
@@ -230,7 +235,7 @@ endpoint-auth:
 
 frontend-calls:
   stage: validate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
@@ -245,7 +250,7 @@ frontend-calls:
 # Runs when the project has a Playwright config. Put the dev server in the config's webServer block.
 e2e:
   stage: e2e
-  image: mcr.microsoft.com/playwright:v1.48.0-jammy
+  image: ${CI_IMAGE_PREFIX}mcr.microsoft.com/playwright:v1.48.0-jammy
   variables:
     npm_config_cache: "$CI_PROJECT_DIR/.npm"
   cache:
@@ -277,7 +282,7 @@ e2e:
 perf:
   stage: perf
   image:
-    name: grafana/k6:0.54.0
+    name: ${CI_IMAGE_PREFIX}grafana/k6:0.54.0
     entrypoint: [""]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -300,7 +305,7 @@ perf:
 
 frontend:
   stage: test
-  image: node:20-bookworm
+  image: ${CI_IMAGE_PREFIX}node:20-bookworm
   variables:
     npm_config_cache: "$CI_PROJECT_DIR/.npm"
   cache:
@@ -353,7 +358,7 @@ secret_detection:
 
 coverage-ratchet:
   stage: validate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -364,7 +369,7 @@ coverage-ratchet:
 
 delivery-metrics:
   stage: delivery-gate
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
@@ -378,7 +383,7 @@ delivery-metrics:
     expire_in: 2 weeks
 
 .delivery-linkage:
-  image: alpine:3.20
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
   variables:
     GIT_DEPTH: "0"
   before_script:

@@ -14,7 +14,7 @@ An order platform, built from an empty repo (greenfield, profile `app`):
 | UI | `frontend/` SvelteKit: order list, order detail, place order |
 | Profile rows | `Profile: app`, `Service roots: services/order, services/inventory, services/payment`, `BFF root: bff/`, `Frontend root: frontend/` |
 
-Install the kit with `./scripts/install.sh --tool <tool> --with-starters <repo>`, then run `/plan` with the goal "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released."
+Install the kit with `./scripts/install.sh --with-starters <repo>`, then run `/plan` with the goal "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released."
 
 ## Expected plan (check `/plan` output against this)
 
@@ -37,7 +37,7 @@ A plan passes when it has these stories (names may differ), no cycle, one surfac
 
 ## Run protocol
 
-1. Fix the inputs and record them in the result file: kit version (`VERSION`), tool, model per role (`docs/model-routing-matrix.md`), CI host.
+1. Fix the inputs and record them in the result file: kit version (`VERSION`), model per role (`docs/model-routing-matrix.md`), CI host (GitLab).
 2. Run `/plan`, then every story in dependency order with `/deliver`. One feature per git worktree (`scripts/feature-worktree.sh`). Approve each gate; count a gate as a re-approval when you sent work back.
 3. Batch the Intake and Design approvals of the P2 stories once (`workflow-orchestration.mdc` Batch approval) and record that you did.
 4. Stop a story when its phase is `blocked` and record the blocked reason. Do not hand-edit code to unblock it; the point is what the kit does without help.
@@ -57,7 +57,7 @@ A plan passes when it has these stories (names may differ), no cycle, one surfac
 | CI red runs per merge request | CI | Gaps between local and CI gates |
 | Hook decisions: ask / block | `delivery-metrics.sh` Hook decisions | Guardrail pressure |
 | Wall-clock days, plan to last merge | approval dates | Cycle time |
-| Tokens or cost per story | tool billing | Spend |
+| Tokens or cost per story | Cursor billing | Spend |
 | Defects found after the last merge (integration run, manual) | tester | What the gates did not catch |
 
 ## Result file
@@ -66,7 +66,7 @@ Copy this block into `docs/benchmark/results/<YYYY-MM-DD>-<kit-version>.md`.
 
 ```text
 Kit version: <VERSION>
-Tool and models: <tool; plan/build/review/debug model IDs>
+Models: <plan/build/review/debug model IDs from model-routing-matrix>
 CI host: GitLab
 Stories finished: <n>/12   Blocked: <n> (<story: reason>, ...)
 Approved gates per story: <avg>   Re-approvals per story: <avg>

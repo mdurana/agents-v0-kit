@@ -13,6 +13,9 @@ cd "$root"
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
+  if [ "${local_sha:-}" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
   case "$local_ref" in
     refs/heads/*) ;;
     *) continue ;;

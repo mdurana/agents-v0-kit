@@ -86,6 +86,26 @@ yaml_run fail "openapi lint: a duplicate operationId fails" "$o" sh "$CI/check-o
 variant v31; sedi 's/openapi: 3.0.3/openapi: 3.1.0/' "$o/v31.yaml"
 yaml_run fail "openapi lint: OpenAPI 3.1 fails (the kit is on 3.0)" "$o" sh "$CI/check-openapi.sh" lint v31.yaml
 
+cat > "$o/async-ok.yaml" <<'EOF'
+asyncapi: 2.6.0
+info: {title: Orders events, version: "1.0.0"}
+channels:
+  orders.created:
+    publish:
+      message:
+        x-event-type: ORDER_CREATED
+        payload:
+          type: object
+          properties:
+            eventType: {type: string}
+            eventVersion: {type: string}
+EOF
+yaml_run pass "asyncapi lint: a valid draft passes" "$o" sh "$CI/check-asyncapi.sh" lint async-ok.yaml
+cp "$o/async-ok.yaml" "$o/async-no-event.yaml"
+sedi '/x-event-type/d' "$o/async-no-event.yaml"
+sedi '/eventType/d' "$o/async-no-event.yaml"
+yaml_run fail "asyncapi lint: a message without event type fails" "$o" sh "$CI/check-asyncapi.sh" lint async-no-event.yaml
+
 cat > "$o/catalog-ok.yaml" <<'EOF'
 openapi: 3.0.3
 info: {title: Orders, version: "1"}

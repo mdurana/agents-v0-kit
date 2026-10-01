@@ -22,7 +22,7 @@ usage() {
 }
 
 sync_templates_from_docs() {
-  for doc in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/agents-v0-kit.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md; do
+  for doc in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/agents-v0-kit.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/benchmark/reference-project.md; do
     [ -f "$KIT/$doc" ] || { printf 'error: missing %s\n' "$KIT/$doc" >&2; exit 1; }
     mkdir -p "$KIT/templates/$(dirname "$doc")"
     cp "$KIT/$doc" "$KIT/templates/$doc"
@@ -144,6 +144,7 @@ docs/user-guide.md
 docs/agents-v0-kit.md
 docs/greenfield-onboarding.md
 docs/brownfield-onboarding.md
+docs/benchmark/reference-project.md
 docs/project-profile.md
 docs/repo-map.md
 ci/check-known-failures.sh
@@ -167,12 +168,14 @@ ci/check-ux-spec.sh
 ci/check-build-plan.sh
 ci/check-endpoint-auth.sh
 ci/check-frontend-calls.sh
+ci/check-asyncapi.sh
 docs/design/_design.template.md
 docs/design/_amendments.template.md
 scripts/render-mr-body.sh
 scripts/release-notes.sh
 scripts/check-delivery-gate-local.sh
 scripts/verify-gitlab-ci-prereqs.sh
+scripts/export-audit-pack.sh
 hooks/pre-push
 CHANGELOG.md
 docs/architecture.md
@@ -184,7 +187,7 @@ ci/check-feature-state.sh
     dest="$t/$rel"
     overwrite=0
     if [ "$UPDATE" = 1 ]; then
-        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/agents-v0-kit.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh ci/check-gate-metrics.sh ci/check-event-schemas.sh ci/check-layout-roots.sh scripts/check-attempt-budget.sh scripts/generate-repo-map.sh scripts/collect-dependency-graphs.sh scripts/discover-codebase.sh scripts/check-onboarding-docs.sh scripts/sync-feature-state.sh scripts/delivery-metrics.sh docs/onboarding/_report.template.md docs/onboarding/_module.template.md docs/maintain/_note.template.md ci/classify-change.sh ci/check-openapi.sh ci/check-design.sh ci/check-design-contracts.sh ci/check-ux-spec.sh ci/check-build-plan.sh ci/check-endpoint-auth.sh ci/check-frontend-calls.sh docs/design/_design.template.md docs/design/_amendments.template.md scripts/render-mr-body.sh scripts/release-notes.sh scripts/check-delivery-gate-local.sh scripts/verify-gitlab-ci-prereqs.sh hooks/pre-push .gitlab-ci.yml .gitlab/merge_request_templates/default.md; do
+        for always in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/agents-v0-kit.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/benchmark/reference-project.md ci/check-approvals.sh ci/check-evidence.sh ci/check-milestone.sh ci/check-delivery-linkage.sh ci/check-approver-gitlab.sh ci/check-coverage-ratchet.sh ci/check-known-failures.sh ci/resolve-layout.sh ci/check-feature-state.sh ci/check-gate-metrics.sh ci/check-event-schemas.sh ci/check-layout-roots.sh scripts/check-attempt-budget.sh scripts/generate-repo-map.sh scripts/collect-dependency-graphs.sh scripts/discover-codebase.sh scripts/check-onboarding-docs.sh scripts/sync-feature-state.sh scripts/delivery-metrics.sh docs/onboarding/_report.template.md docs/onboarding/_module.template.md docs/maintain/_note.template.md ci/classify-change.sh ci/check-openapi.sh ci/check-design.sh ci/check-design-contracts.sh ci/check-ux-spec.sh ci/check-build-plan.sh ci/check-endpoint-auth.sh ci/check-frontend-calls.sh ci/check-asyncapi.sh docs/design/_design.template.md docs/design/_amendments.template.md scripts/render-mr-body.sh scripts/release-notes.sh scripts/check-delivery-gate-local.sh scripts/verify-gitlab-ci-prereqs.sh scripts/export-audit-pack.sh hooks/pre-push .gitlab-ci.yml .gitlab/merge_request_templates/default.md; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi

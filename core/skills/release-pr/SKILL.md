@@ -18,8 +18,9 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 5. **Release row.** Ask for the **GitLab username** of the person who will approve the merge request and record it as the Approver of the `release` row. CI matches it to the real approval; a display name fails the final job.
 6. After a person approves the MR, the manual `delivery-approval` job is played by a person, or by you with the user's explicit authorization (`glab ci trigger delivery-approval`). `GITLAB_TOKEN` is `read_api`, masked, and scoped to the `delivery-approval` environment. The job accepts the release or verify approver.
 7. Publish a status report in the phase result and the merge-request description.
-8. Never merge or approve the merge request, and do not commit, push, force-push, or hard reset without explicit user approval. The version and the tag belong to the release owner; propose the semantic version from the change.
-9. Report merge-request readiness with CI green and stop for an authorized human merge; confirm the merge and CI green before reporting the change released. Deployment records, if any, go through `release-deploy`.
+8. Optional compliance archive: after Verify/Release approval, run `sh scripts/export-audit-pack.sh <feature>` and attach `docs/release/<feature>/audit-manifest.json` to the release record (regulated environments).
+9. Never merge or approve the merge request, and do not commit, push, force-push, or hard reset without explicit user approval. The version and the tag belong to the release owner; propose the semantic version from the change.
+10. Report merge-request readiness with CI green and stop for an authorized human merge; confirm the merge and CI green before reporting the change released. Deployment records, if any, go through `release-deploy`.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: no commits/force-push without approval; MR via `glab` when requested; no merge, no approval by an agent.

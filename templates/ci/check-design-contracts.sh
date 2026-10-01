@@ -41,6 +41,11 @@ for spec in docs/design/*/ux-spec.md; do
   sh "$here/check-ux-spec.sh" "$(basename "$(dirname "$spec")")" || failed=1
 done
 
+for async in docs/design/*/asyncapi.yaml; do
+  [ -f "$async" ] || continue
+  sh "$here/check-asyncapi.sh" lint "$async" || failed=1
+done
+
 if [ "$failed" -ne 0 ]; then
   printf 'FAIL: design checks failed\n' >&2
   exit 1
