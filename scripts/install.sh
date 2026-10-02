@@ -6,9 +6,9 @@
 #       First install: seeds .cursor/ adapter tree and project templates only where missing.
 #
 #   install.sh --update <target-repo>
-#       Syncs kit docs -> templates/, runs validate-kit.sh, then refreshes
-#       kit-managed files (rules, agents, commands, skills, hooks, CI scripts,
-#       reference docs). Target-owned templates are seeded only when missing.
+#       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
+#       commands, skills, hooks, CI scripts, reference docs). Target-owned
+#       templates are seeded only when missing.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,16 +21,6 @@ usage() {
   exit 1
 }
 
-sync_templates_from_docs() {
-  for doc in compliance-matrix.md model-routing-matrix.md user-guide.md agents-v0-kit.md greenfield-onboarding.md brownfield-onboarding.md benchmark/reference-project.md; do
-    src="$KIT/docs/$doc"
-    [ -f "$src" ] || { printf 'error: missing %s\n' "$src" >&2; exit 1; }
-    mkdir -p "$KIT/templates/docs/agents-v0/$(dirname "$doc")"
-    cp "$src" "$KIT/templates/docs/agents-v0/$doc"
-  done
-  printf 'Synced kit docs -> templates/docs/agents-v0/\n'
-}
-
 strip_frontmatter() {
   awk 'NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{fm=0; next} fm{next} {print}' "$1"
 }
@@ -38,33 +28,16 @@ strip_frontmatter() {
 emit_agent() {
   src="$1"
   dst="$2"
-  target_root="$3"
-  python3 - "$src" "$dst" "$target_root" "$KIT/core/model-roles.tsv" <<'PY'
-import json, os, sys
-src, dst, target_root, roles_path = sys.argv[1:5]
-roles = {}
-with open(roles_path, encoding="utf-8") as handle:
-    for line in handle:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        name, role = line.split()
-        roles[name] = role
-name = os.path.splitext(os.path.basename(src))[0]
-role = roles.get(name, "")
-override = os.environ.get(f"KIT_MODEL_{role.upper()}", "").strip() if role else ""
-cfg = os.path.join(target_root, ".cursor", "model-config.json")
-if not override and role and os.path.isfile(cfg):
-    with open(cfg, encoding="utf-8") as handle:
-        override = str((json.load(handle).get(role) or "")).strip()
+  # Model IDs stay as in core/agents (the routing matrix). Remaps are applied
+  # after install by .agents-v0/scripts/update-agents-model.sh.
+  python3 - "$src" "$dst" <<'PY'
+import sys
+src, dst = sys.argv[1:3]
 out = []
 for line in open(src, encoding="utf-8"):
-    if line.startswith(("mode:", "model_kilo:", "model_claude:")):
+    if line.startswith("mode:"):
         continue
-    if override and line.startswith("model:"):
-        out.append(f"model: {override}\n")
-    else:
-        out.append(line)
+    out.append(line)
 with open(dst, "w", encoding="utf-8") as handle:
     handle.writelines(out)
 PY
@@ -109,7 +82,7 @@ install_cursor() {
   mkdir -p "$t/.cursor/rules/org" "$t/.cursor/agents" "$t/.cursor/commands" "$t/.cursor/skills" "$t/.cursor/hooks"
   install_rules "$t/.cursor/rules/org"
   for f in "$KIT"/core/agents/*.md; do
-    emit_agent "$f" "$t/.cursor/agents/$(basename "$f")" "$t"
+    emit_agent "$f" "$t/.cursor/agents/$(basename "$f")"
   done
   for f in "$KIT"/core/commands/*.md; do
     emit_command "$f" "$t/.cursor/commands/$(basename "$f")"
@@ -119,8 +92,8 @@ install_cursor() {
   rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json"
   chmod +x "$t"/.cursor/hooks/*.sh "$t/.cursor/hooks/hook-policy.py"
   cp "$KIT/core/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
-  if [ -f "$KIT/templates/.cursor/model-config.json.example" ]; then
-    cp "$KIT/templates/.cursor/model-config.json.example" "$t/.cursor/model-config.json.example"
+  if [ -f "$KIT/templates/.cursor/model-config.json" ] && [ ! -f "$t/.cursor/model-config.json" ]; then
+    cp "$KIT/templates/.cursor/model-config.json" "$t/.cursor/model-config.json"
   fi
 }
 
@@ -167,6 +140,7 @@ install_templates() {
 .agents-v0/scripts/check-delivery-gate-local.sh
 .agents-v0/scripts/verify-gitlab-ci-prereqs.sh
 .agents-v0/scripts/export-audit-pack.sh
+.agents-v0/scripts/update-agents-model.sh
 .agents-v0/hooks/pre-push
 docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
@@ -215,7 +189,8 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/ci/check-design-contracts.sh .agents-v0/ci/check-ux-spec.sh .agents-v0/ci/check-build-plan.sh .agents-v0/ci/check-endpoint-auth.sh \
         .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
-        .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh; do
+        .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
+        .agents-v0/scripts/update-agents-model.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
@@ -279,10 +254,9 @@ require_pyyaml() {
 
 if [ "$UPDATE" = 1 ]; then
   require_pyyaml
-  sync_templates_from_docs
   "$KIT/scripts/validate-kit.sh"
   if [ "$TARGET_ABS" = "$KIT" ]; then
-    printf 'Kit repo: docs synced to templates/docs/agents-v0/; validate-kit passed.\n'
+    printf 'Kit repo: validate-kit passed.\n'
     exit 0
   fi
 fi
@@ -292,8 +266,9 @@ if [ "$TARGET_ABS" = "$KIT" ]; then
 fi
 
 require_pyyaml
-install_cursor "$TARGET_ABS"
 install_templates "$TARGET_ABS"
+install_cursor "$TARGET_ABS"
+sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 
 if [ -f "$KIT/VERSION" ]; then
   cp "$KIT/VERSION" "$TARGET_ABS/.agents-kit-version"
@@ -303,7 +278,7 @@ printf 'Installed agents-v0 (cursor) into %s\n' "$TARGET_ABS"
 if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
   printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml. Scope GITLAB_TOKEN to the delivery-approval environment (read_api, masked), or that token is visible to every job.\n' >&2
 fi
-printf 'Next: model routing per docs/agents-v0/model-routing-matrix.md; wire .agents-v0/ci/check-approvals.sh + .agents-v0/ci/check-evidence.sh into CI (see templates/.gitlab-ci.yml).\n'
+printf 'Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh. Wire .agents-v0/ci/check-approvals.sh + .agents-v0/ci/check-evidence.sh into CI (see templates/.gitlab-ci.yml).\n'
 printf 'Greenfield: %s/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: %s/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.\n' "$(dirname "$0")" "$(dirname "$0")"
 if [ "$UPDATE" = 0 ]; then
   printf 'To refresh after kit changes: %s --update <target-repo>\n' "$(basename "$0")"

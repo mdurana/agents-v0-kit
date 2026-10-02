@@ -60,7 +60,8 @@ validate_target() {
   [ -f "$t/.cursor/agents/backend-engineer.md" ] || err "target .cursor/agents missing"
   [ -f "$t/.cursor/skills/spec-intake/SKILL.md" ] || err "target .cursor/skills missing"
   [ -x "$t/.cursor/hooks/pre-shell.sh" ] || err "target .cursor/hooks/pre-shell.sh missing or not executable"
-  [ -f "$t/.cursor/model-config.json.example" ] || err "target .cursor/model-config.json.example missing (install.sh seeds it; copy to model-config.json to remap models)"
+  [ -f "$t/.cursor/model-config.json" ] || err "target .cursor/model-config.json missing (install.sh seeds it from templates/.cursor/model-config.json)"
+  [ -x "$t/.agents-v0/scripts/update-agents-model.sh" ] || err "target .agents-v0/scripts/update-agents-model.sh missing or not executable"
   [ -f "$t/README.md" ] || err "target README.md missing (install.sh seeds it)"
   [ -f "$t/.agents-v0/ci/check-approvals.sh" ] || err "target ci/check-approvals.sh missing"
   [ -f "$t/.agents-v0/ci/check-evidence.sh" ] || err "target ci/check-evidence.sh missing"
@@ -143,13 +144,65 @@ for command in intake design build verify release; do
   grep -Eqi 'explicit.*approval|approval.*explicit' "core/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
 done
 
-# 7. Model routing: each agent's cursor model appears in its matrix row; per-tool columns exist.
-[ -f docs/model-routing-matrix.md ] || err "docs/model-routing-matrix.md missing"
-for f in core/agents/*.md; do
-  name="$(basename "$f" .md)"
-  m="$(grep -E '^model:' "$f" | head -n1 | sed 's/^model:[[:space:]]*//; s/[[:space:]]*$//')"
-  grep -E "\\|[[:space:]]*${name}[[:space:]]*\\|" docs/model-routing-matrix.md | grep -Fq "\`$m\`" || err "$name cursor model $m does not match its routing-matrix row"
-done
+# 7. Model routing: each agent's cursor model matches the Cursor ID of its role row.
+[ -f templates/docs/agents-v0/model-routing-matrix.md ] || err "templates/docs/agents-v0/model-routing-matrix.md missing"
+python3 - <<'PY' || err "agent model: does not match the routing-matrix role ID"
+import re, sys
+from pathlib import Path
+
+matrix = Path("templates/docs/agents-v0/model-routing-matrix.md").read_text(encoding="utf-8")
+role_key = {
+    "plan": "plan", "build": "build", "review": "review", "explore": "explore",
+    "debug": "debug", "schemas": "schemas", "docs": "docs", "documenter": "documenter",
+    "orchestrator": "orchestrator", "ux designer": "ux-designer",
+}
+
+def cols(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+ids = {}
+for line in matrix.split("## Task execution", 1)[0].splitlines():
+    if not line.startswith("|"):
+        continue
+    c = cols(line)
+    if len(c) < 3:
+        continue
+    label = re.sub(r"[*_]", "", c[0]).strip().lower()
+    key = role_key.get(label)
+    if not key:
+        continue
+    match = re.search(r"`([^`]+)`", c[2])
+    if not match:
+        sys.exit(f"role row has no Cursor ID: {label}")
+    ids[key] = match.group(1)
+
+section = matrix.split("## Kit agent mapping", 1)[1].split("## Skill-launched", 1)[0]
+agents = {}
+for line in section.splitlines():
+    if not line.startswith("|"):
+        continue
+    c = cols(line)
+    if len(c) < 2:
+        continue
+    name = c[0].strip()
+    label = re.sub(r"[*_]", "", c[1]).strip().lower()
+    key = role_key.get(label)
+    if name and key and name != "Kit agent":
+        agents[name] = key
+
+for path in sorted(Path("core/agents").glob("*.md")):
+    name = path.stem
+    model = ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("model:"):
+            model = line.split(":", 1)[1].strip()
+            break
+    role = agents.get(name)
+    if not role:
+        sys.exit(f"{name} has no Kit agent mapping row")
+    if ids.get(role) != model:
+        sys.exit(f"{name} model {model!r} != {role} Cursor ID {ids.get(role)!r}")
+PY
 # 8. Adapter config exists and wires the right entry points.
 [ -f core/adapters/cursor/hooks.json ] || err "cursor hooks.json missing"
 grep -Fq 'pre-shell.sh' core/adapters/cursor/hooks.json || err "cursor hooks.json does not wire pre-shell"
@@ -214,14 +267,14 @@ grep -Fq 'check-design-contracts.sh' templates/.agents-v0/scripts/check-delivery
 grep -Fq 'check-build-plan.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "check-delivery-gate-local.sh must run the build plan"
 grep -Fq 'check-endpoint-auth.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "check-delivery-gate-local.sh must run endpoint auth"
 python3 -c 'import yaml' >/dev/null 2>&1 || err "PyYAML is required (pip install pyyaml, or apk add py3-yaml). OpenAPI checks do not run without it."
-[ -f core/model-roles.tsv ] || err "core/model-roles.tsv missing"
 grep -Fq 'model-config.json' scripts/install.sh || err "install.sh must remap agent models from .cursor/model-config.json"
-grep -Fq 'model-config.json.example' scripts/install.sh || err "install.sh must seed .cursor/model-config.json.example"
-for f in core/agents/*.md; do
-  name="$(basename "$f" .md)"
-  grep -Eq "^${name}[[:space:]]+" core/model-roles.tsv || err "$name missing from core/model-roles.tsv"
-done
-grep -Fq '## Endpoint authorization' docs/project-profile.md templates/docs/agents-v0/project-profile.md || err "project profile must document extra endpoint-authorization stacks"
+grep -Fq 'templates/.cursor/model-config.json' scripts/install.sh || err "install.sh must seed .cursor/model-config.json from templates/.cursor/model-config.json"
+grep -Fq 'update-agents-model.sh' scripts/install.sh || err "install.sh must seed and run .agents-v0/scripts/update-agents-model.sh"
+[ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
+[ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"
+[ -f scripts/test-update-agents-model.sh ] || err "scripts/test-update-agents-model.sh missing"
+sh scripts/test-update-agents-model.sh || err "scripts/test-update-agents-model.sh failed"
+grep -Fq '## Endpoint authorization' templates/docs/agents-v0/project-profile.md || err "project profile must document extra endpoint-authorization stacks"
 grep -Fq 'Secret-Detection.gitlab-ci.yml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must use GitLab Secret Detection"
 grep -Fq 'check-coverage-ratchet.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run the coverage ratchet check"
 if command -v shellcheck >/dev/null 2>&1; then
@@ -251,16 +304,13 @@ grep -Fq 'Delivery approvals' AGENTS.md || err "AGENTS.md does not describe the 
 grep -Fq 'the repository wins' AGENTS.md || err "AGENTS.md does not state rule precedence"
 grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.md into target workspaces"
 
-# 11. Required template artifacts + docs/templates parity.
-for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/docs/agents-v0/architecture.md templates/docs/agents-v0/network.md templates/docs/agents-v0/project-profile.md templates/docs/agents-v0/requirements/_state.template.json templates/.gitlab/CODEOWNERS templates/.agents-v0/ci/check-approvals.sh templates/.agents-v0/ci/check-evidence.sh templates/.agents-v0/ci/check-milestone.sh templates/.agents-v0/ci/check-delivery-linkage.sh templates/.agents-v0/ci/check-approver-gitlab.sh templates/.agents-v0/ci/check-coverage-ratchet.sh templates/.agents-v0/ci/check-known-failures.sh templates/.agents-v0/ci/resolve-layout.sh templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh templates/.agents-v0/scripts/check-delivery-gate-local.sh templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh templates/.agents-v0/scripts/export-audit-pack.sh templates/.agents-v0/hooks/pre-push templates/.cursor/model-config.json.example templates/docs/agents-v0/milestones/_template.md templates/docs/agents-v0/milestones/p0-platform-skeleton.md templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md templates/docs/agents-v0/milestones/p2-mvp-core-features.md templates/docs/agents-v0/milestones/p3-feature-expansion.md templates/docs/agents-v0/milestones/p4-hardening.md templates/docs/agents-v0/milestones/p5-release-readiness.md templates/docs/agents-v0/repo-map.md templates/docs/agents-v0/workspace.manifest.json templates/.agents-v0/scripts/generate-repo-map.sh templates/.agents-v0/scripts/collect-dependency-graphs.sh templates/.agents-v0/scripts/sync-feature-state.sh templates/.agents-v0/scripts/delivery-metrics.sh templates/.agents-v0/ci/check-feature-state.sh templates/docs/agents-v0/greenfield-onboarding.md templates/docs/agents-v0/brownfield-onboarding.md templates/.agents-v0/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md templates/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml templates/maven/checkstyle.xml templates/maven/dependency-check-suppressions.xml templates/maven/quality-plugins-ci-security.xml templates/maven/contract-conformance.xml templates/maven/archunit/LayerRulesTest.java templates/docs/agents-v0/design/ux-spec.md templates/docs/agents-v0/design/system/context-map.md templates/docs/agents-v0/design/system/nfr-slo.md templates/docs/agents-v0/design/system/threat-model.md templates/docs/agents-v0/design/system/slo-evidence.md templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/ci/check-asyncapi.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh; do
+# 11. Required template artifacts.
+for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/docs/agents-v0/architecture.md templates/docs/agents-v0/network.md templates/docs/agents-v0/project-profile.md templates/docs/agents-v0/requirements/_state.template.json templates/.gitlab/CODEOWNERS templates/.agents-v0/ci/check-approvals.sh templates/.agents-v0/ci/check-evidence.sh templates/.agents-v0/ci/check-milestone.sh templates/.agents-v0/ci/check-delivery-linkage.sh templates/.agents-v0/ci/check-approver-gitlab.sh templates/.agents-v0/ci/check-coverage-ratchet.sh templates/.agents-v0/ci/check-known-failures.sh templates/.agents-v0/ci/resolve-layout.sh templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh templates/.agents-v0/scripts/check-delivery-gate-local.sh templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh templates/.agents-v0/scripts/export-audit-pack.sh templates/.agents-v0/hooks/pre-push templates/.cursor/model-config.json templates/docs/agents-v0/milestones/_template.md templates/docs/agents-v0/milestones/p0-platform-skeleton.md templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md templates/docs/agents-v0/milestones/p2-mvp-core-features.md templates/docs/agents-v0/milestones/p3-feature-expansion.md templates/docs/agents-v0/milestones/p4-hardening.md templates/docs/agents-v0/milestones/p5-release-readiness.md templates/docs/agents-v0/repo-map.md templates/docs/agents-v0/workspace.manifest.json templates/.agents-v0/scripts/generate-repo-map.sh templates/.agents-v0/scripts/collect-dependency-graphs.sh templates/.agents-v0/scripts/sync-feature-state.sh templates/.agents-v0/scripts/delivery-metrics.sh templates/.agents-v0/ci/check-feature-state.sh templates/docs/agents-v0/greenfield-onboarding.md templates/docs/agents-v0/brownfield-onboarding.md templates/.agents-v0/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md templates/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml templates/maven/checkstyle.xml templates/maven/dependency-check-suppressions.xml templates/maven/quality-plugins-ci-security.xml templates/maven/contract-conformance.xml templates/maven/archunit/LayerRulesTest.java templates/docs/agents-v0/design/ux-spec.md templates/docs/agents-v0/design/system/context-map.md templates/docs/agents-v0/design/system/nfr-slo.md templates/docs/agents-v0/design/system/threat-model.md templates/docs/agents-v0/design/system/slo-evidence.md templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/ci/check-asyncapi.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh; do
   [ -f "$artifact" ] || err "required artifact template missing: $artifact"
 done
-for doc in docs/compliance-matrix.md docs/model-routing-matrix.md docs/user-guide.md docs/agents-v0-kit.md docs/greenfield-onboarding.md docs/brownfield-onboarding.md docs/benchmark/reference-project.md; do
-  tpl="templates/docs/agents-v0/${doc#docs/}"
-  [ -f "$tpl" ] || err "$tpl missing (install.sh will not seed docs/agents-v0/${doc#docs/})"
-  if [ -f "$tpl" ]; then
-    cmp -s "$doc" "$tpl" || err "$doc differs from $tpl — run: ./scripts/install.sh --update ."
-  fi
+for doc in compliance-matrix.md model-routing-matrix.md user-guide.md agents-v0-kit.md greenfield-onboarding.md brownfield-onboarding.md benchmark/reference-project.md; do
+  tpl="templates/docs/agents-v0/$doc"
+  [ -f "$tpl" ] || err "$tpl missing (install.sh will not seed docs/agents-v0/$doc)"
 done
 
 # 12. Compliance matrix contracts.
@@ -291,11 +341,11 @@ grep -Fq 'docs/agents-v0/design/system/slo-evidence.md' templates/.agents-v0/ci/
 grep -Fq 'slo-evidence' templates/docs/agents-v0/milestones/p4-hardening.md || err "P4 milestone does not name slo-evidence"
 grep -Fq 'As a [role], I want [goal], so that [benefit].' templates/docs/agents-v0/milestones/_template.md || err "milestone template user story is not As a / I want / so that"
 grep -Fq 'so that' templates/docs/agents-v0/milestones/p0-platform-skeleton.md || err "P0 stories are not As a / I want / so that"
-grep -Fq 'so that' docs/user-guide.md || err "user guide intake example lacks so that"
+grep -Fq 'so that' templates/docs/agents-v0/user-guide.md || err "user guide intake example lacks so that"
 grep -Fq 'milestone' core/commands/v0-intake.md || err "/v0-intake does not mention milestone programs"
 grep -Fq 'Milestone programs' core/rules/workflow-orchestration.mdc || err "workflow rule does not describe milestone programs"
-grep -Fq 'H-B pre-shell.sh' docs/compliance-matrix.md || err "compliance matrix lacks pre-shell blocking classification"
-grep -Fq 'H-W after-edit.sh' docs/compliance-matrix.md || err "compliance matrix lacks after-edit warning classification"
+grep -Fq 'H-B pre-shell.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks pre-shell blocking classification"
+grep -Fq 'H-W after-edit.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks after-edit warning classification"
 
 # 15. Agent context ignore file.
 ignore="templates/.cursorignore"
@@ -362,10 +412,10 @@ skill_count="$(ls -d core/skills/*/ | wc -l | tr -d ' ')"
 grep -Fq "$agent_count subagents" README.md || err "README.md must say $agent_count subagents"
 grep -Fq "$command_count entry points" README.md || err "README.md must say $command_count entry points"
 grep -Fq "$skill_count playbooks" README.md || err "README.md must say $skill_count playbooks"
-grep -Fq "($agent_count agents)" docs/model-routing-matrix.md || err "routing matrix must say ($agent_count agents)"
+grep -Fq "($agent_count agents)" templates/docs/agents-v0/model-routing-matrix.md || err "routing matrix must say ($agent_count agents)"
 for f in core/agents/*.md; do
   name="$(basename "$f" .md)"
-  grep -Eq "^\\|[[:space:]]*${name}[[:space:]]*\\|" docs/model-routing-matrix.md || err "$name has no row in the agent mapping of docs/model-routing-matrix.md"
+  grep -Eq "^\\|[[:space:]]*${name}[[:space:]]*\\|" templates/docs/agents-v0/model-routing-matrix.md || err "$name has no row in the agent mapping of model-routing-matrix.md"
 done
 # Every skill named as `(skill: x)` or `(skills: x, y)` in a command or agent exists.
 for ref in $(grep -rhoE '\(skills?: [^)]*\)' core/commands core/agents | grep -oE '`[a-z-]+`' | tr -d '`' | sort -u); do
@@ -381,7 +431,7 @@ done
 # GitLab-only kit: conduct rule names glab; must not document GitHub/gh as a supported host.
 grep -Fq 'glab' core/rules/ai-agent-conduct.mdc || err "ai-agent-conduct.mdc must name glab (GitLab is the default host)"
 grep -Fq 'gh ' core/rules/ai-agent-conduct.mdc && err "ai-agent-conduct.mdc must not reference gh (GitLab-only kit)"
-grep -Eiq 'github|pull request via gh' README.md AGENTS.md docs/agents-v0-kit.md && err "kit docs must not advertise GitHub/gh support"
+grep -Eiq 'github|pull request via gh' README.md AGENTS.md templates/docs/agents-v0/agents-v0-kit.md && err "kit docs must not advertise GitHub/gh support"
 
 # 18. Scale contracts: planning, ordering, multi-service layout, machine-read gates, budgets.
 grep -Fq 'Program planning' core/rules/workflow-orchestration.mdc || err "workflow rule lacks Program planning"
@@ -483,7 +533,7 @@ grep -Fq '/docs/agents-v0/design/' templates/.gitlab/CODEOWNERS || err "CODEOWNE
 grep -Fq '/openapi/' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover openapi/"
 grep -Fq 'data-component' core/skills/ux-design/SKILL.md || err "ux-design must require data-component on mockup controls"
 grep -Fq 'migration-safety' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service must follow migration-safety for migrations"
-grep -Fq 'design-reviewer' docs/model-routing-matrix.md || err "routing matrix lacks the design-reviewer"
+grep -Fq 'design-reviewer' templates/docs/agents-v0/model-routing-matrix.md || err "routing matrix lacks the design-reviewer"
 # Release and /v0-deliver: thin chain, human merge enforced on the default host, dry run, versioned notes.
 for release_file in templates/.agents-v0/scripts/render-mr-body.sh templates/.agents-v0/scripts/release-notes.sh templates/CHANGELOG.md; do
   [ -f "$release_file" ] || err "required release file missing: $release_file"

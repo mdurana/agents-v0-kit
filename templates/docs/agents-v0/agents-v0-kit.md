@@ -165,15 +165,21 @@ The profile Layout lists `Service roots` (for example `services/order, services/
 
 ## Agents and models
 
-The model is chosen by role. The matrix is `docs/agents-v0/model-routing-matrix.md`. `core/model-roles.tsv` maps each agent file to a role slug. On install, `scripts/install.sh` rewrites `.cursor/agents/*/model:` from `.cursor/model-config.json` when present (template: `templates/.cursor/model-config.json.example`), or from `KIT_MODEL_PLAN`, `KIT_MODEL_BUILD`, and the other `KIT_MODEL_*` variables. Kit source under `core/agents/` keeps the matrix defaults.
+The model is chosen by role. Cursor IDs are the role table in `docs/agents-v0/model-routing-matrix.md`. The Kit agent mapping in that file names which agent uses which role. `.cursor/model-config.json` holds the same defaults and is seeded on install. `scripts/install.sh` rewrites `.cursor/agents/*/model:` from that file by running `sh .agents-v0/scripts/update-agents-model.sh`. `KIT_MODEL_PLAN`, `KIT_MODEL_BUILD`, and the other `KIT_MODEL_*` variables override the file for that run. After install, edit `.cursor/model-config.json` and run that script again. Kit source under `core/agents/` keeps the matrix defaults.
 
-| Role | Does | Cursor model |
-|------|------|----------------|
-| Plan | Planning, requirements, architecture, UX, orchestration | the stronger model |
-| Build | Implementation, tests, maintenance, release | the fast model |
-| Build (critical) | Auth, uploads, public routes, sagas, consumers | the Plan model, passed for that launch |
-| Review | Design review, security review, code review | the stronger model (same Cursor ID as Plan) |
-| Explore, Debug, Schemas, Docs | Repo mapping, a failing test, contracts, doc drafts | fast, except Debug |
+| Role | Does |
+|------|------|
+| Plan | Program planning, requirements, architecture |
+| Build | Services, BFF, frontend, tests, maintenance, release |
+| Build (critical) | Auth, uploads, public routes, sagas, consumers — launched with the Plan model |
+| Review | Design review, security review, code review — not the Build model |
+| Explore | Repo exploration |
+| Debug | Runtime failure root-cause |
+| Schemas | Schema and unit-test sub-tasks |
+| Docs | Doc drafting |
+| Documenter | Brownfield onboard as-is documentation |
+| Orchestrator | `/v0-deliver`, `/v0-status`, `/v0-onboard` |
+| UX Designer | UX design |
 
 Phase agents do not launch other agents. They write a helper brief and return. The main session launches `explore-researcher`, `schema-author`, `debug-investigator`, or `docs-author`, and passes the result back. The same brief a second time is a loop, and the session stops.
 
@@ -223,7 +229,7 @@ Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the
 ./scripts/validate-kit.sh
 ```
 
-`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. Without it, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Copy `templates/.cursor/model-config.json.example` to `.cursor/model-config.json` before `--update` when remapping models to your enterprise allowlist.
+`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. Without it, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
 
 A new repo starts with `scripts/bootstrap-greenfield.sh` ([greenfield-onboarding.md](greenfield-onboarding.md)). An existing repo starts with install, then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)).
 
