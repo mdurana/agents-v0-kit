@@ -1,0 +1,38 @@
+#!/bin/sh
+# Optional pre-push hook. It is not installed into .git/hooks automatically.
+#
+#   cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# When the branch name's last segment matches docs/agents-v0/requirements/<feature>.md, runs
+# .agents-v0/scripts/check-delivery-gate-local.sh and rejects the push when that gate fails.
+# Other branches are pushed unchanged.
+set -eu
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_ref:-}" ] || continue
+  if [ "${local_sha:-}" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+  case "$local_ref" in
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
+  branch="${local_ref#refs/heads/}"
+  feature="${branch##*/}"
+  artifact="docs/agents-v0/requirements/${feature}.md"
+  if [ ! -f "$artifact" ]; then
+    printf 'pre-push: no %s — feature gate skipped\n' "$artifact" >&2
+    continue
+  fi
+  if [ ! -x .agents-v0/scripts/check-delivery-gate-local.sh ] && [ ! -f .agents-v0/scripts/check-delivery-gate-local.sh ]; then
+    printf 'pre-push: .agents-v0/scripts/check-delivery-gate-local.sh is missing\n' >&2
+    exit 1
+  fi
+  printf 'pre-push: local delivery gate for %s\n' "$feature" >&2
+  sh .agents-v0/scripts/check-delivery-gate-local.sh "$feature" --base origin/HEAD
+done
+
+exit 0

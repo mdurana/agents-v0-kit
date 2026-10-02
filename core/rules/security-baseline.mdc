@@ -8,7 +8,7 @@ alwaysApply: false
 
 Baseline org standard for all services and frontends in this repository.
 
-**VAPT addendum:** `docs/security/vapt-prevention-guardrails.md` · Team rules: `vapt-spring.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc`
+**VAPT addendum:** `docs/agents-v0/security/vapt-prevention-guardrails.md` · Team rules: `vapt-spring.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc`
 
 ---
 
@@ -132,10 +132,10 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 
 | Document | Purpose |
 |----------|---------|
-| `docs/security/vapt-prevention-guardrails.md` | VAPT finding–mapped rules (web apps + Spring Boot) |
-| `docs/security/vapt-pr-checklist.md` | PR review checklist |
+| `docs/agents-v0/security/vapt-prevention-guardrails.md` | VAPT finding–mapped rules (web apps + Spring Boot) |
+| `docs/agents-v0/security/vapt-pr-checklist.md` | PR review checklist |
 | Team rules | `vapt-spring.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc` |
-| `docs/security/vapt-prevention-guardrails.md` | VAPT retest matrix and prevention guardrails |
+| `docs/agents-v0/security/vapt-prevention-guardrails.md` | VAPT retest matrix and prevention guardrails |
 
 ---
 
@@ -143,4 +143,4 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 
 - Identify applicable regulations (GDPR, BSP, internal GXI policies) per system
 - Security review required for: auth changes, new upload endpoints, RBAC changes, new public routes
-- VAPT retest criteria: see `docs/security/vapt-prevention-guardrails.md` (Retest Matrix)
+- VAPT retest criteria: see `docs/agents-v0/security/vapt-prevention-guardrails.md` (Retest Matrix)

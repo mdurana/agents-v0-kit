@@ -52,9 +52,11 @@ replay_pid*
 node_modules/
 dist/
 build/
-# Delivery evidence under docs/build/ is committed (workflow-orchestration.mdc Build evidence)
-!docs/build/
-!docs/build/**
+# Delivery evidence under docs/agents-v0/build/ is committed (workflow-orchestration.mdc Build evidence)
+!docs/agents-v0/build/
+!docs/agents-v0/build/**
+!docs/agents-v0/verify/
+!docs/agents-v0/verify/**
 .svelte-kit/
 .output/
 .vercel/

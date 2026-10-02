@@ -14,9 +14,9 @@ An order platform, built from an empty repo (greenfield, profile `app`):
 | UI | `frontend/` SvelteKit: order list, order detail, place order |
 | Profile rows | `Profile: app`, `Service roots: services/order, services/inventory, services/payment`, `BFF root: bff/`, `Frontend root: frontend/` |
 
-Install the kit with `./scripts/install.sh --with-starters <repo>`, then run `/plan` with the goal "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released."
+Install the kit with `./scripts/install.sh --with-starters <repo>`, then run `/v0-plan` with the goal "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released."
 
-## Expected plan (check `/plan` output against this)
+## Expected plan (check `/v0-plan` output against this)
 
 | Story | Surface / service | Depends on |
 |-------|-------------------|------------|
@@ -37,11 +37,11 @@ A plan passes when it has these stories (names may differ), no cycle, one surfac
 
 ## Run protocol
 
-1. Fix the inputs and record them in the result file: kit version (`VERSION`), model per role (`docs/model-routing-matrix.md`), CI host (GitLab).
-2. Run `/plan`, then every story in dependency order with `/deliver`. One feature per git worktree (`scripts/feature-worktree.sh`). Approve each gate; count a gate as a re-approval when you sent work back.
+1. Fix the inputs and record them in the result file: kit version (`VERSION`), model per role (`docs/agents-v0/model-routing-matrix.md`), CI host (GitLab).
+2. Run `/v0-plan`, then every story in dependency order with `/v0-deliver`. One feature per git worktree (`scripts/feature-worktree.sh`). Approve each gate; count a gate as a re-approval when you sent work back.
 3. Batch the Intake and Design approvals of the P2 stories once (`workflow-orchestration.mdc` Batch approval) and record that you did.
 4. Stop a story when its phase is `blocked` and record the blocked reason. Do not hand-edit code to unblock it; the point is what the kit does without help.
-5. After the last story, run `sh scripts/delivery-metrics.sh . > docs/benchmark/results/<YYYY-MM-DD>-<kit-version>.md` in the project and add the manual rows below.
+5. After the last story, run `sh .agents-v0/scripts/delivery-metrics.sh . > docs/agents-v0/benchmark/results/<YYYY-MM-DD>-<kit-version>.md` in the project and add the manual rows below.
 
 ## Metrics
 
@@ -52,7 +52,7 @@ A plan passes when it has these stories (names may differ), no cycle, one surfac
 | Re-approvals per story | manual count | Rework the gates missed |
 | Failed attempts per story | `delivery-metrics.sh` Delivery effort | Build loop health; compare to the attempt budget |
 | Stories `blocked`, with reasons | state files | Where the kit stops |
-| Critical findings at first Verify, per story | `docs/verify/*/vapt-checklist.md`, `review-notes.md` | Build quality |
+| Critical findings at first Verify, per story | `docs/agents-v0/verify/*/vapt-checklist.md`, `review-notes.md` | Build quality |
 | Diff coverage at first CI run | `target/gate-metrics.json` | Tests written with the code |
 | CI red runs per merge request | CI | Gaps between local and CI gates |
 | Hook decisions: ask / block | `delivery-metrics.sh` Hook decisions | Guardrail pressure |
@@ -62,7 +62,7 @@ A plan passes when it has these stories (names may differ), no cycle, one surfac
 
 ## Result file
 
-Copy this block into `docs/benchmark/results/<YYYY-MM-DD>-<kit-version>.md`.
+Copy this block into `docs/agents-v0/benchmark/results/<YYYY-MM-DD>-<kit-version>.md`.
 
 ```text
 Kit version: <VERSION>
@@ -84,7 +84,7 @@ Notes: <what stopped the kit, what it did well>
 | Signal | Likely cause | Where to look |
 |--------|--------------|---------------|
 | Many `blocked` on Build | attempt budget too low, or the Build-role model is too weak for the unit | `Phase attempt budget`, `Build (critical)` row |
-| Many re-approvals at Design | `/plan` stories too large or contexts unclear | `program-planning`, context map |
+| Many re-approvals at Design | `/v0-plan` stories too large or contexts unclear | `program-planning`, context map |
 | Critical findings at first Verify, mostly auth | Build ignores `vapt-spring.mdc` | raise those units to Build (critical) |
 | Low diff coverage, green build | tests are not written with the code | `implement-*` step 6, `check-gate-metrics.sh` |
 | CI red after green local | local gate differs from CI | project-profile verify commands |

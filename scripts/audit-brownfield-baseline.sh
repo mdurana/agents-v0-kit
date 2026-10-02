@@ -3,7 +3,7 @@
 #
 # Usage: audit-brownfield-baseline.sh <target-repo>
 #
-# Use before /build or /maintain on brownfield repos. See docs/brownfield-onboarding.md.
+# Use before /v0-build or /v0-maintain on brownfield repos. See docs/agents-v0/brownfield-onboarding.md.
 set -eu
 
 TARGET="${1:-}"
@@ -38,7 +38,7 @@ run_maven() {
   if "$MVN" -B clean verify; then
     printf 'OK: Maven verify passed\n'
   else
-    printf 'FAIL: Maven verify failed — fix baseline before /build or /maintain\n'
+    printf 'FAIL: Maven verify failed — fix baseline before /v0-build or /v0-maintain\n'
     status=1
   fi
 }
@@ -163,7 +163,7 @@ audit_root() {
 }
 
 if [ -f ci/resolve-layout.sh ]; then
-  eval "$(sh ci/resolve-layout.sh)"
+  eval "$(sh .agents-v0/ci/resolve-layout.sh)"
   printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
   audit_root "${BACKEND_ROOT:-}"
   audit_root "${BFF_ROOT:-}"
@@ -175,7 +175,7 @@ fi
 
 if [ "$ran" = 0 ]; then
   printf 'WARN: no pom.xml, Gradle build, or package.json — run your project verify command manually\n'
-  printf 'See docs/brownfield-onboarding.md\n'
+  printf 'See docs/agents-v0/brownfield-onboarding.md\n'
   exit 2
 fi
 
@@ -183,6 +183,6 @@ printf '\n'
 if [ "$status" -eq 0 ]; then
   printf 'Baseline audit: PASSED. Safe to proceed with gated delivery.\n'
 else
-  printf 'Baseline audit: FAILED. See docs/brownfield-onboarding.md (stabilization, local quality override, CVE suppressions).\n'
+  printf 'Baseline audit: FAILED. See docs/agents-v0/brownfield-onboarding.md (stabilization, local quality override, CVE suppressions).\n'
 fi
 exit "$status"

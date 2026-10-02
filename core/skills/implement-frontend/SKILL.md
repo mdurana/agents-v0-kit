@@ -8,12 +8,12 @@ description: Build phase playbook. Implement SvelteKit client or React admin —
 Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.mdc`).
 
 ## Steps
-1. Read the Design artifacts — including the approved UX spec (`docs/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
-2. **Baseline:** run the full Frontend verify command from `docs/project-profile.md` before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
+1. Read the Design artifacts — including the approved UX spec (`docs/agents-v0/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/agents-v0/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
+2. **Baseline:** run the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
 3. **Wire the frontend quality gate** if missing (ESLint, coverage provider with the ≥ 70% threshold, lockfile audit) — unwired tooling makes the build script compile-only.
 4. For greenfield UI, confirm the Svelte/React decision (asked once in Intake).
-5. Before the first implementation edit, write or continue `docs/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows. Before the gate also run `sh ci/check-frontend-calls.sh`: every `/api/` call must be a catalog operation.
-6. Work **red–green (TDD where practical)** per plan row: failing test first, then implement until green (`quality-and-testing.mdc`). Each loop run uses `Frontend verify (fast)` when that cell is a real command. An empty cell or a placeholder comment means the loop uses the full Frontend verify command. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh scripts/check-attempt-budget.sh docs/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent (`workflow-orchestration.mdc`): record `blocked` and stop. The second red result for the same test writes `docs/build/<feature>/failure-brief.md` and returns for `debug-investigator`. Attempt three applies that note. A third red result stops.
+5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh .agents-v0/ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows. Before the gate also run `sh .agents-v0/ci/check-frontend-calls.sh`: every `/api/` call must be a catalog operation.
+6. Work **red–green (TDD where practical)** per plan row: failing test first, then implement until green (`quality-and-testing.mdc`). Each loop run uses `Frontend verify (fast)` when that cell is a real command. An empty cell or a placeholder comment means the loop uses the full Frontend verify command. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent (`workflow-orchestration.mdc`): record `blocked` and stop. The second red result for the same test writes `docs/agents-v0/build/<feature>/failure-brief.md` and returns for `debug-investigator`. Attempt three applies that note. A third red result stops.
 7. Implement routes/loads/components per `frontend-web.mdc`:
    - SvelteKit: `src/routes/` + `src/lib/` under the frontend root; prefer `load`/server loads; `browser` guard before `localStorage`.
    - React admin: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/slices` under the frontend root; RHF + Zod.
@@ -25,8 +25,8 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 12. XSS: sanitize/avoid `innerHTML`/`{@html}`/`dangerouslySetInnerHTML`.
 13. No backend URLs/RBAC roles/permission keys in client bundles; no `PUBLIC_*`/`VITE_*` leaking internal config; `sourcemap: false` in prod.
 14. Accessibility: semantic HTML, keyboard flows, focus order, ARIA only when needed, contrast, `prefers-reduced-motion` — per the UX spec.
-15. Run the full Frontend verify command from `docs/project-profile.md` once for the Build gate, with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. The fast loop does not replace this gate.
-16. Persist evidence to `docs/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
+15. Run the full Frontend verify command from `docs/agents-v0/project-profile.md` once for the Build gate, with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. The fast loop does not replace this gate.
+16. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
 
 ## Rule-compliance checklist
 - [ ] `frontend-web.mdc`: structure; `load`; `browser` guard; stores; Zod forms; user-visible fetch errors.
@@ -39,5 +39,5 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 - [ ] `vapt-webapp.mdc` F3: client upload UI supplemental.
 - [ ] `frontend-web.mdc` (XSS): sanitize/avoid dangerous HTML sinks.
 - [ ] UX spec: state matrix, component defaults, mockup layout, accessibility, and design-system conformance implemented. API calls use named OpenAPI operations only.
-- [ ] Build evidence persisted under `docs/build/<feature>/`; fix attempts bounded.
+- [ ] Build evidence persisted under `docs/agents-v0/build/<feature>/`; fix attempts bounded.
 - [ ] `workflow-orchestration.mdc`: Build gate criteria met.

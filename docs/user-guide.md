@@ -19,6 +19,8 @@ This guide matches the workflow in this kit: **Intake → Design → Build → V
 
 You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
 
+Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so they do not clash with Cursor’s built-in slash commands such as `/plan`.
+
 ---
 
 
@@ -27,11 +29,11 @@ You do **not** need to run terminal commands, edit code, or pick AI models. Opti
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/deliver` — full journey from requirements through release (stops at every gate).
-  - `/intake` — only clarify and document requirements (good for early discovery).
+  - `/v0-deliver` — full journey from requirements through release (stops at every gate).
+  - `/v0-intake` — only clarify and document requirements (good for early discovery).
 3. **Paste your spec** right after the command, for example:
   ```text
-   /intake
+   /v0-intake
 
    Feature: Customer can download their annual tax statement from the portal.
    Users: retail banking customers (logged in).
@@ -50,30 +52,30 @@ You do **not** need to run terminal commands, edit code, or pick AI models. Opti
 
 | Command     | When to use it                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `/plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/intake`. |
-| `/intake`   | Turn a idea or ticket into clear requirements and open questions.                                       |
-| `/design`   | After intake is approved — APIs, data flows, and architecture decisions.                                |
-| `/build`    | After design is approved — actual software is written.                                                  |
-| `/verify`   | After build is approved — automated tests and security review.                                          |
-| `/release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. |
-| `/deliver`  | Run the whole chain; you approve at each gate.                                                          |
-| `/maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
-| `/triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
-| `/onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
-| `/status`   | Name the feature. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
+| `/v0-plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/v0-intake`. |
+| `/v0-intake`   | Turn a idea or ticket into clear requirements and open questions.                                       |
+| `/v0-design`   | After intake is approved — APIs, data flows, and architecture decisions.                                |
+| `/v0-build`    | After design is approved — actual software is written.                                                  |
+| `/v0-verify`   | After build is approved — automated tests and security review.                                          |
+| `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. |
+| `/v0-deliver`  | Run the whole chain; you approve at each gate.                                                          |
+| `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
+| `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
+| `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
+| `/v0-status`   | Name the feature. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
 
 
-You can also write in normal language, for example: *“Run intake on PROJ-1234”* or *“We’re only doing design for the notifications feature.”* Using the slash commands is clearer for the workflow. When more than one feature is open, name it: `/status tax-statement`.
+You can also write in normal language, for example: *“Run intake on PROJ-1234”* or *“We’re only doing design for the notifications feature.”* Using the slash commands is clearer for the workflow. When more than one feature is open, name it: `/v0-status tax-statement`.
 
 ---
 
 ## If work was interrupted
 
-`/status` plus the feature name reads the saved progress for that feature. It does not mark the phase approved, and it does not restart the chat that was cut off.
+`/v0-status` plus the feature name reads the saved progress for that feature. It does not mark the phase approved, and it does not restart the chat that was cut off.
 
 | What you see | What you do |
 |--------------|-------------|
-| The phase was still being written, or it stopped on a problem | Run the same command again (`/design`, `/build`, and so on). The AI keeps the files already saved and fills in what is missing. |
+| The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved and fills in what is missing. |
 | The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve. |
 | You did not name a feature | The AI lists the open features and asks which one you mean. |
 
@@ -87,7 +89,7 @@ The second feature must not change a file the first one is already changing. Tho
 
 ## Big goals: plan first
 
-When the goal is larger than one story, start with `/plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the five gates in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
+When the goal is larger than one story, start with `/v0-plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the five gates in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
 
 With many small stories you can approve the Intake or Design gate for several of them in one message, but only by naming each one, for example `Approved: Design for P2-A, P2-B, P2-C`. That is available only for ordinary stories with no security triggers and no open questions. Build, Verify, and Release are always approved one story at a time. "Approve all" does not count.
 
@@ -224,7 +226,7 @@ Tests finish first. The security checklist and the code review are prepared toge
 
 ## Maintain (after go-live)
 
-Use `/maintain` when:
+Use `/v0-maintain` when:
 
 - Users report a bug  
 - Security or compliance asks for a patch  
@@ -249,7 +251,7 @@ Describe the issue in plain language. The AI fixes, then runs **Verify** again. 
 **Example (good):**
 
 ```text
-/intake
+/v0-intake
 
 As a branch manager, I want to approve withdrawals over PHP 500k, so that large payments leave the region only with a local approver.
 The approver must be in the same region as the account.
@@ -294,7 +296,7 @@ Make the portal better.
 
 - **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
 - **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
-- **Skip gates** on `/deliver` — you approve each phase. A green build does not approve itself.  
+- **Skip gates** on `/v0-deliver` — you approve each phase. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  
 - **Overwrite another feature’s files** in the same checkout — it stops and names the files instead.  
 - **Store passwords or API keys** in chat — use your org’s secret vault; never paste production secrets.
@@ -308,8 +310,8 @@ Make the portal better.
 
 | Situation                                        | Who                                                                                                                  |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| First time using the kit in a **new** repo       | Engineer scaffolds the app, then runs `scripts/bootstrap-greenfield.sh` (see `docs/greenfield-onboarding.md`).       |
-| First time using the kit in an **existing** repo | Engineer runs `scripts/install.sh` and `scripts/audit-brownfield-baseline.sh` (see `docs/brownfield-onboarding.md`). |
+| First time using the kit in a **new** repo       | Engineer scaffolds the app, then runs `scripts/bootstrap-greenfield.sh` (see `docs/agents-v0/greenfield-onboarding.md`).       |
+| First time using the kit in an **existing** repo | Engineer runs `scripts/install.sh` and `scripts/audit-brownfield-baseline.sh` (see `docs/agents-v0/brownfield-onboarding.md`). |
 | Critical security finding you don’t understand   | Security or lead engineer.                                                                                           |
 | CI failing repeatedly on release                 | Release manager / DevOps.                                                                                            |
 | Changing org-wide rules                          | Engineering + architecture (not this guide).                                                                         |
@@ -323,11 +325,11 @@ Make the portal better.
 
 ```text
 1. Open Cursor chat in the project.
-2. Big goal: /plan first. Then /deliver + paste Jira/spec (or /intake only). Name the feature if more than one is open.
+2. Big goal: /v0-plan first. Then /v0-deliver + paste Jira/spec (or /v0-intake only). Name the feature if more than one is open.
 3. Answer questions when asked.
 4. At each gate: read summary → Approved OR list changes.
-5. If the chat stopped mid-phase: /status <feature> → run the same phase command again.
-6. After go-live: /maintain + describe the issue.
+5. If the chat stopped mid-phase: /v0-status <feature> → run the same phase command again.
+6. After go-live: /v0-maintain + describe the issue.
 ```
 
 For technical setup, model routing, and compliance mapping, see [README.md](../README.md). The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md), [brownfield-onboarding.md](brownfield-onboarding.md).

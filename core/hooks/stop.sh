@@ -26,13 +26,13 @@ transcript="$(printf '%s' "$payload" | hook_json_string_field transcript_path)"
 if [ -n "$transcript" ] && [ -f "$transcript" ]; then
   haystack="$(tail -c 8000 "$transcript" 2>/dev/null || printf '%s' "$payload")"
 fi
-printf '%s' "$haystack" | grep -Eqi 'mvn|npm|vitest|jest|gradle|pytest|coverage|docs/build/|docs/verify/' && exit 0
+printf '%s' "$haystack" | grep -Eqi 'mvn|npm|vitest|jest|gradle|pytest|coverage|docs/agents-v0/build/|docs/agents-v0/verify/' && exit 0
 
 reminder=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   changed="$(git status --porcelain 2>/dev/null | grep -Ev '[[:space:]]([^/]*[/ ])*[^/]*\.(md|mdc|markdown|txt|adoc|json)$' || true)"
   if [ -n "$changed" ]; then
-    reminder="Uncommitted code changes detected. Run the project quality gate (docs/project-profile.md), persist Build/Verify evidence with commit: lines, and sync docs."
+    reminder="Uncommitted code changes detected. Run the project quality gate (docs/agents-v0/project-profile.md), persist Build/Verify evidence with commit: lines, and sync docs."
     printf 'REMINDER: %s\n' "$reminder" >&2
   fi
 fi

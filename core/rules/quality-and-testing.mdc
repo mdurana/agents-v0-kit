@@ -17,13 +17,13 @@ alwaysApply: false
 ## Workflow
 
 1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`).
-2. Before merge: **`mvn clean verify`** (Java) or the full frontend verify command — see `docs/gold-standards.md`. The fast loop does not replace this gate.
+2. Before merge: **`mvn clean verify`** (Java) or the full frontend verify command — see `docs/agents-v0/gold-standards.md`. The fast loop does not replace this gate.
 3. Coverage gaps: `mvn clean test jacoco:report` → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without documented exception (OWASP Dependency-Check / Dependabot).
 
 ## Tooling (Java pipeline)
 
-JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check — wire before heavy coding per `docs/quality-gates-engineering-principles.md`.
+JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check — wire before heavy coding per `docs/agents-v0/quality-gates-engineering-principles.md`.
 
 ## Coverage targets
 
@@ -33,7 +33,7 @@ JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check — wire before 
 | Backend branches | JaCoCo / Sonar rules | |
 | Frontend | **70%** | raise if CI gate exists |
 
-**Brownfield ratchet:** if `docs/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
+**Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
 
 ## Complexity and size (Java)
 

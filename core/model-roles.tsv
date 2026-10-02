@@ -1,9 +1,9 @@
 program-planner	plan
-codebase-documenter	plan
+codebase-documenter	documenter
 requirements-analyst	plan
 solution-architect	plan
-ux-designer	plan
-orchestrator	plan
+ux-designer	ux-designer
+orchestrator	orchestrator
 security-reviewer	review
 code-reviewer	review
 design-reviewer	review

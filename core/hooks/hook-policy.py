@@ -471,12 +471,12 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/agents/"),
     re.compile(r"(^|/)\.cursor/(commands|skills)/"),
     # Every CI gate script: a new check is protected without editing this list.
-    re.compile(r"(^|/)ci/[^/]+\.sh$"),
+    re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.sh$"),
     re.compile(
-        r"(^|/)scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree|"
+        r"(^|/)\.agents-v0/scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree|"
         r"check-delivery-gate-local|verify-gitlab-ci-prereqs|delivery-metrics|export-audit-pack)\.sh$"
     ),
-    re.compile(r"(^|/)hooks/pre-push$"),
+    re.compile(r"(^|/)\.agents-v0/hooks/pre-push$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),
@@ -503,12 +503,12 @@ def classify_path(path: str) -> Tuple[Action, str]:
             f"Protected kit/CI path cannot be modified by agents: {path}",
         )
     norm = path.replace("\\", "/")
-    if re.search(r"(^|/)docs/requirements/.+\.md$", norm):
+    if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         return (
             "ask",
             "Delivery artifact edit — do not change Delivery approvals without explicit human gate approval.",
         )
-    if re.search(r"(^|/)docs/milestones/.+\.md$", norm):
+    if re.search(r"(^|/)docs/agents-v0/milestones/.+\.md$", norm):
         return (
             "ask",
             "Milestone manifest edit — confirm with release owner before changing go/no-go rows.",

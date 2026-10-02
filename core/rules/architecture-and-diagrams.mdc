@@ -12,9 +12,9 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 | Artifact | Location |
 |----------|----------|
-| High-level system | `docs/architecture.md` |
-| Infrastructure, ports | `docs/network.md` |
-| Per-service sequences | `docs/diagrams/sequences/<service-name>.md` |
+| High-level system | `docs/agents-v0/architecture.md` |
+| Infrastructure, ports | `docs/agents-v0/network.md` |
+| Per-service sequences | `docs/agents-v0/diagrams/sequences/<service-name>.md` |
 
 ## Mermaid conventions
 

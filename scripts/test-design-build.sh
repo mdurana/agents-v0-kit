@@ -6,7 +6,7 @@
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
-CI="$KIT/templates/ci"
+CI="$KIT/templates/.agents-v0/ci"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 status=0
@@ -131,10 +131,10 @@ yaml_run fail "openapi merged: a catalog without the draft fails" "$o" sh "$CI/c
 
 # --- ci/check-design.sh ------------------------------------------------------
 d="$tmp/design"
-mkdir -p "$d/docs/requirements" "$d/docs/design/orders" "$d/docs/adr"
-printf '# Orders\nAC-1 place an order\nAC-2 read an order\n' > "$d/docs/requirements/orders.md"
-cp "$o/draft.yaml" "$d/docs/design/orders/openapi.yaml"
-cat > "$d/docs/adr/01-orders.md" <<'EOF'
+mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/orders" "$d/docs/agents-v0/adr"
+printf '# Orders\nAC-1 place an order\nAC-2 read an order\n' > "$d/docs/agents-v0/requirements/orders.md"
+cp "$o/draft.yaml" "$d/docs/agents-v0/design/orders/openapi.yaml"
+cat > "$d/docs/agents-v0/adr/01-orders.md" <<'EOF'
 # ADR 01: Orders
 
 ## Decision
@@ -144,10 +144,10 @@ Synchronous REST.
 - Kafka request/reply: more moving parts for a read-heavy flow.
 - GraphQL: no consumer asked for it.
 EOF
-cat > "$d/docs/design/orders/design.md" <<'EOF'
+cat > "$d/docs/agents-v0/design/orders/design.md" <<'EOF'
 # Design: orders
 
-ADR: docs/adr/01-orders.md
+ADR: docs/agents-v0/adr/01-orders.md
 
 ## Traceability
 | Requirement | Satisfied by |
@@ -174,47 +174,47 @@ RED metrics per operation, a log field orderId, an alert on 5xx above 1 percent.
 Behind flag orders.enabled, default off; expand migration first; rollback by disabling the flag.
 EOF
 run pass "design: a complete design passes" "$d" sh "$CI/check-design.sh" orders
-cp "$d/docs/design/orders/design.md" "$tmp/design.md.keep"
-sedi '/| AC-2 /d' "$d/docs/design/orders/design.md"
+cp "$d/docs/agents-v0/design/orders/design.md" "$tmp/design.md.keep"
+sedi '/| AC-2 /d' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: an AC missing from Traceability fails" "$d" sh "$CI/check-design.sh" orders
-cp "$tmp/design.md.keep" "$d/docs/design/orders/design.md"
-sedi '/| getOrder /d' "$d/docs/design/orders/design.md"
+cp "$tmp/design.md.keep" "$d/docs/agents-v0/design/orders/design.md"
+sedi '/| getOrder /d' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: an operation missing from Authorization fails" "$d" sh "$CI/check-design.sh" orders
-cp "$tmp/design.md.keep" "$d/docs/design/orders/design.md"
-printf '<!-- TEMPLATE: x -->\n' >> "$d/docs/design/orders/design.md"
+cp "$tmp/design.md.keep" "$d/docs/agents-v0/design/orders/design.md"
+printf '<!-- TEMPLATE: x -->\n' >> "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: a TEMPLATE: line fails" "$d" sh "$CI/check-design.sh" orders
-cp "$tmp/design.md.keep" "$d/docs/design/orders/design.md"
-sedi '/^## Rollout/,$d' "$d/docs/design/orders/design.md"
+cp "$tmp/design.md.keep" "$d/docs/agents-v0/design/orders/design.md"
+sedi '/^## Rollout/,$d' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: a missing section fails" "$d" sh "$CI/check-design.sh" orders
-cp "$tmp/design.md.keep" "$d/docs/design/orders/design.md"
-cp "$d/docs/adr/01-orders.md" "$tmp/adr.keep"
-sedi '/GraphQL/d' "$d/docs/adr/01-orders.md"
+cp "$tmp/design.md.keep" "$d/docs/agents-v0/design/orders/design.md"
+cp "$d/docs/agents-v0/adr/01-orders.md" "$tmp/adr.keep"
+sedi '/GraphQL/d' "$d/docs/agents-v0/adr/01-orders.md"
 run fail "design: an ADR with one alternative fails" "$d" sh "$CI/check-design.sh" orders
-cp "$tmp/adr.keep" "$d/docs/adr/01-orders.md"
+cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
 
 run fail "design: pinning needs a design review" "$d" sh "$CI/check-design.sh" orders --pin approved
 h1="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
-printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/design/orders/review.md"
+printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run fail "design: an open Critical blocks the pin" "$d" sh "$CI/check-design.sh" orders --pin approved
-sedi 's/| Open |/| Resolved |/' "$d/docs/design/orders/review.md"
+sedi 's/| Open |/| Resolved |/' "$d/docs/agents-v0/design/orders/review.md"
 run pass "design: a resolved review lets the pin through" "$d" sh "$CI/check-design.sh" orders --pin approved
 run pass "design: the lock matches the pinned design" "$d" sh "$CI/check-design.sh" orders --verify-lock
-printf 'Also the order list is paged.\n' >> "$d/docs/design/orders/design.md"
-sedi 's/^## Rollout/## Rollout\nPaged list./' "$d/docs/design/orders/design.md"
+printf 'Also the order list is paged.\n' >> "$d/docs/agents-v0/design/orders/design.md"
+sedi 's/^## Rollout/## Rollout\nPaged list./' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: a change after the pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 h2="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
-printf 'agent: design-reviewer\ndesign-hash: %s\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/design/orders/review.md"
-printf '| # | Date | Change | Reason | Impacted | Approver | Decision | Hash |\n|---|---|---|---|---|---|---|---|\n| 1 | 2026-01-02 | paged list | consumer asked | AC-2 | dev | Approved | %s |\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/design/orders/amendments.md"
+printf 'agent: design-reviewer\ndesign-hash: %s\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
+printf '| # | Date | Change | Reason | Impacted | Approver | Decision | Hash |\n|---|---|---|---|---|---|---|---|\n| 1 | 2026-01-02 | paged list | consumer asked | AC-2 | dev | Approved | %s |\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/amendments.md"
 run pass "design: an approved amendment can be pinned" "$d" sh "$CI/check-design.sh" orders --pin "amendment 1"
 run pass "design: the lock passes once the amendment is approved" "$d" sh "$CI/check-design.sh" orders --verify-lock
-sedi 's/Approved/Pending/' "$d/docs/design/orders/amendments.md"
+sedi 's/Approved/Pending/' "$d/docs/agents-v0/design/orders/amendments.md"
 run fail "design: a pin with no Approved amendment row fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 
 # --- ci/check-ux-spec.sh -----------------------------------------------------
 u="$tmp/ux"
-mkdir -p "$u/docs/design/orders/mockups"
-cp "$o/draft.yaml" "$u/docs/design/orders/openapi.yaml"
-cat > "$u/docs/design/orders/ux-spec.md" <<'EOF'
+mkdir -p "$u/docs/agents-v0/design/orders/mockups"
+cp "$o/draft.yaml" "$u/docs/agents-v0/design/orders/openapi.yaml"
+cat > "$u/docs/agents-v0/design/orders/ux-spec.md" <<'EOF'
 # UX spec
 
 Screens: mockups/new-order.html
@@ -224,7 +224,7 @@ Screens: mockups/new-order.html
 | Place order button | New order | mockups/new-order.html | createOrder | submits the form | |
 | Cancel link | New order | mockups/new-order.html | — | returns to the list | |
 EOF
-cat > "$u/docs/design/orders/mockups/new-order.html" <<'EOF'
+cat > "$u/docs/agents-v0/design/orders/mockups/new-order.html" <<'EOF'
 <html><body>
 <form><input type="text" name="sku" data-component="Sku field">
 <button data-component="Place order button">Place</button>
@@ -232,31 +232,31 @@ cat > "$u/docs/design/orders/mockups/new-order.html" <<'EOF'
 </body></html>
 EOF
 run fail "ux spec: an input with no row fails" "$u" sh "$CI/check-ux-spec.sh" orders
-printf '| Sku field | New order | mockups/new-order.html | — | accepts text | |\n' >> "$u/docs/design/orders/ux-spec.md"
+printf '| Sku field | New order | mockups/new-order.html | — | accepts text | |\n' >> "$u/docs/agents-v0/design/orders/ux-spec.md"
 run pass "ux spec: rows and mockup agree" "$u" sh "$CI/check-ux-spec.sh" orders
-cp "$u/docs/design/orders/mockups/new-order.html" "$tmp/mock.keep"
-sedi 's|<button data-component="Place order button">|<button>|' "$u/docs/design/orders/mockups/new-order.html"
+cp "$u/docs/agents-v0/design/orders/mockups/new-order.html" "$tmp/mock.keep"
+sedi 's|<button data-component="Place order button">|<button>|' "$u/docs/agents-v0/design/orders/mockups/new-order.html"
 run fail "ux spec: a control with no data-component fails" "$u" sh "$CI/check-ux-spec.sh" orders
-cp "$tmp/mock.keep" "$u/docs/design/orders/mockups/new-order.html"
-cp "$u/docs/design/orders/ux-spec.md" "$tmp/spec.keep"
-sedi 's/| createOrder |/| deleteOrder |/' "$u/docs/design/orders/ux-spec.md"
+cp "$tmp/mock.keep" "$u/docs/agents-v0/design/orders/mockups/new-order.html"
+cp "$u/docs/agents-v0/design/orders/ux-spec.md" "$tmp/spec.keep"
+sedi 's/| createOrder |/| deleteOrder |/' "$u/docs/agents-v0/design/orders/ux-spec.md"
 run fail "ux spec: an operation not in the draft fails" "$u" sh "$CI/check-ux-spec.sh" orders
-cp "$tmp/spec.keep" "$u/docs/design/orders/ux-spec.md"
-printf '<script>fetch("/api/v1/orders")</script>\n' >> "$u/docs/design/orders/mockups/new-order.html"
+cp "$tmp/spec.keep" "$u/docs/agents-v0/design/orders/ux-spec.md"
+printf '<script>fetch("/api/v1/orders")</script>\n' >> "$u/docs/agents-v0/design/orders/mockups/new-order.html"
 run fail "ux spec: a mockup that calls the API fails" "$u" sh "$CI/check-ux-spec.sh" orders
-cp "$tmp/mock.keep" "$u/docs/design/orders/mockups/new-order.html"
-printf '<html><body><p>spare</p></body></html>\n' > "$u/docs/design/orders/mockups/orphan.html"
+cp "$tmp/mock.keep" "$u/docs/agents-v0/design/orders/mockups/new-order.html"
+printf '<html><body><p>spare</p></body></html>\n' > "$u/docs/agents-v0/design/orders/mockups/orphan.html"
 run fail "ux spec: a mockup no row references fails" "$u" sh "$CI/check-ux-spec.sh" orders
-rm -f "$u/docs/design/orders/mockups/orphan.html"
+rm -f "$u/docs/agents-v0/design/orders/mockups/orphan.html"
 mkdir -p "$tmp/noui"
 run pass "ux spec: a story with no UX spec passes" "$tmp/noui" sh "$CI/check-ux-spec.sh" orders
 
 # --- ci/check-build-plan.sh --------------------------------------------------
 b="$tmp/build"
-mkdir -p "$b/docs/requirements" "$b/docs/build/orders" "$b/src/test/java"
-printf '# Orders\nAC-1 place an order\nAC-2 read an order\n' > "$b/docs/requirements/orders.md"
+mkdir -p "$b/docs/agents-v0/requirements" "$b/docs/agents-v0/build/orders" "$b/src/test/java"
+printf '# Orders\nAC-1 place an order\nAC-2 read an order\n' > "$b/docs/agents-v0/requirements/orders.md"
 printf 'class OrderServiceTest {\n  void create_valid_returnsId() {}\n  void get_unknown_returns404() {}\n}\n' > "$b/src/test/java/OrderServiceTest.java"
-cat > "$b/docs/build/orders/plan.md" <<'EOF'
+cat > "$b/docs/agents-v0/build/orders/plan.md" <<'EOF'
 # Build plan
 
 | AC | Status | Test |
@@ -264,7 +264,7 @@ cat > "$b/docs/build/orders/plan.md" <<'EOF'
 | AC-1 | done | OrderServiceTest#create_valid_returnsId |
 | AC-2 | pending | |
 EOF
-cat > "$b/docs/build/orders/build-report.md" <<'EOF'
+cat > "$b/docs/agents-v0/build/orders/build-report.md" <<'EOF'
 # Build report
 
 commit: abcdef1234567
@@ -276,21 +276,21 @@ commit: abcdef1234567
 EOF
 run pass "build plan: a done row with an existing, red-first test passes" "$b" sh "$CI/check-build-plan.sh" orders
 run fail "build plan: --complete fails while a row is pending" "$b" sh "$CI/check-build-plan.sh" orders --complete
-cp "$b/docs/build/orders/plan.md" "$tmp/plan.keep"
-sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/build/orders/plan.md"
+cp "$b/docs/agents-v0/build/orders/plan.md" "$tmp/plan.keep"
+sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/agents-v0/build/orders/plan.md"
 run fail "build plan: a done row with no red card fails" "$b" sh "$CI/check-build-plan.sh" orders
-sedi 's/get_unknown_returns404 |/get_unknown_returns404 (no-red: configuration only) |/' "$b/docs/build/orders/plan.md"
+sedi 's/get_unknown_returns404 |/get_unknown_returns404 (no-red: configuration only) |/' "$b/docs/agents-v0/build/orders/plan.md"
 run pass "build plan: (no-red: reason) waives the red card for one row" "$b" sh "$CI/check-build-plan.sh" orders --complete
-sedi 's/get_unknown_returns404 (no-red: configuration only)/missing_method_name/' "$b/docs/build/orders/plan.md"
+sedi 's/get_unknown_returns404 (no-red: configuration only)/missing_method_name/' "$b/docs/agents-v0/build/orders/plan.md"
 run fail "build plan: a test that no test file contains fails" "$b" sh "$CI/check-build-plan.sh" orders
-cp "$tmp/plan.keep" "$b/docs/build/orders/plan.md"
-sedi '/| AC-2 /d' "$b/docs/build/orders/plan.md"
+cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+sedi '/| AC-2 /d' "$b/docs/agents-v0/build/orders/plan.md"
 run fail "build plan: a requirement with no plan row fails" "$b" sh "$CI/check-build-plan.sh" orders
-cp "$tmp/plan.keep" "$b/docs/build/orders/plan.md"
-printf '| AC-9 | pending | |\n' >> "$b/docs/build/orders/plan.md"
+cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+printf '| AC-9 | pending | |\n' >> "$b/docs/agents-v0/build/orders/plan.md"
 run fail "build plan: a row that is not a requirement fails" "$b" sh "$CI/check-build-plan.sh" orders
-cp "$tmp/plan.keep" "$b/docs/build/orders/plan.md"
-sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/build/orders/plan.md"
+cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/agents-v0/build/orders/plan.md"
 run pass "build plan: REQUIRE_RED=0 turns the red-first check off" "$b" env REQUIRE_RED=0 sh "$CI/check-build-plan.sh" orders
 
 # --- ci/check-endpoint-auth.sh -----------------------------------------------
@@ -336,8 +336,8 @@ run fail "endpoint auth: a new unannotated endpoint fails" "$e" sh "$CI/check-en
 sedi 's|  @GetMapping("/{id}")|  @PermitAll\n  @GetMapping("/{id}")|' "$e/src/main/java/com/acme/OrderController.java"
 run pass "endpoint auth: @PermitAll marks a public endpoint on purpose" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 if (cd "$e" && sh "$CI/check-endpoint-auth.sh" --list .) | grep -Fq "GET /api/v1/orders/legacy  NO-ANNOTATION"; then pass "endpoint auth: --list prints the same rows as discovery"; else fail "endpoint auth: --list prints the same rows as discovery"; fi
-mkdir -p "$e/docs" "$e/api"
-cat > "$e/docs/project-profile.md" <<'EOF'
+mkdir -p "$e/docs/agents-v0" "$e/api"
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
 ## Endpoint authorization
 
 | Stack | Suffix | Marker | Mapping | Security |
@@ -352,7 +352,7 @@ router = APIRouter()
 def health():
     return {}
 EOF
-(cd "$e" && git add docs/project-profile.md api/routes.py)
+(cd "$e" && git add docs/agents-v0/project-profile.md api/routes.py)
 run fail "endpoint auth: a profile stack flags a new unannotated route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 cat > "$e/api/routes.py" <<'EOF'
 from fastapi import APIRouter
@@ -366,8 +366,8 @@ run pass "endpoint auth: a profile stack accepts a secured route" "$e" sh "$CI/c
 
 # --- ci/check-frontend-calls.sh ----------------------------------------------
 f="$tmp/frontend"
-mkdir -p "$f/ci" "$f/openapi" "$f/frontend/src/lib" "$f/frontend/src/lib/__tests__"
-cp "$CI/resolve-layout.sh" "$f/ci/"
+mkdir -p "$f/.agents-v0/ci" "$f/openapi" "$f/frontend/src/lib" "$f/frontend/src/lib/__tests__"
+cp "$CI/resolve-layout.sh" "$f/.agents-v0/ci/"
 printf '{}\n' > "$f/frontend/package.json"
 cp "$o/draft.yaml" "$f/openapi/api-v1.yaml"
 cat > "$f/frontend/src/lib/api.ts" <<'EOF'

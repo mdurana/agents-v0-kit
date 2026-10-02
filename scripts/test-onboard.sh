@@ -1,5 +1,5 @@
 #!/bin/sh
-# test-onboard.sh — behavior tests for the /onboard scripts on a fixture repo (no network).
+# test-onboard.sh — behavior tests for the /v0-onboard scripts on a fixture repo (no network).
 # Covers: discover-codebase.sh, generate-repo-map.sh, collect-dependency-graphs.sh,
 # check-onboarding-docs.sh, sync-feature-state.sh (onboarding), check-approvals.sh (onboard),
 # check-gate-metrics.sh (GATE_REPORT_ONLY). Run by validate-kit.sh. Needs python3.
@@ -21,12 +21,12 @@ expect_fail() { desc="$1"; dir="$2"; shift 2; if (cd "$dir" && "$@") >/dev/null 
 
 # --- fixture ------------------------------------------------------------------
 r="$tmp/repo"
-mkdir -p "$r/ci" "$r/scripts" "$r/docs"
-cp "$KIT"/templates/ci/resolve-layout.sh "$KIT"/templates/ci/check-gate-metrics.sh "$KIT"/templates/ci/check-approvals.sh "$r/ci/"
-cp "$KIT"/templates/scripts/discover-codebase.sh "$KIT"/templates/scripts/generate-repo-map.sh \
-   "$KIT"/templates/scripts/collect-dependency-graphs.sh "$KIT"/templates/scripts/check-onboarding-docs.sh \
-   "$KIT"/templates/scripts/sync-feature-state.sh "$r/scripts/"
-cat > "$r/docs/project-profile.md" <<'EOF'
+mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/docs/agents-v0"
+cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh "$r/.agents-v0/ci/"
+cp "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
+   "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
+   "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$r/.agents-v0/scripts/"
+cat > "$r/docs/agents-v0/project-profile.md" <<'EOF'
 | This repo | Value |
 |-----------|--------|
 | Profile | app |
@@ -111,8 +111,8 @@ def health():
 EOF
 
 # --- discover-codebase.sh ----------------------------------------------------
-expect_pass "discover-codebase runs on the fixture" "$r" sh scripts/discover-codebase.sh
-d="$r/docs/discovery"
+expect_pass "discover-codebase runs on the fixture" "$r" sh .agents-v0/scripts/discover-codebase.sh
+d="$r/docs/agents-v0/discovery"
 has "endpoints: annotated POST with the class base path" "$d/endpoints.txt" "POST /api/v1/orders  annotated"
 has "endpoints: GET without an annotation is flagged" "$d/endpoints.txt" "GET /api/v1/orders/{id}  NO-ANNOTATION"
 has "endpoints: a method before an annotated method is not credited with its annotation" "$d/endpoints.txt" "DELETE /api/v1/orders/{id}  NO-ANNOTATION"
@@ -137,7 +137,7 @@ has "tests: per-root counts" "$d/tests.txt" "services/order  java test files 1"
 has "baseline: unmeasured root is said so" "$d/baseline.md" "not measured"
 has "every inventory carries the commit" "$d/endpoints.txt" "commit:"
 
-(cd "$r" && DISCOVER_MAX=1 sh scripts/discover-codebase.sh >/dev/null 2>&1)
+(cd "$r" && DISCOVER_MAX=1 sh .agents-v0/scripts/discover-codebase.sh >/dev/null 2>&1)
 has "a capped list says it was cut" "$d/endpoints.txt" "TRUNCATED: showing 1 of 4"
 
 # baseline numbers from target/ reports
@@ -147,25 +147,25 @@ cat > "$o/target/site/jacoco/jacoco.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <report name="x"><counter type="LINE" missed="1" covered="1"/></report>
 EOF
-(cd "$r" && sh scripts/discover-codebase.sh >/dev/null 2>&1)
+(cd "$r" && sh .agents-v0/scripts/discover-codebase.sh >/dev/null 2>&1)
 has "baseline: coverage read from jacoco.xml" "$d/baseline.md" "50.0%"
 has "baseline: proposed coverage ratchet row" "$d/baseline.md" "| services/order | 50% |"
 has "baseline: proposed known_failures row" "$d/baseline.md" "| 1 | services/order |"
-expect_pass "gate metrics: GATE_REPORT_ONLY exits 0 on a failing module" "$r" env GATE_REPORT_ONLY=1 sh ci/check-gate-metrics.sh services/order
-expect_fail "gate metrics: the same module fails without GATE_REPORT_ONLY" "$r" sh ci/check-gate-metrics.sh services/order
+expect_pass "gate metrics: GATE_REPORT_ONLY exits 0 on a failing module" "$r" env GATE_REPORT_ONLY=1 sh .agents-v0/ci/check-gate-metrics.sh services/order
+expect_fail "gate metrics: the same module fails without GATE_REPORT_ONLY" "$r" sh .agents-v0/ci/check-gate-metrics.sh services/order
 
 # --- generate-repo-map.sh ----------------------------------------------------
-expect_pass "generate-repo-map runs on the fixture" "$r" sh scripts/generate-repo-map.sh
-has "repo map: resolved service roots" "$r/docs/repo-map.md" '`services/inventory`'
-has "repo map: Maven build file under a service root" "$r/docs/repo-map.md" 'services/order/pom.xml'
-has "repo map: controller found" "$r/docs/repo-map.md" "OrderController.java"
-has "repo map: commit stamped" "$r/docs/repo-map.md" "commit:"
+expect_pass "generate-repo-map runs on the fixture" "$r" sh .agents-v0/scripts/generate-repo-map.sh
+has "repo map: resolved service roots" "$r/docs/agents-v0/repo-map.md" '`services/inventory`'
+has "repo map: Maven build file under a service root" "$r/docs/agents-v0/repo-map.md" 'services/order/pom.xml'
+has "repo map: controller found" "$r/docs/agents-v0/repo-map.md" "OrderController.java"
+has "repo map: commit stamped" "$r/docs/agents-v0/repo-map.md" "commit:"
 
 # --- collect-dependency-graphs.sh --------------------------------------------
 g="$tmp/graphs"
-mkdir -p "$g/ci" "$g/scripts" "$g/docs" "$g/services/order" "$g/services/inventory"
-cp "$KIT"/templates/ci/resolve-layout.sh "$g/ci/"
-cp "$KIT"/templates/scripts/collect-dependency-graphs.sh "$g/scripts/"
+mkdir -p "$g/.agents-v0/ci" "$g/.agents-v0/scripts" "$g/docs/agents-v0" "$g/services/order" "$g/services/inventory"
+cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$g/.agents-v0/ci/"
+cp "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$g/.agents-v0/scripts/"
 : > "$g/services/order/pom.xml"
 : > "$g/services/inventory/pom.xml"
 cat > "$g/services/order/mvnw" <<'EOF'
@@ -175,18 +175,18 @@ printf 'com.acme:order:jar:1\n' >> "$out"
 EOF
 printf '#!/bin/sh\nexit 1\n' > "$g/services/inventory/mvnw"
 chmod +x "$g/services/order/mvnw" "$g/services/inventory/mvnw"
-expect_fail "dependency graphs: a failing root makes the script exit non-zero" "$g" sh scripts/collect-dependency-graphs.sh
-has "dependency graphs: a working root writes its own graph" "$g/docs/discovery/dependency-graph.services-order.txt" "com.acme:order"
-if (cd "$g" && sh scripts/collect-dependency-graphs.sh 2>&1) | grep -Fq "dependency:tree failed under services/inventory"; then
+expect_fail "dependency graphs: a failing root makes the script exit non-zero" "$g" sh .agents-v0/scripts/collect-dependency-graphs.sh
+has "dependency graphs: a working root writes its own graph" "$g/docs/agents-v0/discovery/dependency-graph.services-order.txt" "com.acme:order"
+if (cd "$g" && sh .agents-v0/scripts/collect-dependency-graphs.sh 2>&1) | grep -Fq "dependency:tree failed under services/inventory"; then
   pass "dependency graphs: the failing root is named"
 else
   fail "dependency graphs: the failing root is named"
 fi
 
 # --- check-onboarding-docs.sh ------------------------------------------------
-mkdir -p "$r/docs/onboarding/modules"
+mkdir -p "$r/docs/agents-v0/onboarding/modules"
 cite='`services/order/src/main/java/com/acme/order/OrderController.java:7`'
-cat > "$r/docs/onboarding/report.md" <<EOF
+cat > "$r/docs/agents-v0/onboarding/report.md" <<EOF
 # Onboarding report
 
 commit: abcdef1234567
@@ -197,36 +197,36 @@ The controller is at $cite. The database is reached at db.internal:5432 and \`ex
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| onboard | docs/onboarding/report.md | dev | Approved | 2026-01-01 |
+| onboard | docs/agents-v0/onboarding/report.md | dev | Approved | 2026-01-01 |
 EOF
-expect_pass "onboarding docs: a real citation passes and hostnames are not citations" "$r" sh scripts/check-onboarding-docs.sh
-printf 'Also see `services/order/src/Missing.java:3`.\n' >> "$r/docs/onboarding/report.md"
-expect_fail "onboarding docs: a citation to a missing file fails" "$r" sh scripts/check-onboarding-docs.sh
-sed -i.bak '$d' "$r/docs/onboarding/report.md" && rm -f "$r/docs/onboarding/report.md.bak"
-printf 'Out of range: `services/order/src/main/java/com/acme/order/OrderController.java:999`.\n' >> "$r/docs/onboarding/report.md"
-expect_fail "onboarding docs: a line past the end of the file fails" "$r" sh scripts/check-onboarding-docs.sh
-sed -i.bak '$d' "$r/docs/onboarding/report.md" && rm -f "$r/docs/onboarding/report.md.bak"
-printf '<!-- TEMPLATE: replace -->\n' >> "$r/docs/onboarding/report.md"
-expect_fail "onboarding docs: a TEMPLATE: marker fails" "$r" sh scripts/check-onboarding-docs.sh
-sed -i.bak '$d' "$r/docs/onboarding/report.md" && rm -f "$r/docs/onboarding/report.md.bak"
-printf 'Retention is UNVERIFIED.\n' >> "$r/docs/onboarding/report.md"
-expect_pass "onboarding docs: UNVERIFIED is counted, not failed, by default" "$r" sh scripts/check-onboarding-docs.sh
-expect_fail "onboarding docs: MAX_UNVERIFIED=0 fails on an unknown" "$r" env MAX_UNVERIFIED=0 sh scripts/check-onboarding-docs.sh
-printf '# Module: order\n\nNo commit line here.\n' > "$r/docs/onboarding/modules/order.md"
-expect_fail "onboarding docs: a module document needs a commit line" "$r" sh scripts/check-onboarding-docs.sh
-rm -f "$r/docs/onboarding/modules/order.md"
-mv "$r/docs/onboarding/report.md" "$r/docs/onboarding/report.keep"
-expect_fail "onboarding docs: the default run needs the report" "$r" sh scripts/check-onboarding-docs.sh
-mv "$r/docs/onboarding/report.keep" "$r/docs/onboarding/report.md"
+expect_pass "onboarding docs: a real citation passes and hostnames are not citations" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+printf 'Also see `services/order/src/Missing.java:3`.\n' >> "$r/docs/agents-v0/onboarding/report.md"
+expect_fail "onboarding docs: a citation to a missing file fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
+printf 'Out of range: `services/order/src/main/java/com/acme/order/OrderController.java:999`.\n' >> "$r/docs/agents-v0/onboarding/report.md"
+expect_fail "onboarding docs: a line past the end of the file fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
+printf '<!-- TEMPLATE: replace -->\n' >> "$r/docs/agents-v0/onboarding/report.md"
+expect_fail "onboarding docs: a TEMPLATE: marker fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
+printf 'Retention is UNVERIFIED.\n' >> "$r/docs/agents-v0/onboarding/report.md"
+expect_pass "onboarding docs: UNVERIFIED is counted, not failed, by default" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+expect_fail "onboarding docs: MAX_UNVERIFIED=0 fails on an unknown" "$r" env MAX_UNVERIFIED=0 sh .agents-v0/scripts/check-onboarding-docs.sh
+printf '# Module: order\n\nNo commit line here.\n' > "$r/docs/agents-v0/onboarding/modules/order.md"
+expect_fail "onboarding docs: a module document needs a commit line" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+rm -f "$r/docs/agents-v0/onboarding/modules/order.md"
+mv "$r/docs/agents-v0/onboarding/report.md" "$r/docs/agents-v0/onboarding/report.keep"
+expect_fail "onboarding docs: the default run needs the report" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+mv "$r/docs/agents-v0/onboarding/report.keep" "$r/docs/agents-v0/onboarding/report.md"
 
 # --- onboarding state and approval -------------------------------------------
-expect_pass "check-approvals accepts an Approved onboard row" "$r" sh ci/check-approvals.sh docs/onboarding/report.md onboard
-expect_pass "state: onboarding in progress" "$r" sh scripts/sync-feature-state.sh docs/onboarding/report.md --active-phase onboard --status in_progress
-has "state: written beside the report" "$r/docs/onboarding/state.json" '"activePhase": "onboard"'
-has "state: feature is onboarding" "$r/docs/onboarding/state.json" '"feature": "onboarding"'
-expect_pass "state: approval clears the active phase" "$r" sh scripts/sync-feature-state.sh docs/onboarding/report.md
-has "state: last approved phase is onboard" "$r/docs/onboarding/state.json" '"lastApprovedPhase": "onboard"'
-expect_fail "state: an intake phase is not valid for onboarding" "$r" sh scripts/sync-feature-state.sh docs/onboarding/report.md --active-phase intake --status in_progress
+expect_pass "check-approvals accepts an Approved onboard row" "$r" sh .agents-v0/ci/check-approvals.sh docs/agents-v0/onboarding/report.md onboard
+expect_pass "state: onboarding in progress" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status in_progress
+has "state: written beside the report" "$r/docs/agents-v0/onboarding/state.json" '"activePhase": "onboard"'
+has "state: feature is onboarding" "$r/docs/agents-v0/onboarding/state.json" '"feature": "onboarding"'
+expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
+has "state: last approved phase is onboard" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
+expect_fail "state: an intake phase is not valid for onboarding" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase intake --status in_progress
 
 if [ "$status" -ne 0 ]; then
   echo "test-onboard: FAILED" >&2

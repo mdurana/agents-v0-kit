@@ -24,12 +24,12 @@ node_modules/
 target/
 .gradle/
 build/
-# Delivery evidence under docs/build/ stays indexable for agents (Build evidence contract)
-!docs/build/
-!docs/build/**
+# Delivery evidence under docs/agents-v0/build/ stays indexable for agents (Build evidence contract)
+!docs/agents-v0/build/
+!docs/agents-v0/build/**
 # Verify reports stay indexable for agents (Verify evidence contract)
-!docs/verify/
-!docs/verify/**
+!docs/agents-v0/verify/
+!docs/agents-v0/verify/**
 out/
 dist/
 .svelte-kit/

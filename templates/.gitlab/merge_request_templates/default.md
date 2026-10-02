@@ -2,8 +2,8 @@
 
 <!-- One-line description of the change. -->
 
-**Feature-Artifact:** docs/requirements/<feature>.md
-<!-- Required when this MR changes application code (ci/check-delivery-linkage.sh). A bug fix, CVE patch, dependency bump, or hotfix replaces the line above with: **Maintain-Note:** docs/maintain/<id>/note.md -->
+**Feature-Artifact:** docs/agents-v0/requirements/<feature>.md
+<!-- Required when this MR changes application code (ci/check-delivery-linkage.sh). A bug fix, CVE patch, dependency bump, or hotfix replaces the line above with: **Maintain-Note:** docs/agents-v0/maintain/<id>/note.md -->
 <!-- Do not give both. A fix does not borrow a feature artifact's approvals. -->
 
 ## Changed files
@@ -87,7 +87,7 @@
 
 **Result:** Pass / Fail / N/A — reason and evidence: _______________
 
-> Attach or link the persisted evidence — Build: `docs/build/<feature>/build-report.md`; Verify: `docs/verify/<feature>/test-report.md`, `vapt-checklist.md`, `review-notes.md`.
+> Attach or link the persisted evidence — Build: `docs/agents-v0/build/<feature>/build-report.md`; Verify: `docs/agents-v0/verify/<feature>/test-report.md`, `vapt-checklist.md`, `review-notes.md`.
 
 ## Delivery approvals
 
@@ -96,6 +96,6 @@
 > | Phase | Artifacts | Approver | Decision | Date |
 > |-------|-----------|----------|----------|------|
 >
-> Put evidence paths in each phase row's Artifacts column — Build: `docs/build/<feature>/...`; Verify: `docs/verify/<feature>/...`. An approval must be a real user decision — never inferred. Record the Decision cell as an explicit positive token (canonically `Approved`); `ci/check-approvals.sh` accepts `approved` / `approve` / `yes` / `pass`.
+> Put evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`. An approval must be a real user decision — never inferred. Record the Decision cell as an explicit positive token (canonically `Approved`); `ci/check-approvals.sh` accepts `approved` / `approve` / `yes` / `pass`.
 
 - [ ] Approvals for all completed phases are recorded in the delivery artifact in the canonical table format, with evidence paths that exist on disk

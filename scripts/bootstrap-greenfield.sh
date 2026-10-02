@@ -5,8 +5,8 @@
 #   bootstrap-greenfield.sh [--profile service|ui|app] <target-repo>
 #
 # Prerequisite: scaffold the application (Spring Initializr, create-svelte, etc.) so
-# <target-repo> exists. See docs/greenfield-onboarding.md.
-# --profile fills docs/project-profile.md Layout and verify commands when those
+# <target-repo> exists. See docs/agents-v0/greenfield-onboarding.md.
+# --profile fills docs/agents-v0/project-profile.md Layout and verify commands when those
 # cells are still placeholders. Omit it to infer service, ui, or app from the tree.
 set -eu
 
@@ -60,9 +60,9 @@ TARGET_ABS="$(cd "$TARGET" && pwd)"
 
 mkdir -p "$TARGET_ABS/docs/milestones"
 for m in p0-platform-skeleton p1-contracts-and-data-models p2-mvp-core-features p3-feature-expansion p4-hardening p5-release-readiness; do
-  dest="$TARGET_ABS/docs/milestones/$m.md"
+  dest="$TARGET_ABS/docs/agents-v0/milestones/$m.md"
   if [ ! -f "$dest" ]; then
-    cp "$KIT/templates/docs/milestones/$m.md" "$dest"
+    cp "$KIT/templates/docs/agents-v0/milestones/$m.md" "$dest"
     printf 'Seeded %s\n' "$dest"
   fi
 done
@@ -115,7 +115,7 @@ layout_cell() {
 
 fill_layout() {
   chosen="$1"
-  file="$TARGET_ABS/docs/project-profile.md"
+  file="$TARGET_ABS/docs/agents-v0/project-profile.md"
   [ -f "$file" ] || {
     printf 'WARN: %s missing — Layout profile not recorded\n' "$file" >&2
     return 0
@@ -245,4 +245,4 @@ printf '\nGreenfield bootstrap complete.\n'
 printf 'Next: wire Maven quality snippets from maven/ if Java; copy docker/Dockerfile.* to Dockerfile (see docker/README.md)\n'
 printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
 printf 'Greenfield scaffold hardening: follow skill scaffold-service during P0 build stories.\n'
-printf 'Then start P0 story P0-A with /intake in chat. Guide: docs/greenfield-onboarding.md\n'
+printf 'Then start P0 story P0-A with /v0-intake in chat. Guide: docs/agents-v0/greenfield-onboarding.md\n'

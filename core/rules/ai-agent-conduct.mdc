@@ -36,7 +36,7 @@ alwaysApply: true
 
 ## Artifacts
 
-- **Do create/update:** mandated project docs per `project-delivery-core.mdc` (`README`, `docs/architecture.md`, etc.).
+- **Do create/update:** mandated project docs per `project-delivery-core.mdc` (`README`, `docs/agents-v0/architecture.md`, etc.).
 - **Do not create:** unsolicited scratch notes, session exports, or duplicate rule dumps.
 - Ephemeral planning stays in **chat**.
 

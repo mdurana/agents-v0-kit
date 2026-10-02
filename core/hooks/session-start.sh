@@ -5,14 +5,14 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 lines=""
-[ -f docs/project-profile.md ] && lines="${lines}Project profile: docs/project-profile.md
+[ -f docs/agents-v0/project-profile.md ] && lines="${lines}Project profile: docs/agents-v0/project-profile.md
 "
-[ -f docs/repo-map.md ] && lines="${lines}Repo map: docs/repo-map.md
+[ -f docs/agents-v0/repo-map.md ] && lines="${lines}Repo map: docs/agents-v0/repo-map.md
 "
 state=""
 newest_ts=""
 if [ -d docs/requirements ]; then
-  for f in docs/requirements/*.state.json; do
+  for f in docs/agents-v0/requirements/*.state.json; do
     [ -f "$f" ] || continue
     ts="$(sed -n 's/.*"updatedAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -n 1)"
     if [ -z "$state" ]; then
@@ -40,5 +40,5 @@ fi
 
 hook_emit_session_context "Delivery kit session context:
 $lines
-Use /status to resume gated work. Follow workflow-orchestration.mdc."
+Use /v0-status to resume gated work. Follow workflow-orchestration.mdc."
 exit 0

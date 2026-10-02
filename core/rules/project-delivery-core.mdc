@@ -22,7 +22,7 @@ Event-driven and caching: add only when requirements justify.
 
 ## Directory profiles
 
-Greenfield repos use one profile. Record it in `docs/project-profile.md` under **Layout** (`Profile`, `Backend root`, `Frontend root`, `BFF root`, `Service roots`). A filled Profile row or filled root rows win. `/onboard` records the tree it finds and does not move source onto a greenfield default. When those rows are still placeholders, use the profile that matches the files on disk.
+Greenfield repos use one profile. Record it in `docs/agents-v0/project-profile.md` under **Layout** (`Profile`, `Backend root`, `Frontend root`, `BFF root`, `Service roots`). A filled Profile row or filled root rows win. `/v0-onboard` records the tree it finds and does not move source onto a greenfield default. When those rows are still placeholders, use the profile that matches the files on disk.
 
 | Profile | When | Code roots |
 |---------|------|------------|
@@ -30,11 +30,11 @@ Greenfield repos use one profile. Record it in `docs/project-profile.md` under *
 | `ui` | SvelteKit or React only | `frontend/`. SvelteKit: `src/routes/`, `src/lib/` (`components`, `features`, `services/api`, `stores`, `utils`, `types`). React: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices` |
 | `app` | Service and UI in one repo | `backend/` and `frontend/` (same trees as `service` and `ui`). Add `bff/` only when a BFF is in scope |
 
-The repo root holds `docs/`, `ci/`, and `openapi/` only. Application source does not live there: no root `src/`, `pom.xml`, or `package.json`. `/onboard` may record `.` when a legacy repo already has source at the root.
+The repo root holds `docs/`, `ci/`, and `openapi/` only. Application source does not live there: no root `src/`, `pom.xml`, or `package.json`. `/v0-onboard` may record `.` when a legacy repo already has source at the root.
 
-**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `services/order, services/inventory`) instead of one `Backend root`; `services/*/` JVM modules are also auto-detected. Each root is its own Maven module with its own database, built and scanned by CI (`ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). Maven config paths: `maven/quality-plugins.xml`. CI does not cross git repositories; list other repos in `docs/workspace.manifest.json`.
+**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `services/order, services/inventory`) instead of one `Backend root`; `services/*/` JVM modules are also auto-detected. Each root is its own Maven module with its own database, built and scanned by CI (`ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). Maven config paths: `maven/quality-plugins.xml`. CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
 
-Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
+Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
 
 ## Cross-cutting (all services)
 
@@ -65,15 +65,15 @@ For **RFC 7807** (`application/problem+json`) vs custom envelope, see `api-and-e
 ## Documentation (when behavior or topology changes)
 
 - `README.md`
-- `docs/architecture.md` — system context
-- `docs/network.md` — ports and dependencies
-- `docs/diagrams/sequences/<service>.md` — non-trivial flows
+- `docs/agents-v0/architecture.md` — system context
+- `docs/agents-v0/network.md` — ports and dependencies
+- `docs/agents-v0/diagrams/sequences/<service>.md` — non-trivial flows
 
 Authoritative references (follow repo paths if they differ):
 
 - `docs/security-standards.md` — see also `security-baseline.mdc`
-- `docs/gold-standards.md` — build, run, test, CI
-- `docs/quality-gates.md` / `docs/quality-quick-reference.md` — see `quality-and-testing.mdc`
+- `docs/agents-v0/gold-standards.md` — build, run, test, CI
+- `docs/agents-v0/quality-gates.md` / `docs/quality-quick-reference.md` — see `quality-and-testing.mdc`
 
 ## BFF and frontends
 

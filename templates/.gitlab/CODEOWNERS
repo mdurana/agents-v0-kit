@@ -1,0 +1,22 @@
+# Delivery artifacts — require owner review before merge (pair with branch protection).
+# Replace @your-team with a real GitLab group before setting GITLAB_TOKEN.
+# Code Owner approval must cover /.gitlab-ci.yml so a merge request cannot rewrite that job.
+/docs/agents-v0/requirements/ @your-team
+/docs/agents-v0/milestones/ @your-team
+/docs/agents-v0/build/ @your-team
+/docs/agents-v0/verify/ @your-team
+/docs/agents-v0/maintain/ @your-team
+# Architecture: the approved design, the decisions, and the contract catalog need an architecture owner.
+/docs/agents-v0/design/ @your-team
+/docs/agents-v0/adr/ @your-team
+/openapi/ @your-team
+/ci/ @your-team
+/.gitlab-ci.yml @your-team
+/.gitlab/ @your-team
+/.cursor/hooks.json @your-team
+/.cursor/hooks/ @your-team
+/.cursor/rules/ @your-team
+/.cursor/agents/ @your-team
+/.cursor/commands/ @your-team
+/.cursor/skills/ @your-team
+/CODEOWNERS @your-team

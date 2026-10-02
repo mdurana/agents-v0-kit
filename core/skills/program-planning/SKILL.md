@@ -8,13 +8,13 @@ description: Plan phase playbook. Turn a large goal into milestone manifests, or
 Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc` Program planning).
 
 ## Steps
-1. Read the goal and the repo context (`docs/project-profile.md`, `docs/repo-map.md`). Name the bounded contexts in scope.
-2. Run `system-design` first: `docs/design/system/context-map.md` (one row per context: purpose, service root, owner, sync or async integrations), the NFR/SLO budget, and threat-model notes.
-3. Choose the milestones. Start from `templates/docs/milestones/` (P0 skeleton, P1 contracts and data models, P2 MVP, P3 features, P4 hardening, P5 release readiness). Drop a milestone only with a recorded reason.
-4. Write each story row in `docs/milestones/<milestone>.md`:
+1. Read the goal and the repo context (`docs/agents-v0/project-profile.md`, `docs/agents-v0/repo-map.md`). Name the bounded contexts in scope.
+2. Run `system-design` first: `docs/agents-v0/design/system/context-map.md` (one row per context: purpose, service root, owner, sync or async integrations), the NFR/SLO budget, and threat-model notes.
+3. Choose the milestones. Start from `templates/docs/agents-v0/milestones/` (P0 skeleton, P1 contracts and data models, P2 MVP, P3 features, P4 hardening, P5 release readiness). Drop a milestone only with a recorded reason.
+4. Write each story row in `docs/agents-v0/milestones/<milestone>.md`:
    - Story ID (`P2-A`, `P2-B`, …).
    - User story: one full `As a [role], I want [goal], so that [benefit].` sentence. No `<...>` or `[...]` placeholders. If the role, goal, or benefit is unknown, ask the user.
-   - Feature artifact: a concrete path, `docs/requirements/<feature>.md`.
+   - Feature artifact: a concrete path, `docs/agents-v0/requirements/<feature>.md`.
    - Status: `planned`.
    - Dependency: story IDs only, comma-separated. Milestone-level dependencies (`P1`) are prose and are not checked.
 5. Size every story: one surface (`backend`, `bff`, or `frontend`) and at most eight acceptance criteria. Split a larger story into rows here. Use `Vertical slice: yes` only when the user asked for one journey across surfaces.
@@ -25,7 +25,7 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
 
    | Phase | Artifacts | Approver | Decision | Date |
    |-------|-----------|----------|----------|------|
-   | plan | docs/milestones/&lt;milestone&gt;.md, docs/design/system/context-map.md | &lt;name&gt; | Approved | &lt;date&gt; |
+   | plan | docs/agents-v0/milestones/&lt;milestone&gt;.md, docs/agents-v0/design/system/context-map.md | &lt;name&gt; | Approved | &lt;date&gt; |
 
 ## Rule-compliance checklist
 - [ ] `architecture-and-diagrams.mdc`: contexts, database per service, Mermaid conventions.

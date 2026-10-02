@@ -1,7 +1,7 @@
 ---
 name: docs-author
 description: Drafts README, architecture, network, and sequence doc updates from diffs. Docs role per model-routing-matrix.
-model: composer-2.5
+model: gemini-3.8-flash[reasoning_effort=high]
 mode: subagent
 tools:
   - read

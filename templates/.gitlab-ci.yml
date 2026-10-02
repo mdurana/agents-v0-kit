@@ -29,7 +29,7 @@ default:
   interruptible: true
 
 # Air-gapped or private registry mirrors: set CI_IMAGE_PREFIX (e.g. registry.example.com/)
-# in GitLab CI/CD variables or docs/project-profile.md guidance. Empty = pull from public hubs.
+# in GitLab CI/CD variables or docs/agents-v0/project-profile.md guidance. Empty = pull from public hubs.
 variables:
   CI_IMAGE_PREFIX: ""
 
@@ -42,7 +42,7 @@ workflow:
 # Default: docker:27-dind. That service needs a runner that allows privileged jobs.
 # When privileged jobs are forbidden, delete `services` and the DOCKER_* / TESTCONTAINERS_*
 # variables below and mount /var/run/docker.sock on the job (host Docker). Confirm the choice
-# with sh scripts/verify-gitlab-ci-prereqs.sh before the first pipeline.
+# with sh .agents-v0/scripts/verify-gitlab-ci-prereqs.sh before the first pipeline.
 # A project with no Testcontainers tests can delete the Docker block too.
 build:
   stage: test
@@ -78,8 +78,8 @@ build:
       set -eu
       set -o pipefail
       repo="$(pwd)"
-      eval "$(sh ci/resolve-layout.sh)"
-      sh ci/check-layout-roots.sh
+      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+      sh .agents-v0/ci/check-layout-roots.sh
       mkdir -p ci-artifacts
       : > ci-artifacts/verify.log
       verify_maven() {
@@ -100,7 +100,7 @@ build:
       verify_maven "${BACKEND_ROOT:-}"
       verify_maven "${BFF_ROOT:-}"
       for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
-      if [ -f ci/check-known-failures.sh ]; then sh ci/check-known-failures.sh ci-artifacts/verify.log; fi
+      if [ -f ci/check-known-failures.sh ]; then sh .agents-v0/ci/check-known-failures.sh ci-artifacts/verify.log; fi
   artifacts:
     when: always
     paths:
@@ -137,16 +137,16 @@ gate-metrics:
     - |
       set -eu
       repo="$(pwd)"
-      eval "$(sh ci/resolve-layout.sh)"
-      sh ci/check-layout-roots.sh
+      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+      sh .agents-v0/ci/check-layout-roots.sh
       gate="ci/check-gate-metrics.sh"
       if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
         git fetch origin "$CI_DEFAULT_BRANCH"
         export DIFF_BASE="origin/$CI_DEFAULT_BRANCH"
         # Run the gate script from the default branch so a merge request cannot rewrite its own check.
-        if git cat-file -e "FETCH_HEAD:ci/check-gate-metrics.sh" 2>/dev/null; then
+        if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" 2>/dev/null; then
           trusted="$(mktemp -d)"
-          git show "FETCH_HEAD:ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
+          git show "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
           gate="${trusted}/check-gate-metrics.sh"
         else
           printf 'WARN: using the merge request copy of ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
@@ -181,9 +181,9 @@ event-schema-compat:
       git fetch origin "$CI_DEFAULT_BRANCH"
       check="ci/check-event-schemas.sh"
       # Run the check from the default branch so a merge request cannot rewrite its own check.
-      if git cat-file -e "FETCH_HEAD:ci/check-event-schemas.sh" 2>/dev/null; then
+      if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-event-schemas.sh" 2>/dev/null; then
         trusted="$(mktemp -d)"
-        git show "FETCH_HEAD:ci/check-event-schemas.sh" > "${trusted}/check-event-schemas.sh"
+        git show "FETCH_HEAD:.agents-v0/ci/check-event-schemas.sh" > "${trusted}/check-event-schemas.sh"
         check="${trusted}/check-event-schemas.sh"
       fi
       sh "$check" "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-origin/$CI_DEFAULT_BRANCH}" "$CI_COMMIT_SHA"
@@ -193,9 +193,9 @@ event-schema-compat:
 .trusted-ci: &trusted_ci |
   git fetch origin "$CI_DEFAULT_BRANCH"
   CI_DIR=ci
-  if git cat-file -e "FETCH_HEAD:ci/check-design.sh" 2>/dev/null; then
+  if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
     rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci
-    git archive FETCH_HEAD ci | tar -x -C /tmp/trusted-ci
+    git archive FETCH_HEAD .agents-v0/ci | tar -x -C /tmp/trusted-ci
     CI_DIR=/tmp/trusted-ci/ci
   else
     printf 'WARN: using the merge request copy of ci/ scripts; they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
@@ -209,9 +209,9 @@ design-contract:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
-        - docs/design/*/openapi.yaml
-        - docs/design/*/design.lock
-        - docs/design/*/ux-spec.md
+        - docs/agents-v0/design/*/openapi.yaml
+        - docs/agents-v0/design/*/design.lock
+        - docs/agents-v0/design/*/ux-spec.md
   before_script:
     - apk add --no-cache git python3 py3-yaml
   script:
@@ -267,7 +267,7 @@ e2e:
   script:
     - |
       set -eu
-      eval "$(sh ci/resolve-layout.sh)"
+      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
       cd "${FRONTEND_ROOT:-.}"
       npm ci
       npx playwright test
@@ -326,7 +326,7 @@ frontend:
       set -eu
       set -o pipefail
       repo="$(pwd)"
-      eval "$(sh ci/resolve-layout.sh)"
+      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
       root="${FRONTEND_ROOT:-}"
       if [ -z "$root" ]; then
         printf 'SKIP: layout has no frontend root\n'
@@ -343,7 +343,7 @@ frontend:
       elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
       else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
       fi
-      if [ -f "$repo/ci/check-known-failures.sh" ]; then sh "$repo/ci/check-known-failures.sh" "$repo/ci-artifacts/verify-frontend.log"; fi
+      if [ -f "$repo/.agents-v0/ci/check-known-failures.sh" ]; then sh "$repo/.agents-v0/ci/check-known-failures.sh" "$repo/ci-artifacts/verify-frontend.log"; fi
   artifacts:
     when: always
     paths:
@@ -365,7 +365,7 @@ coverage-ratchet:
   before_script:
     - apk add --no-cache python3
   script:
-    - sh ci/check-coverage-ratchet.sh docs/project-profile.md
+    - sh .agents-v0/ci/check-coverage-ratchet.sh docs/agents-v0/project-profile.md
 
 delivery-metrics:
   stage: delivery-gate
@@ -375,7 +375,7 @@ delivery-metrics:
   before_script:
     - apk add --no-cache python3
   script:
-    - sh scripts/delivery-metrics.sh . | tee delivery-metrics.md
+    - sh .agents-v0/scripts/delivery-metrics.sh . | tee delivery-metrics.md
   artifacts:
     when: always
     paths:
@@ -397,11 +397,11 @@ delivery-metrics:
       fi
       git fetch origin "$CI_DEFAULT_BRANCH"
       trusted="$(mktemp -d)"
-      if git cat-file -e "FETCH_HEAD:ci/check-delivery-linkage.sh" 2>/dev/null \
-        && git cat-file -e "FETCH_HEAD:ci/check-approver-gitlab.sh" 2>/dev/null; then
+      if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-delivery-linkage.sh" 2>/dev/null \
+        && git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-approver-gitlab.sh" 2>/dev/null; then
         for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh classify-change.sh check-design.sh check-build-plan.sh; do
-          if git cat-file -e "FETCH_HEAD:ci/${s}" 2>/dev/null; then
-            git show "FETCH_HEAD:ci/${s}" > "${trusted}/${s}"
+          if git cat-file -e "FETCH_HEAD:.agents-v0/ci/${s}" 2>/dev/null; then
+            git show "FETCH_HEAD:.agents-v0/ci/${s}" > "${trusted}/${s}"
             chmod +x "${trusted}/${s}"
           fi
         done
@@ -421,7 +421,7 @@ delivery-metrics:
         printf 'SKIP: ci checkers are not on %s yet. This bootstrap merge request is not checked against GitLab approvals.\n' "$CI_DEFAULT_BRANCH"
       else
         printf 'WARN: using merge request copies of ci scripts because they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
-        sh ci/check-delivery-linkage.sh "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
+        sh .agents-v0/ci/check-delivery-linkage.sh "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
       fi
       rm -f "$body_file"
 

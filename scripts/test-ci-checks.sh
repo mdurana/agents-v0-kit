@@ -6,8 +6,8 @@
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
-CI="$KIT/templates/ci"
-SC="$KIT/templates/scripts"
+CI="$KIT/templates/.agents-v0/ci"
+SC="$KIT/templates/.agents-v0/scripts"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 status=0
@@ -39,8 +39,8 @@ printf '%s' "$out" | grep -Fq "SERVICE_ROOTS='services/inventory services/order'
   && pass "resolve-layout detects services/*/ modules" || fail "resolve-layout detects services/*/ modules"
 
 d="$tmp/layout-profile"
-mkdir -p "$d/docs"
-cat > "$d/docs/project-profile.md" <<'EOF'
+mkdir -p "$d/docs/agents-v0"
+cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
 | This repo | Value |
 |-----------|--------|
 | Profile | service |
@@ -54,7 +54,7 @@ printf '%s' "$out" | grep -Fq "SERVICE_ROOTS='services/a services/b'" \
   && pass "resolve-layout reads the Service roots row" || fail "resolve-layout reads the Service roots row"
 printf '%s' "$out" | grep -Fq "BACKEND_ROOT=''" \
   && pass "resolve-layout leaves Backend root empty with Service roots" || fail "resolve-layout leaves Backend root empty with Service roots"
-sed 's|services/a, services/b|../escape|' "$d/docs/project-profile.md" > "$d/docs/bad.md"
+sed 's|services/a, services/b|../escape|' "$d/docs/agents-v0/project-profile.md" > "$d/docs/bad.md"
 expect_fail "resolve-layout rejects a Service root outside the repo" "$d" sh "$CI/resolve-layout.sh" docs/bad.md
 
 # --- check-attempt-budget.sh -------------------------------------------------
@@ -78,105 +78,105 @@ expect_fail "attempt budget: 2 failed of 2 is spent" "$d" sh "$SC/check-attempt-
 
 # --- check-approvals.sh plan + check-milestone.sh order ---------------------
 d="$tmp/milestone"
-mkdir -p "$d/docs/milestones" "$d/docs/requirements"
-cat > "$d/docs/milestones/m.md" <<'EOF'
+mkdir -p "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements"
+cat > "$d/docs/agents-v0/milestones/m.md" <<'EOF'
 # Milestone: M
 
 ## Stories
 
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
-| M-A | As a user, I want a, so that b. | docs/requirements/a.md | planned | — |
-| M-B | As a user, I want c, so that d. | docs/requirements/b.md | planned | M-A |
+| M-A | As a user, I want a, so that b. | docs/agents-v0/requirements/a.md | planned | — |
+| M-B | As a user, I want c, so that d. | docs/agents-v0/requirements/b.md | planned | M-A |
 
 ## Delivery approvals
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| plan | docs/milestones/m.md | dev | Approved | 2026-01-01 |
+| plan | docs/agents-v0/milestones/m.md | dev | Approved | 2026-01-01 |
 EOF
-cat > "$d/docs/requirements/a.md" <<'EOF'
+cat > "$d/docs/agents-v0/requirements/a.md" <<'EOF'
 # A
 
 ## Delivery approvals
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| Intake | docs/requirements/a.md | dev | Approved | 2026-01-01 |
-| Build | docs/build/a/build-report.md | dev | Approved | 2026-01-02 |
+| Intake | docs/agents-v0/requirements/a.md | dev | Approved | 2026-01-01 |
+| Build | docs/agents-v0/build/a/build-report.md | dev | Approved | 2026-01-02 |
 EOF
-cat > "$d/docs/requirements/b.md" <<'EOF'
+cat > "$d/docs/agents-v0/requirements/b.md" <<'EOF'
 # B
 
 ## Delivery approvals
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| Intake | docs/requirements/b.md | dev | Approved | 2026-01-01 |
-| Build | docs/build/b/build-report.md | dev | Approved | 2026-01-03 |
+| Intake | docs/agents-v0/requirements/b.md | dev | Approved | 2026-01-01 |
+| Build | docs/agents-v0/build/b/build-report.md | dev | Approved | 2026-01-03 |
 EOF
-expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/milestones/m.md plan
-expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/requirements/a.md plan
-expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/milestones/m.md intake
-expect_pass "check-milestone order check can be turned off" "$d" env MILESTONE_ORDER=0 sh "$CI/check-milestone.sh" docs/milestones/m.md intake
-printf '| Verify | docs/verify/a/test-report.md | dev | Approved | 2026-01-04 |\n' >> "$d/docs/requirements/a.md"
-expect_pass "check-milestone passes once the dependency has a verify approval" "$d" sh "$CI/check-milestone.sh" docs/milestones/m.md intake
+expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/milestones/m.md plan
+expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/a.md plan
+expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+expect_pass "check-milestone order check can be turned off" "$d" env MILESTONE_ORDER=0 sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+printf '| Verify | docs/agents-v0/verify/a/test-report.md | dev | Approved | 2026-01-04 |\n' >> "$d/docs/agents-v0/requirements/a.md"
+expect_pass "check-milestone passes once the dependency has a verify approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 
 # --- check-milestone.sh SLO waivers -----------------------------------------
 d="$tmp/slo"
-mkdir -p "$d/docs/milestones" "$d/docs/requirements" "$d/docs/design/system" "$d/docs/verify/s"
-printf 'commit: abcdef1234567\n' > "$d/docs/verify/s/test-report.md"
-cat > "$d/docs/milestones/p4.md" <<'EOF'
+mkdir -p "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/system" "$d/docs/agents-v0/verify/s"
+printf 'commit: abcdef1234567\n' > "$d/docs/agents-v0/verify/s/test-report.md"
+cat > "$d/docs/agents-v0/milestones/p4.md" <<'EOF'
 # Milestone: P4
 
-Evidence: docs/design/system/slo-evidence.md
+Evidence: docs/agents-v0/design/system/slo-evidence.md
 
 ## Stories
 
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
-| P4-A | As an operator, I want slo, so that ok. | docs/requirements/s.md | planned | — |
+| P4-A | As an operator, I want slo, so that ok. | docs/agents-v0/requirements/s.md | planned | — |
 EOF
-cat > "$d/docs/requirements/s.md" <<'EOF'
+cat > "$d/docs/agents-v0/requirements/s.md" <<'EOF'
 # S
 
 ## Delivery approvals
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| Intake | docs/requirements/s.md | dev | Approved | 2026-01-01 |
-| Verify | docs/verify/s/test-report.md | dev | Approved | 2026-01-02 |
+| Intake | docs/agents-v0/requirements/s.md | dev | Approved | 2026-01-01 |
+| Verify | docs/agents-v0/verify/s/test-report.md | dev | Approved | 2026-01-02 |
 EOF
-cat > "$d/docs/design/system/slo-evidence.md" <<'EOF'
+cat > "$d/docs/agents-v0/design/system/slo-evidence.md" <<'EOF'
 | Surface | Kind | Command or waiver | Output or approver | Date |
 |---------|------|-------------------|--------------------|------|
 | checkout | waiver | Not measured | Ada | 2026-01-01 |
 EOF
-expect_pass "slo waiver is accepted by default" "$d" env VERIFY_STALE=0 sh "$CI/check-milestone.sh" docs/milestones/p4.md verify
-expect_fail "slo waiver is rejected with SLO_ALLOW_WAIVERS=0" "$d" env VERIFY_STALE=0 SLO_ALLOW_WAIVERS=0 sh "$CI/check-milestone.sh" docs/milestones/p4.md verify
+expect_pass "slo waiver is accepted by default" "$d" env VERIFY_STALE=0 sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p4.md verify
+expect_fail "slo waiver is rejected with SLO_ALLOW_WAIVERS=0" "$d" env VERIFY_STALE=0 SLO_ALLOW_WAIVERS=0 sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p4.md verify
 
 # --- check-event-schemas.sh --------------------------------------------------
 d="$tmp/events"
-mkdir -p "$d/docs/design/f/events"
+mkdir -p "$d/docs/agents-v0/design/f/events"
 (
   cd "$d"
   git init -q
   printf '{"eventVersion":"1","type":"object","properties":{"id":{"type":"string"},"qty":{"type":"integer"}},"required":["id"]}\n' \
-    > docs/design/f/events/order-created.json
+    > docs/agents-v0/design/f/events/order-created.json
   git add -A && git_commit base
 )
 base="$(cd "$d" && git rev-parse HEAD)"
 (
   cd "$d"
   printf '{"eventVersion":"1.1","type":"object","properties":{"id":{"type":"string"},"qty":{"type":"integer"},"note":{"type":"string"}},"required":["id"]}\n' \
-    > docs/design/f/events/order-created.json
+    > docs/agents-v0/design/f/events/order-created.json
   git add -A && git_commit additive
 )
 additive="$(cd "$d" && git rev-parse HEAD)"
 (
   cd "$d"
   printf '{"eventVersion":"2","type":"object","properties":{"id":{"type":"string"}},"required":["id"]}\n' \
-    > docs/design/f/events/order-created.json
+    > docs/agents-v0/design/f/events/order-created.json
   git add -A && git_commit breaking
 )
 breaking="$(cd "$d" && git rev-parse HEAD)"
@@ -236,9 +236,9 @@ mkdir -p "$d/app"
 expect_fail "layout roots: a pom outside every known root fails" "$d" sh "$CI/check-layout-roots.sh"
 
 d="$tmp/roots-profile"
-mkdir -p "$d/app" "$d/docs"
+mkdir -p "$d/app" "$d/docs/agents-v0"
 : > "$d/app/pom.xml"
-printf '| This repo | Value |\n|---|---|\n| Backend root | app |\n' > "$d/docs/project-profile.md"
+printf '| This repo | Value |\n|---|---|\n| Backend root | app |\n' > "$d/docs/agents-v0/project-profile.md"
 expect_pass "layout roots: a profile row that names the module passes" "$d" sh "$CI/check-layout-roots.sh"
 
 d="$tmp/roots-backend"

@@ -56,7 +56,7 @@ shell_case 'echo x > .cursor/hooks.json' block
 shell_case 'ls' allow
 
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":".cursor/hooks.json"}}' block "edit .cursor/hooks.json"
-run_hook pre-edit.sh cursor '{"tool_input":{"file_path":"docs/requirements/f.md"}}' allow "cursor edit requirements (ask not enforced)"
+run_hook pre-edit.sh cursor '{"tool_input":{"file_path":"docs/agents-v0/requirements/f.md"}}' allow "cursor edit requirements (ask not enforced)"
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":"src/Main.java"}}' allow "edit src"
 
 # Cursor permission hooks must emit explicit allow JSON (failClosed).

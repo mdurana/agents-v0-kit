@@ -20,7 +20,7 @@ Verify phase playbook for the `code-reviewer` agent (`workflow-orchestration.mdc
    - Docs/diagrams: updated if behavior or topology changed.
 3. Label each finding: **Critical** (merge blocker), **Suggestion** (should fix), **Nice to have** (optional).
 4. Cite file:line and the rule clause for each finding.
-5. Persist review notes to `docs/verify/<feature>/review-notes.md` (finding, label, file:line, rule clause); report to the orchestrator; on Critical, route back to the responsible agent.
+5. Persist review notes to `docs/agents-v0/verify/<feature>/review-notes.md` (finding, label, file:line, rule clause); report to the orchestrator; on Critical, route back to the responsible agent.
 
 ## Rule-compliance checklist
 - [ ] `code-review.mdc`: full checklist applied.
@@ -29,4 +29,4 @@ Verify phase playbook for the `code-reviewer` agent (`workflow-orchestration.mdc
 - [ ] `api-and-events.mdc`: DTOs not entities; idempotency; HTTP semantics.
 - [ ] `architecture-and-diagrams.mdc`: docs/diagrams updated.
 - [ ] UX/a11y: UX spec conformance and accessibility reviewed for UI changes.
-- [ ] `workflow-orchestration.mdc`: Verify gate (review) — no Critical findings; notes persisted to `docs/verify/<feature>/review-notes.md`.
+- [ ] `workflow-orchestration.mdc`: Verify gate (review) — no Critical findings; notes persisted to `docs/agents-v0/verify/<feature>/review-notes.md`.

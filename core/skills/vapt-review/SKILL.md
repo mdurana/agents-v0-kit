@@ -15,7 +15,7 @@ Verify phase playbook for the `security-reviewer` agent (`workflow-orchestration
    - PR-level → `vapt-pr-review.mdc`.
 3. For each finding, record: finding ID, pass/fail, evidence (file:line), retest step.
 4. Mark N/A only for an unaffected surface and record the reason. Mark **any applicable unchecked item as Critical** — merge blocker; N/A is not a security exception.
-5. Persist the checklist results to `docs/verify/<feature>/vapt-checklist.md` (finding ID, pass/fail/N/A + reason, evidence file:line, retest step); report findings to the orchestrator; on Critical, route back to the responsible Build/Maintain agent.
+5. Persist the checklist results to `docs/agents-v0/verify/<feature>/vapt-checklist.md` (finding ID, pass/fail/N/A + reason, evidence file:line, retest step); report findings to the orchestrator; on Critical, route back to the responsible Build/Maintain agent.
 
 ## Rule-compliance checklist
 - [ ] `vapt-spring.mdc`: F1 (logout/blacklist fail-closed), F3 (upload validation), F4 (`@PreAuthorize`/`permit-all`), F5 (auth+authz/rate limits), F6 (session policy).
@@ -23,4 +23,4 @@ Verify phase playbook for the `security-reviewer` agent (`workflow-orchestration
 - [ ] `vapt-pr-review.mdc`: full PR checklist with sign-off.
 - [ ] `security-baseline.mdc`: authn/authz, secrets, cookies, uploads, headers, API hardening, production hygiene, compliance.
 - [ ] `api-and-events.mdc` §"Security at the boundary": parameterized queries; no secrets in logs/responses.
-- [ ] `workflow-orchestration.mdc`: Verify gate (security) — no Critical findings; checklist persisted to `docs/verify/<feature>/vapt-checklist.md`.
+- [ ] `workflow-orchestration.mdc`: Verify gate (security) — no Critical findings; checklist persisted to `docs/agents-v0/verify/<feature>/vapt-checklist.md`.

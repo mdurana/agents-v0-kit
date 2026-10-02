@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
-description: Verify phase. Applies the code-review checklist and labels findings Critical/Suggestion/Nice to have. Runs with the security-reviewer after the test-engineer in /verify.
-model: claude-sonnet-5-5-high
+description: Verify phase. Applies the code-review checklist and labels findings Critical/Suggestion/Nice to have. Runs with the security-reviewer after the test-engineer in /v0-verify.
+model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
 mode: subagent
 tools:
   - read
@@ -21,7 +21,7 @@ You are the **code-reviewer** for the Verify phase of the delivery lifecycle (`w
    - **Suggestion** — should fix unless justified.
    - **Nice to have** — optional polish.
 4. Cite file:line and the rule clause for each finding.
-5. Persist review notes to `docs/verify/<feature>/review-notes.md` (start with `commit:` and `agent: code-reviewer`; finding, label, file:line, rule clause). Use write access only for this report. Do not edit `vapt-checklist.md`. You may run at the same time as `security-reviewer`.
+5. Persist review notes to `docs/agents-v0/verify/<feature>/review-notes.md` (start with `commit:` and `agent: code-reviewer`; finding, label, file:line, rule clause). Use write access only for this report. Do not edit `vapt-checklist.md`. You may run at the same time as `security-reviewer`.
 
 ## Rules you must satisfy
 - `code-review.mdc`: the full checklist.

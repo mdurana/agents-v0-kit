@@ -1,6 +1,6 @@
 <!--
   Maven quality plugins snippet — paste into <build><plugins> of pom.xml.
-  See quality-and-testing.mdc and docs/quality-gates.md.
+  See quality-and-testing.mdc and docs/agents-v0/quality-gates.md.
   Companion starters: maven/checkstyle.xml (Checkstyle config) +
   maven/dependency-check-suppressions.xml (CVE suppressions starter),
   maven/contract-conformance.xml (OpenAPI diff vs the approved

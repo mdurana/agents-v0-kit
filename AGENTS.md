@@ -10,16 +10,16 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 
 | Phase | Command | Lead agent | Skills | Handoff artifact |
 |-------|---------|-----------|--------|------------------|
-| Onboard (brownfield) | `/onboard` | codebase-documenter | onboard-discovery | `docs/onboarding/report.md` (`onboard` row), profile, as-is architecture/network |
-| Plan (program, more than one story) | `/plan` | program-planner | system-design, program-planning | `docs/design/system/context-map.md`, `docs/milestones/<milestone>.md` (`plan` row in `Delivery approvals`) |
-| Intake | `/intake` | requirements-analyst | spec-intake | `docs/requirements/<feature>.md` (AC IDs, NFRs, regulations, `Delivery approvals`) |
-| Design | `/design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, `docs/design/<feature>/ux-spec.md`, `docs/design/<feature>/mockups/` |
-| Build | `/build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/build/<feature>/` with `commit:` in reports |
-| Verify | `/verify` | test-engineer → security-reviewer → code-reviewer | quality-gate, vapt-review, pr-review | `docs/verify/<feature>/` reports with `commit:` |
-| Release | `/release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
-| Maintain | `/maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/maintain/<id>/note.md` (own approvals, tier); routes to Verify |
-| Trivial fixes | `/triage` | maintenance-engineer | bugfix-triage | Classifier-qualified, person-confirmed; abbreviated Verify |
-| Resume | `/status` | orchestrator | — | Next phase from approvals + on-disk evidence |
+| Onboard (brownfield) | `/v0-onboard` | codebase-documenter | onboard-discovery | `docs/agents-v0/onboarding/report.md` (`onboard` row), profile, as-is architecture/network |
+| Plan (program, more than one story) | `/v0-plan` | program-planner | system-design, program-planning | `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/milestones/<milestone>.md` (`plan` row in `Delivery approvals`) |
+| Intake | `/v0-intake` | requirements-analyst | spec-intake | `docs/agents-v0/requirements/<feature>.md` (AC IDs, NFRs, regulations, `Delivery approvals`) |
+| Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, `docs/agents-v0/design/<feature>/ux-spec.md`, `docs/agents-v0/design/<feature>/mockups/` |
+| Build | `/v0-build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/agents-v0/build/<feature>/` with `commit:` in reports |
+| Verify | `/v0-verify` | test-engineer → security-reviewer → code-reviewer | quality-gate, vapt-review, pr-review | `docs/agents-v0/verify/<feature>/` reports with `commit:` |
+| Release | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
+| Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` (own approvals, tier); routes to Verify |
+| Trivial fixes | `/v0-triage` | maintenance-engineer | bugfix-triage | Classifier-qualified, person-confirmed; abbreviated Verify |
+| Resume | `/v0-status` | orchestrator | — | Next phase from approvals + on-disk evidence |
 
 ## Non-negotiable conduct
 
@@ -33,11 +33,11 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 
 ## Rule precedence
 
-If project files contradict a rule, **the repository wins**. Kit org rules are the single source of truth in `core/rules/*.mdc` (installed to `.cursor/rules/org/`). Document approved per-repo exceptions in `docs/project-profile.md` and ADRs; port deliberate kit-wide changes back into this repository.
+If project files contradict a rule, **the repository wins**. Kit org rules are the single source of truth in `core/rules/*.mdc` (installed to `.cursor/rules/org/`). Document approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs; port deliberate kit-wide changes back into this repository.
 
 ## Reference
 
-- `docs/compliance-matrix.md` — every rule clause mapped to the enforcing agent/skill/hook/gate/CI check.
-- `docs/model-routing-matrix.md` — Cursor model IDs for each role (Plan / Build / Review / Debug / Docs).
-- `docs/user-guide.md` — plain-language guide for non-engineering users.
-- `docs/greenfield-onboarding.md` / `docs/brownfield-onboarding.md` — engineer checklists; `scripts/bootstrap-greenfield.sh`, `scripts/audit-brownfield-baseline.sh`.
+- `docs/agents-v0/compliance-matrix.md` — every rule clause mapped to the enforcing agent/skill/hook/gate/CI check.
+- `docs/agents-v0/model-routing-matrix.md` — Cursor model IDs for each role (Plan / Build / Review / Debug / Docs).
+- `docs/agents-v0/user-guide.md` — plain-language guide for non-engineering users.
+- `docs/agents-v0/greenfield-onboarding.md` / `docs/agents-v0/brownfield-onboarding.md` — engineer checklists; `scripts/bootstrap-greenfield.sh`, `scripts/audit-brownfield-baseline.sh`.
