@@ -1,7 +1,7 @@
 ---
 name: codebase-documenter
 description: Onboard phase. Documents an existing codebase as-is — profile, baseline, inventories, module docs, architecture, flows — with cited evidence. Use in /v0-onboard.
-model: gemini-3.8-flash[reasoning_effort=high]
+model: composer-2.5
 mode: subagent
 tools:
   - read

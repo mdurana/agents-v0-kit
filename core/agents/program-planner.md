@@ -1,7 +1,7 @@
 ---
 name: program-planner
 description: Plan phase for programs. Decomposes a large goal into a context map, milestone manifests, and a dependency-ordered story graph. Use first in /v0-plan.
-model: claude-sonnet-5-5-high
+model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
 mode: subagent
 tools:
   - read

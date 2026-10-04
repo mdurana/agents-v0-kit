@@ -7,17 +7,17 @@ Role IDs and defaults match `templates/.cursor/model-config.json` (installed to 
 
 | Role                 | Purpose                                                          | Cursor ID                                                  |
 | -------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
-| **Plan**             | program planning, requirements, architecture                     | `claude-sonnet-5-5-high`                                   |
+| **Plan**             | program planning, requirements, architecture                     | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]`                                   |
 | **Build**            | services, BFF, frontend, tests, maintenance, release             | `composer-2.5`                                 |
 | **Build (critical)** | units that hit a security-review trigger, and sagas or consumers | the Plan model                                             |
 | **Review**           | code review and security review, independent of the Build role   | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
 | **Explore**          | repo exploration sub-tasks                                       | `composer-2.5`                            |
 | **Debug**            | runtime failure root-cause                                       | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
 | **Schemas**          | schema/unit-test sub-tasks                                       | `composer-2.5`                                 |
-| **Docs**             | doc drafting sub-tasks                                           | `gemini-3.8-flash[reasoning_effort=high]`                  |
-| **Documenter**       | brownfield onboard as-is documentation                           | `gemini-3.8-flash[reasoning_effort=high]`                  |
-| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `gemini-3.8-flash[reasoning_effort=high]`                  |
-| **UX Designer**      | UX design                                                        | `gemini-3.8-flash[reasoning_effort=high]`                  |
+| **Docs**             | doc drafting sub-tasks                                           | `composer-2.5`                  |
+| **Documenter**       | brownfield onboard as-is documentation                           | `composer-2.5`                  |
+| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `composer-2.5`                  |
+| **UX Designer**      | UX design                                                        | `composer-2.5`                  |
 
 
 
@@ -97,8 +97,8 @@ A reviewer should not be the model that wrote the code. The Review role uses the
 | spec-intake, bugfix-triage          | Explore     | repo exploration                 | `composer-2.5`                            |
 | bugfix-triage                       | Debug       | runtime failure root-cause       | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
 | contract-first-design, quality-gate | Schemas     | schemas + single-file unit tests | `composer-2.5`                                 |
-| ux-design                           | UX Designer | UX spec authoring                | `gemini-3.8-flash[reasoning_effort=high]`                  |
-| doc-sync                            | Docs        | doc drafting                     | `gemini-3.8-flash[reasoning_effort=high]`                  |
+| ux-design                           | UX Designer | UX spec authoring                | `composer-2.5`                  |
+| doc-sync                            | Docs        | doc drafting                     | `composer-2.5`                  |
 
 
 

@@ -1,7 +1,7 @@
 ---
 name: ux-designer
 description: Design phase. Produces static HTML mockups and the UX spec — flows, screen state matrix, per-component default behavior, accessibility, responsive/device matrix, design-system conformance, UX acceptance criteria. Use in /v0-design for UI-affecting changes.
-model: gemini-3.8-flash[reasoning_effort=high]
+model: composer-2.5
 mode: subagent
 tools:
   - read

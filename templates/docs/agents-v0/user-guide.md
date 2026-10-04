@@ -1,6 +1,6 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and **approve each phase** before work continues. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton stops once, at Release. A story with no API, no screens, and no public route does not stop at Design. Engineers and the AI handle implementation, testing, and security checks.
 
 This guide matches the workflow in this kit: **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
 
@@ -14,7 +14,7 @@ This guide matches the workflow in this kit: **Intake → Design → Build → V
 | **Cursor**     | Desktop app with the project open (your team’s service repo, after the kit is installed).            |
 | **Chat**       | Open the AI chat panel in that project.                                                              |
 | **Your input** | A Jira ticket, Confluence page, email spec, or a short description in plain language.                |
-| **Approvals**  | You say when each phase is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). |
+| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no screens, and no public route does not stop at Design. |
 
 
 You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release (stops at every gate).
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design.
   - `/v0-intake` — only clarify and document requirements (good for early discovery).
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -54,11 +54,11 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | ----------- | ------------------------------------------------------------------------------------------------------- |
 | `/v0-plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/v0-intake`. |
 | `/v0-intake`   | Turn a idea or ticket into clear requirements and open questions.                                       |
-| `/v0-design`   | After intake is approved — APIs, data flows, and architecture decisions.                                |
-| `/v0-build`    | After design is approved — actual software is written.                                                  |
-| `/v0-verify`   | After build is approved — automated tests and security review.                                          |
-| `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. |
-| `/v0-deliver`  | Run the whole chain; you approve at each gate.                                                          |
+| `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues. |
+| `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton writes that design here. |
+| `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
+| `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
+| `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
 | `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
 | `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
@@ -76,7 +76,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 | What you see | What you do |
 |--------------|-------------|
 | The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved and fills in what is missing. |
-| The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve. |
+| The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
 | You did not name a feature | The AI lists the open features and asks which one you mean. |
 
 ---
@@ -89,7 +89,7 @@ The second feature must not change a file the first one is already changing. Tho
 
 ## Big goals: plan first
 
-When the goal is larger than one story, start with `/v0-plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the five gates in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
+When the goal is larger than one story, start with `/v0-plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the gates that apply, in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
 
 With many small stories you can approve the Intake or Design gate for several of them in one message, but only by naming each one, for example `Approved: Design for P2-A, P2-B, P2-C`. That is available only for ordinary stories with no security triggers and no open questions. Build, Verify, and Release are always approved one story at a time. "Approve all" does not count.
 
@@ -101,7 +101,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip ahead without your OK. Each gate ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. A story with an API, screens, or a public route stops at each gate. The platform skeleton skips Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 
@@ -131,13 +131,15 @@ The AI **must not** skip ahead without your OK. Each gate ends with a short repo
 
 **Your question:** *Is the solution shape right before we build?*
 
+This stop applies when the story adds an API, screens, or a public route. A health, readiness, or liveness check does not by itself make it a public route. Otherwise the AI locks the design and continues to Build, and you approve that design together with the build. The platform skeleton does not run this phase.
+
 
 | You should see            | What it means                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
-| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails) and an independent reviewer's findings. You approve once the reviewer has no open Critical item. The approved design is then locked: if building shows it is wrong, the AI stops and asks you to approve an amendment. |
-| ADR (if needed)           | Short decision record for big choices (e.g. sync vs async).                                                   |
+| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops and asks you to approve an amendment. |
+| ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). A story with no product decision records that none was needed. |
 | UI stack (if new screens) | Team may ask **Svelte or React** once — pick what product/engineering agreed.                                 |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
 
@@ -296,7 +298,7 @@ Make the portal better.
 
 - **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
 - **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
-- **Skip gates** on `/v0-deliver` — you approve each phase. A green build does not approve itself.  
+- **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop. The platform skeleton's one stop is Release. A story with no API, no screens, and no public route has no Design stop. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  
 - **Overwrite another feature’s files** in the same checkout — it stops and names the files instead.  
 - **Store passwords or API keys** in chat — use your org’s secret vault; never paste production secrets.
@@ -327,7 +329,7 @@ Make the portal better.
 1. Open Cursor chat in the project.
 2. Big goal: /v0-plan first. Then /v0-deliver + paste Jira/spec (or /v0-intake only). Name the feature if more than one is open.
 3. Answer questions when asked.
-4. At each gate: read summary → Approved OR list changes.
+4. At each gate that applies: read summary → Approved OR list changes. The platform skeleton asks once, at Release.
 5. If the chat stopped mid-phase: /v0-status <feature> → run the same phase command again.
 6. After go-live: /v0-maintain + describe the issue.
 ```

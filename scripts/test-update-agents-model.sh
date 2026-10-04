@@ -110,7 +110,7 @@ grep -Fq '| backend-engineer     | Build        |' "$tmp/docs/agents-v0/model-ro
 grep -Fq '| ux-design                           | UX Designer | UX spec authoring                | `remap-ux-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| **Build (critical)** | units that hit a security-review trigger, and sagas or consumers | the Plan model' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '`/v0-deliver`, `/v0-status`, `/v0-onboard`' "$tmp/docs/agents-v0/model-routing-matrix.md"
-grep -Fq '| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `gemini-3.8-flash[reasoning_effort=high]`' "$tmp/docs/agents-v0/model-routing-matrix.md"
+grep -Fq '| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `composer-2.5`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 
 KIT_MODEL_BUILD='remap-build-model' sh "$tmp/.agents-v0/scripts/update-agents-model.sh" >/dev/null
 grep -Fq 'model: remap-build-model' "$tmp/.cursor/agents/backend-engineer.md"
@@ -124,7 +124,7 @@ grep -Fq '`/v0-deliver`, `/v0-status`, `/v0-onboard`' "$tmp/docs/agents-v0/model
 plain="$(mktemp -d)"
 trap 'rm -rf "$tmp" "$plain"' EXIT
 sh "$KIT/scripts/install.sh" "$plain" >/dev/null
-grep -Fq 'model: claude-sonnet-5-5-high' "$plain/.cursor/agents/program-planner.md"
+grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]' "$plain/.cursor/agents/program-planner.md"
 rm -f "$plain/.cursor/model-config.json"
 if sh "$plain/.agents-v0/scripts/update-agents-model.sh" >/dev/null 2>&1; then
   printf 'FAIL: update-agents-model.sh should fail when model-config.json is missing\n' >&2

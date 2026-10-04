@@ -27,6 +27,8 @@ flowchart TD
   intake -->|gate| design
   design --> dreview
   dreview -->|gate| build
+  intake -->|P0-A| build
+  design -->|no contract| build
   build -->|gate| verify
   verify -->|Critical, Re-opened| build
   verify -->|gate| release
@@ -37,13 +39,13 @@ flowchart TD
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. `/v0-deliver` runs that path by following each phase command and stopping at every gate. It holds no phase steps of its own.
+A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. `/v0-deliver` runs that path by following each phase command and stopping at every gate that applies. It holds no phase steps of its own. P0-A skips Design: Build writes the N/A design and pins it, and one approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues; the Build approval writes its Design row.
 
 | Edge | What it means |
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
 | Plan, dotted into the story path | A goal larger than one story is split into milestones and ordered stories first. One story skips Plan. |
-| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route. A design with none of those is pinned without it. The approved design is hashed into `design.lock`. |
+| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. P0-A does not run this phase: Build writes the N/A design and pins it, and Release writes the row. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
 | Verify back to Maintain | A Critical finding on a fix re-opens Maintain, not the original feature's Build. |
@@ -65,7 +67,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | `/v0-release` | Merge request, then a human merge | `release` row, then the merge |
 | `/v0-maintain` | Fix, CVE, upgrade, refactor, doc drift | `docs/agents-v0/maintain/<id>/note.md` |
 | `/v0-triage` | A change the classifier calls trivial | the same note, `Tier: trivial` |
-| `/v0-deliver` | One story, every gate | the feature's state file |
+| `/v0-deliver` | One story. Stops at every gate that applies. P0-A stops once, at Release | the feature's state file |
 | `/v0-status` | Where the work is, and what to run next | read only |
 
 Resume is the same in every phase. `scripts/sync-feature-state.sh` writes the state file. `lastApprovedPhase` comes only from an `Approved` row. `activeStatus` is `in_progress`, `awaiting_approval`, or `blocked`. Re-entering a command continues from the files on disk. It does not recreate them and it does not approve anything. Two features in one checkout stop when they would edit the same shared file. The usual fix is `scripts/feature-worktree.sh <feature>`, which needs one explicit authorization.
@@ -105,10 +107,10 @@ Design writes, and does not touch the org catalog:
 | `docs/agents-v0/design/<feature>/asyncapi.yaml` | Optional when the story publishes or consumes messages. AsyncAPI 2.x/3.x; channels align with `events/` |
 | `docs/agents-v0/design/<feature>/events/` | Event schemas with `eventVersion`. Changes are additive |
 | `docs/agents-v0/design/<feature>/design.md` | Every AC traced, data model, one authorization row per operation, failure modes, observability, rollout |
-| `docs/agents-v0/adr/<NN>-<slug>.md` | A decision with at least two alternatives |
+| `docs/agents-v0/adr/<NN>-<slug>.md` | A decision with at least two alternatives, or `ADR: N/A: no product decision` when the reviewer is skipped |
 | `docs/agents-v0/design/<feature>/ux-spec.md` and `mockups/` | UI only. Every control has `data-component` and a row. Mockups do not call the API |
 | `docs/agents-v0/design/<feature>/review.md` | `design-reviewer` when there is a draft, a UX spec, or a public route other than `/health`, `/ready`, or `/live`. No open Critical, and the hash matches this design. Absent for an `N/A: no /api/v1 operation` design with no UI |
-| `docs/agents-v0/design/<feature>/design.lock` | Written after the user approves: date, hash, reason |
+| `docs/agents-v0/design/<feature>/design.lock` | Date, hash, and reason. A contract, a UI, or a public route is pinned after that Design approval. A no-contract design and P0-A are pinned first; the Approved row comes with the Build approval, or at Release for P0-A |
 
 When `openapi.yaml` exists, `ci/check-openapi.sh lint` checks the draft and `compat` checks it against the catalog it will merge into. A missing draft is allowed. When `asyncapi.yaml` exists, `ci/check-asyncapi.sh lint` runs (also from `ci/check-design-contracts.sh` in CI). Build merges with `ci/check-openapi.sh merge` and proves it with `merged`. A service repo uses `openapi/<service>-v1.yaml`. A single-service repo uses `openapi/api-v1.yaml`.
 
@@ -129,7 +131,7 @@ The Build gate is not only the agent's report. CI checks:
 | `ci/check-design.sh --verify-lock` | The design changed after it was approved |
 | `ci/check-gate-metrics.sh` | No tests ran, tests failed, changed-line coverage is under 80%, or an unsuppressed HIGH or CRITICAL CVE remains |
 
-Verify runs `test-engineer` first. Then `security-reviewer` and `code-reviewer` run together and write separate reports. Any applicable VAPT item left unchecked is Critical. A Critical list goes back to Build or Maintain. The reports are stamped with the commit that contains the tests, so the commit happens before the stamp. A trivial maintenance note skips the two reviewers and the UX and end-to-end checks. It still runs the build, the gate metrics, and a CVE scan.
+Verify runs `test-engineer` first. Then `security-reviewer` and `code-reviewer` run together and write separate reports. Any applicable VAPT item left unchecked is Critical. A Critical list goes back to Build or Maintain. The reports are stamped with the commit that contains the tests, so the commit happens before the stamp. A trivial maintenance note skips the two reviewers and the UX and end-to-end checks. It still runs the build, the gate metrics, and a CVE scan. P0-A (`Story: P0-A`, `Milestone: P0`) runs only `test-engineer`, the full verify command, and the gate metrics. It skips `security-reviewer`, `code-reviewer`, the UX audit, and end-to-end tests. Its approval is the one Release approval.
 
 ## Release
 

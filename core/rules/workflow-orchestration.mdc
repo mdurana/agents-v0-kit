@@ -135,7 +135,7 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`).
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A writes that N/A design in Build and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate
