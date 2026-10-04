@@ -62,14 +62,14 @@ For local container testing, copy a `docker/Dockerfile.*` starter to `Dockerfile
 
 See `docker/README.md` in the target repo after install.
 
-## 4. Run the gated workflow per story
+## 4. Run the gated workflow for the skeleton
 
-For each row in `docs/agents-v0/milestones/p0-platform-skeleton.md`:
+P0 is one story (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`): one branch and one merge request.
 
 1. `/v0-intake` — paste the user story as `As a [role], I want [goal], so that [benefit].`; approve Intake.
-2. `/v0-design` — contracts/ADR only when the story needs them (P0-C may reference Maven only).
-3. `/v0-build` — agents require a **green baseline** before edits (`/v0-build` command).
-4. `/v0-verify` then `/v0-release` per story, or `/v0-deliver` for a single story end-to-end.
+2. `/v0-design` — no OpenAPI draft and no `design-reviewer` when the story has no `/api/v1` operation, no UI, and no public route. A public health route still gets the reviewer.
+3. `/v0-build` — a missing module on this first skeleton story is the work. A module that already exists must verify clean before edits.
+4. `/v0-verify` then `/v0-release`, or `/v0-deliver` for the story end-to-end. The local delivery gate runs at Release.
 
 Record approvals in each feature artifact’s `Delivery approvals` table. CI uses
 `ci/check-approvals.sh` and `ci/check-evidence.sh`.

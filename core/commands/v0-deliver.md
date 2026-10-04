@@ -20,7 +20,7 @@ Run **one story** through **Intake → Design → Build → Verify → Release**
 | Step | Command | Stops at |
 |------|---------|----------|
 | 1 | `/v0-intake` | Intake gate |
-| 2 | `/v0-design` (contract, `design.md`, mechanical checks, `design-reviewer`, pin) | Design gate |
+| 2 | `/v0-design` (contract or N/A, `design.md`, mechanical checks, `design-reviewer` when there is a contract, a UI, or a public route, pin) | Design gate |
 | 3 | `/v0-build` | Build gate |
 | 4 | `/v0-verify` | Verify gate |
 | 5 | `/v0-release` | merge-request readiness, then the human merge |

@@ -20,9 +20,7 @@ Install the kit with `./scripts/install.sh --with-starters <repo>`, then run `/v
 
 | Story | Surface / service | Depends on |
 |-------|-------------------|------------|
-| P0-A | skeleton, green build for all roots | — |
-| P0-B | kit and milestone tracking | P0-A |
-| P0-C | quality gate (JaCoCo, Checkstyle, SpotBugs, OWASP) per service | P0-A |
+| P0-A | skeleton: green build, kit manifest, quality gate, local container | — |
 | P1-A | order, inventory, payment OpenAPI and event schemas | P0-A |
 | P1-B | one persistence model and migration per service | P0-A |
 | P2-A | inventory: reserve and release stock | P1-A, P1-B |

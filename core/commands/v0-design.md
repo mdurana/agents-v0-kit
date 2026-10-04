@@ -29,10 +29,10 @@ While another feature is in flight in this checkout, write only `docs/agents-v0/
    - An ADR for non-trivial decisions, with the real alternatives.
    - Mermaid diagrams following `architecture-and-diagrams.mdc` conventions.
 6. **Mechanical checks.** Run, and fix until each passes: `sh .agents-v0/ci/check-design.sh <feature>`; when `docs/agents-v0/design/<feature>/openapi.yaml` exists, `sh .agents-v0/ci/check-openapi.sh lint` on that file and `sh .agents-v0/ci/check-openapi.sh compat` against the catalog when the catalog exists; for UI changes `sh .agents-v0/ci/check-ux-spec.sh <feature>`.
-7. **Design review.** Launch the `design-reviewer` subagent. It writes `docs/agents-v0/design/<feature>/review.md` for the current design. Route each Critical finding back to the `solution-architect` (or `ux-designer`), then run the reviewer again: the review must name the design's current hash.
+7. **Design review.** Launch the `design-reviewer` subagent when the story has a `/api/v1` draft, a UX spec, or a public route (`permitAll` or the words "public route" in `design.md`). It writes `docs/agents-v0/design/<feature>/review.md`. Route each Critical finding back to the `solution-architect` (or `ux-designer`), then run the reviewer again: the review must name the design's current hash. Skip the reviewer when `design.md` records `N/A: no /api/v1 operation`, there is no `ux-spec.md`, and the file does not mention a public route. The Authorization section in that case is only that N/A line. `check-design.sh --pin` accepts the pin without `review.md`.
 8. Check the **Design gate** (`workflow-orchestration.mdc`):
    - When the story adds a `/api/v1/` operation, the feature draft `docs/agents-v0/design/<feature>/openapi.yaml` exists and event schemas under `docs/agents-v0/design/<feature>/events/` are defined with `eventVersion`. When it does not, `design.md` records `N/A: no /api/v1 operation` and there is no draft. The org catalog is not part of this gate.
-   - The mechanical checks above pass, and `review.md` has no open Critical finding.
+   - The mechanical checks above pass. When `review.md` exists, it has no open Critical finding. When the reviewer was skipped, `review.md` is absent and `--pin` still succeeds.
    - Error envelope chosen per surface.
    - ADR exists, with at least two alternatives.
    - Diagrams follow Mermaid conventions.

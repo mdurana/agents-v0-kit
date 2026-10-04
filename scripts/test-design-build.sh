@@ -193,6 +193,49 @@ run fail "design: an ADR with one alternative fails" "$d" sh "$CI/check-design.s
 cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
 
 run fail "design: pinning needs a design review" "$d" sh "$CI/check-design.sh" orders --pin approved
+mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/skel" "$d/docs/agents-v0/adr"
+printf '# Skel\nAC-1 the build passes\n' > "$d/docs/agents-v0/requirements/skel.md"
+cat > "$d/docs/agents-v0/adr/01-skel.md" <<'EOF'
+# ADR 01: Skeleton
+
+## Decision
+No product API in the baseline.
+
+## Alternatives considered
+- A hello /api/v1 route: nothing calls it yet.
+- GraphQL: no consumer asked for it.
+EOF
+cat > "$d/docs/agents-v0/design/skel/design.md" <<'EOF'
+# Design: skeleton
+
+ADR: docs/agents-v0/adr/01-skel.md
+
+N/A: no /api/v1 operation
+
+## Traceability
+| Requirement | Satisfied by |
+|---|---|
+| AC-1 | the module verify command |
+
+## Data model
+N/A: no persistence in the skeleton.
+
+## Authorization
+N/A: no /api/v1 operation
+
+## Failure modes
+The verify command fails closed and prints the module that failed.
+
+## Observability
+The build log is the signal for this story.
+
+## Rollout
+The skeleton merges to the default branch before feature stories branch.
+EOF
+run pass "design: a non-API design pins without a review" "$d" sh "$CI/check-design.sh" skel --pin approved
+rm -f "$d/docs/agents-v0/design/skel/design.lock"
+printf 'A public health route uses permitAll.\n' >> "$d/docs/agents-v0/design/skel/design.md"
+run fail "design: a public route still needs a review" "$d" sh "$CI/check-design.sh" skel --pin approved
 h1="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run fail "design: an open Critical blocks the pin" "$d" sh "$CI/check-design.sh" orders --pin approved

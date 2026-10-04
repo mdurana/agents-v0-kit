@@ -245,4 +245,4 @@ printf '\nGreenfield bootstrap complete.\n'
 printf 'Next: wire Maven quality snippets from maven/ if Java; copy docker/Dockerfile.* to Dockerfile (see docker/README.md)\n'
 printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
 printf 'Greenfield scaffold hardening: follow skill scaffold-service during P0 build stories.\n'
-printf 'Then start P0 story P0-A with /v0-intake in chat. Guide: docs/agents-v0/greenfield-onboarding.md\n'
+printf 'Then start the P0 skeleton story P0-A with /v0-intake in chat. Guide: docs/agents-v0/greenfield-onboarding.md\n'

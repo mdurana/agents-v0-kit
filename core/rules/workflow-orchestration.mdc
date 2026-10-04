@@ -135,7 +135,7 @@ A phase is **not complete** until its gate passes. **Stop and ask the user** bef
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- Feature contract draft at `docs/agents-v0/design/<feature>/openapi.yaml`, event schemas under `docs/agents-v0/design/<feature>/events/` with `eventVersion`, `design.md` (traceability, data, authorization, failure modes), ADR, diagrams, and a `design-reviewer` review with no open Critical. The approved design is pinned (`design.lock`); a later change is an amendment. The org catalog (`openapi/api-v1.yaml`, or the path in the profile) is unchanged at this gate. UX spec and static HTML mockups when UI-affecting (`ux-design.mdc`), including a default-behavior row for every interactive component. API-backed component rows name an operation in that feature draft.
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`).
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate

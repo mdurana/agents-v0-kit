@@ -398,7 +398,7 @@ grep -Fq 'Dockerfile' templates/.agents-v0/scripts/run-local-container.sh || err
 grep -Fq 'run-local-container' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document run-local-container.sh"
 grep -Fq 'docker-compose.yml' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document docker-compose.yml"
 grep -Fq '.agents-v0/scripts/' scripts/install.sh || err "install.sh must chmod seeded .agents-v0 scripts"
-grep -Fq 'P0-D' templates/docs/agents-v0/milestones/p0-platform-skeleton.md || err "P0 milestone must include local container story P0-D"
+grep -Fq 'Dockerfile and Compose' templates/docs/agents-v0/milestones/p0-platform-skeleton.md || err "P0 milestone must include the local container in the skeleton story"
 
 # 14. Build-hardening contracts survive in core.
 grep -Fq 'TDD' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service lacks the red–green (TDD) requirement"

@@ -103,6 +103,20 @@ def section(secs, key):
     return None
 
 
+def review_not_required(body):
+    """A design with no API, no UI, and no public route can be pinned without design-reviewer."""
+    if not body or "N/A: no /api/v1 operation" not in body:
+        return False
+    if os.path.isfile(os.path.join(base, "ux-spec.md")):
+        return False
+    for name in ("openapi.yaml", "openapi.yml", "openapi.json"):
+        if os.path.isfile(os.path.join(base, name)):
+            return False
+    if re.search(r"permitAll|public route", body, re.I):
+        return False
+    return True
+
+
 def has_content(body):
     text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
     text = "\n".join(l for l in text.splitlines() if l.strip() and not re.match(r"^\s*\|[-:| ]+\|\s*$", l))
@@ -199,7 +213,8 @@ elif action == "--pin":
     check()
     review = read(os.path.join(base, "review.md"))
     if review is None:
-        fail(f"{base}/review.md is missing: run design-reviewer before the design is approved")
+        if not review_not_required(read(os.path.join(base, "design.md"))):
+            fail(f"{base}/review.md is missing: run design-reviewer before the design is approved")
     else:
         m = re.search(r"^design-hash:\s*([0-9a-f]{12})", review, re.M)
         if not m or not current_hash().startswith(m.group(1)):

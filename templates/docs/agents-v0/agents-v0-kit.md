@@ -43,7 +43,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
 | Plan, dotted into the story path | A goal larger than one story is split into milestones and ordered stories first. One story skips Plan. |
-| Design review and pin | `design-reviewer` writes `review.md`. The approved design is hashed into `design.lock`. |
+| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route. A design with none of those is pinned without it. The approved design is hashed into `design.lock`. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
 | Verify back to Maintain | A Critical finding on a fix re-opens Maintain, not the original feature's Build. |

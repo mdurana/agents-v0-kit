@@ -1,9 +1,9 @@
 # Milestone: P0 — Platform Skeleton
 
-> Program manifest for the first greenfield milestone: runnable repo, kit installed,
-> quality gate wired, and a minimal vertical slice ready for P1 contracts. Each story
-> runs Intake → Design → Build → Verify → Release with approvals in its own feature
-> artifact (`workflow-orchestration.mdc`).
+> Program manifest for the first greenfield milestone. One story, one branch, and one
+> merge request: the repo builds, this manifest is the tracked program, quality plugins
+> are bound to verify, and the app runs locally in a container. Later milestones split
+> into one story per contract (`workflow-orchestration.mdc`).
 
 ## Goal
 
@@ -29,16 +29,11 @@ and in CI.
 
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
-| P0-A | As a developer, I want to clone the repo and run the standard build and test command successfully, so that I have a known-good baseline before feature work. | docs/agents-v0/requirements/p0-a-green-baseline.md | planned | — |
-| P0-B | As a developer, I want this P0 milestone to be the tracked program manifest, so that later stories follow the same gated chain. | docs/agents-v0/requirements/p0-b-kit-and-milestone.md | planned | P0-A |
-| P0-C | As a developer, I want coverage, static analysis, and CVE scanning bound to verify, so that quality failures stop the build before feature work. | docs/agents-v0/requirements/p0-c-quality-gate.md | planned | P0-A |
-| P0-D | As a developer, I want to build and run the app locally with Dockerfile and Compose (Podman or Docker), so that I can test the container path before CI. | docs/agents-v0/requirements/p0-d-local-container.md | planned | P0-A |
+| P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — |
 
-> When `.cursor/` and `.agents-v0/` are already present, P0-B does not install the kit again. `bootstrap-greenfield.sh` or `install.sh` already did that. The story records this manifest.
-> Replace or extend rows as your stack requires (BFF-only, frontend-only, etc.).
-> P0-D: copy the matching starter from `docker/` per `docker/README.md`.
-> Record `Milestone: P0 — Platform Skeleton` and `Story: <id>` in each feature artifact
-> (`spec-intake` skill).
+> When `.cursor/` and `.agents-v0/` are already present, do not reinstall the kit. `bootstrap-greenfield.sh` or `install.sh` already did that. Copy the container starter from `docker/` per `docker/README.md`.
+> Split this row only when a part of the baseline has its own `/api/v1` contract. Keep at most eight acceptance criteria (`AC-1` through `AC-8`).
+> Record `Milestone: P0 — Platform Skeleton` and `Story: P0-A` in the feature artifact (`spec-intake` skill).
 
 ## Delivery approvals
 
