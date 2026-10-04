@@ -87,8 +87,10 @@ for a in $artifacts; do
 done
 
 # Story order: a story with a build approval needs a verify approval on every story
-# it names in the Dependency column. Tokens that are not story IDs of this manifest
-# (milestone names such as P1, or a dash) are prose and are skipped.
+# it names in the Dependency column. A dependency that is a manifest path (*.md)
+# instead needs an Approved milestone row on that file. Other tokens that are not
+# story IDs of this manifest (milestone names such as P1, or a dash) are prose and
+# are skipped.
 # MILESTONE_ORDER=0 turns the check off.
 has_approval() {
   sh "$here/check-approvals.sh" "$1" "$2" >/dev/null 2>&1
@@ -112,6 +114,15 @@ check_story_order() {
     [ -f "$sart" ] || continue
     has_approval "$sart" build || continue
     for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
+      case "$dep" in
+        *.md)
+          if [ ! -f "$dep" ] || ! has_approval "$dep" milestone; then
+            printf 'FAIL: story %s is build-approved but dependency manifest %s has no approved milestone row\n' "$sid" "$dep" >&2
+            order_fail=1
+          fi
+          continue
+          ;;
+      esac
       printf '%s\n' "$ids" | grep -Fxq "$dep" || continue
       dart="$(printf '%s\n' "$rows" | awk -F'^' -v d="$dep" '$1 == d { print $2; exit }')"
       case "$dart" in ''|*'<'*|*'>'*)

@@ -121,6 +121,38 @@ expect_fail "check-milestone fails a build-approved story whose dependency lacks
 expect_pass "check-milestone order check can be turned off" "$d" env MILESTONE_ORDER=0 sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 printf '| Verify | docs/agents-v0/verify/a/test-report.md | dev | Approved | 2026-01-04 |\n' >> "$d/docs/agents-v0/requirements/a.md"
 expect_pass "check-milestone passes once the dependency has a verify approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+cat > "$d/docs/agents-v0/milestones/m.md" <<'EOF'
+# Milestone: M
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency |
+|----------|-----------|------------------|--------|------------|
+| M-A | As a user, I want a, so that b. | docs/agents-v0/requirements/a.md | planned | — |
+| M-B | As a user, I want c, so that d. | docs/agents-v0/requirements/b.md | planned | M-A |
+| M-C | As a user, I want e, so that f. | docs/agents-v0/requirements/c.md | planned | docs/agents-v0/milestones/earlier.md |
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| plan | docs/agents-v0/milestones/m.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/requirements/c.md" <<'EOF'
+# C
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| Intake | docs/agents-v0/requirements/c.md | dev | Approved | 2026-01-01 |
+| Build | docs/agents-v0/build/c/build-report.md | dev | Approved | 2026-01-05 |
+EOF
+mkdir -p "$d/docs/agents-v0/milestones"
+printf '# Earlier\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n| plan | x | dev | Approved | 2026-01-01 |\n' > "$d/docs/agents-v0/milestones/earlier.md"
+expect_fail "check-milestone fails Build when a dependency manifest has no milestone approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+printf '| milestone | docs/agents-v0/milestones/earlier.md | dev | Approved | 2026-01-06 |\n' >> "$d/docs/agents-v0/milestones/earlier.md"
+expect_pass "check-milestone accepts a dependency manifest with an approved milestone row" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 
 # --- check-milestone.sh SLO waivers -----------------------------------------
 d="$tmp/slo"

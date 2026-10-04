@@ -17,6 +17,10 @@
 #   DIFF_BASE=<git-rev>    also measure coverage of Java lines added since merge-base(DIFF_BASE, HEAD)
 #   MIN_DIFF_LINE_PCT=<n>  diff coverage minimum (default 80)
 #   REQUIRE_CVE_REPORT=1   fail when dependency-check-report.json is missing
+#   /v0-verify sets DIFF_BASE and REQUIRE_CVE_REPORT together. It omits both only while a
+#   later quality story named in this story's Out of scope (seeded: P0-C) has no Verify
+#   approval. The test report quotes that story id. Unset, diff coverage and a missing
+#   CVE report are not failures.
 #   GATE_METRICS_OUT=<f>   JSON summary path (default <module-root>/target/gate-metrics.json)
 #   GATE_REPORT_ONLY=1     measure and write the summary, but exit 0 (brownfield onboarding baseline)
 #

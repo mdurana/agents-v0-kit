@@ -2,7 +2,7 @@
   "plan": "claude-sonnet-5-5-high",
   "build": "composer-2.5[fast=false]",
   "review": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
-  "explore": "glm-5p3-flash[reasoning=high]",
+  "explore": "composer-2.5[fast=false]",
   "debug": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
   "schemas": "composer-2.5[fast=false]",
   "docs": "gemini-3.8-flash[reasoning_effort=high]",

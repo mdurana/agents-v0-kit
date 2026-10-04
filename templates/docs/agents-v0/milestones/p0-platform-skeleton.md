@@ -30,10 +30,11 @@ and in CI.
 | Story ID | User story | Feature artifact | Status | Dependency |
 |----------|-----------|------------------|--------|------------|
 | P0-A | As a developer, I want to clone the repo and run the standard build and test command successfully, so that I have a known-good baseline before feature work. | docs/agents-v0/requirements/p0-a-green-baseline.md | planned | — |
-| P0-B | As a developer, I want the delivery kit installed and the P0 milestone tracked, so that later stories follow the same gated chain. | docs/agents-v0/requirements/p0-b-kit-and-milestone.md | planned | P0-A |
+| P0-B | As a developer, I want this P0 milestone to be the tracked program manifest, so that later stories follow the same gated chain. | docs/agents-v0/requirements/p0-b-kit-and-milestone.md | planned | P0-A |
 | P0-C | As a developer, I want coverage, static analysis, and CVE scanning bound to verify, so that quality failures stop the build before feature work. | docs/agents-v0/requirements/p0-c-quality-gate.md | planned | P0-A |
 | P0-D | As a developer, I want to build and run the app locally with Dockerfile and Compose (Podman or Docker), so that I can test the container path before CI. | docs/agents-v0/requirements/p0-d-local-container.md | planned | P0-A |
 
+> When `.cursor/` and `.agents-v0/` are already present, P0-B does not install the kit again. `bootstrap-greenfield.sh` or `install.sh` already did that. The story records this manifest.
 > Replace or extend rows as your stack requires (BFF-only, frontend-only, etc.).
 > P0-D: copy the matching starter from `docker/` per `docker/README.md`.
 > Record `Milestone: P0 — Platform Skeleton` and `Story: <id>` in each feature artifact

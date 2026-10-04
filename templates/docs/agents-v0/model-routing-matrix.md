@@ -11,7 +11,7 @@ Role IDs and defaults match `templates/.cursor/model-config.json` (installed to 
 | **Build**            | services, BFF, frontend, tests, maintenance, release             | `composer-2.5[fast=false]`                                 |
 | **Build (critical)** | units that hit a security-review trigger, and sagas or consumers | the Plan model                                             |
 | **Review**           | code review and security review, independent of the Build role   | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
-| **Explore**          | repo exploration sub-tasks                                       | `glm-5p3-flash[reasoning=high]`                            |
+| **Explore**          | repo exploration sub-tasks                                       | `composer-2.5[fast=false]`                            |
 | **Debug**            | runtime failure root-cause                                       | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
 | **Schemas**          | schema/unit-test sub-tasks                                       | `composer-2.5[fast=false]`                                 |
 | **Docs**             | doc drafting sub-tasks                                           | `gemini-3.8-flash[reasoning_effort=high]`                  |
@@ -94,7 +94,7 @@ A reviewer should not be the model that wrote the code. The Review role uses the
 
 | Skill                               | Role        | Purpose                          | Cursor ID                                                  |
 | ----------------------------------- | ----------- | -------------------------------- | ---------------------------------------------------------- |
-| spec-intake, bugfix-triage          | Explore     | repo exploration                 | `glm-5p3-flash[reasoning=high]`                            |
+| spec-intake, bugfix-triage          | Explore     | repo exploration                 | `composer-2.5[fast=false]`                            |
 | bugfix-triage                       | Debug       | runtime failure root-cause       | `grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]` |
 | contract-first-design, quality-gate | Schemas     | schemas + single-file unit tests | `composer-2.5[fast=false]`                                 |
 | ux-design                           | UX Designer | UX spec authoring                | `gemini-3.8-flash[reasoning_effort=high]`                  |

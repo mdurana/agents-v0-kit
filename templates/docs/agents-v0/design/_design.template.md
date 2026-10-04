@@ -18,7 +18,7 @@ Every acceptance criterion and NFR of `docs/agents-v0/requirements/<feature>.md`
 
 ## Authorization
 
-One row per operation of the contract draft. The resource rule is the BOLA check: how the service proves this principal may touch this `{id}`.
+One row per operation of the contract draft. The resource rule is the BOLA check: how the service proves this principal may touch this `{id}`. A public operation uses `@PreAuthorize("permitAll()")` in Notes. Do not name `org.springframework.security.access.prepost.PermitAll`. When the story has no `/api/v1` operation, this section is `N/A: no /api/v1 operation`.
 
 | operationId | Roles or scopes | Resource rule | Notes |
 |-------------|-----------------|---------------|-------|

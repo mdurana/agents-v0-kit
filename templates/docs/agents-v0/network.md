@@ -5,17 +5,19 @@
 
 ## Ports
 
-| Service | Port (dev) | Exposes | Notes |
-|---------|-----------|---------|-------|
-| <!-- TEMPLATE: svc --> | <!-- 8080 --> | <!-- /api/v1, /health --> | |
+| Service | Port (dev) | Exposes | Status | Citation |
+|---------|-----------|---------|--------|----------|
+| <!-- TEMPLATE: svc --> | <!-- 8080 --> | <!-- /api/v1, /health --> | planned | |
 
 ## Dependencies
 
-| Dependency | Address (env var) | Purpose |
-|------------|-------------------|---------|
-| <!-- TEMPLATE: e.g. PostgreSQL --> | <!-- DB_HOST, DB_PORT --> | <!-- primary store --> |
+| Dependency | Address (env var) | Purpose | Status | Citation |
+|------------|-------------------|---------|--------|----------|
+| <!-- TEMPLATE: e.g. PostgreSQL --> | <!-- DB_HOST, DB_PORT --> | <!-- primary store --> | planned | |
 
-Add a row only for a dependency the code or config actually uses (database, cache, identity provider, broker, outbound API).
+Status is `planned` or `built`. A `planned` row is a target written at plan time. It has no citation. A `built` row cites a file in the commit that shows the process running (config, compose, or source). Add a dependency row only for a database, cache, identity provider, broker, or outbound API the plan or the code names.
+
+`doc-sync` copies a row into `docs/agents-v0/architecture.md` only when Status is `built` and the citation is in the commit being documented. A `planned` row stays here. It is not described as running.
 
 ## Outbound timeouts and resilience
 
