@@ -1,7 +1,7 @@
 ---
 name: explore-researcher
 description: Fast repo exploration for Intake and triage. Maps code areas, conventions, and risks. Launched from the main session per the helper brief.
-model: composer-2.5[fast=false]
+model: composer-2.5
 mode: subagent
 tools:
   - read

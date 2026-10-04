@@ -1,7 +1,7 @@
 ---
 name: schema-author
 description: Drafts OpenAPI/event schemas and focused unit tests. Schemas role per model-routing-matrix.
-model: composer-2.5[fast=false]
+model: composer-2.5
 mode: subagent
 tools:
   - read

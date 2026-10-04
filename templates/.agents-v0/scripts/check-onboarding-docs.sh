@@ -22,6 +22,21 @@ command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2
 if [ "$#" -eq 0 ]; then
   [ -f docs/agents-v0/onboarding/report.md ] || { printf 'FAIL: docs/agents-v0/onboarding/report.md is missing (copy docs/agents-v0/onboarding/_report.template.md)\n' >&2; exit 1; }
   set -- docs/agents-v0/onboarding docs/agents-v0/architecture.md docs/agents-v0/network.md docs/agents-v0/design/system/context-map.md docs/agents-v0/diagrams docs/agents-v0/adr/0000-inherited-decisions.md
+  present=""
+  for path in "$@"; do
+    if [ -e "$path" ]; then
+      present="$present $path"
+    fi
+  done
+  # shellcheck disable=SC2086
+  set -- $present
+else
+  for path in "$@"; do
+    if [ ! -e "$path" ]; then
+      printf 'FAIL: %s is missing\n' "$path" >&2
+      exit 1
+    fi
+  done
 fi
 
 CHECK_PATHS="$(printf '%s\n' "$@")" python3 - <<'PY'

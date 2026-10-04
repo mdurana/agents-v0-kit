@@ -16,7 +16,7 @@ Run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase verif
 Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If `git status` shows another feature's code or a shared-file edit that is not this feature's approved diff, run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase verify --status blocked --reason "<paths>"` and stop.
 
 ## Instructions
-0. Each Verify report must start with provenance headers: `commit: <full-sha>` (tree verified), `kit-version:` (from `.agents-kit-version` if present), `agent:` (role name). When Verify adds or changes tests, those changes must be committed (with explicit user authorization) before the reports are stamped; security and code review then run against that same commit.
+0. Each Verify report must start with provenance headers: `commit: <full-sha>` (tree verified), `kit-version:` (from `.agents-kit-version` if present), `agent:` (role name). When Verify adds or changes tests, commit those first (the hook asks). Stamp the reports with that SHA, then commit them with `git commit -m "<message>" -- docs/agents-v0/verify/<feature>`. That second commit does not ask again. Security and code review, when they run, use that same code commit.
 1. Launch the `test-engineer` subagent (skill: `quality-gate`):
    - Write AAA tests; cover happy/error/edge paths.
    - Use Testcontainers + Pact where the repo already depends on them.
@@ -40,6 +40,10 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
    - Evidence: the reports exist under `docs/agents-v0/verify/<feature>/`.
 5. On any Critical finding in the gathered list, route back to the responsible Build/Maintain agent and re-enter Verify after the fix.
 6. **Stop** and present the gate result to the user. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (`workflow-orchestration.mdc` Phase result) before stopping, including when status is `blocked`. After explicit approval, append the Verify decision (Decision: `Approved`), approver (the GitLab username of the person approving, for example `@ada`: CI may bind the merge request approval to this row), date, the `docs/agents-v0/verify/<feature>/` report paths, and documented CVE exceptions as a row in the delivery record's `Delivery approvals` table — the Intake artifact for the linear path, or the `verify` row of the maintenance note. Do not advance to Release without that approval.
+
+## Abbreviated Verify (P0 skeleton)
+
+When the requirements artifact contains `Story: P0-A` and `Milestone: P0`, only `test-engineer` runs (skill `quality-gate`): the full verify command, `ci/check-gate-metrics.sh` for each Maven root with both flags set, and `docs/agents-v0/verify/<feature>/test-report.md` with `commit:`. `security-reviewer`, `code-reviewer`, the UX audit, and `e2e-perf-testing` are skipped. The Verify approval is still required before Release. Release still waits for `glab mr create` to return a URL. Any other story uses the full Verify below.
 
 ## Abbreviated Verify (Tier trivial)
 For a maintenance note with `Tier: trivial`, after `sh .agents-v0/ci/classify-change.sh <base> --require-trivial` passes, only `test-engineer` runs (skill `quality-gate`): the full verify command, `ci/check-gate-metrics.sh` for each changed Maven root, and a CVE re-scan for a dependency bump. Persist `docs/agents-v0/verify/<id>/test-report.md` with `commit:`. `security-reviewer`, `code-reviewer`, the UX audit, and `e2e-perf-testing` are skipped. The moment the classifier stops saying eligible, the abbreviated path ends: set `Tier: standard` (a person confirms) and run the full Verify. For `Tier: emergency`, this Verify is owed by the note's `Follow-up verify due` date; run the full Verify then.

@@ -193,22 +193,12 @@ run fail "design: an ADR with one alternative fails" "$d" sh "$CI/check-design.s
 cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
 
 run fail "design: pinning needs a design review" "$d" sh "$CI/check-design.sh" orders --pin approved
-mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/skel" "$d/docs/agents-v0/adr"
+mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/skel"
 printf '# Skel\nAC-1 the build passes\n' > "$d/docs/agents-v0/requirements/skel.md"
-cat > "$d/docs/agents-v0/adr/01-skel.md" <<'EOF'
-# ADR 01: Skeleton
-
-## Decision
-No product API in the baseline.
-
-## Alternatives considered
-- A hello /api/v1 route: nothing calls it yet.
-- GraphQL: no consumer asked for it.
-EOF
 cat > "$d/docs/agents-v0/design/skel/design.md" <<'EOF'
 # Design: skeleton
 
-ADR: docs/agents-v0/adr/01-skel.md
+ADR: N/A: no product decision
 
 N/A: no /api/v1 operation
 

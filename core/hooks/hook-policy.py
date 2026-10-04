@@ -340,6 +340,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
                     return "block", "git force-push is not allowed (ai-agent-conduct.mdc)."
             return "ask", "git push requires explicit user approval."
         if sub == "commit":
+            if _commit_paths_are_evidence(parts):
+                return "allow", ""
             return "ask", "git commit requires explicit user approval."
         if sub == "reset" and "--hard" in parts:
             return "block", "git reset --hard is not allowed."
@@ -372,6 +374,23 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
                 return "ask", "git stash pop, drop, or clear can discard work; requires explicit user approval."
 
     return "allow", ""
+
+
+def _commit_paths_are_evidence(parts: List[str]) -> bool:
+    """A reports-only commit (build/ or verify/ docs) does not ask again."""
+    if "--" not in parts:
+        return False
+    paths = [p for p in parts[parts.index("--") + 1 :] if p != "--"]
+    if not paths:
+        return False
+    for path in paths:
+        norm = path.replace("\\", "/").lstrip("./")
+        if not (
+            norm.startswith("docs/agents-v0/build/")
+            or norm.startswith("docs/agents-v0/verify/")
+        ):
+            return False
+    return True
 
 
 def _git_subcommand(parts: List[str]) -> str:

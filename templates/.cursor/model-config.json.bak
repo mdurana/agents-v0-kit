@@ -1,10 +1,10 @@
 {
   "plan": "claude-sonnet-5-5-high",
-  "build": "composer-2.5[fast=false]",
+  "build": "composer-2.5",
   "review": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
   "explore": "glm-5p3-flash[reasoning=high]",
   "debug": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
-  "schemas": "composer-2.5[fast=false]",
+  "schemas": "composer-2.5",
   "docs": "gemini-3.8-flash[reasoning_effort=high]",
   "documenter": "gemini-3.8-flash[reasoning_effort=high]",
   "orchestrator": "gemini-3.8-flash[reasoning_effort=high]",

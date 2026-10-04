@@ -1,7 +1,7 @@
 ---
 name: release-manager
 description: Release phase. Opens merge requests via glab, runs the CI fix loop, publishes status reports. Never commits or force-pushes without explicit approval. Use in /v0-release.
-model: composer-2.5[fast=false]
+model: composer-2.5
 mode: subagent
 tools:
   - read
