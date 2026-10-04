@@ -32,7 +32,12 @@ and in CI.
 | P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — |
 
 > When `.cursor/` and `.agents-v0/` are already present, do not reinstall the kit. `bootstrap-greenfield.sh` or `install.sh` already did that. Copy the container starter from `docker/` per `docker/README.md`.
-> Split this row only when a part of the baseline has its own `/api/v1` contract. Keep at most eight acceptance criteria (`AC-1` through `AC-8`).
+> This row is one story. Record `Vertical slice: yes`. Do not write `## Proposed split` because the container files sit next to the service. Acceptance criteria are only:
+> - `AC-1` the build and tests pass
+> - `AC-2` this milestone is the tracked manifest, and the kit is not installed again when it is already present
+> - `AC-3` coverage, static analysis, and CVE scanning are bound to verify
+> - `AC-4` the app runs locally with Dockerfile and Compose
+> A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`. Split this row only when a part of the baseline has its own `/api/v1` contract.
 > Record `Milestone: P0 — Platform Skeleton` and `Story: P0-A` in the feature artifact (`spec-intake` skill).
 
 ## Delivery approvals

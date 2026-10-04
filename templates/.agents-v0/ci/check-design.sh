@@ -112,7 +112,13 @@ def review_not_required(body):
     for name in ("openapi.yaml", "openapi.yml", "openapi.json"):
         if os.path.isfile(os.path.join(base, name)):
             return False
-    if re.search(r"permitAll|public route", body, re.I):
+    # A health, readiness, or liveness route is the skeleton's proof, not a product API.
+    kept = re.sub(
+        r"(?i)[^\n]*permitAll[^\n]*(health|ready|live)[^\n]*|[^\n]*(health|ready|live)[^\n]*permitAll[^\n]*",
+        "",
+        body,
+    )
+    if re.search(r"permitAll|public route", kept, re.I):
         return False
     return True
 

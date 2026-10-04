@@ -234,7 +234,10 @@ The skeleton merges to the default branch before feature stories branch.
 EOF
 run pass "design: a non-API design pins without a review" "$d" sh "$CI/check-design.sh" skel --pin approved
 rm -f "$d/docs/agents-v0/design/skel/design.lock"
-printf 'A public health route uses permitAll.\n' >> "$d/docs/agents-v0/design/skel/design.md"
+printf 'GET /health uses @PreAuthorize("permitAll()").\n' >> "$d/docs/agents-v0/design/skel/design.md"
+run pass "design: a health permitAll still pins without a review" "$d" sh "$CI/check-design.sh" skel --pin approved
+rm -f "$d/docs/agents-v0/design/skel/design.lock"
+printf 'POST /api/v1/admin uses permitAll.\n' >> "$d/docs/agents-v0/design/skel/design.md"
 run fail "design: a public route still needs a review" "$d" sh "$CI/check-design.sh" skel --pin approved
 h1="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"

@@ -17,7 +17,7 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
    - Feature artifact: a concrete path, `docs/agents-v0/requirements/<feature>.md`.
    - Status: `planned`.
    - Dependency: story IDs only, comma-separated. Milestone-level dependencies (`P1`) are prose and are not checked.
-5. Size every story: one surface (`backend`, `bff`, or `frontend`) and at most eight acceptance criteria. Split a larger story into rows here. Use `Vertical slice: yes` only when the user asked for one journey across surfaces.
+5. Size every story: one surface (`backend`, `bff`, or `frontend`) and at most eight acceptance criteria. Split a larger story into rows here. Use `Vertical slice: yes` only when the user asked for one journey across surfaces. Do not split the seeded P0-A platform skeleton row. It is already one story.
 6. Add an integration story for each pair of contexts that call each other. It depends on both sides, covers the contract and the failure modes, and is the place for consumer-driven contract tests.
 7. Order the stories as a graph with no cycle. A story starts Build only after every story it names has its Verify approval (`ci/check-milestone.sh` enforces this).
 8. Map each filled NFR/SLO row to a P4 hardening story.

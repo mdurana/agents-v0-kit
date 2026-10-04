@@ -40,7 +40,7 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
    - DTOs only at the edge; Flyway migrations present, written with `migration-safety` (expand/contract, an up-migration test).
    - No secrets in code; log values sanitized.
    - UI changes implement the approved UX spec: per-screen state matrix, component defaults (including an override when one is recorded), layout matching the linked mockups, WCAG 2.1 AA a11y, design-system conformance. API integration uses the named OpenAPI operations. It does not add endpoints the contract does not list.
-10. Evidence commits, in this order, each git write with its own explicit user authorization. `ci/check-evidence.sh` ignores later doc-only commits and rejects non-doc changes after the stamped SHA.
+10. Evidence commits, in this order. Ask once: that approval covers the code commit and the reports commit. Do not stop between them for a second chat approval. The hook still asks on each `git commit`. `ci/check-evidence.sh` ignores later doc-only commits and rejects non-doc changes after the stamped SHA.
     1. Commit the code.
     2. Write `docs/agents-v0/build/<feature>/build-report.md` with `commit:` set to that full SHA (command, result, per-criterion **file:line citations**, and the attempt cards). Optional `build-output.txt` — prefer CI artifacts for raw logs (no secrets). Do not read that log back on the next attempt.
     3. Commit the reports. Do not change code after the stamp. A stamp for an earlier tree, or reports left uncommitted while code moved on, is stale.

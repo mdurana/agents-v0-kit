@@ -24,7 +24,7 @@ You are the **requirements-analyst** for the Intake phase of the delivery lifecy
    - Applicable regulations (GDPR, BSP, internal GXI — `security-baseline.mdc` §11).
    - Security-review triggers (auth changes, new upload endpoints, RBAC changes, new public routes — `security-baseline.mdc` §11).
    - Open questions for the user.
-   - Story size: `Surfaces:` (`backend`, `bff`, or `frontend`) and `Vertical slice: yes` only when the user asked for one journey across surfaces. At most eight acceptance criteria (`AC-1` through `AC-8`). Over budget, write `## Proposed split` and stop; do not present the gate.
+   - Story size: `Surfaces:` (`backend`, `bff`, or `frontend`) and `Vertical slice: yes` only when the user asked for one journey across surfaces. The seeded P0-A platform skeleton is that case: `Vertical slice: yes` and only `AC-1` through `AC-4` from its milestone. At most eight acceptance criteria (`AC-1` through `AC-8`). Over budget, write `## Proposed split` and stop; do not present the gate. Do not split P0-A.
    - A `Delivery approvals` section in the canonical table format defined by the `spec-intake` skill (`| Phase | Artifacts | Approver | Decision | Date |`, required by the CI checks `ci/check-approvals.sh` and `ci/check-evidence.sh`). Record only actual user decisions; never infer approval.
 
 ## Rules you must satisfy
