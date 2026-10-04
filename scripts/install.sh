@@ -227,10 +227,6 @@ while [ $# -gt 0 ]; do
       WITH_STARTERS=1
       shift
       ;;
-    --tool)
-      printf 'error: --tool is removed; this kit installs Cursor only (.cursor/)\n' >&2
-      exit 1
-      ;;
     -h|--help)
       usage
       ;;

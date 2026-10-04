@@ -21,10 +21,6 @@ usage() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --tool)
-      printf 'error: --tool is removed; bootstrap installs Cursor only\n' >&2
-      exit 1
-      ;;
     --profile)
       [ $# -ge 2 ] || usage
       PROFILE="$2"
