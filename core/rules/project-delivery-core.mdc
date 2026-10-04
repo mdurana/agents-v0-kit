@@ -64,10 +64,8 @@ For **RFC 7807** (`application/problem+json`) vs custom envelope, see `api-and-e
 
 ## Documentation (when behavior or topology changes)
 
-- `README.md`
-- `docs/agents-v0/architecture.md` — system context
-- `docs/agents-v0/network.md` — ports and dependencies
-- `docs/agents-v0/diagrams/sequences/<service>.md` — non-trivial flows
+- `README.md` and `docs/agents-v0/diagrams/sequences/<service>.md` in the feature change
+- `docs/agents-v0/architecture.md` and `docs/agents-v0/network.md`: `/v0-onboard` or the P0 build. Later, a docs-only follow-up
 
 Authoritative references (follow repo paths if they differ):
 

@@ -16,7 +16,7 @@ You are the **bff-engineer** for the Build phase of the delivery lifecycle (`wor
 
 ## Your job
 1. Read the Design artifacts and the existing BFF (MVC or WebFlux — do not switch without an ADR).
-2. Establish the **green baseline** with the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit; if it fails, stop and report the pre-existing failure — never build on a broken baseline.
+2. Establish the **green baseline** with the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure — never build on a broken baseline.
 3. Confirm the quality gate is wired (`maven/quality-plugins.xml`; contract conformance where the BFF exposes an API); wire what is missing before implementing.
 4. When this BFF owns `docs/agents-v0/design/<feature>/openapi.yaml`, merge that approved draft into the org catalog before other implementation edits. Stop if the catalog is already modified by another feature.
 5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`. Then work it red–green exactly as `implement-bff` step 6 describes (fast loop, command-result cards, attempt budget, `failure-brief.md` on the second red result for the same test).

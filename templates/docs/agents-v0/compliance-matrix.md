@@ -21,7 +21,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Resilience: breaker/retry/timeout | A bff-engineer; S implement-bff |
 | API envelopes (success/error) | A solution-architect; S contract-first-design; G Design gate |
 | Async only when justified | A solution-architect; S contract-first-design; G Design gate |
-| Mandated docs (README, architecture, network, sequences) | A maintenance-engineer, release-manager; S doc-sync, release-pr; G Release gate |
+| Mandated docs: README and sequence diagrams in the feature release. `architecture.md` and `network.md` are written by `/v0-onboard` or the P0 build, then a docs-only follow-up | A maintenance-engineer, release-manager; S doc-sync, release-pr; C /v0-onboard, /v0-build, /v0-release |
 | BFF thin; domain logic in services | A bff-engineer; S implement-bff; R architecture-and-diagrams |
 | Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-spring-service; G Build gate |
 | Cache and YugabyteDB only when requirements justify them | A solution-architect; S contract-first-design; G Design gate |
@@ -188,7 +188,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Critical findings route back | C /v0-verify, /v0-deliver; G Verify gate |
 | Gate decisions, approver, date, and evidence recorded in the existing handoff artifact | C all phase commands; R workflow-orchestration; CI ci/check-approvals.sh, ci/check-evidence.sh |
 | Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /v0-release, /v0-deliver; A release-manager; S release-pr; R workflow-orchestration |
-| Build: green baseline before edits; red–green loop may use the profile fast verify command; the gate still runs full `mvn -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
+| Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs full `mvn -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
 | Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /v0-build; S implement-spring-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-* |

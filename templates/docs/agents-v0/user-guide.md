@@ -210,7 +210,7 @@ Tests finish first. The security checklist and the code review are prepared toge
 
 | You should see | What it means                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| Docs updated   | README / architecture notes for what changed.                                                              |
+| Docs updated   | README and sequence diagrams for what changed. Architecture and network notes are a later docs-only change. |
 | Merge request  | Ready for engineering merge (CI green). |
 | VAPT sign-off  | Security checklist in the merge request description.                                                       |
 

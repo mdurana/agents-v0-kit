@@ -9,7 +9,7 @@ Build phase playbook for the `bff-engineer` agent (`workflow-orchestration.mdc`)
 
 ## Steps
 1. Read the Design artifacts and the existing BFF (MVC or WebFlux — do not switch without an ADR).
-2. **Baseline:** run the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit (use the BFF root when Layout sets one). If it fails, stop and report the pre-existing failure; never build on a broken baseline.
+2. **Baseline:** run the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit (use the BFF root when Layout sets one), unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure; never build on a broken baseline.
 3. **Wire the quality gate** if missing (`maven/quality-plugins.xml`; contract conformance where the BFF exposes an API) — unwired tooling makes `mvn clean verify` compile-only.
 4. When `docs/agents-v0/design/<feature>/openapi.yaml` exists and this BFF owns that contract, merge the approved draft into the org catalog before other implementation edits. Stop if that catalog file is already modified by another feature. If the backend story already merged it, do not merge it again.
 5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh .agents-v0/ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows.

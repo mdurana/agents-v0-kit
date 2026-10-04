@@ -120,7 +120,7 @@ A later edit to an approved design is an amendment, not a quiet change. Build or
 
 ## Build and verify
 
-Build starts from a green baseline, writes `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`, and works red then green. Each attempt appends a card to `build-report.md`. The same test red twice goes to `debug-investigator` before a third try. A third red stops. The phase also has a total budget of failed attempts, default 8 (`scripts/check-attempt-budget.sh`).
+Build starts from a green baseline. A clean checkout of the default branch tip skips the pre-edit verify. It writes `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`, and works red then green. Each attempt appends a card to `build-report.md`. The same test red twice goes to `debug-investigator` before a third try. A third red stops. The phase also has a total budget of failed attempts, default 8 (`scripts/check-attempt-budget.sh`).
 
 The Build gate is not only the agent's report. CI checks:
 

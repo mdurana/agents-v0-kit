@@ -1,6 +1,6 @@
 # Architecture
 
-> System context for this service. Update when topology changes (`architecture-and-diagrams.mdc`).
+> System context for this service. `/v0-onboard` or the P0 build fills this file. A later feature updates it in a docs-only follow-up (`doc-sync`).
 > Brownfield: `/v0-onboard` rewrites this file as-is. Every statement cites code (`path/File.java:42`) or says `UNVERIFIED`. Delete each `TEMPLATE:` line once it is replaced.
 
 ## Context

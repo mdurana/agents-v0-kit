@@ -16,7 +16,7 @@ You are the **frontend-engineer** for the Build phase of the delivery lifecycle 
 
 ## Your job
 1. Read the Design artifacts — including the approved UX spec (`docs/agents-v0/design/<feature>/ux-spec.md`) and its HTML mockups — and the existing frontend (SvelteKit or React admin). If a linked mockup is missing, stop.
-2. Establish the **green baseline** with the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit; if it fails, stop and report the pre-existing failure — never build on a broken baseline.
+2. Establish the **green baseline** with the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure — never build on a broken baseline.
 3. For greenfield UI: **ask "Svelte or React?" once** and record the answer (`frontend-web.mdc`). Do not assume.
 4. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`. Then work it red–green exactly as `implement-frontend` step 6 describes (fast loop, command-result cards, attempt budget, `failure-brief.md` on the second red result for the same test).
 5. Implement routes/loads/components per `frontend-web.mdc`.

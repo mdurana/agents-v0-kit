@@ -1,6 +1,6 @@
 # Network
 
-> Ports and dependencies for this service. Update when topology changes (`architecture-and-diagrams.mdc`).
+> Ports and dependencies for this service. `/v0-onboard` or the P0 build fills this file. A later feature updates it in a docs-only follow-up (`doc-sync`).
 > Brownfield: `/v0-onboard` rewrites this file as-is from `docs/agents-v0/discovery/config.txt` and `docs/agents-v0/discovery/ci-deploy.txt`. Every row cites a file or says `UNVERIFIED`. Delete each `TEMPLATE:` line once it is replaced.
 
 ## Ports

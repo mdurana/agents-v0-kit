@@ -36,7 +36,7 @@ alwaysApply: true
 
 ## Artifacts
 
-- **Do create/update:** mandated project docs per `project-delivery-core.mdc` (`README`, `docs/agents-v0/architecture.md`, etc.).
+- **Do create/update:** `README` and sequence diagrams. `/v0-onboard` or P0 writes `architecture.md` and `network.md`. A later feature leaves them for a docs-only follow-up.
 - **Do not create:** unsolicited scratch notes, session exports, or duplicate rule dumps.
 - Ephemeral planning stays in **chat**.
 

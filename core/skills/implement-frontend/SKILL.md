@@ -9,7 +9,7 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 
 ## Steps
 1. Read the Design artifacts — including the approved UX spec (`docs/agents-v0/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/agents-v0/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
-2. **Baseline:** run the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
+2. **Baseline:** run the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
 3. **Wire the frontend quality gate** if missing (ESLint, coverage provider with the ≥ 70% threshold, lockfile audit) — unwired tooling makes the build script compile-only.
 4. For greenfield UI, confirm the Svelte/React decision (asked once in Intake).
 5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh .agents-v0/ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows. Before the gate also run `sh .agents-v0/ci/check-frontend-calls.sh`: every `/api/` call must be a catalog operation.
