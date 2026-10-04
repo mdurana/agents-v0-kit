@@ -101,16 +101,16 @@ Design writes, and does not touch the org catalog:
 
 | File | Contents |
 |------|----------|
-| `docs/agents-v0/design/<feature>/openapi.yaml` | The feature's contract fragment. OpenAPI 3.0, `/api/v1/`, unique `operationId`s, security, `Idempotency-Key` on POST, one error envelope |
+| `docs/agents-v0/design/<feature>/openapi.yaml` | Only when the story adds a `/api/v1` operation. OpenAPI 3.0, unique `operationId`s, security, `Idempotency-Key` on POST, one error envelope. Otherwise `design.md` records `N/A: no /api/v1 operation` and this file is absent |
 | `docs/agents-v0/design/<feature>/asyncapi.yaml` | Optional when the story publishes or consumes messages. AsyncAPI 2.x/3.x; channels align with `events/` |
 | `docs/agents-v0/design/<feature>/events/` | Event schemas with `eventVersion`. Changes are additive |
 | `docs/agents-v0/design/<feature>/design.md` | Every AC traced, data model, one authorization row per operation, failure modes, observability, rollout |
 | `docs/agents-v0/adr/<NN>-<slug>.md` | A decision with at least two alternatives |
 | `docs/agents-v0/design/<feature>/ux-spec.md` and `mockups/` | UI only. Every control has `data-component` and a row. Mockups do not call the API |
-| `docs/agents-v0/design/<feature>/review.md` | `design-reviewer`. No open Critical, and the hash matches this design |
+| `docs/agents-v0/design/<feature>/review.md` | `design-reviewer` when there is a draft, a UX spec, or a public route. No open Critical, and the hash matches this design. Absent when the design is `N/A: no /api/v1 operation` with no UI and no public route |
 | `docs/agents-v0/design/<feature>/design.lock` | Written after the user approves: date, hash, reason |
 
-`ci/check-openapi.sh lint` checks the draft. `compat` checks it against the catalog it will merge into. When `asyncapi.yaml` exists, `ci/check-asyncapi.sh lint` runs (also from `ci/check-design-contracts.sh` in CI). Build merges with `ci/check-openapi.sh merge` and proves it with `merged`. A service repo uses `openapi/<service>-v1.yaml`. A single-service repo uses `openapi/api-v1.yaml`.
+When `openapi.yaml` exists, `ci/check-openapi.sh lint` checks the draft and `compat` checks it against the catalog it will merge into. A missing draft is allowed. When `asyncapi.yaml` exists, `ci/check-asyncapi.sh lint` runs (also from `ci/check-design-contracts.sh` in CI). Build merges with `ci/check-openapi.sh merge` and proves it with `merged`. A service repo uses `openapi/<service>-v1.yaml`. A single-service repo uses `openapi/api-v1.yaml`.
 
 A later edit to an approved design is an amendment, not a quiet change. Build or Verify stops, the design files change, the reviewer runs again, the user approves a row in `amendments.md`, and `ci/check-design.sh --pin` records the new hash. CI rejects a design that drifted from its lock.
 
