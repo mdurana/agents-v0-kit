@@ -14,6 +14,7 @@ flowchart TD
   design["/v0-design"]
   dreview["design review and pin"]
   build["/v0-build"]
+  p0["P0-A"]
   verify["/v0-verify"]
   release["/v0-release readiness"]
   merge["human merge"]
@@ -27,8 +28,8 @@ flowchart TD
   intake -->|gate| design
   design --> dreview
   dreview -->|gate| build
-  intake -->|P0-A| build
   design -->|no contract| build
+  p0 -->|start| build
   build -->|gate| verify
   verify -->|Critical, Re-opened| build
   verify -->|gate| release
@@ -39,13 +40,14 @@ flowchart TD
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. `/v0-deliver` runs that path by following each phase command and stopping at every gate that applies. It holds no phase steps of its own. P0-A skips Design: Build writes the N/A design and pins it, and one approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues; the Build approval writes its Design row.
+A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. `/v0-deliver` runs that path by following each phase command and stopping at every gate that applies. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues; the Build approval writes its Design row.
 
 | Edge | What it means |
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
 | Plan, dotted into the story path | A goal larger than one story is split into milestones and ordered stories first. One story skips Plan. |
-| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. P0-A does not run this phase: Build writes the N/A design and pins it, and Release writes the row. |
+| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. |
+| P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the row. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
 | Verify back to Maintain | A Critical finding on a fix re-opens Maintain, not the original feature's Build. |
@@ -131,11 +133,11 @@ The Build gate is not only the agent's report. CI checks:
 | `ci/check-design.sh --verify-lock` | The design changed after it was approved |
 | `ci/check-gate-metrics.sh` | No tests ran, tests failed, changed-line coverage is under 80%, or an unsuppressed HIGH or CRITICAL CVE remains |
 
-Verify runs `test-engineer` first. Then `security-reviewer` and `code-reviewer` run together and write separate reports. Any applicable VAPT item left unchecked is Critical. A Critical list goes back to Build or Maintain. The reports are stamped with the commit that contains the tests, so the commit happens before the stamp. A trivial maintenance note skips the two reviewers and the UX and end-to-end checks. It still runs the build, the gate metrics, and a CVE scan. P0-A (`Story: P0-A`, `Milestone: P0`) runs only `test-engineer`, the full verify command, and the gate metrics. It skips `security-reviewer`, `code-reviewer`, the UX audit, and end-to-end tests. Its approval is the one Release approval.
+Verify runs `test-engineer` first. When `HEAD` is still the build report's commit and Verify adds no tests, it quotes that run and adds only diff coverage and the CVE report. Then `security-reviewer` and `code-reviewer` run together and write separate reports. Any applicable VAPT item left unchecked is Critical. A Critical list goes back to Build or Maintain. The reports are stamped with the commit that contains the tests, so the commit happens before the stamp. A trivial maintenance note skips the two reviewers and the UX and end-to-end checks. It still runs the build, the gate metrics, and a CVE scan. P0-A (`Story: P0-A`, `Milestone: P0`) runs only `test-engineer`, the full verify command, and the gate metrics. It skips `security-reviewer`, `code-reviewer`, the UX audit, and end-to-end tests. Its approval is the one Release approval.
 
 ## Release
 
-`/v0-release` renders the merge-request body from the evidence (`scripts/render-mr-body.sh`) and dry-runs the local delivery gate with `scripts/check-delivery-gate-local.sh <feature>` (linkage with `CHECK_MR_APPROVER=0`, design contracts, build plan, endpoint authorization). Copy `.agents-v0/hooks/pre-push` to `.git/.agents-v0/hooks/pre-push` to run that gate on push when the branch name matches `docs/agents-v0/requirements/<feature>.md`. The body names either `Feature-Artifact:` or `Maintain-Note:`, not both. Opening the merge request, and every commit and push, each need their own authorization. The CI fix loop stops after three rounds. A code fix in that loop goes back through Verify, because it makes the evidence commit stale.
+`/v0-release` renders the merge-request body from the evidence (`scripts/render-mr-body.sh`) and dry-runs the local delivery gate with `scripts/check-delivery-gate-local.sh <feature>` (linkage with `CHECK_MR_APPROVER=0`, design contracts, build plan, endpoint authorization). It does not edit `architecture.md` or `network.md`; those stay a docs-only follow-up. When the build and verify reports already name `HEAD`, it does not commit them again. Copy `.agents-v0/hooks/pre-push` to `.git/.agents-v0/hooks/pre-push` to run that gate on push when the branch name matches `docs/agents-v0/requirements/<feature>.md`. The body names either `Feature-Artifact:` or `Maintain-Note:`, not both. Opening the merge request, and every commit and push, each need their own authorization. The CI fix loop stops after three rounds. A code fix in that loop goes back through Verify, because it makes the evidence commit stale.
 
 After Verify or Release approval, teams may run `scripts/export-audit-pack.sh <feature>` to write `docs/agents-v0/release/<feature>/audit-manifest.json` (SHA-256 hashes of delivery evidence) for compliance archives.
 

@@ -66,9 +66,8 @@ See `docker/README.md` in the target repo after install.
 
 P0 is one story (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`): one branch and one merge request.
 
-1. `/v0-intake` — paste the user story as `As a [role], I want [goal], so that [benefit].` Do not approve it yet.
-2. `/v0-build` — this story does not run `/v0-design`. Build writes `design.md` (`N/A: no /api/v1 operation`) and pins it. A missing module on this first skeleton story is the work. A module that already exists must verify clean before edits. A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`.
-3. `/v0-verify` then `/v0-release`, or `/v0-deliver` for the story end-to-end. Do not stop for a separate approval at Intake, Build, or Verify. The one approval is at Release, after the test report exists and `glab mr create` has returned a URL. The local delivery gate runs there.
+1. `/v0-build`, or `/v0-deliver` for the story end-to-end. Do not run `/v0-intake` or `/v0-design`. Build copies the milestone story and AC-1 through AC-4, writes `design.md` (`N/A: no /api/v1 operation`), and pins it. A missing module on this first skeleton story is the work. A module that already exists must verify clean before edits. A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`.
+2. `/v0-verify` then `/v0-release`. Do not stop for a separate approval at Build or Verify. The one approval is at Release, after the test report exists and `glab mr create` has returned a URL. The local delivery gate runs there.
 
 Record approvals in each feature artifact’s `Delivery approvals` table. CI uses
 `ci/check-approvals.sh` and `ci/check-evidence.sh`.

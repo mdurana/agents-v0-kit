@@ -33,7 +33,7 @@ While another feature is in flight in this checkout, write only `docs/agents-v0/
 8. **Stop** and present the gate result to the user. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (`workflow-orchestration.mdc` Phase result). After explicit approval, record the Intake decision (Decision: `Approved`), approver, date, and requirements-artifact path in its `Delivery approvals` section. Do not advance to Design without that approval.
 
 ## P0 skeleton
-When the artifact contains `Story: P0-A` and `Milestone: P0`, write the requirements and the four acceptance criteria from `docs/agents-v0/milestones/p0-platform-skeleton.md`. Do not ask for approval and do not write an Approved row. Run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase build --status in_progress`. The next command is `/v0-build`, which writes the N/A design and pins it. Release records this approval with the others from the one approval at the end.
+When the story is P0-A from `docs/agents-v0/milestones/p0-platform-skeleton.md`, do not launch `requirements-analyst` and do not write the requirements file. The next command is `/v0-build`. That command copies the user story and AC-1 through AC-4 from the milestone, then writes the N/A design and pins it. Release records the Intake row with the others from the one approval at the end.
 
 ## Rules
 `workflow-orchestration.mdc`, `ai-agent-conduct.mdc`, `project-delivery-core.mdc`, `frontend-web.mdc`, `security-baseline.mdc` §11.

@@ -1,6 +1,6 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton stops once, at Release. A story with no API, no screens, and no public route does not stop at Design. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design. Engineers and the AI handle implementation, testing, and security checks.
 
 This guide matches the workflow in this kit: **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
 
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design.
   - `/v0-intake` — only clarify and document requirements (good for early discovery).
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -53,9 +53,9 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | Command     | When to use it                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------- |
 | `/v0-plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/v0-intake`. |
-| `/v0-intake`   | Turn a idea or ticket into clear requirements and open questions.                                       |
+| `/v0-intake`   | Turn a idea or ticket into clear requirements and open questions. The platform skeleton does not run this. |
 | `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues. |
-| `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton writes that design here. |
+| `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
 | `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
@@ -101,7 +101,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. A story with an API, screens, or a public route stops at each gate. The platform skeleton skips Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. A story with an API, screens, or a public route stops at each gate. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 

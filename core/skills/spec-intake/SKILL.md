@@ -32,9 +32,9 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - Record `Surfaces:` as `backend`, `bff`, or `frontend`. When `docs/agents-v0/project-profile.md` lists `Service roots`, also record `Service root: <root>` for a backend or BFF story. A story that needs two service roots is two stories.
    - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
    - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. Write `## Proposed split` with extra milestone rows (story sentence, surface, dependency) and stop until the user approves the split. After approval, this artifact keeps the first slice; each other row is its own feature.
-   - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. The seeded P0-A platform skeleton is that case: record `Vertical slice: yes` and only `AC-1` through `AC-4` from `docs/agents-v0/milestones/p0-platform-skeleton.md`. Do not write `## Proposed split` for it.
+   - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Do not write `## Proposed split` for the seeded P0-A row. This skill does not write that story; `/v0-build` copies it.
 6. Resolve open questions with the user.
-7. Present the Intake gate result and wait for approval before Design.
+7. Present the Intake gate result and wait for approval before Design. P0-A does not run this skill. `/v0-build` copies that milestone story and AC-1 through AC-4.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report.
