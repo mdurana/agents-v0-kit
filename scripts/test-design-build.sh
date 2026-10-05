@@ -174,6 +174,24 @@ RED metrics per operation, a log field orderId, an alert on 5xx above 1 percent.
 Behind flag orders.enabled, default off; expand migration first; rollback by disabling the flag.
 EOF
 run pass "design: a complete design passes" "$d" sh "$CI/check-design.sh" orders
+cp "$d/docs/agents-v0/requirements/orders.md" "$tmp/req.keep"
+cp "$d/docs/agents-v0/design/orders/design.md" "$tmp/design-neg.keep"
+cat >> "$d/docs/agents-v0/requirements/orders.md" <<'EOF'
+
+### AC-3 — unknown order
+Kind: negative
+Given no order for fixture ORD-404
+When the caller reads it
+Then HTTP 404 and the orders table is unchanged
+EOF
+sedi '/| AC-2 | operation getOrder |/a\
+| AC-3 | operation getOrder |' "$d/docs/agents-v0/design/orders/design.md"
+run fail "design: a negative AC missing from Failure modes fails" "$d" sh "$CI/check-design.sh" orders
+sedi '/^## Failure modes/a\
+AC-3 unknown id returns HTTP 404 and the row is unchanged.' "$d/docs/agents-v0/design/orders/design.md"
+run pass "design: naming the negative AC in Failure modes passes" "$d" sh "$CI/check-design.sh" orders
+cp "$tmp/req.keep" "$d/docs/agents-v0/requirements/orders.md"
+cp "$tmp/design-neg.keep" "$d/docs/agents-v0/design/orders/design.md"
 cp "$d/docs/agents-v0/design/orders/design.md" "$tmp/design.md.keep"
 sedi '/| AC-2 /d' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: an AC missing from Traceability fails" "$d" sh "$CI/check-design.sh" orders

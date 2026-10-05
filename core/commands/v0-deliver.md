@@ -4,16 +4,16 @@ description: Run one story through the lifecycle by following each phase command
 
 # /v0-deliver
 
-Run **one story** through **Intake → Design → Build → Verify → Release** by following each phase command in order. `/v0-deliver` holds no phase detail of its own: every prerequisite, resume rule, collision check, helper step, mechanical check, gate, and approval record lives in `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, and `/v0-release`. A goal larger than one story starts with `/v0-plan`; `/v0-deliver` then runs one story of the approved manifest, in dependency order.
+Run **one story** through **Intake → Design → Build → Verify → Release** by following each phase command in order. `/v0-deliver` holds no phase detail of its own: every prerequisite, resume rule, collision check, helper step, mechanical check, gate, and approval record lives in `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, and `/v0-release`. A new program of more than one story starts with `/v0-roadmap`, then `/v0-architecture`, then `/v0-plan`. `/v0-deliver` then runs one story of the approved manifest, in dependency order. `/v0-export` and `/v0-deck` are not steps in this pipeline.
 
 ## Start or resume
 1. Name the feature (the slug of `docs/agents-v0/requirements/<feature>.md`) and, for a new one, the source spec (Jira, Confluence, or a description). Ask when either is missing. Do not guess the feature from the newest state file.
-2. If `docs/agents-v0/requirements/<feature>.state.json` exists, read it as `/v0-status` does. `in_progress` or `blocked`: run that same phase command again. `awaiting_approval`: ask for the approval and stop. No active phase: run the command after `lastApprovedPhase`. With no artifact yet, start `/v0-build` when the story is P0-A. Otherwise route by tier and start `/v0-intake`.
+2. If `docs/agents-v0/requirements/<feature>.state.json` exists, read it as `/v0-status` does. `in_progress` or `blocked`: run that same phase command again. `awaiting_approval`: ask for the approval and stop. No active phase: run the command after `lastApprovedPhase`. With no artifact yet, start `/v0-build` when the story is P0-A. A named ticket, or a milestone that already has an `Approved` `plan` row, starts `/v0-intake`. Skip list: `workflow-orchestration.mdc` Architecture. Otherwise route by tier and start `/v0-intake`.
 3. Before the first phase, check what the phase commands would otherwise only find late: a brownfield repo has an `Approved` `onboard` row (`/v0-onboard`); a story from a milestone manifest has every dependency story Verify-approved; no other feature's code or shared-file edit is in the working tree. Report the first unmet prerequisite and stop.
 
 ## Tier routing
 - **Trivial** — use `/v0-triage`, then `/v0-maintain` with the abbreviated Verify.
-- **Major** — the full pipeline; Design includes `system-design` and threat-model notes; use the milestone manifest when applicable.
+- **Major** — the full pipeline; Design includes `system-design`, threat-model notes, and the ARC pack when `Material: yes`; use the milestone manifest when applicable.
 - **Standard** — the pipeline below.
 
 ## Pipeline

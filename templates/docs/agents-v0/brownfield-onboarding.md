@@ -12,7 +12,7 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 ```
 
 Then run `/v0-onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
-codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-intake` or `/v0-plan`:
+codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, or `/v0-plan`:
 
 | Output | Path |
 |--------|------|
@@ -75,8 +75,7 @@ Do **not** document weaker VAPT or auth controls — escalate to Security instea
 Use `/v0-maintain` for bugs, CVEs, and doc drift. Changes that touch auth, sessions,
 routes, uploads, or security config must re-enter `/v0-verify` (VAPT checklist).
 
-Large rewrites or new subsystems should use full `/v0-intake` and `/v0-design`, not
-`/v0-maintain` alone.
+A new program of more than one story, after the `onboard` row is approved, starts with `/v0-roadmap` and a discovery file anywhere in the repo, then `/v0-architecture`, then `/v0-plan`. Architecture extends the as-is `docs/agents-v0/architecture.md` and `docs/agents-v0/network.md`. It does not delete their citations. A named ticket starts at `/v0-intake`. Large rewrites or new subsystems use that program path, or full `/v0-intake` and `/v0-design` for one story, not `/v0-maintain` alone. The inventories under `docs/agents-v0/discovery/` are the onboard baseline. They are not the product discovery file `/v0-roadmap` reads.
 
 ## References
 

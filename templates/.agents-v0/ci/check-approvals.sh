@@ -6,8 +6,11 @@
 #
 # Usage: sh check-approvals.sh <requirements-artifact> <phase>
 #   <requirements-artifact>  e.g. docs/agents-v0/requirements/my-feature.md
-#   <phase>                  onboard | plan | intake | design | build | verify | release | maintain | milestone
-#                            (plan: a milestone manifest's program-planning approval;
+#   <phase>                  onboard | roadmap | architecture | plan | intake | design | arc | build | verify | release | maintain | milestone
+#                            (roadmap: docs/agents-v0/roadmap/<program>.md, the /v0-roadmap approval;
+#                             architecture: docs/agents-v0/architecture.md, the /v0-architecture approval;
+#                             plan: a milestone manifest's program-planning approval;
+#                             arc: docs/agents-v0/design/system/arc-record.md, the committee approval;
 #                             onboard: docs/agents-v0/onboarding/report.md, the /v0-onboard approval)
 #
 # Exit codes: 0 = approval recorded; 1 = missing artifact, section, or approval.
@@ -24,9 +27,9 @@ if [ -z "$art" ] || [ -z "$phase" ]; then
   exit 1
 fi
 case "$phase" in
-  onboard|plan|intake|design|build|verify|release|maintain|milestone) ;;
+  onboard|roadmap|architecture|plan|intake|design|arc|build|verify|release|maintain|milestone) ;;
   *)
-    printf 'FAIL: unknown phase "%s" (expected onboard|plan|intake|design|build|verify|release|maintain|milestone)\n' "$phase" >&2
+    printf 'FAIL: unknown phase "%s" (expected onboard|roadmap|architecture|plan|intake|design|arc|build|verify|release|maintain|milestone)\n' "$phase" >&2
     exit 1
     ;;
 esac

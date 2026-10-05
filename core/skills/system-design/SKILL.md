@@ -1,21 +1,18 @@
 ---
 name: system-design
-description: Major-tier system design. Context map, NFR/SLO budget, threat-model notes, deployment topology before feature contracts.
+description: Major-tier system design when no program architecture row exists. Follow program-architecture for the missing pack. Do not keep a second procedure.
 ---
 
 # system-design
 
-Run for **Major** change tier (`workflow-orchestration.mdc`) or greenfield program start (before P1).
+Use this only for a **Major** story that has no `Approved` `architecture` row (`workflow-orchestration.mdc`). A new program writes the pack in `/v0-architecture` before any backlog.
 
 ## Steps
-1. Read Intake/program goals and `docs/agents-v0/project-profile.md` / `docs/agents-v0/repo-map.md`.
-2. Produce or update `docs/agents-v0/design/system/context-map.md` — bounded contexts, integrations, sync vs async.
-3. Record NFR/SLO budget in `docs/agents-v0/design/system/nfr-slo.md` (latency, availability, RPO/RTO). Filled rows stay open until the P4 SLO story writes `docs/agents-v0/design/system/slo-evidence.md` (`slo-evidence`): a measurement or a waiver per row.
-4. Threat-model notes in `docs/agents-v0/design/system/threat-model.md` — assets, trust boundaries, top STRIDE risks, mitigations (no full STRIDE grid required).
-5. Deployment topology in `docs/agents-v0/network.md` + sequence diagrams for critical flows.
-6. ADR for non-trivial choices (`docs/agents-v0/adr/`).
-7. **Stop** for approval before feature-level `/v0-design` contracts. When this skill runs inside `/v0-plan`, the Plan gate is that stop; `program-planning` continues from these outputs.
+1. When `docs/agents-v0/architecture.md` has an `Approved` `architecture` row, cite that file and `docs/agents-v0/design/system/arc-record.md`. Do not rewrite them.
+2. When that row is absent, follow `program-architecture` with the requirements artifact as the problem source. Do not invent a roadmap. Stop for the `architecture` approval before feature contracts.
+3. Do not write a second copy of those steps here.
 
 ## Rule-compliance checklist
-- [ ] `architecture-and-diagrams.mdc`, `security-baseline.mdc` §11 triggers addressed.
-- [ ] Async/messaging/cache justified (`project-delivery-core.mdc`).
+- [ ] An existing `architecture` row was cited, or `program-architecture` filled the gap.
+- [ ] `architecture-and-diagrams.mdc` and `security-baseline.mdc` §11 are addressed by that pack.
+- [ ] Async, messaging, and cache are justified (`project-delivery-core.mdc`).

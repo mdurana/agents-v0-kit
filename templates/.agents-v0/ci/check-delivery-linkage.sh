@@ -219,6 +219,7 @@ feature_design_and_plan() {
   if [ "${REQUIRE_BUILD_PLAN:-1}" != "0" ]; then
     sh "$here/check-build-plan.sh" "$slug" --complete || exit 1
   fi
+  sh "$here/check-arc.sh" "$1" || exit 1
 }
 
 if [ -z "$code_files" ]; then

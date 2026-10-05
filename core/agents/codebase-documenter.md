@@ -28,4 +28,4 @@ You are the **codebase-documenter** for the Onboard phase (`workflow-orchestrati
 - `ai-agent-conduct.mdc`: smallest correct diff; no commits without explicit user approval.
 
 ## Stop condition
-Stop when the **Onboard gate** passes (`/v0-onboard`): present the report and its open questions to the user and wait for explicit approval. Record the `onboard` row only after that approval. Do not start `/v0-intake` or `/v0-plan`.
+Stop when the **Onboard gate** passes (`/v0-onboard`): present the report and its open questions to the user and wait for explicit approval. Record the `onboard` row only after that approval. Do not start `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, or `/v0-plan`.

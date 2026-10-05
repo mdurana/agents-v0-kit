@@ -11,9 +11,11 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 | Phase | Command | Lead agent | Skills | Handoff artifact |
 |-------|---------|-----------|--------|------------------|
 | Onboard (brownfield) | `/v0-onboard` | codebase-documenter | onboard-discovery | `docs/agents-v0/onboarding/report.md` (`onboard` row), profile, as-is architecture/network |
-| Plan (program, more than one story) | `/v0-plan` | program-planner | system-design, program-planning | `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/milestones/<milestone>.md` (`plan` row in `Delivery approvals`) |
-| Intake | `/v0-intake` | requirements-analyst | spec-intake | `docs/agents-v0/requirements/<feature>.md` (AC IDs, NFRs, regulations, `Delivery approvals`) |
-| Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, `docs/agents-v0/design/<feature>/ux-spec.md`, `docs/agents-v0/design/<feature>/mockups/` |
+| Roadmap (greenfield program) | `/v0-roadmap` | program-planner | program-roadmap | `docs/agents-v0/roadmap/<program>.md` (`roadmap` row, `Discovery:` path) |
+| Architecture (before backlog) | `/v0-architecture` | solution-architect | program-architecture | `docs/agents-v0/architecture.md` (`architecture` row) and the ARC record (`arc` row) |
+| Plan (program, more than one story) | `/v0-plan` | program-planner | program-planning | `docs/agents-v0/milestones/<milestone>.md` (`plan` row; Surface and Size on each story) |
+| Intake | `/v0-intake` | requirements-analyst | spec-intake | `docs/agents-v0/requirements/<feature>.md` (Gherkin AC IDs with `Kind`, NFRs, `Delivery approvals`) |
+| Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, UX spec, mockups; ARC record when `Material: yes` |
 | Build | `/v0-build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/agents-v0/build/<feature>/` with `commit:` in reports |
 | Verify | `/v0-verify` | test-engineer → security-reviewer → code-reviewer | quality-gate, vapt-review, pr-review | `docs/agents-v0/verify/<feature>/` reports with `commit:` |
 | Release | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |

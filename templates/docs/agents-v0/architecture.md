@@ -1,7 +1,7 @@
 # Architecture
 
-> System context for this service. `/v0-onboard` or the P0 build fills this file. A later feature updates it in a docs-only follow-up (`doc-sync`).
-> Brownfield: `/v0-onboard` rewrites this file as-is. Every statement cites code (`path/File.java:42`) or says `UNVERIFIED`. Delete each `TEMPLATE:` line once it is replaced.
+> System context for this service. `/v0-onboard` or the P0 build fills the as-is sections. `/v0-architecture` adds the C4 sections and the `architecture` approval before any story. A later feature updates as-is text in a docs-only follow-up (`doc-sync`).
+> Brownfield: `/v0-onboard` rewrites the as-is sections. Every statement cites code (`path/File.java:42`) or says `UNVERIFIED`. `/v0-architecture` keeps those citations and adds the target C4 sections beside them. Delete each `TEMPLATE:` line once it is replaced.
 
 ## Context
 
@@ -30,3 +30,18 @@ flowchart LR
 ## ADRs
 
 See `docs/agents-v0/adr/`.
+
+## C4 Context
+
+<!-- /v0-architecture: people and external systems. No product, database, or broker names. -->
+
+## C4 Container
+
+<!-- /v0-architecture: containers only, still technology-agnostic. The pattern ADR chooses technology. -->
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+
+> `/v0-architecture` appends the `architecture` row after one explicit approval. The Artifacts cell names `docs/agents-v0/design/system/arc-record.md`. An `arc` row is only for a later story that amends the recommendation. `/v0-plan` waits for the `architecture` row. Who skips this command: `workflow-orchestration.mdc` Architecture.

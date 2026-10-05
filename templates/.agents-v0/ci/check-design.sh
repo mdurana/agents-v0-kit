@@ -15,7 +15,8 @@
 # modes, Observability, and Rollout, each with content or "N/A: <reason>"; no TEMPLATE: line is
 # left; every AC-n of the requirements artifact appears in Traceability; every operationId of the
 # draft appears in Authorization; the "ADR:" line names an existing ADR with at least two
-# alternatives (or says "N/A: <reason>").
+# alternatives (or says "N/A: <reason>"). Every AC whose requirements block says
+# Kind: negative or Kind: edge is named in Failure modes.
 # Lock: the pin is the design as the person approved it. After that, a change to the design is an
 # amendment: docs/agents-v0/design/<feature>/amendments.md needs an Approved row naming the first 12
 # characters of the new hash, and a new pin line. Pin only after the person approved.
@@ -155,6 +156,12 @@ def check():
         for ac in sorted(set(re.findall(r"\bAC-\d+\b", requirements)), key=lambda s: int(s[3:])):
             if not re.search(r"\b%s\b" % re.escape(ac), trace):
                 fail(f"{path}: {ac} is not in Traceability")
+        failure = section(secs, "failure modes") or ""
+        for block in re.split(r"(?m)^###\s+", requirements)[1:]:
+            heading = re.match(r"(AC-\d+)\b", block)
+            kind = re.search(r"(?mi)^Kind:\s*(negative|edge)\s*$", block)
+            if heading and kind and not re.search(r"\b%s\b" % re.escape(heading.group(1)), failure):
+                fail(f"{path}: {heading.group(1)} ({kind.group(1).lower()}) is not in Failure modes")
     draft = next((p for p in (os.path.join(base, n) for n in ("openapi.yaml", "openapi.yml", "openapi.json")) if os.path.isfile(p)), None)
     if draft:
         ids = re.findall(r"""["']?operationId["']?\s*:\s*["']?([\w.\-]+)""", read(draft) or "")

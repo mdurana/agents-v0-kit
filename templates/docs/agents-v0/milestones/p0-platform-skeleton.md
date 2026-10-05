@@ -27,9 +27,9 @@ and in CI.
 
 ## Stories
 
-| Story ID | User story | Feature artifact | Status | Dependency |
-|----------|-----------|------------------|--------|------------|
-| P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — |
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — | vertical slice | 4 |
 
 > When `.cursor/` and `.agents-v0/` are already present, do not reinstall the kit. `bootstrap-greenfield.sh` or `install.sh` already did that. Copy the container starter from `docker/` per `docker/README.md`.
 > This row is one story. Record `Vertical slice: yes`. Do not write `## Proposed split` because the container files sit next to the service. Acceptance criteria are only:

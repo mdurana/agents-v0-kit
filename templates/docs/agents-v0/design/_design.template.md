@@ -26,7 +26,7 @@ One row per operation of the contract draft. The resource rule is the BOLA check
 
 ## Failure modes
 
-<!-- TEMPLATE: for each dependency and step, what fails, what the service does (timeout, retry, circuit breaker, fallback, compensation), and what the user sees. Include the slow and the partially-failed case, not only "down". -->
+<!-- TEMPLATE: for each dependency and step, what fails, what the service does (timeout, retry, circuit breaker, fallback, compensation), and what the user sees. Include the slow and the partially-failed case, not only "down". Name every Kind: negative and Kind: edge id from the requirements artifact (AC-2, AC-3, …). -->
 
 ## Observability
 

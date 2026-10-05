@@ -8,6 +8,7 @@
 #                    "Service root:" line, else openapi/api-v1.yaml; skipped when neither exists)
 #   design.lock   -> check-design.sh <feature> --verify-lock
 #   ux-spec.md    -> check-ux-spec.sh <feature>
+# A requirements file that already has an Approved Intake row is re-checked with check-intake.sh.
 # Needs python3 and PyYAML. Exit 1 when any check fails; every feature is checked either way.
 
 set -eu
@@ -39,6 +40,19 @@ done
 for spec in docs/agents-v0/design/*/ux-spec.md; do
   [ -f "$spec" ] || continue
   sh "$here/check-ux-spec.sh" "$(basename "$(dirname "$spec")")" || failed=1
+done
+
+for req in docs/agents-v0/requirements/*.md; do
+  [ -f "$req" ] || continue
+  case "$req" in
+    *.phase-result.md|*.helper-brief.md) continue ;;
+  esac
+  if grep -Eq '^[[:space:]]*Material:[[:space:]]*yes[[:space:]]*$' "$req"; then
+    sh "$here/check-arc.sh" "$req" || failed=1
+  fi
+  if sh "$here/check-approvals.sh" "$req" intake >/dev/null 2>&1; then
+    sh "$here/check-intake.sh" "$req" || failed=1
+  fi
 done
 
 for async in docs/agents-v0/design/*/asyncapi.yaml; do

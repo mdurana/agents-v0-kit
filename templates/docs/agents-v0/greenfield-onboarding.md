@@ -74,10 +74,13 @@ Record approvals in each feature artifact’s `Delivery approvals` table. CI use
 
 ## 5. Advance milestones
 
-After P0 go/no-go (`milestone` row approved, `check-milestone.sh` green), copy
-`docs/agents-v0/milestones/_template.md` to `p1-contracts-and-data-models.md`, etc., per
+After P0 go/no-go (`milestone` row approved, `check-milestone.sh` green), a program of more than one story starts with `/v0-roadmap` and the path of the discovery document. That file may live anywhere in the repository. `/v0-architecture` then writes the C4-through-operations pack and the ARC record, and stops for one approval before any story. Plan reads that pack and fills Surface and Size on each story row. It does not rewrite the pack. A story that adds a service, a datastore, a security boundary, or a breaking API is `Material: yes`. Design cites `docs/agents-v0/design/system/arc-record.md` when the program recommendation already covers it. An `arc` row is written only when the story amends that recommendation. Who skips `/v0-architecture`: `workflow-orchestration.mdc` Architecture.
+
+`/v0-export` and `/v0-deck` are optional. They do not gate a merge.
+
+Copy `docs/agents-v0/milestones/_template.md` to `p1-contracts-and-data-models.md`, etc., per
 [README.md](../README.md) milestone program (P1 contracts, P2 MVP, P3 features, P4
-hardening, P5 release readiness).
+hardening, P5 release readiness) when those files are not already seeded.
 
 ## References
 

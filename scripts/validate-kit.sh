@@ -108,7 +108,7 @@ for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/rules core/agents cor
 done
 
 # 3. Commands: every phase command exists; workflow rule references the phases; evidence contracts.
-for command in plan intake design build verify maintain release deliver status onboard triage; do
+for command in roadmap architecture plan intake design build verify maintain release deliver status onboard triage export deck; do
   [ -f "core/commands/v0-$command.md" ] || err "missing /v0-$command command"
 done
 grep -Fq '`/v0-plan`' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-plan"
@@ -327,6 +327,16 @@ grep -Fq 'milestone' templates/.agents-v0/ci/check-approvals.sh || err "check-ap
 grep -Fq 'Milestone/Story links' core/skills/spec-intake/SKILL.md || err "spec-intake does not record milestone/story links"
 grep -Fq 'so that' core/skills/spec-intake/SKILL.md || err "spec-intake does not require the As a / I want / so that user story"
 grep -Fq 'AC-8' core/skills/spec-intake/SKILL.md || err "spec-intake lacks the acceptance-criteria cap"
+grep -Fq 'Kind: happy' core/skills/spec-intake/SKILL.md || err "spec-intake must require Kind on each scenario"
+grep -Fq 'check-intake.sh' core/skills/spec-intake/SKILL.md || err "spec-intake must run check-intake.sh"
+grep -Fq 'check-intake.sh' core/commands/v0-intake.md || err "/v0-intake gate must run check-intake.sh"
+grep -Fq 'user_story' core/commands/v0-intake.md || err "/v0-intake phase result must copy the user story"
+grep -Fq 'Kind: negative' templates/.agents-v0/ci/check-design.sh || err "check-design.sh must require negative scenarios in Failure modes"
+grep -Fq 'check-intake.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must re-check an approved Intake"
+grep -Fq 'intake <feature>' core/commands/v0-deck.md || err "/v0-deck must accept an intake kind"
+grep -Fq 'Non-technical' core/skills/leadership-deck/SKILL.md || err "leadership-deck must render scenario names for a non-technical audience"
+[ -f templates/.agents-v0/ci/check-intake.sh ] || err "required Intake check missing: templates/.agents-v0/ci/check-intake.sh"
+grep -Fq '.agents-v0/ci/check-intake.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-intake.sh"
 grep -Fq 'Vertical slice' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the story-size budget"
 grep -Fq 'helper-brief' core/rules/workflow-orchestration.mdc || err "workflow rule lacks helper briefs"
 grep -Fq 'docs/agents-v0/build/<feature>/plan.md' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the build plan"
@@ -474,6 +484,17 @@ grep -Fq 'check-onboarding-docs.sh' core/skills/onboard-discovery/SKILL.md || er
 grep -Fq 'discover-codebase.sh' core/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run discover-codebase.sh"
 grep -Fq 'UNVERIFIED' core/agents/codebase-documenter.md || err "codebase-documenter must mark unknowns UNVERIFIED"
 grep -Fq 'onboard' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the onboard phase"
+grep -Fq 'roadmap' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the roadmap phase"
+grep -Fq '|arc|' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the arc phase"
+grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must run check-arc.sh for a material story"
+grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must run check-arc.sh"
+grep -Fq 'Material: yes' core/commands/v0-design.md || err "/v0-design must stop for a material ARC pack"
+grep -Fq 'Discovery:' core/commands/v0-roadmap.md || err "/v0-roadmap must record the discovery path the user passed"
+grep -Fq 'program-architecture' core/commands/v0-architecture.md || err "/v0-architecture must follow program-architecture"
+grep -Fq 'does not write stories' core/commands/v0-architecture.md || err "/v0-architecture must not write the backlog"
+grep -Fq '/v0-architecture' core/commands/v0-plan.md || err "/v0-plan must wait for /v0-architecture"
+grep -Fq 'tickets-sources.md' core/commands/v0-export.md || err "/v0-export must stamp tickets-sources.md"
+grep -Fq 'not steps in this pipeline' core/commands/v0-deliver.md || err "/v0-deliver must leave export and deck out of the pipeline"
 grep -Fq 'onboard' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the onboard approval"
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-intake.md || err "/v0-intake must wait for the onboard approval on a brownfield repo"
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-plan.md || err "/v0-plan must wait for the onboard approval on a brownfield repo"
@@ -505,7 +526,7 @@ for maintain_script in classify-change.sh; do
 done
 grep -Fq '_note.template.md' scripts/install.sh || err "install.sh does not seed the maintenance note template"
 # Design and Build: mechanical checks, an independent review, a pinned design, a real plan.
-for design_file in check-openapi.sh check-design.sh check-design-contracts.sh check-ux-spec.sh check-build-plan.sh check-endpoint-auth.sh check-frontend-calls.sh; do
+for design_file in check-openapi.sh check-design.sh check-design-contracts.sh check-ux-spec.sh check-build-plan.sh check-endpoint-auth.sh check-frontend-calls.sh check-arc.sh; do
   [ -f "templates/.agents-v0/ci/$design_file" ] || err "required Design/Build check missing: templates/.agents-v0/ci/$design_file"
   grep -Fq ".agents-v0/ci/$design_file" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$design_file"
 done
@@ -573,8 +594,10 @@ for cmd in design build verify; do
 done
 grep -Fq 'Release owner' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Release rows"
 # Always-on context budget: the rules every session loads must not creep past this size.
+# 36000 covers the roadmap entry, the material ARC line, and the export/deck exception.
+# Procedure stays in the commands and skills.
 always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc AGENTS.md | wc -c | tr -d ' ')"
-[ "$always_on_bytes" -le 33000 ] || err "always-on rules are $always_on_bytes bytes (limit 33000): move detail into a command, agent, or skill"
+[ "$always_on_bytes" -le 36000 ] || err "always-on rules are $always_on_bytes bytes (limit 36000): move detail into a command, agent, or skill"
 for ci_script in check-gate-metrics.sh check-event-schemas.sh; do
   grep -Fq ".agents-v0/ci/$ci_script" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$ci_script"
 done

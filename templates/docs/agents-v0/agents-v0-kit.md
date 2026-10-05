@@ -9,6 +9,8 @@ The kit targets **Cursor**. `scripts/install.sh` copies the core into `.cursor/`
 ```mermaid
 flowchart TD
   onboard["/v0-onboard brownfield"]
+  roadmap["/v0-roadmap"]
+  arch["/v0-architecture"]
   plan["/v0-plan program"]
   intake["/v0-intake"]
   design["/v0-design"]
@@ -22,8 +24,11 @@ flowchart TD
   triage["/v0-triage"]
   maintain["/v0-maintain"]
 
+  onboard -.->|onboard row| roadmap
   onboard -.->|onboard row| plan
   onboard -.->|onboard row| intake
+  roadmap -->|roadmap row| arch
+  arch -->|architecture row| plan
   plan -->|plan row| intake
   intake -->|gate| design
   design --> dreview
@@ -40,13 +45,15 @@ flowchart TD
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. `/v0-deliver` runs that path by following each phase command and stopping at every gate that applies. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues; the Build approval writes its Design row.
+A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. A new program of more than one story runs Roadmap, Architecture, and Plan before that path. `/v0-deliver` runs one story by following each phase command and stopping at every gate that applies. It does not run `/v0-export` or `/v0-deck`. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes`. The Build approval writes its Design row when that shortcut applies.
 
 | Edge | What it means |
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
-| Plan, dotted into the story path | A goal larger than one story is split into milestones and ordered stories first. One story skips Plan. |
-| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. |
+| Roadmap | A new program of more than one story. The person points `/v0-roadmap` at a discovery file anywhere in the repo. The kit sequences it and does not rediscover the problem. A named ticket, a milestone that already has a `plan` row, Maintain, and Trivial skip this. |
+| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack. One approval records the `architecture` row and names the ARC file. An `arc` row is only a later amendment. Who skips this command: `workflow-orchestration.mdc` Architecture. |
+| Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
+| Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation. |
 | P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the row. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
@@ -54,16 +61,20 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | Triage | Docs-only or version-only, and only when `ci/classify-change.sh` says so and a person confirms. |
 | Deploy | Optional, after the merge, one environment at a time. Records go in a later docs-only merge request. |
 
-`/v0-status` does not move the work. It reads the state file and names the next command.
+`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, `plan`, and `arc` rows. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
 
 ## Commands
 
 | Command | When | Record |
 |---------|------|--------|
 | `/v0-onboard` | An existing repo, once | `docs/agents-v0/onboarding/report.md` |
-| `/v0-plan` | More than one story | `docs/agents-v0/milestones/<milestone>.md`, `docs/agents-v0/design/system/context-map.md` |
-| `/v0-intake` | One story's requirements | `docs/agents-v0/requirements/<feature>.md` |
-| `/v0-design` | Contract and design before code | `docs/agents-v0/design/<feature>/` |
+| `/v0-roadmap` | A new program. Pass the discovery file path | `docs/agents-v0/roadmap/<program>.md` |
+| `/v0-architecture` | After the roadmap, before any story | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
+| `/v0-plan` | More than one story, after architecture | `docs/agents-v0/milestones/<milestone>.md` |
+| `/v0-intake` | One story's requirements, Gherkin `AC-*` with a failure case, or `Negatives: N/A` when no security trigger applies | `docs/agents-v0/requirements/<feature>.md` |
+| `/v0-design` | Contract and design before code. ARC when `Material: yes` | `docs/agents-v0/design/<feature>/`, and `docs/agents-v0/design/system/arc-record.md` when material |
+| `/v0-export` | When someone asks for a Jira copy | `docs/agents-v0/backlog/tickets.csv` |
+| `/v0-deck` | When someone asks for a briefing from an approved story, or from the approved program | `docs/agents-v0/presentations/<name>.md` |
 | `/v0-build` | Implement against the approved design | `docs/agents-v0/build/<feature>/` |
 | `/v0-verify` | Tests, security, review | `docs/agents-v0/verify/<feature>/` |
 | `/v0-release` | Merge request, then a human merge | `release` row, then the merge |
@@ -81,12 +92,13 @@ Resume is the same in every phase. `scripts/sync-feature-state.sh` writes the st
 | Feature | `docs/agents-v0/requirements/<feature>.state.json` | the requirements artifact, one row per phase |
 | Onboarding | `docs/agents-v0/onboarding/state.json` | `docs/agents-v0/onboarding/report.md`, phase `onboard` |
 | Maintenance | `docs/agents-v0/maintain/<id>/state.json` | the note, phases `maintain` and `verify` |
-| Program | none | a `plan` row on each milestone manifest |
+| Program | none | a `roadmap` row, then an `architecture` row on `docs/agents-v0/architecture.md`, then a `plan` row on each milestone manifest |
+| ARC | none | an `arc` row on `docs/agents-v0/design/system/arc-record.md`, only when a story says `Material: yes` |
 | Milestone go/no-go | none | a `milestone` row on the manifest |
 
 The approvals table is five columns: Phase, Artifacts, Approver, Decision, Date. CI accepts `Approved`, `approved`, `yes`, or `pass` as the decision, and rejects `Not approved` and `Re-opened`. The Approver cell is the person's GitLab username (`@ada`), because the final job matches it to the real merge-request approval. Build and Verify evidence paths in that row must exist on disk and start with a `commit:` line for the tree that was tested. A later code change makes the line stale, and CI rejects it until the phase is re-run on the new commit.
 
-`docs/agents-v0/requirements/<feature>.phase-result.md` is the handoff the next phase reads. It names the phase, the status, the artifacts, and one blocker per line.
+`docs/agents-v0/requirements/<feature>.phase-result.md` is the handoff the next phase reads. It names the phase, the status, the artifacts, and one blocker per line. An Intake result also copies the user story, the acceptance-criterion count, the failure-scenario count, the regulations, and the open questions.
 
 ## Change tiers
 

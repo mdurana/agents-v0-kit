@@ -22,17 +22,22 @@
 
 ## Stories
 
-| Story ID | User story | Feature artifact | Status | Dependency |
-|----------|-----------|------------------|--------|------------|
-| <P2-A> | As a [role], I want [goal], so that [benefit]. | docs/agents-v0/requirements/<feature>.md | planned | — |
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| <P2-A> | As a [role], I want [goal], so that [benefit]. | docs/agents-v0/requirements/<feature>.md | planned | — | — | — |
 
 > Conventions:
 > - The User story cell is one sentence: `As a [role], I want [goal], so that [benefit].`
 >   Replace every `<...>` in that cell before `/v0-intake`. Intake copies the sentence into
 >   the feature artifact and splits the goal and each constraint into `AC-1`, `AC-2`, …
->   (`spec-intake` skill). Out of scope stays a separate list. Intake does not invent a
->   role, goal, or benefit.
-> - Each linked feature artifact records `Milestone: <Pn-name>` and `Story: <story-id>`
+>   one Gherkin scenario each, with `Kind` and an observable `Then` (`spec-intake` skill). One scenario
+>   is a negative or an edge, unless `Negatives: N/A` applies. That scenario counts toward the cap of 8.
+>   Out of scope stays a separate list. Intake does not invent a role, goal, or benefit.
+> - Surface is `backend`, `bff`, `frontend`, or `vertical slice`. Size is the number of
+>   acceptance criteria, at most 8, including that negative or edge. `/v0-plan` fills both.
+>   `ci/check-milestone.sh` does not read them. Seeded P0-A stays at 4.
+> - Each linked feature artifact records `Milestone: <Pn-name>`,
+>   `Milestone file: docs/agents-v0/milestones/<this-file>.md`, and `Story: <story-id>`
 >   under its title (`spec-intake` skill) for traceability.
 > - Status is prose (planned / in-flight / done); the machine check is evidence-based:
 >   `ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to

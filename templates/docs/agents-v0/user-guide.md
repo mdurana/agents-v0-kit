@@ -1,8 +1,8 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit: **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
+This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
 
 ---
 
@@ -30,7 +30,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
   - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design.
-  - `/v0-intake` — only clarify and document requirements (good for early discovery).
+  - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text
    /v0-intake
@@ -52,9 +52,13 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 | Command     | When to use it                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `/v0-plan`     | A big goal (a platform, several services): split it into milestones and ordered stories before any `/v0-intake`. |
-| `/v0-intake`   | Turn a idea or ticket into clear requirements and open questions. The platform skeleton does not run this. |
-| `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues. |
+| `/v0-roadmap`  | A new program. Point it at the discovery document your team already wrote, anywhere in the repo. The AI sequences now / next / later and stops. It does not reopen the problem. |
+| `/v0-architecture` | After that roadmap is approved and before any story. The AI writes the system shape and the architecture decision and stops. |
+| `/v0-plan`     | After that architecture decision is approved: milestones and ordered stories before any `/v0-intake`. |
+| `/v0-intake`   | Turn one idea or ticket into clear requirements. Each acceptance criterion is a Given / When / Then. One is a failure case, unless the story has no security trigger and no failure behavior. The platform skeleton does not run this. |
+| `/v0-export`   | Optional. Regenerates a Jira spreadsheet from the approved stories. It does not change the plan. |
+| `/v0-deck`     | Optional. Writes a briefing from one approved story (`intake`), or from the approved roadmap and plan (`product` or `delivery`). You say who the audience is and what the meeting must decide. |
+| `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
 | `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
@@ -87,9 +91,9 @@ You can approve intake for a second feature while the first feature’s build is
 
 The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it. The usual way is one working folder per feature: engineering runs `scripts/feature-worktree.sh <feature>` once you have said yes, and each feature then builds in its own folder without touching the others.
 
-## Big goals: plan first
+## Big goals: roadmap, then plan
 
-When the goal is larger than one story, start with `/v0-plan` and paste the goal. The AI proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the gates that apply, in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify.
+When the goal is a new program, start with `/v0-roadmap` and the path of the discovery document your team already agreed. That file may sit anywhere in the repo. It needs these headings, each filled in: Problem, Success metric, Options, Chosen option, In scope, Out of scope. The AI turns In scope into now / next / later and stops. It does not reopen the problem. You approve the sequence. Then `/v0-architecture` writes the system shape (who talks to whom, the options, the network, and how it runs) and stops. You approve that once, before any story exists. Then `/v0-plan` proposes the pieces (which parts of the system, which milestones, which stories, and in what order) and stops. You approve the plan once. Each story then runs through the gates that apply, in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify. Who skips the roadmap, the architecture command, and the plan is the skip list in `workflow-orchestration.mdc` (a single ticket, the platform skeleton, and a fix after go-live).
 
 With many small stories you can approve the Intake or Design gate for several of them in one message, but only by naming each one, for example `Approved: Design for P2-A, P2-B, P2-C`. That is available only for ordinary stories with no security triggers and no open questions. Build, Verify, and Release are always approved one story at a time. "Approve all" does not count.
 
@@ -101,7 +105,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. A story with an API, screens, or a public route stops at each gate. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 
@@ -110,11 +114,13 @@ The AI **must not** skip a gate that applies. A story with an API, screens, or a
 
 | You should see               | What it means                                                                                 |
 | ---------------------------- | --------------------------------------------------------------------------------------------- |
-| Acceptance criteria          | Testable “done” statements (who can do what, under which conditions).                         |
+| Acceptance criteria          | One Given / When / Then per criterion. The result names what you would see (a status, a saved record, a message, or a screen). |
+| A failure case               | At least one criterion says what happens when the input or the dependency is wrong. If the story has no security trigger and no failure behavior, the artifact records `Negatives: N/A` and a reason instead. |
+| How to try it                | The state required beforehand, and one way a person can check the main path before QA.        |
 | NFRs                         | Speed, availability, audit needs (in plain language).                                         |
 | Regulations / policies       | e.g. privacy, banking, or internal GXI items that apply.                                      |
 | UX requirements (UI changes) | Accessibility target (WCAG 2.1 AA), devices/browsers, design system, and UX success criteria. |
-| Open questions               | List should be empty or you’ve answered each one.                                             |
+| Open questions               | The list says none.                                                                           |
 
 
 **You might say:**  
@@ -131,7 +137,7 @@ The AI **must not** skip a gate that applies. A story with an API, screens, or a
 
 **Your question:** *Is the solution shape right before we build?*
 
-This stop applies when the story adds an API, screens, or a public route. A health, readiness, or liveness check does not by itself make it a public route. Otherwise the AI locks the design and continues to Build, and you approve that design together with the build. The platform skeleton does not run this phase.
+This stop applies when the story adds an API, screens, or a public route, and when it adds a service, a datastore, a security boundary, or a breaking API. That last case uses the architecture decision you already approved. You are asked to accept a new recommendation only when this story changes it. A health, readiness, or liveness check does not by itself make it a public route. Otherwise the AI locks the design and continues to Build, and you approve that design together with the build. The platform skeleton does not run this phase.
 
 
 | You should see            | What it means                                                                                                 |
@@ -246,7 +252,7 @@ Describe the issue in plain language. The AI fixes, then runs **Verify** again. 
 **Include:**
 
 - **Who, what, and why** in one sentence: As a [role], I want [goal], so that [benefit].  
-- **Constraints** (privacy, regions, deadlines, systems involved). Intake turns the sentence and each constraint into numbered acceptance criteria (`AC-1`, `AC-2`, …).  
+- **Constraints** (privacy, regions, deadlines, systems involved). Intake turns the sentence and each constraint into numbered acceptance criteria (`AC-1`, `AC-2`, …), one Given / When / Then scenario each, including one failure case unless the story has no security trigger and no failure behavior.  
 - **Links** (Jira, Confluence, Figma) — paste text if you can’t link  
 - **Out of scope** (what we are *not* doing), as its own list
 
@@ -327,7 +333,7 @@ Make the portal better.
 
 ```text
 1. Open Cursor chat in the project.
-2. Big goal: /v0-plan first. Then /v0-deliver + paste Jira/spec (or /v0-intake only). Name the feature if more than one is open.
+2. New program: /v0-roadmap <path to the discovery file>, then /v0-architecture, then /v0-plan. One ticket: /v0-deliver or /v0-intake. Name the feature if more than one is open.
 3. Answer questions when asked.
 4. At each gate that applies: read summary → Approved OR list changes. The platform skeleton asks once, at Release.
 5. If the chat stopped mid-phase: /v0-status <feature> → run the same phase command again.

@@ -294,6 +294,180 @@ printf '{}\n' > "$d/frontend/package.json"
 : > "$d/frontend/node_modules/x/pom.xml"
 expect_pass "layout roots: node_modules is not scanned" "$d" sh "$CI/check-layout-roots.sh"
 
+# --- roadmap row and material ARC -------------------------------------------
+d="$tmp/arc"
+mkdir -p "$d/docs/agents-v0/roadmap" "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/system"
+cat > "$d/docs/agents-v0/roadmap/claims.md" <<'EOF'
+# Roadmap
+
+Discovery: notes/discovery.md
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/milestones/m.md" <<'EOF'
+# Milestone: M
+
+Roadmap: docs/agents-v0/roadmap/claims.md
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| M-A | As a user, I want a, so that b. | docs/agents-v0/requirements/a.md | planned | — | backend | 1 |
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| plan | docs/agents-v0/milestones/m.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/requirements/a.md" <<'EOF'
+# A
+
+Material: no
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| Intake | docs/agents-v0/requirements/a.md | dev | Approved | 2026-01-01 |
+EOF
+expect_pass "check-approvals accepts the roadmap row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/roadmap/claims.md roadmap
+expect_pass "check-milestone accepts a manifest that names an approved roadmap" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+expect_pass "check-arc ignores a story that is not material" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
+printf 'Material: yes\nARC: docs/agents-v0/design/system/arc-record.md\n' > "$d/docs/agents-v0/requirements/a.md"
+expect_fail "check-arc fails a material story with no ARC record" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
+mkdir -p "$d/docs/agents-v0"
+cat > "$d/docs/agents-v0/design/system/arc-record.md" <<'EOF'
+# ARC record
+
+## Fitness functions
+
+| Name | Target | Evidence |
+|------|--------|----------|
+| checkout | p95 under 300ms | slo-evidence |
+EOF
+cat > "$d/docs/agents-v0/architecture.md" <<'EOF'
+# Architecture
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| architecture | docs/agents-v0/architecture.md, docs/agents-v0/design/system/arc-record.md | dev | Approved | 2026-01-01 |
+EOF
+expect_pass "check-arc accepts an architecture row that names the ARC file" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
+cat > "$d/docs/agents-v0/design/system/arc-record.md" <<'EOF'
+# ARC record
+
+## Fitness functions
+
+| Name | Target | Evidence |
+|------|--------|----------|
+| checkout | p95 under 300ms | slo-evidence |
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| arc | docs/agents-v0/design/system/arc-record.md | dev | Approved | 2026-01-02 |
+EOF
+expect_pass "check-arc accepts an approved ARC record" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
+expect_pass "check-approvals accepts the arc row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/design/system/arc-record.md arc
+cat > "$d/docs/agents-v0/architecture.md" <<'EOF'
+# Architecture
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| architecture | docs/agents-v0/architecture.md | dev | Approved | 2026-01-01 |
+EOF
+printf '\nArchitecture: docs/agents-v0/architecture.md\n' >> "$d/docs/agents-v0/milestones/m.md"
+cat >> "$d/docs/agents-v0/requirements/a.md" <<'EOF'
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| Intake | docs/agents-v0/requirements/a.md | dev | Approved | 2026-01-01 |
+EOF
+expect_pass "check-approvals accepts the architecture row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/architecture.md architecture
+expect_pass "check-milestone accepts a manifest that names an approved architecture pack" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+
+# --- check-intake.sh ---------------------------------------------------------
+d="$tmp/intake"
+mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/milestones"
+cat > "$d/docs/agents-v0/milestones/p2.md" <<'EOF'
+| P2-A | As a clerk, I want to place an order, so that stock is reserved. |
+EOF
+cat > "$d/docs/agents-v0/requirements/orders.md" <<'EOF'
+# Orders
+
+As a clerk, I want to place an order, so that stock is reserved.
+
+Milestone: P2
+Milestone file: docs/agents-v0/milestones/p2.md
+Story: P2-A
+Surfaces: backend
+Material: no
+
+## Preconditions
+The clerk is signed in and fixture CUST-1 exists.
+
+## Desk check
+Call POST /api/v1/orders with fixture CUST-1 and confirm the order row.
+
+## Acceptance criteria
+
+### AC-1 — place the order
+Kind: happy
+Given a signed-in clerk and fixture CUST-1
+When the clerk places an order for SKU-1
+Then HTTP 201 and the order row is stored with status PENDING
+
+### AC-2 — reject an unsigned clerk
+Kind: negative
+Given no session for fixture CUST-1
+When the clerk places an order
+Then HTTP 401 and no order row is written
+
+## Out of scope
+- Mobile checkout
+
+## NFRs
+The place-order call returns within two seconds for fixture CUST-1.
+
+## Regulations
+N/A: no personal data beyond the customer id already stored.
+
+## Security-review triggers
+- auth: the clerk must be signed in
+
+## Open questions
+none
+EOF
+expect_pass "check-intake accepts a story with a refusing negative" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
+cp "$d/docs/agents-v0/requirements/orders.md" "$d/docs/agents-v0/requirements/plain.md"
+sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
+sedi 's/Call POST.*/Sign in as the clerk and place one order for the customer./' "$d/docs/agents-v0/requirements/plain.md"
+sedi 's/Then HTTP 201 and the order row is stored with status PENDING/Then the clerk sees the confirmation./' "$d/docs/agents-v0/requirements/plain.md"
+expect_pass "check-intake accepts a plain desk check and Then" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/plain.md
+sedi 's/Then the clerk sees the confirmation./Then nope/' "$d/docs/agents-v0/requirements/plain.md"
+expect_fail "check-intake rejects a Then that is only a stub" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/plain.md
+sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
+sedi 's/Kind: negative/Kind: happy/' "$d/docs/agents-v0/requirements/orders.md"
+expect_fail "check-intake rejects a security trigger without a refusal" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
+sedi 's/Kind: happy/Kind: negative/' "$d/docs/agents-v0/requirements/orders.md"
+sedi 's/Then HTTP 201 and the order row is stored with status PENDING/Then it works as expected/' "$d/docs/agents-v0/requirements/orders.md"
+expect_fail "check-intake rejects a vague Then" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
+printf 'Story: P0-A\n' > "$d/docs/agents-v0/requirements/p0.md"
+expect_pass "check-intake skips P0-A" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/p0.md
+
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2
   exit 1

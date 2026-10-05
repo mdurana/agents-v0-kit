@@ -13,7 +13,9 @@ Read `docs/agents-v0/project-profile.md` in the target repo for build/test comma
 
 ```mermaid
 flowchart LR
-  plan[Plan program] -.->|gate| intake
+  roadmap[Roadmap] -->|gate| arch[Architecture]
+  arch -->|gate| plan[Plan program]
+  plan -->|gate| intake
   intake[Intake] -->|gate| design[Design]
   design -->|gate| build[Build]
   build -->|gate| verify[Verify]
@@ -21,14 +23,25 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A program of more than one story starts with **Plan** (`/v0-plan`, below). Each phase is entered via a command (`/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`) or chained via `/v0-deliver`. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A named ticket, and a milestone that already has an `Approved` `plan` row, start at Intake. P0-A starts at Build. Commands: `/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`, or `/v0-deliver`. `/v0-export` and `/v0-deck` are not phases. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
+
+## Roadmap
+
+Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` set to the path. It does not copy the file. A missing path or a placeholder heading stops. The `roadmap` row (`ci/check-approvals.sh <roadmap> roadmap`) covers the sequence. The discovery file has no kit approval row.
+
+### Roadmap gate
+Now, Next, and Later are in-scope items copied from the discovery file. Stop for explicit user approval before Architecture.
+
+## Architecture
+
+`/v0-architecture` (`program-architecture`) runs after the `roadmap` row and before any backlog. Skip list: P0-A, a named ticket, and Maintain or Trivial. It writes the C4-through-operations pack and `docs/agents-v0/design/system/arc-record.md`. It does not write stories. One approval records the `architecture` row and names that ARC file. An `arc` row is only a later amendment. Plan waits for the `architecture` row.
 
 ## Program planning
 
-`/v0-plan` decomposes a goal larger than one story (a platform, a multi-service change, any Major-tier program) before any `/v0-intake`. `program-planner` follows `system-design` and `program-planning` and writes `docs/agents-v0/design/system/context-map.md` and the milestone manifests under `docs/agents-v0/milestones/`. A program has no state file. Its approval is a `plan` row in each manifest's `Delivery approvals` table (`ci/check-approvals.sh <manifest> plan`).
+`/v0-plan` turns an approved roadmap and that architecture pack into milestone manifests before any `/v0-intake`. It does not rewrite the pack. `program-planner` follows `program-planning` and writes `docs/agents-v0/milestones/`. A program has no state file. Its approval is a `plan` row (`ci/check-approvals.sh <manifest> plan`). P0-A alone needs no roadmap and no architecture pack. Any other program waits for the `roadmap` row and the `architecture` row. Each manifest records `Roadmap:` and `Architecture:`; `ci/check-milestone.sh` checks them.
 
 ### Plan gate
-`/v0-plan` lists the criteria: a context map; concrete stories with story-ID dependencies and no cycle; every story inside the size budget; an integration story for each pair of contexts that call each other; the `plan` row after explicit user approval. `ci/check-milestone.sh` fails a story with a `build` approval while a story it depends on has no `verify` approval (`MILESTONE_ORDER=0` turns that off).
+Every story fits a context already on the approved context map; story-ID dependencies have no cycle; Surface and Size on each row; one surface and at most eight criteria, including the negative; an integration story for each pair of contexts that call each other; every story goal taken from the roadmap; the `plan` row after explicit user approval. `ci/check-milestone.sh` fails a story with a `build` approval while a story it depends on has no `verify` approval (`MILESTONE_ORDER=0` turns that off).
 
 ## Phase resume
 
@@ -43,7 +56,7 @@ The state file separates the last approval from the phase in flight. `scripts/sy
 
 Once `docs/agents-v0/requirements/<feature>.md` exists, the phase command runs `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase <phase> --status in_progress` and continues from files already on disk; it does not recreate them. A red baseline, a spent attempt budget, or a missing prerequisite re-runs it with `--status blocked --reason "<one line>"` and stops. A phase ready for the user re-runs it with `--status awaiting_approval` and stops. Do not add an `Approved` row until the user approves.
 
-`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`.
+`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`. A roadmap with no `architecture` row names `/v0-architecture`. An architecture row with no `plan` row names `/v0-plan`. Also report `roadmap`, `plan`, and `arc` when `Material: yes`. Do not report `/v0-export` or `/v0-deck`.
 
 ## Parallel features
 
@@ -90,7 +103,7 @@ A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fi
 
 ## Phase result
 
-When a phase reaches `awaiting_approval` or `blocked`, write `docs/agents-v0/requirements/<feature>.phase-result.md` before stopping, with `phase`, `status` (`awaiting_approval` or `blocked`), `artifacts` (paths), and `blockers` (one per line). The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes. It is per feature and is not a shared file.
+When a phase reaches `awaiting_approval` or `blocked`, write `docs/agents-v0/requirements/<feature>.phase-result.md` before stopping, with `phase`, `status` (`awaiting_approval` or `blocked`), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes. It is per feature and is not a shared file.
 
 ## Command results
 
@@ -108,9 +121,11 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 
 | Phase | Command | Lead agent | Skill(s) | Handoff artifact |
 |-------|---------|-----------|----------|------------------|
-| Plan (program) | `/v0-plan` | `program-planner` | `system-design`, `program-planning` | `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/milestones/<milestone>.md` (`plan` row in `Delivery approvals`) |
-| Intake | `/v0-intake` | `requirements-analyst` | `spec-intake` | `docs/agents-v0/requirements/<feature>.md` (acceptance criteria, NFRs incl. UX for UI, regulations, `Delivery approvals`) |
-| Design | `/v0-design` | `solution-architect`, `ux-designer` | `contract-first-design`, `ux-design` | OpenAPI + events, ADR, diagrams, `docs/agents-v0/design/<feature>/ux-spec.md`, `docs/agents-v0/design/<feature>/mockups/` |
+| Roadmap (program) | `/v0-roadmap` | `program-planner` | `program-roadmap` | `docs/agents-v0/roadmap/<program>.md` (`roadmap` row, `Discovery:` path) |
+| Architecture (program) | `/v0-architecture` | `solution-architect` | `program-architecture` | `docs/agents-v0/architecture.md` (`architecture` row) and `docs/agents-v0/design/system/arc-record.md` (`arc` row), before any story |
+| Plan (program) | `/v0-plan` | `program-planner` | `program-planning` | `docs/agents-v0/milestones/<milestone>.md` (`plan` row; Surface and Size on each story). Reads the architecture pack |
+| Intake | `/v0-intake` | `requirements-analyst` | `spec-intake` | `docs/agents-v0/requirements/<feature>.md` (Gherkin `AC-*`, `Kind`, NFRs, regulations, `Delivery approvals`) |
+| Design | `/v0-design` | `solution-architect`, `ux-designer` | `contract-first-design`, `ux-design` | OpenAPI + events, ADR, diagrams, UX spec, mockups; `docs/agents-v0/design/system/arc-record.md` when `Material: yes` |
 | Build | `/v0-build` | `backend-engineer` / `bff-engineer` / `frontend-engineer` | `implement-*` | Code + migrations + tests; `docs/agents-v0/build/<feature>/` evidence |
 | Verify | `/v0-verify` | `test-engineer`, then `security-reviewer` and `code-reviewer` together | `quality-gate`, `vapt-review`, `pr-review` | `docs/agents-v0/verify/<feature>/` reports |
 | Maintain | `/v0-maintain` | `maintenance-engineer` | `bugfix-triage`, `dependency-upgrade`, `doc-sync`, `characterization-tests`, `migration-safety` | Fix + docs; approval to re-enter Verify |
@@ -130,12 +145,13 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 ### Intake gate
 - User story recorded as `As a [role], I want [goal], so that [benefit].`
-- Acceptance criteria (stable IDs, e.g. AC-1) split from that story and its constraints, one behavior per row; out of scope recorded separately. NFRs, regulations, security-review triggers, open questions resolved.
-- **Story size.** One primary surface (`Surfaces: backend`, `bff`, or `frontend`), one bounded context, at most eight acceptance criteria (`AC-1` through `AC-8`). A larger story does not pass: the analyst writes `## Proposed split` and stops until the user approves it (`spec-intake`). `Vertical slice: yes` is recorded only when the user asks for one journey across surfaces; it may list more than one surface and still has at most eight criteria.
+- Acceptance criteria (`### AC-1` …) follow `spec-intake`. `ci/check-intake.sh` must pass: `Kind`, the `Then`, one `negative` or `edge` (or `Negatives: N/A` with no security trigger), preconditions, a desk check, NFRs, and regulations. Open questions are `none`. `Material: yes` or `no`. P0-A skips the check.
+- **Story size.** One primary surface (`Surfaces: backend`, `bff`, or `frontend`), one bounded context, at most eight acceptance criteria (`AC-1` through `AC-8`), including the negative. A larger story stops on `## Proposed split` (`spec-intake`). `Vertical slice: yes` only when the user asks for one journey across surfaces.
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval.
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
+- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, fitness functions). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives those fitness functions in `docs/agents-v0/design/system/slo-evidence.md`.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate
@@ -166,6 +182,10 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 ## Approval stops
 
 `/v0-deliver` stops where the phase command says to stop. On Critical findings, route to Build/Maintain and re-enter Verify.
+
+## Documentation
+
+`/v0-export` and `/v0-deck` write derived files from approved records. They add no `Approved` row. `/v0-deliver` does not call them. A missing CSV or deck does not block a phase. Detail is in those commands.
 
 ## Rule precedence
 
