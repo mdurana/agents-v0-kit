@@ -35,5 +35,5 @@ Targets are the filled rows in `docs/agents-v0/design/system/nfr-slo.md`. Do not
 |-------|-----------|----------|----------|------|
 | arc | docs/agents-v0/design/system/arc-record.md | <name> | Approved | <date> |
 
-> The program decision is the `architecture` row, which names this file. Add an `arc` row here only when a story amends the recommendation.
+> The program decision is the `architecture` row, which names this file. Add an `arc` row here only when a story amends the recommendation. When that recommendation changes, the accepted pattern ADR stays. `## Options` names the successor. The old ADR's status is `Superseded by ADR <NN>`.
 > `ci/check-arc.sh` accepts that architecture row, or an `arc` row on this file, when a requirements artifact says `Material: yes`.

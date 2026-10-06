@@ -487,6 +487,9 @@ grep -Fq 'onboard' templates/.agents-v0/ci/check-approvals.sh || err "check-appr
 grep -Fq 'roadmap' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the roadmap phase"
 grep -Fq '|arc|' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the arc phase"
 grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must run check-arc.sh for a material story"
+grep -Fq 'check-adr.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must run check-adr.sh"
+grep -Fq 'Superseded by ADR' core/skills/contract-first-design/SKILL.md || err "contract-first-design must supersede an accepted ADR instead of rewriting it"
+grep -Fq 'Superseded by ADR' templates/.agents-v0/ci/check-adr.sh || err "check-adr.sh must require a superseding ADR"
 grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must run check-arc.sh"
 grep -Fq 'Material: yes' core/commands/v0-design.md || err "/v0-design must stop for a material ARC pack"
 grep -Fq 'Discovery:' core/commands/v0-roadmap.md || err "/v0-roadmap must record the discovery path the user passed"
@@ -526,7 +529,7 @@ for maintain_script in classify-change.sh; do
 done
 grep -Fq '_note.template.md' scripts/install.sh || err "install.sh does not seed the maintenance note template"
 # Design and Build: mechanical checks, an independent review, a pinned design, a real plan.
-for design_file in check-openapi.sh check-design.sh check-design-contracts.sh check-ux-spec.sh check-build-plan.sh check-endpoint-auth.sh check-frontend-calls.sh check-arc.sh; do
+for design_file in check-openapi.sh check-design.sh check-design-contracts.sh check-ux-spec.sh check-build-plan.sh check-endpoint-auth.sh check-frontend-calls.sh check-arc.sh check-adr.sh; do
   [ -f "templates/.agents-v0/ci/$design_file" ] || err "required Design/Build check missing: templates/.agents-v0/ci/$design_file"
   grep -Fq ".agents-v0/ci/$design_file" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$design_file"
 done

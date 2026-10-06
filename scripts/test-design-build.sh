@@ -137,6 +137,8 @@ cp "$o/draft.yaml" "$d/docs/agents-v0/design/orders/openapi.yaml"
 cat > "$d/docs/agents-v0/adr/01-orders.md" <<'EOF'
 # ADR 01: Orders
 
+- **Status:** Accepted
+
 ## Decision
 Synchronous REST.
 
@@ -209,6 +211,12 @@ cp "$d/docs/agents-v0/adr/01-orders.md" "$tmp/adr.keep"
 sedi '/GraphQL/d' "$d/docs/agents-v0/adr/01-orders.md"
 run fail "design: an ADR with one alternative fails" "$d" sh "$CI/check-design.sh" orders
 cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
+sedi '/Status:/d' "$d/docs/agents-v0/adr/01-orders.md"
+run fail "design: an ADR without a status fails" "$d" sh "$CI/check-design.sh" orders
+cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
+sedi 's/Accepted/Superseded by ADR 02/' "$d/docs/agents-v0/adr/01-orders.md"
+run fail "design: a superseded ADR cannot be cited" "$d" sh "$CI/check-design.sh" orders
+cp "$tmp/adr.keep" "$d/docs/agents-v0/adr/01-orders.md"
 
 run fail "design: pinning needs a design review" "$d" sh "$CI/check-design.sh" orders --pin approved
 mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/skel"
@@ -251,8 +259,21 @@ h1="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run fail "design: an open Critical blocks the pin" "$d" sh "$CI/check-design.sh" orders --pin approved
 sedi 's/| Open |/| Resolved |/' "$d/docs/agents-v0/design/orders/review.md"
+sedi 's/Accepted/Proposed/' "$d/docs/agents-v0/adr/01-orders.md"
+hp="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
+printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$hp" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
+run pass "design: a Proposed ADR still passes the structure check" "$d" sh "$CI/check-design.sh" orders
+run fail "design: a Proposed ADR cannot be pinned" "$d" sh "$CI/check-design.sh" orders --pin approved
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-orders.md"
+ha="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
+printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$ha" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run pass "design: a resolved review lets the pin through" "$d" sh "$CI/check-design.sh" orders --pin approved
 run pass "design: the lock matches the pinned design" "$d" sh "$CI/check-design.sh" orders --verify-lock
+cp "$d/docs/agents-v0/adr/01-orders.md" "$tmp/adr.pinned"
+sedi 's/Synchronous REST./Synchronous REST plus a queue./' "$d/docs/agents-v0/adr/01-orders.md"
+run fail "design: rewriting an accepted ADR fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+cp "$tmp/adr.pinned" "$d/docs/agents-v0/adr/01-orders.md"
+run pass "design: restoring the accepted ADR matches the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 printf 'Also the order list is paged.\n' >> "$d/docs/agents-v0/design/orders/design.md"
 sedi 's/^## Rollout/## Rollout\nPaged list./' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: a change after the pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
@@ -263,6 +284,89 @@ run pass "design: an approved amendment can be pinned" "$d" sh "$CI/check-design
 run pass "design: the lock passes once the amendment is approved" "$d" sh "$CI/check-design.sh" orders --verify-lock
 sedi 's/Approved/Pending/' "$d/docs/agents-v0/design/orders/amendments.md"
 run fail "design: a pin with no Approved amendment row fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+
+# --- ci/check-adr.sh ---------------------------------------------------------
+adr="$tmp/adr-records"
+mkdir -p "$adr/docs/agents-v0/adr"
+cat > "$adr/docs/agents-v0/adr/01-store.md" <<'EOF'
+# ADR 01: Store
+
+- **Status:** Accepted
+
+## Decision
+PostgreSQL.
+
+## Alternatives considered
+- MySQL: the team has no operator for it.
+- SQLite: it is not shared across instances.
+EOF
+(cd "$adr" && git init -q && git add -A && git_c commit -q -m accepted)
+run pass "adr: a committed accepted ADR passes" "$adr" sh "$CI/check-adr.sh"
+sedi 's/PostgreSQL./MongoDB./' "$adr/docs/agents-v0/adr/01-store.md"
+run fail "adr: rewriting a committed accepted ADR fails" "$adr" sh "$CI/check-adr.sh"
+(cd "$adr" && git checkout -q -- docs/agents-v0/adr/01-store.md)
+sedi 's/Accepted/Superseded by ADR 02/' "$adr/docs/agents-v0/adr/01-store.md"
+run fail "adr: supersession without a successor fails" "$adr" sh "$CI/check-adr.sh"
+cat > "$adr/docs/agents-v0/adr/02-store.md" <<'EOF'
+# ADR 02: Store
+
+- **Status:** Accepted
+
+## Decision
+MongoDB.
+
+## Alternatives considered
+- PostgreSQL: the new workload is document-shaped.
+- SQLite: it is not shared across instances.
+EOF
+run pass "adr: superseding with an accepted successor passes" "$adr" sh "$CI/check-adr.sh"
+sedi 's/Accepted/Proposed/' "$adr/docs/agents-v0/adr/02-store.md"
+run fail "adr: a successor that is still Proposed fails" "$adr" sh "$CI/check-adr.sh"
+sedi 's/Proposed/Accepted/' "$adr/docs/agents-v0/adr/02-store.md"
+sedi 's/Accepted/Superseded by ADR 03/' "$adr/docs/agents-v0/adr/02-store.md"
+run fail "adr: a superseded successor without its own successor fails" "$adr" sh "$CI/check-adr.sh"
+cat > "$adr/docs/agents-v0/adr/03-store.md" <<'EOF'
+# ADR 03: Store
+
+- **Status:** Accepted
+
+## Decision
+Document store.
+
+## Alternatives considered
+- PostgreSQL: the workload outgrew rows.
+- MongoDB: the operator moved off it.
+EOF
+run pass "adr: a supersession chain that ends Accepted passes" "$adr" sh "$CI/check-adr.sh"
+hist="$tmp/adr-history"
+mkdir -p "$hist/docs/agents-v0/adr"
+cat > "$hist/docs/agents-v0/adr/01-store.md" <<'EOF'
+# ADR 01: Store
+
+- **Status:** Accepted
+
+## Decision
+PostgreSQL.
+
+## Alternatives considered
+- MySQL: the team has no operator for it.
+- SQLite: it is not shared across instances.
+EOF
+(cd "$hist" && git init -q && git add -A && git_c commit -q -m accepted)
+sedi 's/PostgreSQL./MongoDB./' "$hist/docs/agents-v0/adr/01-store.md"
+(cd "$hist" && git add -A && git_c commit -q -m rewrite)
+run fail "adr: a commit that rewrites an accepted ADR fails" "$hist" sh "$CI/check-adr.sh"
+inh="$tmp/adr-inherited"
+mkdir -p "$inh/docs/agents-v0/adr"
+cat > "$inh/docs/agents-v0/adr/0000-inherited-decisions.md" <<'EOF'
+# Inherited decisions
+
+- Framework: Spring. Status: Accepted (inherited)
+EOF
+(cd "$inh" && git init -q && git add -A && git_c commit -q -m inherited)
+run pass "adr: an inherited record passes" "$inh" sh "$CI/check-adr.sh"
+sedi 's/Spring/Quarkus/' "$inh/docs/agents-v0/adr/0000-inherited-decisions.md"
+run fail "adr: rewriting an inherited decision fails" "$inh" sh "$CI/check-adr.sh"
 
 # --- ci/check-ux-spec.sh -----------------------------------------------------
 u="$tmp/ux"

@@ -15,11 +15,13 @@
 # modes, Observability, and Rollout, each with content or "N/A: <reason>"; no TEMPLATE: line is
 # left; every AC-n of the requirements artifact appears in Traceability; every operationId of the
 # draft appears in Authorization; the "ADR:" line names an existing ADR with at least two
-# alternatives (or says "N/A: <reason>"). Every AC whose requirements block says
-# Kind: negative or Kind: edge is named in Failure modes.
-# Lock: the pin is the design as the person approved it. After that, a change to the design is an
-# amendment: docs/agents-v0/design/<feature>/amendments.md needs an Approved row naming the first 12
-# characters of the new hash, and a new pin line. Pin only after the person approved.
+# alternatives (or says "N/A: <reason>"). That ADR has Status Proposed or Accepted. A pin requires
+# Accepted. Citing a superseded ADR fails: point at the successor. Every AC whose requirements block
+# says Kind: negative or Kind: edge is named in Failure modes.
+# Lock: the pin is the design as the person approved it, including the cited ADR. After that, a
+# change to the design or that ADR is an amendment: docs/agents-v0/design/<feature>/amendments.md
+# needs an Approved row naming the first 12 characters of the new hash, and a new pin line. A changed
+# decision supersedes the ADR (ci/check-adr.sh) instead of rewriting it. Pin only after the person approved.
 
 set -eu
 
@@ -61,6 +63,37 @@ def read(path):
         return None
 
 
+def named_adr(body):
+    if not body:
+        return None
+    match = re.search(r"^ADR:\s*(.+)$", body, re.M)
+    if not match:
+        return None
+    ref = match.group(1).strip().strip("`")
+    if re.match(r"^N/A\b", ref):
+        return None
+    return ref
+
+
+def adr_status(text):
+    match = re.search(r"(?im)^(?:[-*]\s*)?(?:\*\*)?Status(?:\*\*)?\s*:\s*(.+?)\s*$", text or "")
+    if not match:
+        return None
+    return re.sub(r"\*+", "", match.group(1)).strip()
+
+
+def status_kind(status):
+    if status is None:
+        return None
+    if re.match(r"(?i)^proposed$", status):
+        return "proposed"
+    if re.match(r"(?i)^accepted(?:\s*\(inherited\))?$", status):
+        return "accepted"
+    if re.match(r"(?i)^superseded by\s+\S", status):
+        return "superseded"
+    return "invalid"
+
+
 def design_files():
     out = []
     for name in ("design.md", "openapi.yaml", "openapi.yml", "openapi.json", "ux-spec.md"):
@@ -69,7 +102,26 @@ def design_files():
     for sub in ("events", "mockups"):
         for dirpath, _dirs, names in os.walk(os.path.join(base, sub)):
             out += [os.path.join(dirpath, n) for n in names]
-    return sorted(out)
+    adr = named_adr(read(os.path.join(base, "design.md")))
+    if adr and os.path.isfile(adr):
+        out.append(adr)
+    return sorted(set(out))
+
+
+def require_accepted_adr():
+    """A pin is an accepted decision. Proposed stays unpinned; superseded must not stay cited."""
+    adr = named_adr(read(os.path.join(base, "design.md")))
+    if not adr:
+        return
+    text = read(adr)
+    if text is None:
+        fail(f"{adr}: cited ADR is missing")
+        return
+    kind = status_kind(adr_status(text))
+    if kind != "accepted":
+        shown = adr_status(text) or "missing"
+        fail(f"{adr}: an approved design cites an ADR whose status is {shown}; "
+             "set Status to Accepted before the pin, or supersede it and cite the successor")
 
 
 def current_hash():
@@ -178,10 +230,18 @@ def check():
         if text is None:
             fail(f"{path}: ADR not found: {adr}")
         else:
-            alt = section(sections(text), "alternatives") or ""
-            items = [l for l in alt.splitlines() if re.match(r"^\s*[-*]\s+\S", l) and "TEMPLATE" not in l]
-            if len(items) < 2:
-                fail(f"{adr}: needs at least two alternatives considered")
+            kind = status_kind(adr_status(text))
+            if kind is None:
+                fail(f"{adr}: missing Status (Proposed, Accepted, or Superseded by ADR <NN>)")
+            elif kind == "invalid":
+                fail(f"{adr}: Status must be Proposed, Accepted, or Superseded by ADR <NN> (got {adr_status(text)})")
+            elif kind == "superseded":
+                fail(f"{adr}: design cites a superseded ADR; cite the successor named by its Status")
+            else:
+                alt = section(sections(text), "alternatives") or ""
+                items = [l for l in alt.splitlines() if re.match(r"^\s*[-*]\s+\S", l) and "TEMPLATE" not in l]
+                if len(items) < 2:
+                    fail(f"{adr}: needs at least two alternatives considered")
 
 
 lock_path = os.path.join(base, "design.lock")
@@ -222,8 +282,10 @@ if action == "--hash":
     raise SystemExit(0)
 if action == "--verify-lock":
     verify_lock()
+    require_accepted_adr()
 elif action == "--pin":
     check()
+    require_accepted_adr()
     review = read(os.path.join(base, "review.md"))
     if review is None:
         if not review_not_required(read(os.path.join(base, "design.md"))):

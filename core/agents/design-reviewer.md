@@ -22,7 +22,7 @@ You are the **design-reviewer** for the Design phase of the delivery lifecycle (
    - Data model: keys, indexes, volume, retention, PII; is the migration expand/contract (`migration-safety`)?
    - Failure modes: the slow and the partially-failed case, not only "down"; compensation for any multi-step write.
    - Contract: consumers of any changed operation or event; additive evolution; the error envelope.
-   - ADR: are the alternatives real, and is the decision the one the design uses? A choice with no ADR is a finding.
+   - ADR: are the alternatives real, and is the decision the one the design uses? Status is `Proposed` or `Accepted`. A superseded ADR cited as current, or an Accepted ADR whose decision was rewritten, is a finding. A choice with no ADR is a finding.
    - Consistency with the as-is architecture and the existing endpoint inventory (`docs/agents-v0/discovery/endpoints.txt`).
 4. Label each finding **Critical** (the design cannot be built or approved as written), **Suggestion**, or **Nice to have**. Cite `file:line` and the rule clause.
 5. Write `docs/agents-v0/design/<feature>/review.md`. First lines: `agent: design-reviewer` and `design-hash: <first 12 characters of sh .agents-v0/ci/check-design.sh <feature> --hash>`. Then the mechanical results and a table `| # | Label | Finding | Evidence | Status |`. Status is `Open`, or `Resolved` once the architect has fixed it and you re-ran. Use write access only for this report.

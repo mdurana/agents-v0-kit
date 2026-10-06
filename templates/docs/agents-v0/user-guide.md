@@ -145,7 +145,7 @@ This stop applies when the story adds an API, screens, or a public route, and wh
 | API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
 | Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops and asks you to approve an amendment. |
-| ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). A story with no product decision records that none was needed. |
+| ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). Once you accept it, a later change adds a new record and leaves the old one in place. A story with no product decision records that none was needed. |
 | UI stack (if new screens) | Team may ask **Svelte or React** once — pick what product/engineering agreed.                                 |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
 

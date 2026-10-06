@@ -9,12 +9,15 @@
 #   design.lock   -> check-design.sh <feature> --verify-lock
 #   ux-spec.md    -> check-ux-spec.sh <feature>
 # A requirements file that already has an Approved Intake row is re-checked with check-intake.sh.
+# docs/agents-v0/adr/ is checked with check-adr.sh (accepted records are superseded, not rewritten).
 # Needs python3 and PyYAML. Exit 1 when any check fails; every feature is checked either way.
 
 set -eu
 
 here="$(cd "$(dirname "$0")" && pwd)"
 failed=0
+
+sh "$here/check-adr.sh" || failed=1
 
 for f in docs/agents-v0/design/*/openapi.yaml; do
   [ -f "$f" ] || continue

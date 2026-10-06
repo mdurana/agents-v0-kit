@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Workflow orchestration
 
-This rule binds the kit's commands, agents, skills, and hooks into a single delivery lifecycle. It is `alwaysApply: true` so every agent session operates under it. Each phase command holds its own step list; this rule holds what applies to all of them.
+This rule binds the kit's commands, agents, skills, and hooks into one lifecycle. Each phase command holds its own step list; this rule holds what applies to all of them.
 
 Read `docs/agents-v0/project-profile.md` in the target repo for build/test commands, the Layout directory profile, and brownfield baseline exceptions before Build or Maintain. Profiles (`service`, `ui`, `app`) are defined in `project-delivery-core.mdc`. A filled Profile row or filled root rows win; when those rows are still placeholders, use the profile that matches the files on disk.
 
@@ -34,7 +34,7 @@ Now, Next, and Later are in-scope items copied from the discovery file. Stop for
 
 ## Architecture
 
-`/v0-architecture` (`program-architecture`) runs after the `roadmap` row and before any backlog. Skip list: P0-A, a named ticket, and Maintain or Trivial. It writes the C4-through-operations pack and `docs/agents-v0/design/system/arc-record.md`. It does not write stories. One approval records the `architecture` row and names that ARC file. An `arc` row is only a later amendment. Plan waits for the `architecture` row.
+`/v0-architecture` (`program-architecture`) runs after the `roadmap` row and before any backlog. Skip list: P0-A, a named ticket, and Maintain or Trivial. It writes the C4-through-operations pack and `docs/agents-v0/design/system/arc-record.md`. It does not write stories. One approval records the `architecture` row and names that ARC file. An `arc` row is a later amendment that supersedes the accepted ADR. Plan waits for the `architecture` row.
 
 ## Program planning
 
@@ -150,7 +150,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin is `design.lock`; a later change is an amendment. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment. A changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
 - `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, fitness functions). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives those fitness functions in `docs/agents-v0/design/system/slo-evidence.md`.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 

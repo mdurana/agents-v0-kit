@@ -2,6 +2,8 @@
 
 - **Date:** YYYY-MM-DD
 - **Status:** Proposed | Accepted | Superseded by ADR <NN>
+
+<!-- An Accepted ADR stays. A later decision writes the next file and sets this line to "Superseded by ADR <NN>". Do not edit Decision or Alternatives after Accepted. -->
 - **Deciders:** <names>
 
 ## Context

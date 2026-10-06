@@ -12,7 +12,7 @@ An `Approved` `roadmap` row on `docs/agents-v0/roadmap/<program>.md`. When that 
 P0-A alone and a single named ticket skip this command. Maintain and Trivial never open it.
 
 ## Resume
-Continue from the architecture files already on disk. Do not recreate a section that is already filled. A program has no per-feature state file.
+Continue from the architecture files already on disk. Do not recreate a section that is already filled. Do not rewrite an Accepted ADR; supersede it (`sh .agents-v0/ci/check-adr.sh`). A program has no per-feature state file.
 
 ## Collision
 This command writes shared files: `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`, and `docs/agents-v0/adr/`. Stop before editing one that `git status` already shows modified by a feature in flight.
@@ -27,8 +27,8 @@ This command writes shared files: `docs/agents-v0/architecture.md`, `docs/agents
    - Contracts: catalog shape. No feature `openapi.yaml`.
    - Operations: `docs/agents-v0/design/system/nfr-slo.md` and `docs/agents-v0/design/system/threat-model.md`. SLO numbers live only in `nfr-slo.md`.
    - ARC: `docs/agents-v0/design/system/arc-record.md`. Name the discovery file and the pattern ADR. Do not copy them. Point fitness functions at `nfr-slo.md`.
-3. Check the **Architecture gate**: every step above has a filled section, C4 names no product technology, the ADR has two real options, and the ARC record has a recommendation plus a Fitness functions section.
-4. **Stop** and present the pack. After one explicit approval, record the `architecture` row on `docs/agents-v0/architecture.md`. Its Artifacts cell lists every file in the pack, including `docs/agents-v0/design/system/arc-record.md`. Do not add an `arc` row. Do not start `/v0-plan` without the `architecture` row.
+3. Check the **Architecture gate**: every step above has a filled section, C4 names no product technology, the ADR has two real options and a Status of Proposed or Accepted, and the ARC record has a recommendation plus a Fitness functions section. `sh .agents-v0/ci/check-adr.sh` passes. An Accepted ADR is superseded, not rewritten, when the decision changes.
+4. **Stop** and present the pack. After one explicit approval, set the pattern ADR's Status to `Accepted` when it is still `Proposed`, then record the `architecture` row on `docs/agents-v0/architecture.md`. Its Artifacts cell lists every file in the pack, including `docs/agents-v0/design/system/arc-record.md`. Do not add an `arc` row. Do not start `/v0-plan` without the `architecture` row.
 
 ## Rules
 `workflow-orchestration.mdc`, `architecture-and-diagrams.mdc`, `project-delivery-core.mdc`, `security-baseline.mdc` §11.
