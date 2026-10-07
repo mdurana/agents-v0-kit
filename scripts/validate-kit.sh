@@ -98,8 +98,8 @@ for ref in $(grep -rhoE '`[a-z-]+\.mdc`' core/rules core/agents core/commands co
   [ -f "core/rules/$ref" ] || err "kit content references missing rule $ref"
 done
 for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/rules core/agents core/commands core/skills | tr -d '`' | sort -u); do
-  # Outputs that /v0-onboard writes in the target repo are not seeded templates.
-  case "$ref" in docs/agents-v0/onboarding/report.md|docs/agents-v0/adr/0000-inherited-decisions.md|docs/agents-v0/discovery/*) continue ;; esac
+  # Outputs that /v0-onboard or /v0-architecture write in the target repo are not seeded templates.
+  case "$ref" in docs/agents-v0/onboarding/report.md|docs/agents-v0/adr/0000-inherited-decisions.md|docs/agents-v0/discovery/*|docs/agents-v0/design/system/architecture-review.md) continue ;; esac
   if [ -f "$ref" ]; then
     continue
   fi
@@ -596,6 +596,30 @@ for cmd in design build verify; do
   grep -Fq 'Re-opened' "core/commands/v0-$cmd.md" || err "/v0-$cmd must say what a Re-opened approval row means"
 done
 grep -Fq 'Release owner' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Release rows"
+# Architecture pack: complete sections, an independent review, a mechanical check CI re-runs.
+for arch_file in templates/.agents-v0/ci/check-architecture-pack.sh templates/docs/agents-v0/design/system/ops-readiness.md templates/docs/agents-v0/design/system/_component.template.md; do
+  [ -f "$arch_file" ] || err "required architecture pack file missing: $arch_file"
+done
+for heading in '## Data flow' '## Data models' '### Conceptual' '### Logical' '### Physical' '## State machine' '## Failure domains and degradation' '## MVP and future state'; do
+  grep -Fq "$heading" templates/docs/agents-v0/architecture.md || err "architecture.md template lacks the '$heading' section"
+done
+grep -Fq '## Target topology' templates/docs/agents-v0/network.md || err "network.md template lacks the Target topology section"
+grep -Fq '## Patterns considered' templates/docs/agents-v0/adr/_template.md || err "ADR template lacks the Patterns considered table"
+grep -Fq 'Component plan' templates/docs/agents-v0/design/system/context-map.md || err "context-map template must be the service map (Component plan column)"
+grep -Fq 'Structural fitness' templates/docs/agents-v0/design/system/arc-record.md || err "arc-record template lacks structural fitness functions"
+for section in '## Build and run ownership' '## Error budget policy' '## Database maintenance and operation' '## Production readiness checklist' '## Runbook template'; do
+  grep -Fq "$section" templates/docs/agents-v0/design/system/ops-readiness.md || err "ops-readiness template lacks '$section'"
+done
+grep -Fq 'check-architecture-pack.sh' core/commands/v0-architecture.md || err "/v0-architecture gate must run check-architecture-pack.sh"
+grep -Fq 'check-architecture-pack.sh' core/skills/program-architecture/SKILL.md || err "program-architecture must run check-architecture-pack.sh"
+grep -Fq 'architecture-review.md' core/commands/v0-architecture.md || err "/v0-architecture must run the independent architecture review"
+grep -Fq 'architecture-review.md' core/agents/design-reviewer.md || err "design-reviewer must write architecture-review.md for the pack"
+grep -Fq 'check-architecture-pack.sh' templates/.agents-v0/ci/check-milestone.sh || err "check-milestone must run check-architecture-pack.sh for an approved architecture row"
+grep -Fq 'check-architecture-pack.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fetch check-architecture-pack.sh from the default branch for the delivery jobs"
+grep -Fq '.agents-v0/ci/check-architecture-pack.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-architecture-pack.sh"
+for seed in design/system/ops-readiness.md design/system/_component.template.md design/system/context-map.md; do
+  grep -Fq "docs/agents-v0/$seed" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$seed"
+done
 # Always-on context budget: the rules every session loads must not creep past this size.
 # 36000 covers the roadmap entry, the material ARC line, and the export/deck exception.
 # Procedure stays in the commands and skills.

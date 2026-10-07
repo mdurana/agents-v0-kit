@@ -11,7 +11,7 @@ Verify-phase playbook for the P4 SLO story (`workflow-orchestration.mdc`). The `
 Run when the requirements artifact is the P4 SLO story, or when it cites `docs/agents-v0/design/system/nfr-slo.md`. Skip with a recorded N/A when the story does not close SLO rows.
 
 ## Steps
-1. Read `docs/agents-v0/design/system/nfr-slo.md`. A row is filled when its name cell is non-empty and at least one other cell in that row is non-empty. That file is the only SLO list. The Fitness functions section in `docs/agents-v0/design/system/arc-record.md` points here and is not a second list.
+1. Read `docs/agents-v0/design/system/nfr-slo.md`. A row is filled when its name cell is non-empty and at least one other cell in that row is non-empty. That file is the only SLO list. The Fitness functions section in `docs/agents-v0/design/system/arc-record.md` points SLO targets here. Its structural table (principle, check, threshold, on failure) is not an SLO list and is not closed by this skill.
 2. Write `docs/agents-v0/design/system/slo-evidence.md` using the table below. One evidence row per filled NFR/SLO row, matched on the surface or tier name.
 3. `measured`: put the command in **Command or waiver** and a repo-relative output file in **Output or approver**. The file must exist and must not contain `..`. Put the run date as `YYYY-MM-DD`.
 4. `waiver`: put the reason in **Command or waiver**, the approver's name in **Output or approver**, and the date as `YYYY-MM-DD`. A waiver is a recorded decision, not a measurement.

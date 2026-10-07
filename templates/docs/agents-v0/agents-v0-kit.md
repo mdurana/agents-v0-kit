@@ -51,7 +51,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
 | Roadmap | A new program of more than one story. The person points `/v0-roadmap` at a discovery file anywhere in the repo. The kit sequences it and does not rediscover the problem. A named ticket, a milestone that already has a `plan` row, Maintain, and Trivial skip this. |
-| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
+| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
 | Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
 | Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design, including the cited ADR, is hashed into `design.lock` after the Design approval. The pin requires the ADR's Status to be `Accepted`. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation, and that change supersedes the pattern ADR. |
 | P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the row. |
@@ -93,7 +93,7 @@ Resume is the same in every phase. `scripts/sync-feature-state.sh` writes the st
 | Onboarding | `docs/agents-v0/onboarding/state.json` | `docs/agents-v0/onboarding/report.md`, phase `onboard` |
 | Maintenance | `docs/agents-v0/maintain/<id>/state.json` | the note, phases `maintain` and `verify` |
 | Program | none | a `roadmap` row, then an `architecture` row on `docs/agents-v0/architecture.md`, then a `plan` row on each milestone manifest |
-| ARC | none | an `arc` row on `docs/agents-v0/design/system/arc-record.md`, only when a story says `Material: yes` |
+| ARC | none | an `arc` row on `docs/agents-v0/design/system/arc-record.md`, only when a material story amends the recommendation |
 | Milestone go/no-go | none | a `milestone` row on the manifest |
 
 The approvals table is five columns: Phase, Artifacts, Approver, Decision, Date. CI accepts `Approved`, `approved`, `yes`, or `pass` as the decision, and rejects `Not approved` and `Re-opened`. The Approver cell is the person's GitLab username (`@ada`), because the final job matches it to the real merge-request approval. Build and Verify evidence paths in that row must exist on disk and start with a `commit:` line for the tree that was tested. A later code change makes the line stale, and CI rejects it until the phase is re-run on the new commit.
@@ -129,6 +129,22 @@ Design writes, and does not touch the org catalog:
 When `openapi.yaml` exists, `ci/check-openapi.sh lint` checks the draft and `compat` checks it against the catalog it will merge into. A missing draft is allowed. When `asyncapi.yaml` exists, `ci/check-asyncapi.sh lint` runs (also from `ci/check-design-contracts.sh` in CI). Build merges with `ci/check-openapi.sh merge` and proves it with `merged`. A service repo uses `openapi/<service>-v1.yaml`. A single-service repo uses `openapi/api-v1.yaml`.
 
 A later edit to an approved design is an amendment, not a quiet change. Build or Verify stops, the design files change, the reviewer runs again, the user approves a row in `amendments.md`, and `ci/check-design.sh --pin` records the new hash. The pin includes the cited ADR. A changed decision supersedes that ADR. `ci/check-adr.sh` rejects a rewrite once an `Accepted` revision is in git history; before that commit it checks status and successors only. CI rejects a design that drifted from its lock.
+
+## Architecture pack
+
+`/v0-architecture` writes these files. The pack is complete when `sh .agents-v0/ci/check-architecture-pack.sh` passes and `design-reviewer` has no open Critical. After the `architecture` row, CI re-runs the check with `--approved` through `ci/check-milestone.sh`. A section that does not apply says `N/A: <reason>`; the heading stays.
+
+| File | Contents |
+|------|----------|
+| `docs/agents-v0/architecture.md` | C4 Context and Container (no product names), Data flow (the Container nodes, edges relabelled `transport / payload`), Data models (conceptual, logical, physical `erDiagram`), State machine, Failure domains and degradation, MVP and future state |
+| `docs/agents-v0/network.md` | Target topology: zones, protocol-labelled edges, security boundaries |
+| `docs/agents-v0/adr/<NN>-<slug>.md` | The pattern ADR: two or more real options, a `Patterns considered` table compared on cost, security, reliability, and operability |
+| `docs/agents-v0/design/system/context-map.md` | Bounded contexts and the service map: service root, contract, sequence diagram, component plan, status |
+| `docs/agents-v0/design/system/components/<service>.md` | One component plan per context (from `_component.template.md`), or `N/A: <reason>`. Links its parent and never contradicts it |
+| `docs/agents-v0/design/system/nfr-slo.md`, `threat-model.md` | SLO and RPO/RTO targets; assets, trust boundaries, STRIDE risks |
+| `docs/agents-v0/design/system/ops-readiness.md` | Build-and-run ownership, error budget policy, database maintenance and operation, the P5 readiness checklist, a runbook template |
+| `docs/agents-v0/design/system/arc-record.md` | Recommendation, plus structural fitness functions (principle, check, threshold, on failure). SLO targets stay in `nfr-slo.md` |
+| `docs/agents-v0/design/system/architecture-review.md` | `design-reviewer` report on the pack |
 
 ## Build and verify
 
@@ -210,6 +226,7 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 | `check-approver-gitlab.sh` | The Approver matches a human who approved the merge request |
 | `check-milestone.sh` | Every story in a manifest has the phase approval, in dependency order |
 | `check-design.sh` | The design is complete, and still matches its lock |
+| `check-architecture-pack.sh` | The architecture pack is complete: C4 names no product, Data flow matches the Container nodes, data models, state machine, failure domains, target topology, ops readiness, a structural fitness function, component plans, and a clean architecture review. `--approved` also needs an Accepted pattern ADR |
 | `check-design-contracts.sh` | Every feature draft: OpenAPI lint/compat, lock, UX spec, optional AsyncAPI lint |
 | `check-openapi.sh` | The contract lints, is compatible, and was merged |
 | `check-asyncapi.sh` | Optional `asyncapi.yaml` meets channel and message rules |

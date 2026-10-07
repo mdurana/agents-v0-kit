@@ -23,6 +23,10 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 | High-level system | `docs/agents-v0/architecture.md` |
 | Infrastructure, ports | `docs/agents-v0/network.md` |
 | Per-service sequences | `docs/agents-v0/diagrams/sequences/<service-name>.md` |
+| Bounded contexts and service map | `docs/agents-v0/design/system/context-map.md` |
+| Per-service component plan | `docs/agents-v0/design/system/components/<service-name>.md` |
+| Data flow, data models, state machine, failure domains | `docs/agents-v0/architecture.md` |
+| Operations readiness and runbooks | `docs/agents-v0/design/system/ops-readiness.md` |
 
 ## Mermaid conventions
 
@@ -31,6 +35,7 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 - **Edge labels** with special chars: quote them — `-->|"retry"|`.
 - **Subgraphs** for boundaries: frontend, BFF, backend, data, messaging.
 - ≤ ~**50 nodes**; split if larger.
+- **Data flow** reuses the C4 Container node IDs and relabels edges only (`transport / payload`). Data models use `erDiagram` (logical: every field; physical: every field with its type, underscores in type tokens). Lifecycles use `stateDiagram-v2`.
 - Renders in Cursor; export to Lucid/draw.io via import or converter.
 
 ## Architecture principles

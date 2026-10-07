@@ -122,7 +122,7 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 | Phase | Command | Lead agent | Skill(s) | Handoff artifact |
 |-------|---------|-----------|----------|------------------|
 | Roadmap (program) | `/v0-roadmap` | `program-planner` | `program-roadmap` | `docs/agents-v0/roadmap/<program>.md` (`roadmap` row, `Discovery:` path) |
-| Architecture (program) | `/v0-architecture` | `solution-architect` | `program-architecture` | `docs/agents-v0/architecture.md` (`architecture` row) and `docs/agents-v0/design/system/arc-record.md` (`arc` row), before any story |
+| Architecture (program) | `/v0-architecture` | `solution-architect` | `program-architecture` | `docs/agents-v0/architecture.md` (`architecture` row names the ARC file), before any story |
 | Plan (program) | `/v0-plan` | `program-planner` | `program-planning` | `docs/agents-v0/milestones/<milestone>.md` (`plan` row; Surface and Size on each story). Reads the architecture pack |
 | Intake | `/v0-intake` | `requirements-analyst` | `spec-intake` | `docs/agents-v0/requirements/<feature>.md` (Gherkin `AC-*`, `Kind`, NFRs, regulations, `Delivery approvals`) |
 | Design | `/v0-design` | `solution-architect`, `ux-designer` | `contract-first-design`, `ux-design` | OpenAPI + events, ADR, diagrams, UX spec, mockups; `docs/agents-v0/design/system/arc-record.md` when `Material: yes` |
@@ -151,7 +151,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 ### Design gate
 - `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment. A changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
-- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, fitness functions). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives those fitness functions in `docs/agents-v0/design/system/slo-evidence.md`.
+- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives the SLO rows in `slo-evidence.md`. The structural table is not an SLO list.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
 
 ### Build gate

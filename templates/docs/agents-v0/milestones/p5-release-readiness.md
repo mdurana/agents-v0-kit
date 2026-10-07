@@ -3,6 +3,10 @@
 ## Goal
 Production readiness: docs, runbooks, CI/CD, release checklist, milestone go/no-go.
 
+## Readiness checklist
+
+P5-A ticks the boxes in `docs/agents-v0/design/system/ops-readiness.md`. A box stays open only with a named reason in that file. `ci/check-architecture-pack.sh` checks that the sections exist. It does not check the boxes.
+
 ## Stories
 
 | Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |

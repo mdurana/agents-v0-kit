@@ -19,6 +19,14 @@
 - <!-- alt 1 --> — pros/cons.
 - <!-- alt 2 --> — pros/cons.
 
+## Patterns considered
+
+<!-- Pattern decisions only (topology, platform, integration style, data store, migration approach). Delete this section for any other ADR. At least two rows, compared on cost, security, reliability, and operability. A brownfield migration names the pattern it uses: strangler fig, adapter, dual write, or flag-controlled cutover. -->
+
+| Pattern | Fit | Trade-offs | Rejected because |
+|---------|-----|------------|------------------|
+| | | | |
+
 ## Consequences
 
 - Positive: ...

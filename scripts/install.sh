@@ -128,6 +128,7 @@ install_templates() {
 .agents-v0/ci/check-asyncapi.sh
 .agents-v0/ci/check-arc.sh
 .agents-v0/ci/check-adr.sh
+.agents-v0/ci/check-architecture-pack.sh
 .agents-v0/ci/check-intake.sh
 .agents-v0/ci/check-feature-state.sh
 .agents-v0/scripts/generate-repo-map.sh
@@ -160,6 +161,11 @@ docs/agents-v0/maintain/_note.template.md
 docs/agents-v0/design/_design.template.md
 docs/agents-v0/design/_amendments.template.md
 docs/agents-v0/design/system/arc-record.md
+docs/agents-v0/design/system/context-map.md
+docs/agents-v0/design/system/nfr-slo.md
+docs/agents-v0/design/system/threat-model.md
+docs/agents-v0/design/system/ops-readiness.md
+docs/agents-v0/design/system/_component.template.md
 docs/agents-v0/roadmap/_template.md
 docs/agents-v0/backlog/export-params.md
 docs/agents-v0/backlog/tickets-sources.md
@@ -195,7 +201,7 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md .agents-v0/ci/classify-change.sh .agents-v0/ci/check-openapi.sh .agents-v0/ci/check-design.sh \
         .agents-v0/ci/check-design-contracts.sh .agents-v0/ci/check-ux-spec.sh .agents-v0/ci/check-build-plan.sh .agents-v0/ci/check-endpoint-auth.sh \
-        .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh .agents-v0/ci/check-arc.sh .agents-v0/ci/check-adr.sh .agents-v0/ci/check-intake.sh docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
+        .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh .agents-v0/ci/check-arc.sh .agents-v0/ci/check-adr.sh .agents-v0/ci/check-architecture-pack.sh .agents-v0/ci/check-intake.sh docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh; do

@@ -9,7 +9,7 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 
 ## Steps
 1. Read the **Deploy** table in `docs/agents-v0/project-profile.md`: one row per environment, in promotion order, with the deploy command, the smoke check, and the rollback command. A missing smoke check or rollback command is a blocker; do not guess one.
-2. Confirm the merged commit: CI is green on the default branch and the image or artifact tag names that commit.
+2. Confirm the merged commit: CI is green on the default branch and the image or artifact tag names that commit. When `docs/agents-v0/design/system/ops-readiness.md` exists, a production deploy waits until each checklist box is ticked or names a reason.
 3. For each environment, in table order:
    - Ask the user to authorize deploying to that environment. One authorization covers one environment. Hooks ask before publish and deploy commands; do not bypass them.
    - Run the row's deploy command, then its smoke check. Save the command, exit code, and output summary to `docs/agents-v0/release/<feature>/deploy-<environment>.md` (start with `commit:`) in the working tree, or in the release issue. No secrets in the file. The merge is done and the default branch takes no direct commit: commit these records only in a separate docs-only follow-up merge request, which needs its own authorization.

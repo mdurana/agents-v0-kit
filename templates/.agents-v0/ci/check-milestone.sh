@@ -49,12 +49,14 @@ fi
 arch="$(sed -n 's/^[[:space:]]*Architecture:[[:space:]]*//p' "$manifest" | head -n 1 | sed 's/[[:space:]]*$//')"
 if [ -n "$arch" ]; then
   sh "$here/check-approvals.sh" "$arch" architecture || exit 1
+  sh "$here/check-architecture-pack.sh" --approved "$arch" || exit 1
 fi
 
 # Stories table: | Story ID | User story | Feature artifact | Status | Dependency |
 # Surface and Size may follow Dependency. They are not read here.
 # A "Roadmap:" line names a file that must carry an Approved roadmap row.
-# An "Architecture:" line names a file that must carry an Approved architecture row.
+# An "Architecture:" line names a file that must carry an Approved architecture row and a
+# complete pack (check-architecture-pack.sh --approved).
 section="$(awk '
   /^#+[[:space:]]*[Ss]tories/ { in_section = 1; next }
   /^#+[[:space:]]/ { in_section = 0 }

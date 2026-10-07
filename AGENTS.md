@@ -12,7 +12,7 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 |-------|---------|-----------|--------|------------------|
 | Onboard (brownfield) | `/v0-onboard` | codebase-documenter | onboard-discovery | `docs/agents-v0/onboarding/report.md` (`onboard` row), profile, as-is architecture/network |
 | Roadmap (greenfield program) | `/v0-roadmap` | program-planner | program-roadmap | `docs/agents-v0/roadmap/<program>.md` (`roadmap` row, `Discovery:` path) |
-| Architecture (before backlog) | `/v0-architecture` | solution-architect | program-architecture | `docs/agents-v0/architecture.md` (`architecture` row) and the ARC record (`arc` row) |
+| Architecture (before backlog) | `/v0-architecture` | solution-architect | program-architecture | `docs/agents-v0/architecture.md` (`architecture` row, names the ARC file) |
 | Plan (program, more than one story) | `/v0-plan` | program-planner | program-planning | `docs/agents-v0/milestones/<milestone>.md` (`plan` row; Surface and Size on each story) |
 | Intake | `/v0-intake` | requirements-analyst | spec-intake | `docs/agents-v0/requirements/<feature>.md` (Gherkin AC IDs with `Kind`, NFRs, `Delivery approvals`) |
 | Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, UX spec, mockups; ARC record when `Material: yes` |

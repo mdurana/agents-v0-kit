@@ -14,6 +14,7 @@ Design phase playbook for the `solution-architect` agent (`workflow-orchestratio
 3. Define event schemas under `docs/agents-v0/design/<feature>/events/` with `eventVersion`; evolution additive; envelope includes `eventId`, `eventType`, `eventVersion`, `timestamp`, `source`, `correlationId`, `data`, `idempotency_key`.
 4. Pick one error envelope per API surface: RFC 7807 (`application/problem+json`) **or** the custom `{success, data/error}` envelope — do not mix without versioning.
 5. Add idempotency keys on non-idempotent POST/create/pay/cancel.
+5b. Expose only what consumers need: callers come to depend on every observable behaviour, including error text and ordering. Change a published operation additively. Retire a field or operation in two steps: mark it `deprecated: true` with the sunset date in its description, and remove it only in a later change after the consumers named in `design.md` have moved. A breaking change needs a new major version or an ADR.
 6. Write `docs/agents-v0/design/<feature>/design.md` from `docs/agents-v0/design/_design.template.md`:
    - **Traceability:** every `AC-n` and NFR of the requirements artifact maps to the operation, event, UX component, or ADR that satisfies it.
    - **Data model:** entities, keys, indexes, volume, retention, PII, and the migration shape (`migration-safety`).

@@ -25,8 +25,212 @@ expect_fail() {
   if (cd "$dir" && "$@") >/dev/null 2>&1; then fail "$desc (expected non-zero)"; else pass "$desc"; fi
 }
 
+sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
+
 git_commit() {
   git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false commit -q -m "$1"
+}
+
+# write_pack <dir>: a complete, valid program architecture pack.
+write_pack() {
+  p="$1"
+  mkdir -p "$p/docs/agents-v0/design/system/components" "$p/docs/agents-v0/adr"
+  cat > "$p/docs/agents-v0/architecture.md" <<'EOF'
+# Architecture
+
+## C4 Context
+
+```mermaid
+flowchart TB
+  Customer[Customer]
+  subgraph orderPlatform [Order Platform]
+    OrderApp[Order application]
+  end
+  Customer -->|HTTPS| OrderApp
+```
+
+## C4 Container
+
+```mermaid
+flowchart TB
+  Customer[Customer]
+  subgraph orderPlatform [Order Platform]
+    WebApp[Web application]
+    OrderService[Order service]
+    MessageBus[Message bus]
+  end
+  Customer -->|HTTPS| WebApp
+  WebApp -->|sync REST| OrderService
+  OrderService -->|"async event"| MessageBus
+```
+
+## Data flow
+
+```mermaid
+flowchart TB
+  Customer[Customer]
+  subgraph orderPlatform [Order Platform]
+    WebApp[Web application]
+    OrderService[Order service]
+    MessageBus[Message bus]
+  end
+  Customer -->|"HTTPS / HTML and JSON"| WebApp
+  WebApp -->|"REST / JSON order request"| OrderService
+  OrderService -->|"async / order-created event"| MessageBus
+```
+
+## Data models
+
+### Conceptual
+
+An Order belongs to one Customer.
+
+### Logical
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    id PK
+    email
+  }
+  ORDER {
+    id PK
+    customer_id FK
+    status
+  }
+```
+
+### Physical
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    uuid id PK
+    varchar_255 email
+  }
+  ORDER {
+    uuid id PK
+    uuid customer_id FK
+    varchar_32 status
+  }
+```
+
+## State machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> Submitted: POST /orders
+  Submitted --> [*]
+```
+
+## Failure domains and degradation
+
+| Dependency | Failure | Blast radius | Degraded behaviour | Validation |
+|------------|---------|--------------|--------------------|------------|
+| Message bus | unavailable | new orders accepted but not published | outbox retries; the order page shows pending | dependency-kill test in P4 |
+
+## MVP and future state
+
+One service and one bus now. A second service is split out when a second team owns checkout.
+EOF
+  cat > "$p/docs/agents-v0/network.md" <<'EOF'
+# Network
+
+## Target topology
+
+```mermaid
+flowchart LR
+  subgraph publicZone [Public]
+    Ingress[Ingress]
+  end
+  subgraph privateZone [Private]
+    Workloads[Workloads]
+  end
+  Ingress -->|HTTPS| Workloads
+```
+EOF
+  cat > "$p/docs/agents-v0/design/system/nfr-slo.md" <<'EOF'
+# NFR / SLO budget
+
+| Surface | Latency (p95) | Availability | Notes |
+|---------|---------------|--------------|-------|
+| checkout | 300ms | 99.9% | |
+EOF
+  cat > "$p/docs/agents-v0/design/system/threat-model.md" <<'EOF'
+# Threat model
+
+## Assets
+
+- customer email
+
+## Trust boundaries
+
+- browser to ingress
+
+## Top risks (STRIDE)
+
+| Risk | Mitigation |
+|------|------------|
+| spoofed session | signed tokens |
+EOF
+  cat > "$p/docs/agents-v0/design/system/ops-readiness.md" <<'EOF'
+# Operations readiness
+
+## Build and run ownership
+
+| Item | Value |
+|------|-------|
+| Owning team | orders |
+
+## Error budget policy
+
+When a budget is spent, feature releases stop until it recovers.
+
+## Database maintenance and operation
+
+N/A: the first release has no datastore of its own.
+
+## Production readiness checklist
+
+- [ ] On-call rotation and escalation path are defined.
+EOF
+  cat > "$p/docs/agents-v0/adr/01-pattern.md" <<'EOF'
+# ADR 01: pattern
+
+- **Status:** Proposed
+EOF
+  cat > "$p/docs/agents-v0/design/system/arc-record.md" <<'EOF'
+# ARC record
+
+## Options
+
+docs/agents-v0/adr/01-pattern.md
+
+## Fitness functions
+
+| Principle | Check | Threshold | On failure |
+|-----------|-------|-----------|------------|
+| no module cycles | ArchUnit rule | zero cycles | block merge |
+EOF
+  cat > "$p/docs/agents-v0/design/system/context-map.md" <<'EOF'
+# System context map
+
+## Bounded contexts
+
+| Context | Responsibility | Integrations | Service root | Contract | Sequence diagram | Component plan | Status |
+|---------|----------------|--------------|--------------|----------|------------------|----------------|--------|
+| orders | place orders | bus | . | openapi/api-v1.yaml | N/A: none yet | N/A: single service in this release | planned |
+EOF
+  cat > "$p/docs/agents-v0/design/system/architecture-review.md" <<'EOF'
+agent: design-reviewer
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Suggestion | name the retry budget | architecture.md | Open |
+EOF
 }
 
 # --- resolve-layout.sh -------------------------------------------------------
@@ -378,8 +582,9 @@ cat > "$d/docs/agents-v0/design/system/arc-record.md" <<'EOF'
 EOF
 expect_pass "check-arc accepts an approved ARC record" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
 expect_pass "check-approvals accepts the arc row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/design/system/arc-record.md arc
-cat > "$d/docs/agents-v0/architecture.md" <<'EOF'
-# Architecture
+write_pack "$d"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+cat >> "$d/docs/agents-v0/architecture.md" <<'EOF'
 
 ## Delivery approvals
 
@@ -453,13 +658,11 @@ none
 EOF
 expect_pass "check-intake accepts a story with a refusing negative" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
 cp "$d/docs/agents-v0/requirements/orders.md" "$d/docs/agents-v0/requirements/plain.md"
-sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
 sedi 's/Call POST.*/Sign in as the clerk and place one order for the customer./' "$d/docs/agents-v0/requirements/plain.md"
 sedi 's/Then HTTP 201 and the order row is stored with status PENDING/Then the clerk sees the confirmation./' "$d/docs/agents-v0/requirements/plain.md"
 expect_pass "check-intake accepts a plain desk check and Then" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/plain.md
 sedi 's/Then the clerk sees the confirmation./Then nope/' "$d/docs/agents-v0/requirements/plain.md"
 expect_fail "check-intake rejects a Then that is only a stub" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/plain.md
-sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }
 sedi 's/Kind: negative/Kind: happy/' "$d/docs/agents-v0/requirements/orders.md"
 expect_fail "check-intake rejects a security trigger without a refusal" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
 sedi 's/Kind: happy/Kind: negative/' "$d/docs/agents-v0/requirements/orders.md"
@@ -467,6 +670,107 @@ sedi 's/Then HTTP 201 and the order row is stored with status PENDING/Then it wo
 expect_fail "check-intake rejects a vague Then" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
 printf 'Story: P0-A\n' > "$d/docs/agents-v0/requirements/p0.md"
 expect_pass "check-intake skips P0-A" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/p0.md
+
+# --- check-architecture-pack.sh ----------------------------------------------
+d="$tmp/pack"
+write_pack "$d"
+expect_pass "check-architecture-pack accepts a complete pack" "$d" sh "$CI/check-architecture-pack.sh"
+expect_fail "check-architecture-pack --approved needs an Accepted pattern ADR" "$d" sh "$CI/check-architecture-pack.sh" --approved
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+expect_pass "check-architecture-pack --approved accepts an Accepted pattern ADR" "$d" sh "$CI/check-architecture-pack.sh" --approved
+
+d="$tmp/pack-tech"
+write_pack "$d"
+sedi 's/MessageBus\[Message bus\]/MessageBus[Kafka topic]/' "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack rejects a product name in C4" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-topology"
+write_pack "$d"
+python3 - "$d/docs/agents-v0/architecture.md" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+flow = text.index("## Data flow")
+head, tail = text[:flow], text[flow:]
+tail = tail.replace("OrderService", "BillingService", 1)
+open(path, "w", encoding="utf-8").write(head + tail)
+PY
+expect_fail "check-architecture-pack rejects a Data flow with other nodes than C4 Container" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-placeholder"
+write_pack "$d"
+python3 - "$d/docs/agents-v0/architecture.md" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+text = re.sub(r"### Logical\n\n```mermaid.*?```\n", "### Logical\n\n<!-- fill me -->\n", text, flags=re.S)
+open(path, "w", encoding="utf-8").write(text)
+PY
+expect_fail "check-architecture-pack rejects an empty Logical data model" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's|<!-- fill me -->|N/A: the system keeps no state of its own.|' "$d/docs/agents-v0/architecture.md"
+expect_pass "check-architecture-pack accepts N/A with a reason" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's|N/A: the system keeps no state of its own.|N/A: no|' "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack rejects N/A without a reason" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-review"
+write_pack "$d"
+rm "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_fail "check-architecture-pack needs the independent review" "$d" sh "$CI/check-architecture-pack.sh"
+write_pack "$d"
+printf '| 2 | Critical | no failure row for the bus | architecture.md | Open |\n' >> "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_fail "check-architecture-pack rejects an open Critical review finding" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/| Critical | no failure row for the bus | architecture.md | Open |/| Critical | no failure row for the bus | architecture.md | Resolved |/' "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_pass "check-architecture-pack accepts a Resolved Critical" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-fitness"
+write_pack "$d"
+sedi 's/| no module cycles | ArchUnit rule | zero cycles | block merge |/| <e.g. rule> | <e.g. check> | <e.g. threshold> | <e.g. action> |/' "$d/docs/agents-v0/design/system/arc-record.md"
+expect_fail "check-architecture-pack needs a structural fitness function row" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-component"
+write_pack "$d"
+sedi 's#N/A: single service in this release#docs/agents-v0/design/system/components/orders.md#' "$d/docs/agents-v0/design/system/context-map.md"
+expect_fail "check-architecture-pack needs the component plan file a context names" "$d" sh "$CI/check-architecture-pack.sh"
+printf '# Component plan: orders\n\nParent: `docs/agents-v0/architecture.md`\n' > "$d/docs/agents-v0/design/system/components/orders.md"
+expect_pass "check-architecture-pack accepts a component plan that links its parent" "$d" sh "$CI/check-architecture-pack.sh"
+printf '# Component plan: orders\n' > "$d/docs/agents-v0/design/system/components/orders.md"
+expect_fail "check-architecture-pack rejects a component plan with no parent link" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-milestone"
+write_pack "$d"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+mkdir -p "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements"
+cat >> "$d/docs/agents-v0/architecture.md" <<'EOF'
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| architecture | docs/agents-v0/architecture.md, docs/agents-v0/design/system/arc-record.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/requirements/a.md" <<'EOF'
+# a
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| Intake | docs/agents-v0/requirements/a.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/milestones/m.md" <<'EOF'
+# m
+
+Architecture: docs/agents-v0/architecture.md
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency |
+|----------|-----------|------------------|--------|------------|
+| M-A | As a clerk, I want x, so that y. | docs/agents-v0/requirements/a.md | todo | - |
+EOF
+expect_pass "check-milestone runs the pack check for an approved architecture row" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+rm "$d/docs/agents-v0/design/system/ops-readiness.md"
+expect_fail "check-milestone fails when the approved pack is incomplete" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2

@@ -399,7 +399,7 @@ delivery-metrics:
       trusted="$(mktemp -d)"
       if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-delivery-linkage.sh" 2>/dev/null \
         && git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-approver-gitlab.sh" 2>/dev/null; then
-        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-approver-gitlab.sh classify-change.sh check-design.sh check-build-plan.sh; do
+        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-architecture-pack.sh check-approver-gitlab.sh classify-change.sh check-design.sh check-build-plan.sh; do
           if git cat-file -e "FETCH_HEAD:.agents-v0/ci/${s}" 2>/dev/null; then
             git show "FETCH_HEAD:.agents-v0/ci/${s}" > "${trusted}/${s}"
             chmod +x "${trusted}/${s}"
