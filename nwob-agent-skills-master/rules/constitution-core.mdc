@@ -1,0 +1,100 @@
+---
+description: Cross-platform constitution core. SDD workflows, architectural principles, quality standards, and overridable defaults
+alwaysApply: true
+---
+
+# Constitution Core
+
+**Version:** 1.4.0  
+**Last Amended:** 2026-09-30  
+**Enforcement:** Strict. Any deviation from this document will be flagged as a critical architectural violation.
+
+## Core execution and spec-driven development
+
+*   **Phase 0 Discovery:** On every engagement, run Phase 0 discovery per `sdd-artifact-layout.md`.
+*   **Agent Persona:** Switch persona using `/persona` or `/switch` — ensuring only one active persona exists in `.cursor/` at a time. Follow the `AGENTS.md` execution model by matching intent to skill and strictly following the skill workflow.
+*   **Artifact Management:** Resolve SDD paths via `.nwob/artifact-paths.json` when present (`spec` required; `stories_dir` optional); otherwise use default `nwob-docs/sdd/` layout. Non-SDD artifacts use fixed `nwob-docs/` paths. Obsolete mapping keys `plan` / `tasks` **MUST** be removed.
+*   **SDD Gates:** Initial gate requires resolved `epic-spec.md` (`spec`) on disk. Architecture artifacts (`masterplan.md` dual with `architecture.md`, flat `sdd/components/{component-name}-plan.md`) are **derived from** `epic-spec.md` by SA/LB. Build requires in-scope `story-spec.md` + `story-tasks.md`.
+*   **Zero Vibe-Coding:** Ad-hoc feature implementation bypassing the `epic-spec` → `story-spec` → `story-tasks` workflow is strictly prohibited.
+*   **Authoritative Scope:** Owning skills **MUST** produce and maintain `epic-spec.md` (including chronological backlog index and high-level US/TS) plus in-scope `story-spec.md` and `story-tasks.md` before implementation work proceeds. Workflow outputs are binding for agents and implementers unless formally amended.
+*   **`*-spec.md` / `*-plan.md` / architecture write ACL:** Any persona may **read** these files. **Write** only when the owning skill is active. Solution Architect and Lead Builder are **co-equal** for SA/LB artifacts:
+    *   `epic-spec.md`, `story-spec.md` (product anatomy) — Product Owner author skills (`/problem` … `/backlog`) or SA **or** LB when invoking those skills / `/define` / `/features`
+    *   `story-spec.md` (technical annex) and `story-tasks.md` — Builder / Pod Builder `co-design-solution`; SA/LB via `/orchestrate-design` / `co-design-solution`
+    *   `architecture.md` ↔ `sdd/masterplan.md` (dual-persist), flat `sdd/components/{component-name}-plan.md`, ADR bodies, OpenAPI — SA **or** LB
+    *   Pod Builder **MUST NOT** author `epic-spec.md`, `masterplan.md`, `architecture.md`, `sdd/components/**`, ADR bodies, or OpenAPI
+    *   **MUST NOT** rewrite or “improve” these files outside an owning skill, or during `/persona` / `/switch` / `nwob init`. Route AC/product changes to PO `/backlog`; route annex gaps to `co-design-solution`; route architecture gaps to SA/LB.
+    *   **Retired artifacts (do not generate):** `epic-plan.md`, `epic-tasks.md`, `story-plan.md`, nested `sdd/components/{id}/`, `component-spec.md` twins.
+
+## Architectural principles
+
+*   **Stateless workloads.** Applications **MUST** run as stateless deployable units (containers, serverless functions, mobile or desktop clients with external persistence). Durable transactional state and messaging must reside in external datastores or brokers. Binary payloads go in object storage when applicable.
+*   **Observability.** Every deliverable **MUST** be instrumented for distributed tracing. Propagate context across outbound network calls, database access, message brokers, and inter-process communication. Default observability stack is named under Default technology stack; OpenTelemetry is optional when explicitly specified in user prompt, SDD artifacts, or `constitution-custom.mdc`.
+*   **Query performance.** When using relational or document stores, **MUST** design indexes and queries to avoid N+1 access patterns.
+
+## Default technology stack (overridable)
+
+Enterprise defaults below. Override in `constitution-custom.mdc` (or higher-precedence sources per AGENTS.md). Do not invent a conflicting stack without documenting the override.
+
+*   **Primary language:** Java (prefer modern features: records, switch expressions, virtual threads when applicable).
+*   **Relational database:** PostgreSQL. Schema changes **MUST** be version-controlled (e.g. Liquibase). Use proper indexing; no N+1 queries.
+*   **Message broker:** Kafka for event-driven communication. Producers **MUST** implement idempotency. Consumers **MUST** handle dead-letter queues (DLQs) and reliable offset commits.
+*   **Caching and distributed locks:** Redis for ephemeral caching, session management, or distributed locking only — not a persistent system of record.
+*   **Observability:** Default to **Datadog** for metrics, APM, logs, and distributed tracing on EKS. **OpenTelemetry** is optional when explicitly specified. All incoming requests, outgoing HTTP/gRPC calls, database queries, and Kafka events **MUST** propagate trace context end-to-end regardless of backend.
+
+## Default data lifecycle (overridable)
+
+Enterprise defaults below. Override in `constitution-custom.mdc` when the product requires a different policy.
+
+*   **Soft-delete mandate:** Application-level hard deletes are prohibited across services unless `constitution-custom.mdc` explicitly documents an exception.
+*   **Audit timestamps:** Every database entity **MUST** include `created_at`, `updated_at`, and `deleted_at` fields when soft-delete applies.
+*   **Application DELETE behavior:** API `DELETE` and internal deletion logic **MUST** only populate `deleted_at`. The application layer **MUST NOT** hold permissions to execute physical `DELETE FROM` for soft-deleted entities.
+*   **Data lifecycle management (DLM):** Permanent deletion is decoupled from the application and handled by a scheduled asynchronous infrastructure process (e.g. K8s CronJob or PostgreSQL `pg_cron`) per retention policy.
+
+## Contracts and quality
+
+*   **Error handling (RFC 7807).** API errors **MUST** follow RFC 7807 Problem Details and include at least: `timestamp`, `status`, `error_code` (domain-specific), `message`, and `trace_id` (Datadog trace ID by default, or OpenTelemetry span ID when OTel is in the effective stack). **MUST** distinguish client or validation faults from system failures.
+*   **HTTP status mapping.** **MUST NOT** use `500` for validation failures or business-rule violations. Map domain exceptions to precise 4xx codes (400, 401, 403, 404, 409).
+*   **External interfaces.** Where the project exposes HTTP APIs, SDK interfaces, or event schemas, **MUST** maintain machine-readable contract documentation. Contract-first YAML vs annotation-generated OpenAPI is project-defined in `constitution-custom.mdc`; RFC 7807 remains mandatory either way.
+*   **Coverage gates.** Builds **MUST** fail below 100% meaningful line and branch coverage on the measured scope. Tests **MUST** assert behavior and edge cases. Assertion-free, getter-only, and coverage-counter-only tests are forbidden. Measured scope is named in `constitution-custom.mdc`. The 100% number is not overridable.
+*   **Default harnesses.** Java backend defaults: JUnit 5, Mockito, JaCoCo, and Testcontainers for PostgreSQL, Kafka, and Redis integration. Checkstyle, PMD, SpotBugs, and `mvn` are Java-only — mark N/A on non-Java clones. iOS defaults: XCTest / `xcodebuild`. Android defaults: Gradle unit and instrumented tests. Product stacks may narrow harnesses in `constitution-custom.mdc`.
+*   **Test pyramid.** 70/20/10 in `implementation-quality-standards.md` is a mix hint. The numeric gate is 100% meaningful coverage.
+
+## Delivery and review (load detail on demand)
+
+*   **Git and MR.** Branch, commit, and scoped-MR law **MUST** follow `git-delivery-standards.md`. Draft MR title and body **MUST** follow `merge-request-patterns.md`. Branch regex and title pattern live in `constitution-custom.mdc`.
+*   **Increment review.** After each `story-tasks.md` ID, `review-implementation` **MUST** pass before the next increment. The same person **MAY** dual-hat with `trigger-ai-build`. That dual-hat verdict satisfies the increment gate. Increment review is not a second human peer.
+*   **MR draft.** Session 4 **MUST** use `raise-merge-request` to draft title, body, and branch names. The human opens the MR in GitLab. The agent **MUST NOT** commit, push, or call GitLab APIs.
+*   **MR audit.** Session 5 **MUST** be a peer `/audit` (`audit-and-approve-code`). The Sessions 1–4 author **MUST NOT** self-audit. The agent writes `audit-report.md` and a GitLab review draft only. It **MUST NOT** post, approve, or merge.
+*   **GitLab approval.** A human **MUST** approve and merge in GitLab. Agents **MUST NOT** approve or merge.
+*   **Implementation quality.** SOLID, defensive design, and testing rules **MUST** follow `implementation-quality-standards.md` during increment review and MR audit. The full MR standards checklist in `builder-quality-patterns.md` applies at Session 5 only.
+
+## Planning and story anatomy
+
+*   **Comprehensive story mapping.** The `epic-spec.md` **MUST** contain a complete chronological backlog index of all User Stories and Technical Stories plus high-level US/TS. Full anatomy **MUST** live in `{stories_dir}/{STORY_ID}/story-spec.md` for each indexed story (product fields; technical annex filled by co-design).
+*   **Chronological execution.** **MUST** list every User Story and Technical Story in `epic-spec.md` in strict chronological execution order. Foundation and infrastructure stories **MUST** precede UI/feature stories.
+*   **Story fields.** **MUST** include exactly: `Type:`, `Summary:`, `Description:`, `Acceptance Criteria (AC):`, `Dependencies:`, `Size:` (Fibonacci).
+*   **Acceptance criteria.** **MUST** write all AC in strict Gherkin (`Given` / `When` / `Then` / `And`). Vague prose bullets are **FORBIDDEN**. Every AC **MUST** represent a discrete, testable scenario.
+*   **5-point cap.** Any story estimated at 5 or more points **MUST** be evaluated for decomposition. If logically possible, break into smaller 2 or 3 point stories that deliver incremental value.
+*   **Technical debt.** **MUST NOT** create standalone technical debt stories. Fold debt reduction into user-value stories or non-story maintenance tasks.
+
+## Definition of done
+
+*   **Code hygiene.** Formatting and static hygiene gates defined in CI **MUST** pass. Public interface changes **MUST** include documentation strings. Non-obvious logic **MUST** carry intent comments explaining why.
+*   **Security.** **MUST NOT** introduce hardcoded secrets. **MUST** validate or sanitize external inputs. When using SQL or data stores, **MUST** use parameterized queries to avoid injection. **MUST** encrypt sensitive data at rest and in transit, and sanitize dynamic log fields.
+*   **Compatibility.** Interface changes and schema migrations **MUST** be backward compatible, replay-safe, and documented.
+*   **Review gates.** Dual-hat increment review per `story-tasks.md` ID, Session 5 peer `/audit`, and human GitLab approval **MUST** pass before merge.
+
+## Governance
+
+*   This constitution core **MUST** supersede conflicting ad-hoc guidance.
+*   **Versioning:** Semantic versioning applies (MAJOR: redefinition, MINOR: new principle, PATCH: clarifications).
+*   Amendments **MUST** update the Sync Impact Report, bump version, set Last Amended date, and propagate template updates. Feature `epic-spec.md` Constitution Check **MUST** be completed before Phase 0 research.
+
+### Sync impact report (v1.4.0, 2026-09-30)
+
+| Artifact | Impact |
+|----------|--------|
+| `constitution-core.mdc` | MINOR 1.4.0: Retire `epic-plan.md`, `epic-tasks.md`, `story-plan.md`; backlog + HL US/TS in `epic-spec.md`; annex in `story-spec.md`; flat `sdd/components/{component-name}-plan.md`; initial gate = `epic-spec` only. |
+| `sdd-artifact-layout.md` | Mapping keys `spec` + `stories_dir` only; dual-persist system-level only; legacy read-only paths documented. |
+| `AGENTS.md`, persona boundaries, bundles, templates, CLI | Full consolidation sync. |
+| Prior 1.3.0 | SA ↔ LB co-equal write ACL; dual-persist `architecture.md` ↔ `sdd/masterplan.md`. |

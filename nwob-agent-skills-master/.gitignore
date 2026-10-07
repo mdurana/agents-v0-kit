@@ -1,0 +1,44 @@
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Build
+target/
+build/
+*.class
+
+# Test coverage
+*.exec
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Dependencies
+*.jar
+*.war
+*.gem
+.bundle
+.idea
+Gemfile.lock
+gemfiles/*.lock
+coverage/*
+pkg/*
+
+doc
+log
+
+
+# Custom
+.DS_Store
+.venv/
+.cursor/
+.nwob/
+__pycache__/
+*.pyc
+references/samples/artifact-paths.example.json

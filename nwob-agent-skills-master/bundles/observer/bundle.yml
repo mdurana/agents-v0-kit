@@ -1,0 +1,63 @@
+schema_version: "2.0"
+
+bundle:
+  id: observer
+  name: Observer
+  version: "2.0.0"
+  role: observer
+  description: >-
+    Pilot observation, workflow feedback, chat and meeting capture,
+    and mentor handoff packaging.
+  author: nwob-agent-skills
+  license: MIT
+
+provides:
+  agent: agents/observer.md
+  skills:
+    - observer/summarize-chat-session
+    - observer/summarize-meeting
+    - observer/document-ai-techniques
+    - observer/provide-workflow-feedback
+    - observer/prepare-mentor-handoff
+  cursor:
+    rules:
+      persona: true
+      boundaries:
+        - rules/observer-skill-boundaries.md
+  commands:
+    - name: summarize
+      skill: observer/summarize-chat-session
+      scaffold: nwob-docs/observations/session-summary.md
+      template: observer/session-summary-template.md
+    - name: meeting
+      skill: observer/summarize-meeting
+      scaffold: nwob-docs/observations/meeting-summary.md
+      template: observer/meeting-summary-template.md
+    - name: handoff
+      skill: observer/prepare-mentor-handoff
+      scaffold: nwob-docs/observations/mentor-handoff.md
+      template: observer/handoff-template.md
+  templates:
+    - observer/handoff-template.md
+    - observer/session-summary-template.md
+    - observer/meeting-summary-template.md
+  scaffolds:
+    - path: nwob-docs/observations/session-summary.md
+      template: observer/session-summary-template.md
+      commands: [summarize]
+    - path: nwob-docs/observations/meeting-summary.md
+      template: observer/meeting-summary-template.md
+      commands: [meeting]
+    - path: nwob-docs/observations/mentor-handoff.md
+      template: observer/handoff-template.md
+      commands: [handoff]
+
+artifacts:
+  - path: nwob-docs/observations/session-summary.md
+    produced_by: [summarize]
+  - path: nwob-docs/observations/meeting-summary.md
+    produced_by: [meeting]
+  - path: nwob-docs/observations/mentor-handoff.md
+    produced_by: [handoff]
+
+tags: [observer, pilot, mentor]

@@ -1,0 +1,21 @@
+---
+description: NWOB Phase 0 discovery, nwob-docs artifact paths, and SDD gates
+alwaysApply: true
+---
+
+# NWOB Core
+
+- On every engagement, run Phase 0 discovery per [sdd-artifact-layout.md](../../references/rules/sdd-artifact-layout.md).
+- Resolve SDD paths via `.nwob/artifact-paths.json` when present (`spec` required; optional `stories_dir`); default `nwob-docs/sdd/` otherwise. Remove obsolete mapping keys `plan` / `tasks`. Non-SDD artifacts use fixed `nwob-docs/` paths.
+- Read SDD/architecture artifacts at mapped or default paths; write only via owning skills (see write ACL below).
+- Register service clones in `nwob-docs/architecture/service-map.md`; clone under `repositories/{service-name}/` when needed (prompter-managed, not created by init).
+- `/contracts` persists OpenAPI to `repositories/{service-name}/src/main/resources/swagger/` when clones exist (SA or LB).
+- **Initial SDD gate:** resolved `epic-spec.md` (`spec`) on disk. **Build gate:** in-scope `story-spec.md` + `story-tasks.md`; story order from epic-spec backlog index.
+- **Write ACL:** Any persona may read. **Write** only via owning skills:
+  - `epic-spec.md` (problem, roadmap, HL US/TS, backlog index), `story-spec.md` (product fields) — PO author skills or SA **or** LB (`/define`, `/features`, …)
+  - Technical annex in `story-spec.md`, `story-tasks.md` — Builder / Pod Builder `co-design-solution`; SA/LB `/orchestrate-design` / `co-design-solution` (prompt `tasks.md` → `story-tasks.md`)
+  - `architecture.md` ↔ `sdd/masterplan.md` (dual-persist only), flat `sdd/components/{component-name}-plan.md`, ADR, OpenAPI — SA **or** LB (derived from `epic-spec.md`)
+  - Pod Builder **MUST NOT** author `epic-spec.md`, masterplan, architecture, components, ADRs, OpenAPI
+  - **MUST NOT** rewrite these files outside an owning skill, or during `/persona` / `/switch` / `nwob init`
+- Follow [AGENTS.md](../../AGENTS.md) execution model: match intent to skill, follow skill workflow strictly.
+- Switch persona: `/persona` or `/switch` — one active persona in `.cursor/` at a time; switch never creates/edits/deletes project `*-spec.md` / `*-plan.md`.

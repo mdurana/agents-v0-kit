@@ -1,0 +1,58 @@
+{
+  "schema_version": "2.0",
+  "bundles": [
+    "product-owner",
+    "solution-architect",
+    "lead-builder",
+    "builder",
+    "pod-builder",
+    "observer"
+  ],
+  "core": {
+    "skills": ["initialize-project", "switch-persona"],
+    "commands": ["persona", "switch"],
+    "references": ["rules/*", "samples/presentation.config.md"],
+    "project_rules": [
+      { "source": "constitution-custom.mdc", "dest": "constitution-custom.mdc" }
+    ],
+    "scaffolds": [
+      "nwob-docs/sdd/.gitkeep",
+      "nwob-docs/sdd/stories/.gitkeep",
+      "nwob-docs/architecture/adr/.gitkeep",
+      "nwob-docs/diagrams/sequences/.gitkeep",
+      "nwob-docs/meetings/.gitkeep",
+      "nwob-docs/observations/.gitkeep",
+      "nwob-docs/process/.gitkeep",
+      "nwob-docs/presentations/.gitkeep"
+    ],
+    "scaffold_files": [
+      {
+        "path": "nwob-docs/architecture/service-map.md",
+        "template": "sa/service-map-template.md"
+      }
+    ]
+  },
+  "bundle_summaries": {
+    "solution-architect": {
+      "version": "2.3.0",
+      "commands": [
+        "define",
+        "problem",
+        "ideate",
+        "roadmap",
+        "features",
+        "intake",
+        "c4",
+        "pattern",
+        "platform",
+        "services",
+        "contracts",
+        "ops",
+        "adr",
+        "arc",
+        "architecture"
+      ],
+      "command_standards": "rules/solution-architect-command-standards.md"
+    }
+  }
+}

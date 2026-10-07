@@ -1,0 +1,92 @@
+schema_version: "2.0"
+
+bundle:
+  id: product-owner
+  name: Product Owner
+  version: "2.0.0"
+  role: product-owner
+  description: >-
+    Spec-driven product discovery, roadmap, backlog, and leader-facing presentation
+    skills. Produces nwob-docs/sdd artifacts per the Enterprise System Constitution.
+  author: nwob-agent-skills
+  license: MIT
+
+provides:
+  agent: agents/product-owner.md
+  skills:
+    - product-owner/business-problem-identification
+    - product-owner/product-ideation
+    - product-owner/product-roadmap-creation
+    - product-owner/feature-definition
+    - product-owner/backlog-management-and-refinement
+    - product-owner/value-stream-mapping
+    - product-owner/presentation-intake-update
+    - product-owner/presentation-content-extraction
+    - product-owner/presentation-generation
+    - product-owner/presentation-enrichment
+  cursor:
+    rules:
+      persona: true
+      boundaries:
+        - rules/product-owner-skill-boundaries.md
+        - rules/presentation-standards.md
+        - rules/ideation-frameworks.md
+        - rules/intent-interview-patterns.md
+  commands:
+    - name: problem
+      skill: product-owner/business-problem-identification
+      scaffold: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+    - name: ideate
+      skill: product-owner/product-ideation
+      scaffold: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+    - name: roadmap
+      skill: product-owner/product-roadmap-creation
+      scaffold: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+    - name: features
+      skill: product-owner/feature-definition
+      scaffold: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+    - name: backlog
+      skill: product-owner/backlog-management-and-refinement
+      scaffold: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+    - name: value
+      skill: product-owner/value-stream-mapping
+    - name: intake
+      skill: product-owner/presentation-intake-update
+      scaffold: nwob-docs/presentations/intake-record.md
+      template: presentations/intake-record-template.md
+    - name: collect
+      skill: product-owner/presentation-content-extraction
+    - name: present
+      skill: product-owner/presentation-generation
+    - name: enrich
+      skill: product-owner/presentation-enrichment
+    - name: deck
+      skill: product-owner/presentation-generation
+      note: Full present chain per presentation-standards.md
+  templates:
+    - sdd/spec-template.md
+    - sdd/story-spec-template.md
+    - presentations/intake-record-template.md
+    - po/tickets-export-params.template.md
+  scaffolds:
+    - path: nwob-docs/sdd/epic-spec.md
+      template: sdd/spec-template.md
+      commands: [problem, ideate, roadmap, features, backlog]
+    - path: nwob-docs/presentations/intake-record.md
+      template: presentations/intake-record-template.md
+      commands: [problem, intake]
+
+artifacts:
+  - path: nwob-docs/sdd/epic-spec.md
+    produced_by: [problem, ideate, roadmap, features, backlog]
+  - path: nwob-docs/presentations/intake-record.md
+    produced_by: [problem, intake]
+  - path: nwob-docs/presentations/
+    produced_by: [present, deck, enrich]
+
+tags: [product, sdd, backlog, spec, presentation]
