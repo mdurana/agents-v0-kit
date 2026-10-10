@@ -1,6 +1,6 @@
 ---
 name: implement-frontend
-description: Build phase playbook. Implement SvelteKit client or React admin — routes, loads, forms, a11y, XSS-safe content — with red–green tests.
+description: Build phase playbook. Implement React (default) or existing SvelteKit UI — routes, loads, forms, a11y, XSS-safe content — with red–green tests.
 ---
 
 # implement-frontend
@@ -11,12 +11,12 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 1. Read the Design artifacts — including the approved UX spec (`docs/agents-v0/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/agents-v0/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
 2. **Baseline:** run the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
 3. **Wire the frontend quality gate** if missing (ESLint, coverage provider with the ≥ 70% threshold, lockfile audit) — unwired tooling makes the build script compile-only.
-4. For greenfield UI, confirm the Svelte/React decision (asked once in Intake).
+4. Default UI is React 19, TypeScript 5.9, Vite 7 (`frontend-web.mdc`). Use SvelteKit only when the repo already uses it.
 5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh .agents-v0/ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows. Before the gate also run `sh .agents-v0/ci/check-frontend-calls.sh`: every `/api/` call must be a catalog operation.
 6. Work **red–green (TDD where practical)** per plan row: failing test first, then implement until green (`quality-and-testing.mdc`). Each loop run uses `Frontend verify (fast)` when that cell is a real command. An empty cell or a placeholder comment means the loop uses the full Frontend verify command. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent (`workflow-orchestration.mdc`): record `blocked` and stop. The second red result for the same test writes `docs/agents-v0/build/<feature>/failure-brief.md` and returns for `debug-investigator`. Attempt three applies that note. A third red result stops.
 7. Implement routes/loads/components per `frontend-web.mdc`:
-   - SvelteKit: `src/routes/` + `src/lib/` under the frontend root; prefer `load`/server loads; `browser` guard before `localStorage`.
-   - React admin: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/slices` under the frontend root; RHF + Zod.
+   - React (default): `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/slices` under the frontend root; RHF + Zod.
+   - SvelteKit (existing repos only): `src/routes/` + `src/lib/` under the frontend root; prefer `load`/server loads; `browser` guard before `localStorage`.
    - UX spec: per-screen state matrix (loading/error/empty/success), component default behavior (honor an override when the spec records one), and layout matching the linked mockups.
 8. Wire the API client in the app, not in the mockups: call only the OpenAPI operation named on each component row. Those operations come from the feature draft merged into the org catalog. Send Bearer, `X-Correlation-ID`, and `traceparent`; map success, validation error, 401, and 5xx to the states in the spec. 401 refresh/redirect per `frontend-web.mdc`.
 9. Enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.

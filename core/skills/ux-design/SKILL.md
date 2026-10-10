@@ -8,7 +8,7 @@ description: Design phase playbook. Produce HTML mockups and the UX spec — flo
 Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`).
 
 ## Steps
-1. Read the Intake artifact (`docs/agents-v0/requirements/<feature>.md`): acceptance criteria, UX requirements (WCAG 2.1 AA target, device/browser matrix, design-system reference), and the recorded Svelte/React decision. Read the feature draft `docs/agents-v0/design/<feature>/openapi.yaml` when the UI calls an API.
+1. Read the Intake artifact (`docs/agents-v0/requirements/<feature>.md`): acceptance criteria, UX requirements (WCAG 2.1 AA target, device/browser matrix, design-system reference), and the UI stack (React default; SvelteKit only when the repo already uses it). Read the feature draft `docs/agents-v0/design/<feature>/openapi.yaml` when the UI calls an API.
 2. Inventory the screens affected by the acceptance criteria; map each criterion to a screen.
 3. For each screen write the **state matrix** — loading, error, empty, success (`frontend-web.mdc` UX clause) — with the trigger for each state and the mockup file for that state.
 4. Write **static HTML mockups** under `docs/agents-v0/design/<feature>/mockups/`. One file per screen state (for example `list-empty.html`, `create-error.html`). HTML and CSS only. Every interactive element (link, button, input, select, textarea, summary, or an element with role button, link, tab, menuitem, checkbox, or switch) carries `data-component="<Component name>"`, the same name as its row in the component table. No fetch, no API client, no secrets. Show layout, hierarchy, labels, and every interactive control.
@@ -34,7 +34,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 - [ ] API-backed components name an operation in `docs/agents-v0/design/<feature>/openapi.yaml`. No new endpoint in the UX spec.
 - [ ] UX spec complete: flows, per-screen state matrix, WCAG 2.1 AA accessibility, responsive/device matrix, design-system conformance; N/A determinations reasoned.
 - [ ] UX acceptance criteria name the screen and the mockup.
-- [ ] `frontend-web.mdc`: state matrix; accessibility; Svelte/React decision honored.
+- [ ] `frontend-web.mdc`: state matrix; accessibility; React default (or existing SvelteKit) honored.
 - [ ] `architecture-and-diagrams.mdc`: Mermaid conventions for flows.
 - [ ] `quality-and-testing.mdc`: UX acceptance criteria are testable on the built UI.
 - [ ] `workflow-orchestration.mdc`: Design gate criteria met; stopped for approval.

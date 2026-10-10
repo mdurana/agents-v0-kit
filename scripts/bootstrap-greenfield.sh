@@ -72,9 +72,9 @@ infer_profile() {
   be=0
   fe=0
   bff=0
-  if has_jvm_at "$TARGET_ABS/backend"; then be=1; fi
-  if [ -f "$TARGET_ABS/frontend/package.json" ]; then fe=1; fi
-  if has_jvm_at "$TARGET_ABS/bff"; then bff=1; fi
+  if has_jvm_at "$TARGET_ABS/app/backend" || has_jvm_at "$TARGET_ABS/backend"; then be=1; fi
+  if [ -f "$TARGET_ABS/app/frontend/package.json" ] || [ -f "$TARGET_ABS/frontend/package.json" ]; then fe=1; fi
+  if has_jvm_at "$TARGET_ABS/app/bff" || has_jvm_at "$TARGET_ABS/bff"; then bff=1; fi
   if [ "$be" = 1 ] && [ "$fe" = 1 ] && [ "$bff" = 1 ]; then
     printf 'app-bff\n'
   elif [ "$be" = 1 ] && [ "$fe" = 1 ]; then
@@ -109,6 +109,32 @@ layout_cell() {
   ' "$file"
 }
 
+# Prefer an existing app/<name> module, else the repo-root module, else app/<name>.
+module_root() {
+  name="$1"
+  kind="$2"
+  if [ "$kind" = ui ]; then
+    if [ -f "$TARGET_ABS/app/$name/package.json" ]; then
+      printf 'app/%s/' "$name"
+      return 0
+    fi
+    if [ -f "$TARGET_ABS/$name/package.json" ]; then
+      printf '%s/' "$name"
+      return 0
+    fi
+  else
+    if has_jvm_at "$TARGET_ABS/app/$name"; then
+      printf 'app/%s/' "$name"
+      return 0
+    fi
+    if has_jvm_at "$TARGET_ABS/$name"; then
+      printf '%s/' "$name"
+      return 0
+    fi
+  fi
+  printf 'app/%s/' "$name"
+}
+
 fill_layout() {
   chosen="$1"
   file="$TARGET_ABS/docs/agents-v0/project-profile.md"
@@ -132,7 +158,7 @@ fill_layout() {
   esac
   if [ -z "$chosen" ]; then
     if has_jvm_at "$TARGET_ABS" || [ -f "$TARGET_ABS/package.json" ]; then
-      printf 'Source at the repo root is not a greenfield layout. Move it under backend/, bff/, or frontend/, then re-run with --profile service|ui|app\n'
+      printf 'Source at the repo root is not a greenfield layout. Move it under app/backend/, app/bff/, or app/frontend/, then re-run with --profile service|ui|app\n'
     else
       printf 'Layout profile not inferred. Re-run with --profile service|ui|app\n'
     fi
@@ -141,21 +167,21 @@ fill_layout() {
   case "$chosen" in
     service)
       profile_name='service'
-      backend_root='backend/'
+      backend_root="$(module_root backend jvm)"
       frontend_root='n/a'
       bff_root='n/a'
-      backend_verify='cd backend && ./mvnw -B clean verify'
-      backend_fast='cd backend && ./mvnw -B clean verify -P!ci-security'
+      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
+      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
     service-bff)
       profile_name='service'
-      backend_root='backend/'
+      backend_root="$(module_root backend jvm)"
       frontend_root='n/a'
-      bff_root='bff/'
-      backend_verify='cd backend && ./mvnw -B clean verify'
-      backend_fast='cd backend && ./mvnw -B clean verify -P!ci-security'
+      bff_root="$(module_root bff jvm)"
+      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
+      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
@@ -163,30 +189,30 @@ fill_layout() {
       profile_name='service'
       backend_root='n/a'
       frontend_root='n/a'
-      bff_root='bff/'
-      backend_verify='cd bff && ./mvnw -B clean verify'
-      backend_fast='cd bff && ./mvnw -B clean verify -P!ci-security'
+      bff_root="$(module_root bff jvm)"
+      backend_verify="cd ${bff_root%/} && ./mvnw -B clean verify"
+      backend_fast="cd ${bff_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
     ui)
       profile_name='ui'
       backend_root='n/a'
-      frontend_root='frontend/'
+      frontend_root="$(module_root frontend ui)"
       bff_root='n/a'
       backend_verify='n/a'
       backend_fast='n/a'
-      frontend_verify='cd frontend && npm run verify'
+      frontend_verify="cd ${frontend_root%/} && npm run verify"
       openapi='n/a'
       ;;
     app|app-bff)
       profile_name='app'
-      backend_root='backend/'
-      frontend_root='frontend/'
-      if [ "$chosen" = app-bff ]; then bff_root='bff/'; else bff_root='n/a'; fi
-      backend_verify='cd backend && ./mvnw -B clean verify'
-      backend_fast='cd backend && ./mvnw -B clean verify -P!ci-security'
-      frontend_verify='cd frontend && npm run verify'
+      backend_root="$(module_root backend jvm)"
+      frontend_root="$(module_root frontend ui)"
+      if [ "$chosen" = app-bff ]; then bff_root="$(module_root bff jvm)"; else bff_root='n/a'; fi
+      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
+      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
+      frontend_verify="cd ${frontend_root%/} && npm run verify"
       openapi='openapi/api-v1.yaml'
       ;;
   esac

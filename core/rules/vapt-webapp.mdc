@@ -6,7 +6,7 @@ alwaysApply: false
 
 # VAPT Guardrails — Web Applications
 
-Apply when editing SvelteKit/React routes, hooks, server loads, or client components.
+Apply when editing React or SvelteKit routes, hooks, server loads, or client components.
 
 ---
 

@@ -25,8 +25,9 @@
 
   Versions are examples. springdoc-openapi-maven-plugin must match the springdoc-openapi version in
   the service (check the plugin's compatibility table: the 1.x line pairs with Spring Boot 2, the 2.x
-  line with Spring Boot 3). This snippet was written against those plugins' documented
-  configuration and has not been run against your service: run it once before relying on it.
+  line with Spring Boot 3/4). Canonical kit stack is Spring Boot 4.1.1. This snippet was written
+  against those plugins' documented configuration and has not been run against your service: run
+  it once before relying on it.
 -->
 
 <plugin>

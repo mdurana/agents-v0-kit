@@ -395,6 +395,7 @@ grep -Fq -- '--profile' scripts/bootstrap-greenfield.sh || err "bootstrap-greenf
 grep -Fq 'Directory profiles' core/rules/project-delivery-core.mdc || err "project-delivery-core.mdc does not define directory profiles"
 grep -Fq 'resolve-layout.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must resolve the directory profile"
 grep -Fq 'backend/pom.xml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build an app-profile backend/"
+grep -Fq 'app/backend/pom.xml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build app/backend/"
 grep -Fq 'lastApprovedPhase' templates/docs/agents-v0/requirements/_state.template.json || err "state template must record lastApprovedPhase"
 grep -Fq 'lastApprovedPhase' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state.sh must derive lastApprovedPhase"
 grep -Fq 'Phase resume' core/rules/workflow-orchestration.mdc || err "workflow rule must describe phase resume"

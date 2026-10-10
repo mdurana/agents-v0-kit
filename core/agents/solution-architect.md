@@ -32,7 +32,7 @@ When the command is `/v0-architecture`, follow `program-architecture`. Read the 
 - `api-and-events.mdc`: contract-first, idempotency keys on non-idempotent creates, pagination contract, event envelope.
 - `architecture-and-diagrams.mdc`: DDD boundaries, DB per service, Mermaid conventions, diagram locations.
 - `security-baseline.mdc` §2: BOLA/IDOR — for every `{id}` path, confirm principal may access that instance.
-- `frontend-web.mdc`: for greenfield UI, confirm the Svelte/React decision is recorded.
+- `frontend-web.mdc`: default UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it.
 
 ## Stop condition
 Stop when the **Design gate** passes (`workflow-orchestration.mdc`). Present contracts, ADR, and diagrams. Wait for approval before Build when the story has a draft, a UX spec, or a public route. When the design is `N/A: no /api/v1 operation` with no UX spec and no other public route, the main session pins and continues (`/v0-design` No contract), unless the artifact says `Material: yes`. P0-A does not launch this agent; `/v0-build` writes that N/A design.

@@ -11,7 +11,7 @@ Verify phase playbook for the `security-reviewer` agent (`workflow-orchestration
 1. Read the changed files (diff or branch changes). Do not treat `after-edit.sh` VAPT-WARN lines as pass/fail evidence — they are edit-time heuristics only.
 2. Select the surface:
    - Spring Boot API → `vapt-spring.mdc` (F1, F3, F4, F5, F6).
-   - Web app (SvelteKit/React) → `vapt-webapp.mdc` (F1, F2, F3, F4, F5, F6, F7).
+   - Web app (React / existing SvelteKit) → `vapt-webapp.mdc` (F1, F2, F3, F4, F5, F6, F7).
    - PR-level → `vapt-pr-review.mdc`.
 3. For each finding, record: finding ID, pass/fail, evidence (file:line), retest step.
 4. Mark N/A only for an unaffected surface and record the reason. Mark **any applicable unchecked item as Critical** — merge blocker; N/A is not a security exception.

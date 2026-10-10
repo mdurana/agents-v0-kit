@@ -10,9 +10,9 @@ your team’s standard generator, then open it in Cursor.
 
 | Profile | Typical bootstrap |
 |---------|-------------------|
-| `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=backend` — Java 17+, Spring Boot 3.x, Flyway if using PostgreSQL. A BFF-only repo uses `baseDir=bff` and stays thin per `project-delivery-core.mdc` |
-| `ui` | SvelteKit (`npx sv create frontend`) or React (Vite or org template) under `frontend/` |
-| `app` | Spring Initializr with `baseDir=backend`. UI under `frontend/`. Add `bff/` only when a BFF is in scope |
+| `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=app/backend` — Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway. A BFF-only repo uses `baseDir=app/bff` and stays thin per `project-delivery-core.mdc` |
+| `ui` | React 19 + TypeScript 5.9 + Vite 7 (org template or `npm create vite@latest app/frontend -- --template react-ts`) under `app/frontend/`. SvelteKit only when continuing an existing SvelteKit codebase |
+| `app` | Spring Initializr with `baseDir=app/backend` (same backend stack as `service`). React UI under `app/frontend/` (same as `ui`). Add `app/bff/` only when a BFF is in scope |
 
 Do not scaffold `src/`, `pom.xml`, or `package.json` at the repo root. `docs/`, `ci/`, and `openapi/` stay there.
 
@@ -26,7 +26,7 @@ From the **agents-v0** kit repo:
 ./scripts/bootstrap-greenfield.sh --profile app /path/to/your-new-repo
 ```
 
-`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/agents-v0/project-profile.md` when those cells are still placeholders.
+`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `app/backend/pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/agents-v0/project-profile.md` when those cells are still placeholders.
 
 During P0 build stories, agents follow the **`scaffold-service`** skill (secure defaults,
 quality plugins, container starter). **Major** cross-cutting changes use **`system-design`** in `/v0-design`.

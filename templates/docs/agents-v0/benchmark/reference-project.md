@@ -8,10 +8,10 @@ An order platform, built from an empty repo (greenfield, profile `app`):
 
 | Part | Choice |
 |------|--------|
-| Services | `services/order`, `services/inventory`, `services/payment` (Spring Boot 3, Java 21, one PostgreSQL schema each) |
+| Services | `services/order`, `services/inventory`, `services/payment` (Java 21, Spring Boot 4.1.1, one PostgreSQL 15 schema each) |
 | Integration | Kafka. `order` starts a saga: reserve stock, charge payment, confirm; each step has a compensation |
 | BFF | `bff/` (aggregation, session edge) |
-| UI | `frontend/` SvelteKit: order list, order detail, place order |
+| UI | `frontend/` React 19 + Vite 7: order list, order detail, place order |
 | Profile rows | `Profile: app`, `Service roots: services/order, services/inventory, services/payment`, `BFF root: bff/`, `Frontend root: frontend/` |
 
 Install the kit with `./scripts/install.sh --with-starters <repo>`. Write a discovery file anywhere in the repo (for this benchmark, `notes/order-discovery.md`) with the headings Problem, Success metric, Options, Chosen option, In scope, and Out of scope. The problem sentence is: "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released." Run `/v0-roadmap notes/order-discovery.md`, approve it, then `/v0-architecture`, approve it, then `/v0-plan`. P0-A is inside this program, so the roadmap and the architecture pack are required.

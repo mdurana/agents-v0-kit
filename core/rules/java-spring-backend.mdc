@@ -14,7 +14,7 @@ SOLID; DRY/KISS/YAGNI; composition over inheritance; explicit dependencies. **Gu
 
 ## Source layout
 
-Paths are relative to the Spring root in `docs/agents-v0/project-profile.md` (`backend/` for profile `service` and `app`, `bff/` when that module is the Spring root). Directory profiles: `project-delivery-core.mdc`. Do not add `src/` at the repo root.
+Paths are relative to the Spring root in `docs/agents-v0/project-profile.md` (`app/backend/` for profile `service` and `app`, `app/bff/` when that module is the Spring root). Directory profiles: `project-delivery-core.mdc`. Do not add `src/` at the repo root.
 
 - **Packages** under the application base: `api`, `service`, `repository`, `domain`.
 - **Flyway:** `src/main/resources/db/migration`.

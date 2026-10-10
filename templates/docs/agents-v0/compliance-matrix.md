@@ -10,8 +10,8 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| Canonical stack (Spring Boot 3.x, PostgreSQL, Flyway, OpenAPI) | A backend-engineer; S implement-spring-service; G Build gate |
-| Frontend: ask Svelte or React once | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
+| Canonical stack (Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.0 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`) | A backend-engineer, frontend-engineer; S implement-spring-service, implement-frontend; G Build gate |
+| Frontend default: React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI ci/resolve-layout.sh |
 | Correlation ID propagation | A backend-engineer, bff-engineer, frontend-engineer; S implement-spring-service, implement-bff, implement-frontend; G Build gate |
 | Distributed tracing (traceparent/OTel) | A backend-engineer, bff-engineer, frontend-engineer; G Build gate |
@@ -109,7 +109,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| SvelteKit/React structure, load/server loads, browser guard | A frontend-engineer; S implement-frontend |
+| React structure (default); SvelteKit load/server loads and browser guard when existing | A frontend-engineer; S implement-frontend |
 | API client: Bearer, X-Correlation-ID, traceparent, 401 handling | A frontend-engineer; S implement-frontend; G Build gate |
 | Accessibility (semantic HTML, keyboard, ARIA, reduced motion) | A frontend-engineer; S implement-frontend; G Verify gate (a11y check) |
 | XSS: sanitize/avoid innerHTML/{@html}/dangerouslySetInnerHTML | A frontend-engineer; S implement-frontend; A code-reviewer; S pr-review |

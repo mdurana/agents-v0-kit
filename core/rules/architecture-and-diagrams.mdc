@@ -51,7 +51,7 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 | Area | Mandatory |
 |------|-----------|
-| Stack | Java 17+, Spring Boot 3.x, PostgreSQL 15+, Flyway, OpenAPI 3.0, JUnit 5, Testcontainers |
+| Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.0, H2 in test |
 | Layers | Controllers (`@Valid`, DTOs) → Service → Repository → Domain |
 | Domain | Value objects; aggregates; domain events; repository ports in domain |
 | Security | JWT, SecurityContext, MDC correlation; permit `/health`, `/actuator`, `/v3/api-docs`, `/swagger-ui`; protect `/api/v1/**` |
@@ -61,7 +61,7 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 | Area | Mandatory |
 |------|-----------|
-| Stack | Spring Boot 3.x, WebFlux **or** MVC per repo, Redis, Resilience4j, OpenAPI 3.0 |
+| Stack | Spring Boot 4.1.1, Spring MVC, Spring Security, Redis, Resilience4j, OpenAPI 3.0 |
 | Role | Aggregation, UI DTOs, auth/session edge, GET cache, rate limit, unified errors |
 | Clients | WebClient/RestClient: ~10s timeout, retry, breaker; `X-Correlation-ID`; service auth |
 | Pipeline | Auth → rate limit → cache (GET) / invalidation (writes) → validation → controller |
@@ -69,9 +69,9 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 ## Frontend stacks (summary)
 
-| Admin (React) | Client (SvelteKit) |
-|---------------|-------------------|
-| React 18+, TS, Vite, Redux/Zustand, React Query, MUI/Ant, Router v6, RHF + Zod | SvelteKit 1.x+, TS, Vite, stores, load + fetch, Tailwind, Felte + Zod |
+| Default (React) | Existing (SvelteKit) |
+|-----------------|----------------------|
+| React 19, TypeScript 5.9, Vite 7, Vitest 3, Redux/Zustand, React Query, Router v6, RHF + Zod | Only when the repo already uses it: TS, Vite, stores, load + fetch |
 | Vitest + Testing Library | Vitest + Playwright for critical paths |
 
 Detail: `frontend-web.mdc`.

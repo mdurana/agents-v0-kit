@@ -482,6 +482,22 @@ mkdir -p "$d/backend"
 : > "$d/backend/pom.xml"
 expect_pass "layout roots: backend/ is detected" "$d" sh "$CI/check-layout-roots.sh"
 
+d="$tmp/roots-app-backend"
+mkdir -p "$d/app/backend" "$d/app/frontend"
+: > "$d/app/backend/pom.xml"
+printf '{}\n' > "$d/app/frontend/package.json"
+expect_pass "layout roots: app/backend/ is detected" "$d" sh "$CI/check-layout-roots.sh"
+if (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "BACKEND_ROOT='app/backend'"; then
+  pass "layout roots: app/backend resolves as the backend root"
+else
+  fail "layout roots: app/backend resolves as the backend root"
+fi
+if (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "FRONTEND_ROOT='app/frontend'"; then
+  pass "layout roots: app/frontend resolves as the frontend root"
+else
+  fail "layout roots: app/frontend resolves as the frontend root"
+fi
+
 d="$tmp/roots-services"
 mkdir -p "$d/services/order"
 : > "$d/services/order/pom.xml"

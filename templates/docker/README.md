@@ -8,8 +8,8 @@ and **`docker-compose.yml`**, run via `./scripts/run-local-container.sh` (Podman
 | Stack | Copy to repo root |
 |-------|-------------------|
 | Spring Boot (Maven) | `docker/Dockerfile.spring-boot` → `Dockerfile` |
-| Node SSR / SvelteKit node adapter | `docker/Dockerfile.node` → `Dockerfile` (adjust `CMD` if needed) |
-| Static SPA (Vite/React, SvelteKit static) | `docker/Dockerfile.static-nginx` → `Dockerfile` and keep `docker/nginx-spa.conf` |
+| Static SPA (Vite/React default) | `docker/Dockerfile.static-nginx` → `Dockerfile` and keep `docker/nginx-spa.conf` |
+| Node SSR / existing SvelteKit node adapter | `docker/Dockerfile.node` → `Dockerfile` (adjust `CMD` if needed) |
 
 ```bash
 cp docker/Dockerfile.spring-boot Dockerfile

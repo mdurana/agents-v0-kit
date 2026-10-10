@@ -6,10 +6,10 @@
 
 ```bash
 mvn clean verify        # Java, from the backend root in docs/agents-v0/project-profile.md
-npm run build           # frontend (SvelteKit/React), from the UI root
+npm run build           # frontend (React default; SvelteKit when existing), from the UI root
 ```
 
-Profile `service` uses `cd backend && ./mvnw -B clean verify` (or `cd bff && ./mvnw -B clean verify` for a BFF-only repo). Profile `ui` uses `cd frontend && npm run verify`. Profile `app` runs both. The commands recorded in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`ci/resolve-layout.sh`).
+Profile `service` uses `cd app/backend && ./mvnw -B clean verify` (or `cd app/bff && ./mvnw -B clean verify` for a BFF-only repo). Profile `ui` uses `cd app/frontend && npm run verify`. Profile `app` runs both. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. The commands recorded in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`ci/resolve-layout.sh`).
 
 ## Run
 

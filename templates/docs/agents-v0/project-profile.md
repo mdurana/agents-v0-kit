@@ -6,9 +6,13 @@
 
 | Layer | Value |
 |-------|--------|
-| Backend | <!-- e.g. Java 21, Spring Boot 3.4, Maven wrapper --> |
-| Frontend | <!-- e.g. SvelteKit / React, package manager --> |
-| Database | <!-- e.g. PostgreSQL 15, Flyway --> |
+| Backend | <!-- Java 21, Spring Boot 4.1.1, Maven wrapper --> |
+| HTTP | <!-- Spring MVC, embedded Tomcat 11.0.26 --> |
+| Security | <!-- Spring Security --> |
+| Frontend | <!-- React 19, TypeScript 5.9, Vite 7 --> |
+| Database | <!-- PostgreSQL 15, Flyway --> |
+| Tests | <!-- JUnit (spring-boot-starter-test), ArchUnit 1.4.0, H2 test profile, Vitest 3 --> |
+| Local run | <!-- Compose API :8080, UI :8081, postgres:15-alpine --> |
 
 ## Commands
 
@@ -25,21 +29,21 @@
 
 ## Layout
 
-Directory profiles (`project-delivery-core.mdc`): `service` (`backend/`, or `bff/` when that is the only Spring module), `ui` (`frontend/`), `app` (`backend/` + `frontend/`, optional `bff/`). The repo root has no application `src/`. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `ci/resolve-layout.sh` reads the two-column rows below.
+Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that is the only Spring module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `ci/resolve-layout.sh` reads the two-column rows below.
 
 | Profile | When | Code roots |
 |---------|------|------------|
-| service | Spring Boot only | `backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. Packages: `api`, `service`, `repository`, `domain`. BFF-only: `bff/` instead |
-| ui | SvelteKit or React only | `frontend/`. SvelteKit: `src/routes/`, `src/lib/`. React: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/` |
-| app | Service and UI in one repo | `backend/` and `frontend/`. `bff/` only when a BFF is in scope. `docs/`, `ci/`, `openapi/` at the repo root |
+| service | Spring Boot only | `app/backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. Packages: `api`, `service`, `repository`, `domain`. BFF-only: `app/bff/` instead |
+| ui | React (default); SvelteKit only when the repo already uses it | `app/frontend/`. React: `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/`. SvelteKit (existing): `src/routes/`, `src/lib/` |
+| app | Service and UI in one repo | `app/backend/` and `app/frontend/`. `app/bff/` only when a BFF is in scope. `docs/`, `openapi/` at the repo root |
 
 | This repo | Value |
 |-----------|--------|
 | Profile | <!-- service, ui, or app --> |
-| Backend root | <!-- `backend/` or n/a --> |
-| Frontend root | <!-- `frontend/` or n/a --> |
-| BFF root | <!-- `bff/` or n/a --> |
-| Service roots | <!-- comma-separated roots for a multi-service repo, e.g. `services/order, services/inventory`, or n/a --> |
+| Backend root | <!-- `app/backend/` or n/a --> |
+| Frontend root | <!-- `app/frontend/` or n/a --> |
+| BFF root | <!-- `app/bff/` or n/a --> |
+| Service roots | <!-- comma-separated roots for a multi-service repo, e.g. `app/services/order, app/services/inventory`, or n/a --> |
 | OpenAPI | <!-- `openapi/api-v1.yaml`; multi-service repos use `openapi/<service>-v1.yaml` per service, or n/a --> |
 | CI image prefix | <!-- optional; mirror prefix for `.gitlab-ci.yml` (`CI_IMAGE_PREFIX`, e.g. `registry.example.com/`) --> |
 | Phase attempt budget | <!-- total failed verify attempts per phase before blocked; default 8 --> |

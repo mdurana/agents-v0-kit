@@ -124,15 +124,17 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 | Topic | agents-v0 | NWOB |
 |-------|-----------|------|
-| **Backend default** | Java 17+, Spring Boot 3.x | Java (modern); neutral in `constitution-custom.mdc` |
-| **Database** | PostgreSQL 15+, Flyway | PostgreSQL, Liquibase |
+| **Backend default** | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway | Java (modern); neutral in `constitution-custom.mdc` |
+| **Tests** | JUnit via `spring-boot-starter-test`, ArchUnit 1.4.0, H2 in test profile, Vitest 3 | Project-specific |
+| **Local run** | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | Project-specific |
+| **Database** | PostgreSQL 15, Flyway | PostgreSQL, Liquibase |
 | **Messaging** | Kafka/Rabbit/SCS when justified | Kafka + idempotency + DLQ |
 | **Cache** | Redis / Caffeine / Hazelcast | Redis ephemeral only |
 | **Observability** | OTel-aligned, Prometheus, correlation ID | Datadog default; OTel optional |
 | **Errors** | RFC 7807 **or** custom envelope (one per surface) | RFC 7807 mandatory (`trace_id`, `error_code`) |
 | **Data lifecycle** | Not prescribed in kit core | Soft-delete mandate, audit timestamps, async purge |
 | **Stateless workloads** | Implicit | Mandatory (K8s/EKS defaults) |
-| **Frontend** | Svelte or React (ask once) | No dedicated frontend rules |
+| **Frontend** | React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | No dedicated frontend rules |
 | **Security** | `security-baseline`, VAPT rules; unchecked VAPT = Critical | Short DoD security bullets; no VAPT pack |
 | **Complexity** | Cognitive ≤15, method ≤30 lines, class <300 | `implementation-quality-standards.md` |
 | **Test naming** | `methodName_scenario_expectedOutcome` | `tc<NNN>_method_given_should` + AAA comments |

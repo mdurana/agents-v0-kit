@@ -5,7 +5,8 @@
 #
 # Reads the two-column "This repo" rows under ## Layout. When Profile is
 # service, ui, or app, those rows win. Otherwise detect pom.xml / package.json
-# under backend/, frontend/, and bff/, and JVM modules under services/*/. A root
+# under app/backend/, app/frontend/, and app/bff/ (else backend/, frontend/, and bff/),
+# and JVM modules under app/services/*/ (else services/*/). A root
 # pom.xml or package.json is a legacy tree only; greenfield profiles never put
 # source at the repo root.
 # Output variables: LAYOUT_PROFILE, BACKEND_ROOT, FRONTEND_ROOT, BFF_ROOT, and
@@ -151,46 +152,77 @@ if [ -n "$profile" ] || [ -n "$backend" ] || [ -n "$frontend" ] || [ -n "$bff" ]
   exit 0
 fi
 
-# No profile: list JVM modules under services/*/ (one deployable service each).
-auto_services=""
-for d in services/*/; do
-  [ -d "$d" ] || continue
-  if has_jvm "${d%/}"; then
-    auto_services="${auto_services:+$auto_services }${d%/}"
-  fi
-done
+# No profile: prefer app/<module>, else the same name at the repo root.
+# app/ itself is not a module. A pom.xml directly under app/ is not a root.
+collect_services() {
+  parent="$1"
+  [ -d "$parent" ] || return 0
+  for d in "$parent"/*/; do
+    [ -d "$d" ] || continue
+    mod="${d%/}"
+    if has_jvm "$mod"; then
+      auto_services="${auto_services:+$auto_services }$mod"
+    fi
+  done
+}
 
-if has_jvm backend; then
-  backend="backend"
+jvm_at() {
+  if has_jvm "app/$1"; then
+    printf 'app/%s' "$1"
+    return 0
+  fi
+  if has_jvm "$1"; then
+    printf '%s' "$1"
+    return 0
+  fi
+  return 1
+}
+
+ui_at() {
+  if [ -f app/frontend/package.json ]; then
+    printf 'app/frontend'
+    return 0
+  fi
   if [ -f frontend/package.json ]; then
+    printf 'frontend'
+    return 0
+  fi
+  return 1
+}
+
+auto_services=""
+collect_services app/services
+if [ -z "$auto_services" ]; then
+  collect_services services
+fi
+
+backend="$(jvm_at backend)" || backend=""
+frontend="$(ui_at)" || frontend=""
+bff="$(jvm_at bff)" || bff=""
+
+if [ -n "$backend" ]; then
+  if [ -n "$frontend" ]; then
     profile="app"
-    frontend="frontend"
   else
     profile="service"
     frontend=""
   fi
-  if has_jvm bff; then bff="bff"; else bff=""; fi
 elif [ -n "$auto_services" ]; then
-  if [ -f frontend/package.json ]; then
+  if [ -n "$frontend" ]; then
     profile="app"
-    frontend="frontend"
   else
     profile="service"
   fi
-  if has_jvm bff; then bff="bff"; fi
-elif [ -f frontend/package.json ]; then
+elif [ -n "$frontend" ]; then
   profile="ui"
-  frontend="frontend"
-elif has_jvm bff; then
+elif [ -n "$bff" ]; then
   profile="service"
-  bff="bff"
 elif has_jvm . || [ -f package.json ]; then
   if has_jvm .; then backend="."; fi
   if [ -f package.json ]; then frontend="."; fi
 fi
 
-# services/*/ modules are listed only when they are the backend tree: a repo with
-# backend/ keeps that as its one backend root.
-if has_jvm backend; then auto_services=""; fi
+# A backend module is the one backend root. Service roots apply only when it is absent.
+if [ -n "$backend" ]; then auto_services=""; fi
 
 emit "$profile" "$backend" "$frontend" "$bff" "$auto_services"

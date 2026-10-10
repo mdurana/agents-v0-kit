@@ -147,7 +147,7 @@ This stop applies when the story adds an API, screens, or a public route, and wh
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
 | Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops and asks you to approve an amendment. |
 | ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). Once you accept it, a later change adds a new record and leaves the old one in place. A story with no product decision records that none was needed. |
-| UI stack (if new screens) | Team may ask **Svelte or React** once — pick what product/engineering agreed.                                 |
+| UI stack (if new screens) | Default is **React 19, TypeScript 5.9, Vite 7**. SvelteKit only when the repo already uses it. |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
 
 

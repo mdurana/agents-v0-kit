@@ -9,32 +9,35 @@ alwaysApply: true
 
 | Layer | Default | Notes |
 |-------|---------|--------|
-| Backend | Java 17+, Spring Boot 3.x | Constructor injection; API → service → repository → domain |
+| Backend | Java 21, Spring Boot 4.1.1, Maven wrapper | Constructor injection; API → service → repository → domain |
+| HTTP | Spring MVC, embedded Tomcat 11.0.26 | |
+| Security | Spring Security | |
 | API | OpenAPI 3.0, `/api/v1/` | Contract-first when introducing or changing APIs |
-| DB | PostgreSQL 15+ | Flyway SQL migrations |
+| DB | PostgreSQL 15, Flyway | |
+| Frontend | React 19, TypeScript 5.9, Vite 7 | SvelteKit only if already used |
+| Tests | JUnit (`spring-boot-starter-test`), ArchUnit 1.4.0, H2 test profile, Vitest 3 | |
+| Local run | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | |
 | Distributed SQL | YugabyteDB | Only when scale-out / HA topology requires it |
 | Messaging | Kafka / RabbitMQ / Spring Cloud Stream | When async, sagas, or loose coupling required — not by default |
 | Cache | Redis / Caffeine / Hazelcast | Redis shared; Caffeine in-process; Hazelcast when clustered cache fits |
 
-**Frontend:** Do not assume React vs Svelte. Ask once per greenfield UI: *"Svelte or React?"*
-
-Event-driven and caching: add only when requirements justify.
+Event-driven and caching: only when justified.
 
 ## Directory profiles
 
-Greenfield repos use one profile. Record it in `docs/agents-v0/project-profile.md` under **Layout** (`Profile`, `Backend root`, `Frontend root`, `BFF root`, `Service roots`). A filled Profile row or filled root rows win. `/v0-onboard` records the tree it finds and does not move source onto a greenfield default. When those rows are still placeholders, use the profile that matches the files on disk.
+Greenfield repos use one profile. Record it under **Layout** in `docs/agents-v0/project-profile.md` (`Profile`, `Backend root`, `Frontend root`, `BFF root`, `Service roots`). A filled Profile or root row wins. `/v0-onboard` records the tree it finds and does not move source. When rows are still placeholders, match the files on disk.
 
 | Profile | When | Code roots |
 |---------|------|------------|
-| `service` | Spring Boot only | `backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. A BFF-only repo uses `bff/` instead of `backend/` |
-| `ui` | SvelteKit or React only | `frontend/`. SvelteKit: `src/routes/`, `src/lib/` (`components`, `features`, `services/api`, `stores`, `utils`, `types`). React: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices` |
-| `app` | Service and UI in one repo | `backend/` and `frontend/` (same trees as `service` and `ui`). Add `bff/` only when a BFF is in scope |
+| `service` | Spring Boot only | `app/backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. A BFF-only repo uses `app/bff/` instead of `app/backend/` |
+| `ui` | React default; SvelteKit only if already used | `app/frontend/`. React: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices`. Existing SvelteKit: `src/routes/`, `src/lib/` |
+| `app` | Service and UI in one repo | `app/backend/` and `app/frontend/` (same trees as `service` and `ui`). Add `app/bff/` only when a BFF is in scope |
 
-The repo root holds `docs/`, `ci/`, and `openapi/` only. Application source does not live there: no root `src/`, `pom.xml`, or `package.json`. `/v0-onboard` may record `.` when a legacy repo already has source at the root.
+The repo root holds `docs/`, `ci/`, and `openapi/`. No root `src/`, `pom.xml`, or `package.json`. `/v0-onboard` may record `.` when a legacy repo already has source at the root.
 
-**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `services/order, services/inventory`) instead of one `Backend root`; `services/*/` JVM modules are also auto-detected. Each root is its own Maven module with its own database, built and scanned by CI (`ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). Maven config paths: `maven/quality-plugins.xml`. CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
+**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `app/services/order, app/services/inventory`) instead of one `Backend root`; `app/services/*/` JVM modules are also auto-detected. Each root is its own Maven module with its own database, built and scanned by CI (`ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). Maven config paths: `maven/quality-plugins.xml`. CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
 
-Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands run inside the code root (`cd backend && ./mvnw`, `cd frontend && npm`, `cd bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
+Inside a Spring root, packages under the application base are `api`, `service`, `repository`, and `domain`. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands run inside the code root (`cd app/backend && ./mvnw`, `cd app/frontend && npm`, `cd app/bff && ./mvnw` when that root is set). CI reads the Layout table via `ci/resolve-layout.sh`.
 
 ## Cross-cutting (all services)
 
@@ -67,17 +70,13 @@ For **RFC 7807** (`application/problem+json`) vs custom envelope, see `api-and-e
 - `README.md` and `docs/agents-v0/diagrams/sequences/<service>.md` in the feature change
 - `docs/agents-v0/architecture.md` and `docs/agents-v0/network.md`: `/v0-onboard` or the P0 build. Later, a docs-only follow-up
 
-Authoritative references (follow repo paths if they differ):
-
-- `docs/security-standards.md` — see also `security-baseline.mdc`
-- `docs/agents-v0/gold-standards.md` — build, run, test, CI
-- `docs/agents-v0/quality-gates.md` / `docs/quality-quick-reference.md` — see `quality-and-testing.mdc`
+Authoritative refs (repo paths win if they differ): `docs/security-standards.md` + `security-baseline.mdc`; `docs/agents-v0/gold-standards.md`; `docs/agents-v0/quality-gates.md` / `docs/quality-quick-reference.md` + `quality-and-testing.mdc`.
 
 ## BFF and frontends
 
 - **BFF:** aggregation, auth/session handoff, safe GET caching, rate limits, DTO mapping — **thin**; domain rules in domain services.
 - Use **Spring MVC** or **WebFlux** per existing service — do not switch reactive/MVC without an architectural decision.
-- **Admin (React)** and **client (SvelteKit):** `frontend-web.mdc`; consistent API client, correlation + trace headers, 401 handling.
+- **Frontend:** React default per `frontend-web.mdc`; API client, correlation + trace headers, 401 handling.
 
 ## OMS / order domain (when relevant)
 

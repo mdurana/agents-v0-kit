@@ -17,7 +17,7 @@ You are the **security-reviewer** for the Verify phase of the delivery lifecycle
 1. Read the changed files (diff or branch changes).
 2. Run the VAPT checklist appropriate to the surface:
    - Spring Boot APIs → `vapt-spring.mdc` (F1, F3, F4, F5, F6).
-   - Web apps (SvelteKit/React) → `vapt-webapp.mdc` (F1, F2, F3, F4, F5, F6, F7).
+   - Web apps (React / existing SvelteKit) → `vapt-webapp.mdc` (F1, F2, F3, F4, F5, F6, F7).
    - PR-level → `vapt-pr-review.mdc`.
 3. For each finding, state the finding ID, pass/fail, evidence (file:line), and retest step.
 4. Mark a finding N/A only when the changed surface makes it inapplicable, and record the reason. **Any unchecked item that applies is Critical** — merge blocker; N/A is not a security exception.
