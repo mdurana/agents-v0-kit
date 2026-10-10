@@ -279,6 +279,8 @@ A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the k
 |----------|----------|
 | How do I approve a phase? | [user-guide.md](user-guide.md) |
 | How do I start a new repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
+| Design fill-in snippets (less invent) | [snippets/README.md](snippets/README.md) |
+| Should we thin always-on rules? | [token-optimization-assessment.md](token-optimization-assessment.md) |
 | Which check enforces which rule? | [compliance-matrix.md](compliance-matrix.md) |
 | Which model runs which role? | [model-routing-matrix.md](model-routing-matrix.md) |
 | How do we measure a first run? | [benchmark/reference-project.md](benchmark/reference-project.md) |

@@ -341,6 +341,16 @@ grep -Fq 'Vertical slice' core/rules/workflow-orchestration.mdc || err "workflow
 grep -Fq 'helper-brief' core/rules/workflow-orchestration.mdc || err "workflow rule lacks helper briefs"
 grep -Fq 'docs/agents-v0/build/<feature>/plan.md' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the build plan"
 grep -Fq 'failure-brief.md' core/commands/v0-build.md || err "/v0-build does not send the second failure to debug-investigator"
+grep -Fq 'check-failure-brief.sh' core/commands/v0-build.md || err "/v0-build must run check-failure-brief.sh before attempt three"
+[ -f templates/.agents-v0/scripts/check-failure-brief.sh ] || err "missing templates/.agents-v0/scripts/check-failure-brief.sh"
+grep -Fq 'check-failure-brief.sh' scripts/install.sh || err "install.sh does not seed check-failure-brief.sh"
+[ -f templates/docs/agents-v0/snippets/openapi-resource-crud.yaml ] || err "missing OpenAPI CRUD snippet"
+[ -f templates/docs/agents-v0/snippets/adr-sync-vs-async.md ] || err "missing ADR sync-vs-async snippet"
+[ -f templates/docs/agents-v0/snippets/ux-spec-one-screen.md ] || err "missing UX one-screen snippet"
+grep -Fq 'snippets/openapi-resource-crud.yaml' core/skills/contract-first-design/SKILL.md || err "contract-first-design must prefer the OpenAPI snippet"
+grep -Fq 'Frontend verify (fast)' scripts/bootstrap-greenfield.sh || err "bootstrap must fill Frontend verify (fast)"
+grep -Fq 'must** use `Frontend verify (fast)' core/skills/implement-frontend/SKILL.md || err "implement-frontend must require a real fast verify cell"
+grep -Fq 'token-optimization-assessment.md' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must link the always-on trim assessment"
 grep -Fq 'phase-result.md' core/agents/orchestrator.md || err "orchestrator does not write the phase result"
 grep -Fq 'together' core/commands/v0-verify.md || err "/v0-verify does not run the read-only reviewers together"
 grep -Fq 'build-output.txt' core/rules/workflow-orchestration.mdc || err "workflow rule does not keep raw verify logs out of the next attempt"
@@ -664,7 +674,7 @@ always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-
 for ci_script in check-gate-metrics.sh check-event-schemas.sh; do
   grep -Fq ".agents-v0/ci/$ci_script" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$ci_script"
 done
-for sc_script in feature-worktree.sh check-attempt-budget.sh; do
+for sc_script in feature-worktree.sh check-attempt-budget.sh check-failure-brief.sh; do
   grep -Fq ".agents-v0/scripts/$sc_script" scripts/install.sh || err "install.sh does not seed .agents-v0/scripts/$sc_script"
 done
 

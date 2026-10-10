@@ -9,7 +9,7 @@ mvn clean verify        # Java, from the backend root in docs/agents-v0/project-
 npm run build           # frontend (React default; SvelteKit when existing), from the UI root
 ```
 
-Profile `service` uses `cd app/backend && ./mvnw -B clean verify` (or `cd app/bff && ./mvnw -B clean verify` for a BFF-only repo). Profile `ui` uses `cd app/frontend && npm run verify`. Profile `app` runs both. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. The commands recorded in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`ci/resolve-layout.sh`).
+Profile `service` uses `cd app/backend && ./mvnw -B clean verify` (or `cd app/bff && ./mvnw -B clean verify` for a BFF-only repo). Profile `ui` uses `cd app/frontend && npm run verify`. Profile `app` runs both. Fast loops: `Backend verify (fast, no OWASP)` (`./mvnw -B clean verify -P!ci-security`) and `Frontend verify (fast)` (`npm test`) — bootstrap `--scaffold-app` fills these; the red–green loop must not use a placeholder cell. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. The commands recorded in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`ci/resolve-layout.sh`).
 
 ## Run
 

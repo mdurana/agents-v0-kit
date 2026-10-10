@@ -44,3 +44,4 @@ If project files contradict a rule, **the repository wins**. Kit org rules are t
 - `templates/docs/agents-v0/model-routing-matrix.md` — Cursor model IDs for each role (Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, UX Designer). Build (critical) uses the Plan model.
 - `templates/docs/agents-v0/user-guide.md` — plain-language guide for non-engineering users.
 - `templates/docs/agents-v0/greenfield-onboarding.md` / `brownfield-onboarding.md` — checklists; `bootstrap-greenfield.sh --scaffold-app`, `audit-brownfield-baseline.sh`.
+- `templates/docs/agents-v0/snippets/` — Design fill-ins (OpenAPI CRUD, sync-vs-async ADR, one-screen UX).

@@ -23,7 +23,7 @@
 | Service verify | <!-- multi-service repos only; {root} = the story's Service root, e.g. ./mvnw -B -f {root}/pom.xml clean verify --> |
 | Service verify (fast, no OWASP) | <!-- e.g. ./mvnw -B -f {root}/pom.xml clean verify -P!ci-security --> |
 | Frontend verify | <!-- e.g. npm run verify --> |
-| Frontend verify (fast) | <!-- e.g. npm test — red–green loop; the gate still uses Frontend verify --> |
+| Frontend verify (fast) | <!-- e.g. cd app/frontend && npm test — required for the red–green loop; gate still uses Frontend verify --> |
 | Lint | <!-- optional --> |
 | Local run | <!-- e.g. ./scripts/run-local-container.sh --> |
 

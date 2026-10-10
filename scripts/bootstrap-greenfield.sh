@@ -6,8 +6,9 @@
 #
 # Prerequisite: <target-repo> exists (may be empty). Default greenfield path uses
 # --scaffold-app to extract templates/app/p0-platform-skeleton.tar.gz. External
-# generators (Spring Initializr, Vite) remain a fallback. See
-# docs/agents-v0/greenfield-onboarding.md.
+# generators (Spring Initializr, Vite) remain a fallback. Guide in the kit repo:
+# templates/docs/agents-v0/greenfield-onboarding.md (installed as
+# docs/agents-v0/greenfield-onboarding.md).
 # --profile fills docs/agents-v0/project-profile.md Layout and verify commands when those
 # cells are still placeholders. Omit it to infer service, ui, or app from the tree.
 set -eu
@@ -189,6 +190,7 @@ fill_layout() {
       backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
       backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
+      frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
     service-bff)
@@ -199,6 +201,7 @@ fill_layout() {
       backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
       backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
+      frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
     bff)
@@ -209,6 +212,7 @@ fill_layout() {
       backend_verify="cd ${bff_root%/} && ./mvnw -B clean verify"
       backend_fast="cd ${bff_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify='n/a'
+      frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
       ;;
     ui)
@@ -219,6 +223,7 @@ fill_layout() {
       backend_verify='n/a'
       backend_fast='n/a'
       frontend_verify="cd ${frontend_root%/} && npm run verify"
+      frontend_fast="cd ${frontend_root%/} && npm test"
       openapi='n/a'
       ;;
     app|app-bff)
@@ -229,6 +234,7 @@ fill_layout() {
       backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
       backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
       frontend_verify="cd ${frontend_root%/} && npm run verify"
+      frontend_fast="cd ${frontend_root%/} && npm test"
       openapi='openapi/api-v1.yaml'
       ;;
   esac
@@ -241,6 +247,7 @@ fill_layout() {
     -v backend_verify="$backend_verify" \
     -v backend_fast="$backend_fast" \
     -v frontend_verify="$frontend_verify" \
+    -v frontend_fast="$frontend_fast" \
     -v openapi="$openapi" '
     function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
     {
@@ -259,6 +266,7 @@ fill_layout() {
         else if (a[1] == "Backend verify") repl = backend_verify
         else if (a[1] == "Backend verify (fast, no OWASP)") repl = backend_fast
         else if (a[1] == "Frontend verify") repl = frontend_verify
+        else if (a[1] == "Frontend verify (fast)") repl = frontend_fast
         if (repl != "") {
           printf "| %s | %s |\n", a[1], repl
           next

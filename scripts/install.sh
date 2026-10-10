@@ -137,6 +137,7 @@ install_templates() {
 .agents-v0/scripts/delivery-metrics.sh
 .agents-v0/scripts/feature-worktree.sh
 .agents-v0/scripts/check-attempt-budget.sh
+.agents-v0/scripts/check-failure-brief.sh
 .agents-v0/scripts/discover-codebase.sh
 .agents-v0/scripts/check-onboarding-docs.sh
 .agents-v0/scripts/render-mr-body.sh
@@ -197,7 +198,7 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/ci/check-delivery-linkage.sh .agents-v0/ci/check-approver-gitlab.sh .agents-v0/ci/check-coverage-ratchet.sh \
         .agents-v0/ci/check-known-failures.sh .agents-v0/ci/resolve-layout.sh .agents-v0/ci/check-feature-state.sh \
         .agents-v0/ci/check-gate-metrics.sh .agents-v0/ci/check-event-schemas.sh .agents-v0/ci/check-layout-roots.sh \
-        .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
+        .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
         .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md .agents-v0/ci/classify-change.sh .agents-v0/ci/check-openapi.sh .agents-v0/ci/check-design.sh \

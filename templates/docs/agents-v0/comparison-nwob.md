@@ -4,7 +4,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 **Legend:** ✅ full · ◐ partial or indirect · ❌ absent
 
-**Counts (repo snapshot):** agents-v0 — 15 commands, 19 agents, 27 skills, 14 rules, ~24 CI scripts; NWOB — 6 installable personas (+ 3 planned stubs), ~30 `SKILL.md` files, ~28 slash commands, constitution v1.4.0, no CI/hooks in the NWOB package.
+**Counts (repo snapshot):** agents-v0 — 16 commands, 19 agents, 28 skills, 14 rules, ~25 CI scripts; NWOB — 6 installable personas (+ 3 planned stubs), ~30 `SKILL.md` files, ~28 slash commands, constitution v1.4.0, no CI/hooks in the NWOB package.
 
 ---
 

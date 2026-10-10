@@ -41,9 +41,6 @@ if re.search(r"(?m)^Story:\s*P0-A\s*$", text):
     print(f"OK: {path} is P0-A and skips the intake check")
     raise SystemExit(0)
 
-if re.search(r"(?m)^##\s+Proposed split\s*$", text):
-    fail(f"{path}: Proposed split is still open")
-
 BANNED = ("works as expected", "handles errors gracefully", "successfully processes")
 REFUSAL = re.compile(
     r"(?i)(\b(400|401|403|422)\b|unauthorized|forbidden|rejected|denied|invalid|validation)"
@@ -100,6 +97,12 @@ def filled(body, allow_na=True, allow_none=False, min_len=20):
 
 
 secs = sections(text)
+if re.search(r"(?m)^##\s+Proposed split\s*$", text):
+    fail(f"{path}: Proposed split is still open — do not present the Intake gate")
+    split_body = section(secs, "proposed split") or ""
+    if not re.search(r"(?m)^\s*\|.+\|.+\|", split_body):
+        fail(f"{path}: Proposed split must list extra stories in a table (sentence, surface, dependency)")
+
 stories = [l for l in text.splitlines() if re.match(r"(?i)^As a .+?, I want .+?, so that \S", l)]
 if len(stories) != 1:
     fail(f"{path}: user story must be one line: As a [role], I want [goal], so that [benefit].")

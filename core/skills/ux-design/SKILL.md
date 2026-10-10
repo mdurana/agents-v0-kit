@@ -9,7 +9,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 
 ## Steps
 1. Read the Intake artifact (`docs/agents-v0/requirements/<feature>.md`): acceptance criteria, UX requirements (WCAG 2.1 AA target, device/browser matrix, design-system reference), and the UI stack (React default; SvelteKit only when the repo already uses it). Read the feature draft `docs/agents-v0/design/<feature>/openapi.yaml` when the UI calls an API.
-2. Inventory the screens affected by the acceptance criteria; map each criterion to a screen.
+2. Inventory the screens affected by the acceptance criteria; map each criterion to a screen. For a single primary screen, copy `docs/agents-v0/snippets/ux-spec-one-screen.md` to `docs/agents-v0/design/<feature>/ux-spec.md` and fill placeholders (still add mockups). Multi-screen stories use `docs/agents-v0/design/ux-spec.md` as the shape.
 3. For each screen write the **state matrix** — loading, error, empty, success (`frontend-web.mdc` UX clause) — with the trigger for each state and the mockup file for that state.
 4. Write **static HTML mockups** under `docs/agents-v0/design/<feature>/mockups/`. One file per screen state (for example `list-empty.html`, `create-error.html`). HTML and CSS only. Every interactive element (link, button, input, select, textarea, summary, or an element with role button, link, tab, menuitem, checkbox, or switch) carries `data-component="<Component name>"`, the same name as its row in the component table. No fetch, no API client, no secrets. Show layout, hierarchy, labels, and every interactive control.
 5. Draw **user flows** as Mermaid flowcharts (`architecture-and-diagrams.mdc` conventions); one flow per primary task.

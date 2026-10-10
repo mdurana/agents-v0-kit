@@ -2,7 +2,7 @@
 
 You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
+This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. A new empty repo is bootstrapped with `--scaffold-app` so the platform skeleton already has code under `app/` before `/v0-build`.
 
 ---
 
@@ -319,8 +319,10 @@ Make the portal better.
 
 | Situation                                        | Who                                                                                                                  |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| First time using the kit in a **new** repo       | Engineer creates an empty repo, then runs `scripts/bootstrap-greenfield.sh --profile app --scaffold-app` (see `docs/agents-v0/greenfield-onboarding.md`). |
-| First time using the kit in an **existing** repo | Engineer runs `scripts/install.sh` and `scripts/audit-brownfield-baseline.sh` (see `docs/agents-v0/brownfield-onboarding.md`). |
+| First time using the kit in a **new** repo       | Engineer creates an empty repo, then runs `scripts/bootstrap-greenfield.sh --profile app --scaffold-app` (see `docs/agents-v0/greenfield-onboarding.md`). That extracts the P0 app archive into `app/`. |
+| First time using the kit in an **existing** repo | Engineer runs `scripts/install.sh` and `scripts/audit-brownfield-baseline.sh` (see `docs/agents-v0/brownfield-onboarding.md`). Do not use `--scaffold-app`. |
+| Design / OpenAPI / UX fill-ins                   | Engineer uses `docs/agents-v0/snippets/` (CRUD OpenAPI, sync-vs-async ADR, one-screen UX) instead of inventing structure. |
+| Red–green loops burning time                     | Engineer ensures profile **fast** verify cells are real commands (`npm test`, `./mvnw … -P!ci-security`); second failure uses `failure-brief.md`. |
 | Critical security finding you don’t understand   | Security or lead engineer.                                                                                           |
 | CI failing repeatedly on release                 | Release manager / DevOps.                                                                                            |
 | Changing org-wide rules                          | Engineering + architecture (not this guide).                                                                         |
@@ -341,4 +343,4 @@ Make the portal better.
 6. After go-live: /v0-maintain + describe the issue.
 ```
 
-For technical setup, model routing, and compliance mapping, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--scaffold-app`), [brownfield-onboarding.md](brownfield-onboarding.md).
+For technical setup, model routing, and compliance mapping, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--scaffold-app`), [brownfield-onboarding.md](brownfield-onboarding.md), [snippets/README.md](snippets/README.md).
