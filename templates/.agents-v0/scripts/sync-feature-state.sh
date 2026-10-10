@@ -4,11 +4,14 @@
 # Usage:
 #   sh .agents-v0/scripts/sync-feature-state.sh <docs/agents-v0/requirements/feature.md>
 #   sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status <status> [--reason <text>] <artifact>
+#   sh .agents-v0/scripts/sync-feature-state.sh --clear-active <artifact>
 #
 # Without flags, lastApprovedPhase is derived from Approved rows. An in_progress or
 # blocked active phase is kept. awaiting_approval is cleared once that phase is Approved.
 # With flags, set the phase in flight. Status is in_progress, awaiting_approval, or blocked.
-# blocked requires --reason. This script never writes an approval.
+# blocked requires --reason. --clear-active drops the phase in flight. Decision Local is
+# not an Approved token, so lastApprovedPhase stays on the previous Approved phase.
+# This script never writes an approval.
 # Other artifacts: docs/agents-v0/onboarding/report.md keeps docs/agents-v0/onboarding/state.json (phase "onboard");
 # docs/agents-v0/maintain/<id>/note.md keeps docs/agents-v0/maintain/<id>/state.json (phases "maintain", "verify").
 
@@ -19,9 +22,11 @@ active_phase=""
 active_status=""
 reason=""
 set_active=0
+clear_active=0
 
 usage() {
   printf 'usage: %s [--active-phase PHASE --status STATUS] [--reason TEXT] <requirements-artifact>\n' "$0" >&2
+  printf '       %s --clear-active <requirements-artifact>\n' "$0" >&2
   exit 1
 }
 
@@ -44,6 +49,10 @@ while [ $# -gt 0 ]; do
       reason="$2"
       shift 2
       ;;
+    --clear-active)
+      clear_active=1
+      shift
+      ;;
     -h|--help)
       usage
       ;;
@@ -56,6 +65,9 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$art" ] && [ -f "$art" ] || usage
+if [ "$set_active" = 1 ] && [ "$clear_active" = 1 ]; then
+  usage
+fi
 if [ "$set_active" = 1 ]; then
   [ -n "$active_phase" ] && [ -n "$active_status" ] || usage
 fi
@@ -78,6 +90,7 @@ HOOK_ART="$art" \
 HOOK_SLUG="$slug" \
 HOOK_BASE="$base_commit" \
 HOOK_SET_ACTIVE="$set_active" \
+HOOK_CLEAR_ACTIVE="$clear_active" \
 HOOK_ACTIVE_PHASE="$active_phase" \
 HOOK_ACTIVE_STATUS="$active_status" \
 HOOK_BLOCKED_REASON="$reason" \
@@ -140,7 +153,11 @@ if os.path.isfile(out):
     except ValueError:
         prev = {}
 
-if os.environ.get("HOOK_SET_ACTIVE") == "1":
+if os.environ.get("HOOK_CLEAR_ACTIVE") == "1":
+    active_phase = ""
+    active_status = ""
+    blocked_reason = ""
+elif os.environ.get("HOOK_SET_ACTIVE") == "1":
     active_phase = os.environ.get("HOOK_ACTIVE_PHASE", "")
     active_status = os.environ.get("HOOK_ACTIVE_STATUS", "")
     blocked_reason = os.environ.get("HOOK_BLOCKED_REASON", "")

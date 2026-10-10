@@ -118,6 +118,38 @@ has "release notes: --insert adds the entry to the changelog" "$r/CHANGELOG.md" 
 if [ "$(grep -c '^## \[Unreleased\]' "$r/CHANGELOG.md")" = 1 ]; then pass "release notes: --insert keeps one Unreleased heading"; else fail "release notes: --insert keeps one Unreleased heading"; fi
 exit_is 1 "release notes: a missing file is an error" sh -c "cd '$r' && sh .agents-v0/scripts/release-notes.sh docs/agents-v0/requirements/nope.md"
 
+# --- local release checkpoint ------------------------------------------------
+cat > "$r/docs/agents-v0/requirements/local-story.md" <<'EOF'
+# Local story
+
+As a developer, I want a local checkpoint, so that the next story can start.
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| verify | docs/agents-v0/verify/local-story/test-report.md | @ada | Approved | 2026-02-01 |
+| release | feature/local-story abcdef1234567890 | @ada | Local | 2026-02-02 |
+EOF
+state_sh="$KIT/templates/.agents-v0/scripts/sync-feature-state.sh"
+(cd "$r" && sh "$state_sh" docs/agents-v0/requirements/local-story.md --active-phase release --status in_progress >/dev/null)
+has "local release: checkpoint keeps the release phase in flight" "$r/docs/agents-v0/requirements/local-story.state.json" '"activePhase": "release"'
+(cd "$r" && sh "$state_sh" --clear-active docs/agents-v0/requirements/local-story.md >/dev/null)
+has "local release: clear-active leaves lastApprovedPhase on verify" "$r/docs/agents-v0/requirements/local-story.state.json" '"lastApprovedPhase": "verify"'
+has "local release: clear-active drops the phase in flight" "$r/docs/agents-v0/requirements/local-story.state.json" '"activePhase": ""'
+exit_is 1 "local release: Decision Local is not an Approved release row" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/local-story.md" release
+exit_is 0 "local release: the verify row is still approved" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/local-story.md" verify
+
+resolve="$KIT/templates/.agents-v0/scripts/resolve-integration-branch.sh"
+prof="$tmp/profile"
+mkdir -p "$prof/docs/agents-v0"
+printf '| Integration branch | develop |\n' > "$prof/docs/agents-v0/project-profile.md"
+got="$(cd "$prof" && sh "$resolve")"
+if [ "$got" = "develop" ]; then pass "integration branch: profile row wins"; else fail "integration branch: profile row wins (got $got)"; fi
+printf '| Integration branch | <!-- e.g. main --> |\n' > "$prof/docs/agents-v0/project-profile.md"
+got="$(cd "$prof" && sh "$resolve")"
+if [ "$got" = "HEAD" ]; then pass "integration branch: a placeholder falls through to HEAD"; else fail "integration branch: a placeholder falls through to HEAD (got $got)"; fi
+
 if [ "$status" -ne 0 ]; then
   echo "test-release: FAILED" >&2
   exit 1

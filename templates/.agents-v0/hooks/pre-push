@@ -32,7 +32,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     exit 1
   fi
   printf 'pre-push: local delivery gate for %s\n' "$feature" >&2
-  sh .agents-v0/scripts/check-delivery-gate-local.sh "$feature" --base origin/HEAD
+  sh .agents-v0/scripts/check-delivery-gate-local.sh "$feature"
 done
 
 exit 0

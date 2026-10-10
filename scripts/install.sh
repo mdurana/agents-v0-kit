@@ -142,6 +142,7 @@ install_templates() {
 .agents-v0/scripts/render-mr-body.sh
 .agents-v0/scripts/release-notes.sh
 .agents-v0/scripts/check-delivery-gate-local.sh
+.agents-v0/scripts/resolve-integration-branch.sh
 .agents-v0/scripts/verify-gitlab-ci-prereqs.sh
 .agents-v0/scripts/export-audit-pack.sh
 .agents-v0/scripts/update-agents-model.sh
@@ -203,6 +204,7 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/ci/check-design-contracts.sh .agents-v0/ci/check-ux-spec.sh .agents-v0/ci/check-build-plan.sh .agents-v0/ci/check-endpoint-auth.sh \
         .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh .agents-v0/ci/check-arc.sh .agents-v0/ci/check-adr.sh .agents-v0/ci/check-architecture-pack.sh .agents-v0/ci/check-intake.sh docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
+        .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break

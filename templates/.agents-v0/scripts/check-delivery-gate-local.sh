@@ -2,13 +2,13 @@
 # check-delivery-gate-local.sh — run the pre-push delivery checks in one command.
 #
 # Usage: sh .agents-v0/scripts/check-delivery-gate-local.sh <feature> [--base <ref>]
-# Default base is origin/HEAD. Renders the merge-request body, then runs linkage
+# Default base is resolve-integration-branch.sh. Renders the merge-request body, then runs linkage
 # (CHECK_MR_APPROVER=0), design contracts, the build plan, and endpoint authorization.
 # Exit 1 when any check fails.
 set -eu
 
 feature=""
-base="origin/HEAD"
+base=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base)
@@ -30,6 +30,9 @@ done
 
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
+if [ -z "$base" ]; then
+  base="$(sh .agents-v0/scripts/resolve-integration-branch.sh)"
+fi
 body="$(mktemp)"
 trap 'rm -f "$body"' EXIT
 

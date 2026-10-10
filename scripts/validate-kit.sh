@@ -140,7 +140,7 @@ for f in core/skills/*/SKILL.md; do
 done
 
 # 6. Phase commands carry explicit approval wording.
-for command in intake design build verify release; do
+for command in intake design build verify release local-release; do
   grep -Eqi 'explicit.*approval|approval.*explicit' "core/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
 done
 
@@ -582,6 +582,17 @@ grep -Fq 'Re-opened' core/commands/v0-deliver.md || err "/v0-deliver must define
 grep -Fqi 'subagents cannot launch subagents' core/commands/v0-deliver.md || err "/v0-deliver must state the fallback when subagents cannot launch subagents"
 if [ "$(wc -l < core/commands/v0-deliver.md | tr -d ' ')" -gt 60 ]; then err "/v0-deliver has grown past 60 lines: it should point at the phase commands, not restate them"; fi
 grep -Fq '## Maintenance change' core/commands/v0-release.md || err "/v0-release must handle a maintenance note"
+[ -f core/commands/v0-local-release.md ] || err "missing /v0-local-release command"
+[ -f core/skills/local-release/SKILL.md ] || err "missing local-release skill"
+grep -Fq '/v0-local-release' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-local-release"
+grep -Fq 'Decision `Local`' core/commands/v0-local-release.md || err "/v0-local-release must record Decision Local"
+grep -Fq -- '--clear-active' core/commands/v0-local-release.md || err "/v0-local-release must clear the active phase"
+grep -Fq '/v0-local-release' core/commands/v0-deliver.md || err "/v0-deliver must run /v0-local-release"
+grep -Fq 'resolve-integration-branch.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "local delivery gate must resolve its default base"
+grep -Fq 'resolve-integration-branch.sh' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must resolve its default base"
+if grep -Fq 'origin/HEAD' templates/.agents-v0/hooks/pre-push; then err "pre-push must not hardcode origin/HEAD"; fi
+grep -Fq '.agents-v0/scripts/resolve-integration-branch.sh' scripts/install.sh || err "install.sh does not seed resolve-integration-branch.sh"
+grep -Fq -- '--clear-active' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must support --clear-active"
 grep -Fq 'GitLab username' core/commands/v0-verify.md || err "/v0-verify must record the GitLab username as the approver"
 grep -Fq 'GitLab username' core/commands/v0-maintain.md || err "/v0-maintain must record the GitLab username as the approver"
 grep -Fq 'docs/agents-v0/maintain/*/state.json' core/commands/v0-status.md || err "/v0-status must read maintenance state files"

@@ -1,8 +1,8 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
+This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here.
 
 ---
 
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design.
   - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -61,6 +61,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
+| `/v0-local-release` | Optional, after verify. Records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
 | `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
@@ -105,7 +106,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 

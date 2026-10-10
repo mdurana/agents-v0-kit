@@ -18,6 +18,7 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 | Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | Contracts, ADR, diagrams, UX spec, mockups; ARC record when `Material: yes` |
 | Build | `/v0-build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/agents-v0/build/<feature>/` with `commit:` in reports |
 | Verify | `/v0-verify` | test-engineer → security-reviewer → code-reviewer | quality-gate, vapt-review, pr-review | `docs/agents-v0/verify/<feature>/` reports with `commit:` |
+| Local release | `/v0-local-release` | release-manager | local-release | Optional after Verify |
 | Release | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` (own approvals, tier); routes to Verify |
 | Trivial fixes | `/v0-triage` | maintenance-engineer | bugfix-triage | Classifier-qualified, person-confirmed; abbreviated Verify |
@@ -28,7 +29,7 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 - Reconnaissance → Plan → Execute → Verify → Report in every phase.
 - A phase is not complete until its gate passes; stop and wait for explicit user approval before advancing. Never infer approval.
 - Approval decisions go in the existing handoff artifact's `Delivery approvals` table (canonical 5-column format: Phase, Artifacts, Approver, Decision, Date).
-- Merge-request readiness is intermediate: completion is a human-authorized merge with CI green. On GitLab, after the merge request is approved, run the manual `delivery-approval` job (`GITLAB_TOKEN` is `read_api`, masked, and scoped to that job's environment). Commits, pushes, and merge-request creation each need their own authorization.
+- Merge-request readiness is intermediate: completion is a human-authorized merge with CI green. On GitLab, after the merge request is approved, run the manual `delivery-approval` job. Commits, pushes, and merge-request creation each need their own authorization.
 - Smallest correct diff; no drive-by refactors; no unsolicited files.
 - Build gate: code compiles; `mvn clean verify` or the frontend build passes.
 - No secrets in code, logs, or client bundles; sanitize log values; never dump environment variables.

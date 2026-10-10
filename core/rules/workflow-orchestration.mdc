@@ -23,7 +23,7 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A named ticket, and a milestone that already has an `Approved` `plan` row, start at Intake. P0-A starts at Build. Commands: `/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`, or `/v0-deliver`. `/v0-export` and `/v0-deck` are not phases. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A named ticket, and a milestone that already has an `Approved` `plan` row, start at Intake. P0-A starts at Build. Commands: `/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`, or `/v0-deliver`. `/v0-local-release` is optional after Verify. `/v0-export` and `/v0-deck` are not phases. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
 
 ## Roadmap
 
@@ -177,7 +177,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - README and sequence diagrams synced; `architecture.md` and `network.md` stay a docs-only follow-up; MR/PR template + VAPT sign-off; CI green; `release` row (Approver = the GitLab username that approves the MR) recorded on the MR branch before merge.
 - On GitLab, after the MR is approved, run the manual `delivery-approval` job. It matches that approver to an Approved release or verify row. `GITLAB_TOKEN` is a masked project access token with `read_api` scope, limited to the `delivery-approval` environment.
 - Completion = authorized human merge; that merge (reviews, checks, merge commit) is the record — no follow-up commit to record it.
-- When `docs/agents-v0/project-profile.md` has a **Deploy** table, `release-deploy` runs after the merge: one explicit user authorization, a smoke check, and a rollback command per environment, in promotion order. Deployment is complete at the last passing smoke check; its records go in a docs-only follow-up MR, never a commit to the default branch.
+- When `docs/agents-v0/project-profile.md` has a **Deploy** table, `release-deploy` runs after the merge: one explicit user authorization, a smoke check, and a rollback command per environment. Its records go in a docs-only follow-up MR, never a commit to the default branch.
 
 ## Approval stops
 

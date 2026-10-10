@@ -18,6 +18,7 @@ flowchart TD
   build["/v0-build"]
   p0["P0-A"]
   verify["/v0-verify"]
+  localrel["/v0-local-release"]
   release["/v0-release readiness"]
   merge["human merge"]
   deploy["deploy, when the profile has a Deploy table"]
@@ -38,6 +39,8 @@ flowchart TD
   build -->|gate| verify
   verify -->|Critical, Re-opened| build
   verify -->|gate| release
+  verify -.->|optional| localrel
+  localrel --> release
   release --> merge
   merge --> deploy
   triage --> maintain
@@ -45,7 +48,7 @@ flowchart TD
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. A new program of more than one story runs Roadmap, Architecture, and Plan before that path. `/v0-deliver` runs one story by following each phase command and stopping at every gate that applies. It does not run `/v0-export` or `/v0-deck`. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes`. The Build approval writes its Design row when that shortcut applies.
+A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. Optional `/v0-local-release` may sit after Verify. After that checkpoint the next story may start, and `/v0-release` still ships this story later. Verify may also go straight to `/v0-release`. A new program of more than one story runs Roadmap, Architecture, and Plan before that path. `/v0-deliver` runs one story by following each phase command and stopping at every gate that applies. It does not run `/v0-export` or `/v0-deck`. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. Optional `/v0-local-release` may write Intake, Design, Build, and Verify first; Release then writes only the Release row. A later story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes`. The Build approval writes its Design row when that shortcut applies.
 
 | Edge | What it means |
 |------|----------------|
@@ -54,7 +57,8 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
 | Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
 | Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design, including the cited ADR, is hashed into `design.lock` after the Design approval. The pin requires the ADR's Status to be `Accepted`. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation, and that change supersedes the pattern ADR. |
-| P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the row. |
+| P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the five rows. Optional `/v0-local-release` may write the first four. |
+| Local release, dotted | Optional after Verify. Decision `Local` is not `Approved`. The next story may start. `/v0-release` does not require this edge. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
 | Verify back to Maintain | A Critical finding on a fix re-opens Maintain, not the original feature's Build. |
@@ -77,10 +81,11 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | `/v0-deck` | When someone asks for a briefing from an approved story, or from the approved program | `docs/agents-v0/presentations/<name>.md` |
 | `/v0-build` | Implement against the approved design | `docs/agents-v0/build/<feature>/` |
 | `/v0-verify` | Tests, security, review | `docs/agents-v0/verify/<feature>/` |
-| `/v0-release` | Merge request, then a human merge | `release` row, then the merge |
+| `/v0-local-release` | Optional, after Verify. Decision `Local`. The next story may start. Skip it to run `/v0-release` | `release` row with Decision `Local` |
+| `/v0-release` | After Verify, or after Decision `Local`. Merge request, then a human merge | `Approved` `release` row, then the merge |
 | `/v0-maintain` | Fix, CVE, upgrade, refactor, doc drift | `docs/agents-v0/maintain/<id>/note.md` |
 | `/v0-triage` | A change the classifier calls trivial | the same note, `Tier: trivial` |
-| `/v0-deliver` | One story. Stops at every gate that applies. P0-A stops once, at Release | the feature's state file |
+| `/v0-deliver` | One story. Stops at every gate that applies. P0-A stops once, at Release. `/v0-local-release` is optional | the feature's state file |
 | `/v0-status` | Where the work is, and what to run next | read only |
 
 Resume is the same in every phase. `scripts/sync-feature-state.sh` writes the state file. `lastApprovedPhase` comes only from an `Approved` row. `activeStatus` is `in_progress`, `awaiting_approval`, or `blocked`. Re-entering a command continues from the files on disk. It does not recreate them and it does not approve anything. Two features in one checkout stop when they would edit the same shared file. The usual fix is `scripts/feature-worktree.sh <feature>`, which needs one explicit authorization.

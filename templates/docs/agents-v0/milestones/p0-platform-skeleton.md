@@ -39,7 +39,7 @@ and in CI.
 > - `AC-4` the app runs locally with Dockerfile and Compose
 > A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`. Split this row only when a part of the baseline has its own `/api/v1` contract.
 > `/v0-build` records `Milestone: P0 — Platform Skeleton` and `Story: P0-A` in the feature artifact. Do not launch `requirements-analyst`.
-> Do not run `/v0-intake` or `/v0-design`. `/v0-build` copies this story and AC-1 through AC-4 into `docs/agents-v0/requirements/p0-a-platform-skeleton.md`, writes `design.md` (`N/A: no /api/v1 operation`, `ADR: N/A: no product decision`), and pins it. One approval, at Release, after the test report exists and `glab mr create` has returned a URL. That approval writes the Intake, Design, Build, Verify, and Release rows.
+> Do not run `/v0-intake` or `/v0-design`. `/v0-build` copies this story and AC-1 through AC-4 into `docs/agents-v0/requirements/p0-a-platform-skeleton.md`, writes `design.md` (`N/A: no /api/v1 operation`, `ADR: N/A: no product decision`), and pins it. One approval, at Release, after the test report exists and `glab mr create` has returned a URL. That approval writes the Intake, Design, Build, Verify, and Release rows. Optional `/v0-local-release` may write the first four rows and Decision `Local` first; Release then writes only the Release row.
 
 ## Delivery approvals
 
