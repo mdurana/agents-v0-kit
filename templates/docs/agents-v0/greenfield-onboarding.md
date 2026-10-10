@@ -3,70 +3,87 @@
 Engineer checklist for starting a **new** service or app repo with the agents-v0
 delivery kit and **incremental** milestone delivery (P0 → P5).
 
-## 1. Scaffold the application (outside the kit)
+## 1. Create an empty repo (preferred) or scaffold outside the kit
 
-The kit does not run Spring Initializr or frontend CLIs for you. Create the repo with
-your team’s standard generator, then open it in Cursor.
+**Preferred:** create an empty git repo (no application source yet). The kit bundles a
+P0 codebase archive (`templates/app/p0-platform-skeleton.tar.gz`) that matches the
+canonical stack — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
+PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only.
+
+**Fallback** when you must use an external generator:
 
 | Profile | Typical bootstrap |
 |---------|-------------------|
-| `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=app/backend` — Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway. A BFF-only repo uses `baseDir=app/bff` and stays thin per `project-delivery-core.mdc` |
-| `ui` | React 19 + TypeScript 5.9 + Vite 7 (org template or `npm create vite@latest app/frontend -- --template react-ts`) under `app/frontend/`. SvelteKit only when continuing an existing SvelteKit codebase |
-| `app` | Spring Initializr with `baseDir=app/backend` (same backend stack as `service`). React UI under `app/frontend/` (same as `ui`). Add `app/bff/` only when a BFF is in scope |
+| `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=app/backend` |
+| `ui` | React + Vite under `app/frontend/` (SvelteKit only when continuing an existing SvelteKit codebase) |
+| `app` | Backend under `app/backend/` and UI under `app/frontend/` |
 
-Do not scaffold `src/`, `pom.xml`, or `package.json` at the repo root. `docs/`, `ci/`, and `openapi/` stay there.
+Do not put `src/`, `pom.xml`, or `package.json` at the repo root. `docs/`, `ci/`, and `openapi/` stay there.
 
-Commit the initial skeleton (or use an empty repo) before installing the kit.
-
-## 2. Install the kit and seed P0
+## 2. Install the kit, extract the app template, seed P0
 
 From the **agents-v0** kit repo:
 
 ```bash
-./scripts/bootstrap-greenfield.sh --profile app /path/to/your-new-repo
+mkdir -p /path/to/your-new-repo && git -C /path/to/your-new-repo init
+./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/your-new-repo
 ```
 
-`--profile` is `service`, `ui`, or `app` (`project-delivery-core.mdc`). Omit it to infer the profile from `pom.xml`, `app/backend/pom.xml`, `backend/pom.xml`, or `package.json`. This runs `install.sh --with-starters`, seeds milestone manifests **P0–P5** when missing, and fills the Layout rows plus verify commands in `docs/agents-v0/project-profile.md` when those cells are still placeholders.
+`--scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` into `app/backend`
+and/or `app/frontend` (and seeds `docker-compose.yml` for profile `app`) without
+overwriting existing trees. `--profile` is `service`, `ui`, or `app`. Omit `--profile`
+to infer from the tree after extract. This also runs `install.sh --with-starters`, seeds
+milestone manifests **P0–P5** when missing, and fills Layout / verify commands in
+`docs/agents-v0/project-profile.md` when those cells are still placeholders.
 
-During P0 build stories, agents follow the **`scaffold-service`** skill (secure defaults,
-quality plugins, container starter). **Major** cross-cutting changes use **`system-design`** in `/v0-design`.
+Repack the archive after editing `templates/app/{backend,frontend}`:
+
+```bash
+./scripts/pack-app-template.sh
+```
+
+During P0 build stories, agents follow **`scaffold-service`**: prove the template (or
+harden an external skeleton). Do not reinvent health/shell when the archive was used.
+**Major** cross-cutting changes use **`system-design`** in `/v0-design`.
 
 Manual equivalent:
 
 ```bash
-./scripts/install.sh /path/to/your-new-repo
+./scripts/install.sh --with-starters /path/to/your-new-repo
+./scripts/scaffold-app-template.sh --profile app /path/to/your-new-repo
 cp /path/to/agents-v0/templates/docs/agents-v0/milestones/p0-platform-skeleton.md \
    /path/to/your-new-repo/docs/agents-v0/milestones/
 ```
 
-The manual path does not fill Layout. Set the **This repo** rows in `docs/agents-v0/project-profile.md`, or re-run bootstrap with `--profile`.
+The manual path without bootstrap does not fill Layout. Set the **This repo** rows in `docs/agents-v0/project-profile.md`, or re-run bootstrap with `--profile`.
 
 Wire CI with the seeded `.gitlab-ci.yml` (on-prem GitLab). Protect the default branch (merge requests only; no direct push) and turn on Code Owner approval for `.gitlab-ci.yml`, `ci/`, and `.cursor/`. Set `GITLAB_TOKEN` (`read_api`, masked) on the protected `delivery-approval` environment only, and replace `@your-team` in `CODEOWNERS`. Check the token and the Docker runner choice with `sh .agents-v0/scripts/verify-gitlab-ci-prereqs.sh` (`GITLAB_HOST`, `GITLAB_PROJECT_ID`). For air-gapped runners, set GitLab CI variable `CI_IMAGE_PREFIX` to your mirror prefix (document the same value in the profile's **CI image prefix** row). The build job uses privileged Docker-in-Docker and caches `.m2/repository`; the frontend and e2e jobs cache `.npm/`. When privileged jobs are forbidden, follow the `/var/run/docker.sock` comment on the build job. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Install PyYAML (`pip install pyyaml`) so local OpenAPI checks run. Before pushing a feature branch, run `sh .agents-v0/scripts/check-delivery-gate-local.sh <feature>`. To run that gate on every push, copy `.agents-v0/hooks/pre-push` to `.git/.agents-v0/hooks/pre-push` and mark it executable. After Release, regulated teams may archive evidence with `sh .agents-v0/scripts/export-audit-pack.sh <feature>`. To remap Cursor models, edit `.cursor/model-config.json` (seeded on install), then run `sh .agents-v0/scripts/update-agents-model.sh`. Ensure `.gitignore` keeps `docs/agents-v0/build/` and `docs/agents-v0/verify/` committable.
 
 ## 3. Wire quality before heavy coding
 
-Copy kit starters into the Maven build when applicable:
+With `--scaffold-app`, the backend already binds JaCoCo, Checkstyle, SpotBugs, and the
+`ci-security` OWASP profile; ArchUnit lives under `src/test`. For an external skeleton,
+copy kit starters into the Maven build when applicable:
 
 - `maven/quality-plugins.xml` — JaCoCo, Checkstyle, SpotBugs, OWASP Dependency-Check on `verify`
 - `maven/contract-conformance.xml` — when OpenAPI is generated
 - `maven/archunit/LayerRulesTest.java` — layer boundaries
 
-See `templates/docs/agents-v0/quality-gates-engineering-principles.md` and
-`docs/agents-v0/gold-standards.md` in the target repo after install.
+See `docs/agents-v0/gold-standards.md` in the target repo after install.
 
-For local container testing, copy a `docker/Dockerfile.*` starter to `Dockerfile`, then:
+For local run after `--scaffold-app` (profile `app`):
 
 ```bash
-./scripts/run-local-container.sh
+docker compose up --build -d
 ```
 
-See `docker/README.md` in the target repo after install.
+API `:8080`, UI `:8081`, `postgres:15-alpine`. See `docker/README.md` for single-service Dockerfile starters.
 
 ## 4. Run the gated workflow for the skeleton
 
 P0 is one story (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`): one branch and one merge request.
 
-1. `/v0-build`, or `/v0-deliver` for the story end-to-end. Do not run `/v0-intake` or `/v0-design`. Build copies the milestone story and AC-1 through AC-4, writes `design.md` (`N/A: no /api/v1 operation`), and pins it. A missing module on this first skeleton story is the work. A module that already exists must verify clean before edits. A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`.
+1. `/v0-build`, or `/v0-deliver` for the story end-to-end. Do not run `/v0-intake` or `/v0-design`. Build copies the milestone story and AC-1 through AC-4, writes `design.md` (`N/A: no /api/v1 operation`), and pins it. When `--scaffold-app` already extracted the template, prove AC-1–AC-4; do not recreate the skeleton. A missing module on this first skeleton story is the work only when no template was used. A module that already exists must verify clean before edits. A `/health`, `/ready`, or `/live` route with `@PreAuthorize("permitAll()")` does not by itself require `design-reviewer`.
 2. `/v0-verify` then `/v0-release`. Do not stop for a separate approval at Build or Verify. The one approval is at Release, after the test report exists and `glab mr create` has returned a URL. Optional `/v0-local-release` may run after Verify instead of waiting for that URL; Release then writes only the Release row. The local delivery gate runs in both commands.
 
 Record approvals in each feature artifact’s `Delivery approvals` table. CI uses

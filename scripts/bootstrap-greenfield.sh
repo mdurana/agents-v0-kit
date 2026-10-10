@@ -2,20 +2,23 @@
 # bootstrap-greenfield.sh — install agents-v0 into a new repo and seed the P0 milestone manifest.
 #
 # Usage:
-#   bootstrap-greenfield.sh [--profile service|ui|app] <target-repo>
+#   bootstrap-greenfield.sh [--profile service|ui|app] [--scaffold-app] <target-repo>
 #
-# Prerequisite: scaffold the application (Spring Initializr, create-svelte, etc.) so
-# <target-repo> exists. See docs/agents-v0/greenfield-onboarding.md.
+# Prerequisite: <target-repo> exists (may be empty). Default greenfield path uses
+# --scaffold-app to extract templates/app/p0-platform-skeleton.tar.gz. External
+# generators (Spring Initializr, Vite) remain a fallback. See
+# docs/agents-v0/greenfield-onboarding.md.
 # --profile fills docs/agents-v0/project-profile.md Layout and verify commands when those
 # cells are still placeholders. Omit it to infer service, ui, or app from the tree.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE=""
+SCAFFOLD_APP=0
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--profile service|ui|app] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--profile service|ui|app] [--scaffold-app] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
 
@@ -25,6 +28,10 @@ while [ $# -gt 0 ]; do
       [ $# -ge 2 ] || usage
       PROFILE="$2"
       shift 2
+      ;;
+    --scaffold-app)
+      SCAFFOLD_APP=1
+      shift
       ;;
     -h|--help)
       usage
@@ -53,6 +60,15 @@ esac
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
 "$KIT/scripts/install.sh" --with-starters "$TARGET_ABS"
+
+if [ "$SCAFFOLD_APP" = 1 ]; then
+  scaffold_profile="$PROFILE"
+  case "$scaffold_profile" in
+    service|ui|app) ;;
+    *) scaffold_profile=app ;;
+  esac
+  sh "$KIT/scripts/scaffold-app-template.sh" --profile "$scaffold_profile" "$TARGET_ABS"
+fi
 
 mkdir -p "$TARGET_ABS/docs/milestones"
 for m in p0-platform-skeleton p1-contracts-and-data-models p2-mvp-core-features p3-feature-expansion p4-hardening p5-release-readiness; do
@@ -264,7 +280,12 @@ fi
 fill_layout "$PROFILE"
 
 printf '\nGreenfield bootstrap complete.\n'
-printf 'Next: wire Maven quality snippets from maven/ if Java; copy docker/Dockerfile.* to Dockerfile (see docker/README.md)\n'
+if [ "$SCAFFOLD_APP" = 1 ]; then
+  printf 'App template extracted from templates/app/p0-platform-skeleton.tar.gz.\n'
+  printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
+else
+  printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with scaffold-service.\n'
+  printf '      wire Maven quality snippets from maven/ if Java; see docker/README.md\n'
+fi
 printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
-printf 'Greenfield scaffold hardening: follow skill scaffold-service during P0 build stories.\n'
-printf 'Then start the P0 skeleton story P0-A with /v0-build or /v0-deliver in chat. Guide: docs/agents-v0/greenfield-onboarding.md\n'
+printf 'Then start P0-A with /v0-build or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md\n'

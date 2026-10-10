@@ -20,10 +20,13 @@ For static nginx builds, ensure `docker/nginx-spa.conf` exists (copy from this f
 
 ## Compose
 
-`docker-compose.yml` builds `Dockerfile` in the project root and publishes
-`${APP_PORT:-8080}` to the container (override with `APP_PORT` or `-p` on the script).
+Single-service starter: `docker-compose.yml` builds `Dockerfile` in the project root and
+publishes `${APP_PORT:-8080}` (override with `APP_PORT` or `-p` on the script).
 
-Optional Postgres for Spring Boot local dev:
+Profile `app` from `--scaffold-app` replaces that with API `:8080`, UI `:8081`, and
+`postgres:15-alpine` (see `templates/app/docker-compose.yml`).
+
+Optional Postgres overlay for a single Spring Boot service:
 
 ```bash
 docker compose -f docker-compose.yml -f docker/docker-compose.postgres.yml up --build -d

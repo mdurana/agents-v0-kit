@@ -57,7 +57,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
 | Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
 | Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design, including the cited ADR, is hashed into `design.lock` after the Design approval. The pin requires the ADR's Status to be `Accepted`. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation, and that change supersedes the pattern ADR. |
-| P0-A start | The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the five rows. Optional `/v0-local-release` may write the first four. |
+| P0-A start | Prefer `bootstrap-greenfield.sh --scaffold-app` so the bundled app archive seeds `app/backend` and `app/frontend`. The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it — prove the template; do not reinvent it. Release writes the five rows. Optional `/v0-local-release` may write the first four. |
 | Local release, dotted | Optional after Verify. Decision `Local` is not `Approved`. The next story may start. `/v0-release` does not require this edge. |
 | Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. |
 | Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
@@ -264,18 +264,21 @@ Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the
 ./scripts/install.sh /path/to/repo
 ./scripts/install.sh --with-starters /path/to/repo
 ./scripts/install.sh --update /path/to/repo
+./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/new-repo
+./scripts/pack-app-template.sh   # after editing templates/app/{backend,frontend}
 ./scripts/validate-kit.sh
 ```
 
-`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. Without it, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
+`--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. It does **not** copy `templates/app/` (the P0 codebase). Without `--with-starters`, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
 
-A new repo starts with `scripts/bootstrap-greenfield.sh` ([greenfield-onboarding.md](greenfield-onboarding.md)). An existing repo starts with install, then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)).
+A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the kit and extract `templates/app/p0-platform-skeleton.tar.gz` into `app/backend` and `app/frontend` ([greenfield-onboarding.md](greenfield-onboarding.md)). Default stack: Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only. An existing repo starts with install (no `--scaffold-app`), then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)).
 
 ## Read next
 
 | Question | Document |
 |----------|----------|
 | How do I approve a phase? | [user-guide.md](user-guide.md) |
+| How do I start a new repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
 | Which check enforces which rule? | [compliance-matrix.md](compliance-matrix.md) |
 | Which model runs which role? | [model-routing-matrix.md](model-routing-matrix.md) |
 | How do we measure a first run? | [benchmark/reference-project.md](benchmark/reference-project.md) |

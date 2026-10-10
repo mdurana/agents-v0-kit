@@ -20,8 +20,15 @@ npm run dev            # frontend
 
 ### Local container (Dockerfile + Compose)
 
-Local integration testing uses a root **`Dockerfile`** (or **`Containerfile`**) and
-**`docker-compose.yml`**, run with Podman or Docker via the kit script.
+**Profile `app` after `--scaffold-app`:** root `docker-compose.yml` already builds
+`app/backend` (API `:8080`) and `app/frontend` (UI `:8081`) with `postgres:15-alpine`.
+
+```bash
+docker compose up --build -d
+```
+
+**Single-service / external skeleton:** use a root **`Dockerfile`** (or **`Containerfile`**)
+and the starter `docker-compose.yml`, via Podman or Docker and the kit script.
 
 1. Copy a starter from `docker/` (see `docker/README.md`):
    - Spring Boot: `docker/Dockerfile.spring-boot` → `Dockerfile`
@@ -36,7 +43,7 @@ Local integration testing uses a root **`Dockerfile`** (or **`Containerfile`**) 
 ./scripts/run-local-container.sh -p 9090      # sets APP_PORT for compose
 ```
 
-Optional Postgres overlay (Spring Boot):  
+Optional Postgres overlay (Spring Boot, `postgres:15-alpine`):  
 `compose -f docker-compose.yml -f docker/docker-compose.postgres.yml up --build -d`
 
 ## Test

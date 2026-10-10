@@ -7,9 +7,11 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 
 ```bash
 ./scripts/install.sh /path/to/existing-repo
-# Optional Maven/docker/OpenAPI starters (copies full templates/ tree):
+# Optional Maven/docker/OpenAPI starters (copies templates/ except templates/app/):
 # ./scripts/install.sh --with-starters /path/to/existing-repo
 ```
+
+Do **not** run `bootstrap-greenfield.sh --scaffold-app` on an existing codebase. That archive is for empty greenfield repos only; `/v0-onboard` records the tree as it is and does not move source onto `app/backend` / `app/frontend`.
 
 Then run `/v0-onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
 codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, or `/v0-plan`:

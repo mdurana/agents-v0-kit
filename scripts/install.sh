@@ -218,7 +218,9 @@ docs/agents-v0/benchmark/reference-project.md
   if [ "$WITH_STARTERS" = 1 ]; then
     (
       cd "$KIT/templates"
-      find . -type f ! -name '.DS_Store' | while IFS= read -r f; do
+      # app/ is the P0 codebase template (archive + editable tree). Install it via
+      # scripts/scaffold-app-template.sh / bootstrap --scaffold-app, not as starters.
+      find . -type f ! -name '.DS_Store' ! -path './app/*' | while IFS= read -r f; do
         copy_template_file "${f#./}"
       done
     )

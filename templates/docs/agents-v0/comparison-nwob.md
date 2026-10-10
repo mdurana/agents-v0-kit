@@ -147,7 +147,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | Concern | agents-v0 | NWOB |
 |---------|-----------|------|
 | **Install** | `install.sh`, `--with-starters`, `--update` | External clone or submodule; `--force`, `--no-scaffold-docs` |
-| **Greenfield** | `bootstrap-greenfield.sh` | `nwob init` + `nwob-docs/` scaffold |
+| **Greenfield** | `bootstrap-greenfield.sh --scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` (canonical stack health/shell) | `nwob init` + `nwob-docs/` scaffold |
 | **Brownfield** | `audit-brownfield-baseline.sh`, `/v0-onboard` | Map external SDD in place; no forced copy |
 | **Multi-service** | Service roots, per-service OpenAPI, `workspace.manifest.json` | `repositories/` + `service-map.md` |
 | **Air-gap** | `CI_IMAGE_PREFIX` mirrors | Not addressed |
@@ -189,7 +189,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 | NWOB (intent / command) | agents-v0 |
 |-------------------------|-----------|
-| Phase 0 discovery | `/v0-onboard` (brownfield) or greenfield bootstrap |
+| Phase 0 discovery | `/v0-onboard` (brownfield) or `bootstrap-greenfield.sh --scaffold-app` (greenfield) |
 | `/problem`, `/ideate`, `/roadmap` | `/v0-roadmap` (with discovery input) |
 | `/c4` … `/architecture`, `/arc` | `/v0-architecture` |
 | `/features`, `/backlog` | `/v0-plan`, `/v0-intake`, `/v0-export` |

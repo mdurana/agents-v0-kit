@@ -319,7 +319,7 @@ Make the portal better.
 
 | Situation                                        | Who                                                                                                                  |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| First time using the kit in a **new** repo       | Engineer scaffolds the app, then runs `scripts/bootstrap-greenfield.sh` (see `docs/agents-v0/greenfield-onboarding.md`).       |
+| First time using the kit in a **new** repo       | Engineer creates an empty repo, then runs `scripts/bootstrap-greenfield.sh --profile app --scaffold-app` (see `docs/agents-v0/greenfield-onboarding.md`). |
 | First time using the kit in an **existing** repo | Engineer runs `scripts/install.sh` and `scripts/audit-brownfield-baseline.sh` (see `docs/agents-v0/brownfield-onboarding.md`). |
 | Critical security finding you don’t understand   | Security or lead engineer.                                                                                           |
 | CI failing repeatedly on release                 | Release manager / DevOps.                                                                                            |
@@ -341,4 +341,4 @@ Make the portal better.
 6. After go-live: /v0-maintain + describe the issue.
 ```
 
-For technical setup, model routing, and compliance mapping, see [README.md](../README.md). The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md), [brownfield-onboarding.md](brownfield-onboarding.md).
+For technical setup, model routing, and compliance mapping, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--scaffold-app`), [brownfield-onboarding.md](brownfield-onboarding.md).

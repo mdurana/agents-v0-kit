@@ -14,7 +14,7 @@ An order platform, built from an empty repo (greenfield, profile `app`):
 | UI | `frontend/` React 19 + Vite 7: order list, order detail, place order |
 | Profile rows | `Profile: app`, `Service roots: services/order, services/inventory, services/payment`, `BFF root: bff/`, `Frontend root: frontend/` |
 
-Install the kit with `./scripts/install.sh --with-starters <repo>`. Write a discovery file anywhere in the repo (for this benchmark, `notes/order-discovery.md`) with the headings Problem, Success metric, Options, Chosen option, In scope, and Out of scope. The problem sentence is: "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released." Run `/v0-roadmap notes/order-discovery.md`, approve it, then `/v0-architecture`, approve it, then `/v0-plan`. P0-A is inside this program, so the roadmap and the architecture pack are required.
+Start from an empty repo with `./scripts/bootstrap-greenfield.sh --profile app --scaffold-app <repo>` (P0-A uses the bundled health/shell template under `app/`). Evolve Layout to multi-service roots as stories require. Write a discovery file anywhere in the repo (for this benchmark, `notes/order-discovery.md`) with the headings Problem, Success metric, Options, Chosen option, In scope, and Out of scope. The problem sentence is: "Customers place an order; stock is reserved and payment is taken, or the order is cancelled and everything is released." Run `/v0-roadmap notes/order-discovery.md`, approve it, then `/v0-architecture`, approve it, then `/v0-plan`. P0-A is inside this program, so the roadmap and the architecture pack are required.
 
 ## Expected plan (check `/v0-plan` output against this)
 

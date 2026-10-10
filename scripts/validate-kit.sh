@@ -632,6 +632,30 @@ grep -Fq '.agents-v0/ci/check-architecture-pack.sh' scripts/install.sh || err "i
 for seed in design/system/ops-readiness.md design/system/_component.template.md design/system/context-map.md; do
   grep -Fq "docs/agents-v0/$seed" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$seed"
 done
+# P0 app codebase template (archive for greenfield --scaffold-app)
+[ -f templates/app/p0-platform-skeleton.tar.gz ] || err "missing templates/app/p0-platform-skeleton.tar.gz — run scripts/pack-app-template.sh"
+[ -f scripts/pack-app-template.sh ] || err "missing scripts/pack-app-template.sh"
+[ -f scripts/scaffold-app-template.sh ] || err "missing scripts/scaffold-app-template.sh"
+[ -f scripts/test-app-template.sh ] || err "missing scripts/test-app-template.sh"
+[ -d templates/app/backend ] && [ -d templates/app/frontend ] || err "templates/app/{backend,frontend} source tree required"
+[ -f templates/app/docker-compose.yml ] || err "templates/app/docker-compose.yml required"
+grep -Fq "postgres:15-alpine" templates/app/docker-compose.yml || err "app compose must use postgres:15-alpine"
+grep -Fq "postgres:15-alpine" templates/docker/docker-compose.postgres.yml || err "postgres overlay must use postgres:15-alpine"
+grep -Fq '! -path '\''./app/*'\''' scripts/install.sh || err "install.sh --with-starters must exclude templates/app/*"
+grep -Fq -- '--scaffold-app' scripts/bootstrap-greenfield.sh || err "bootstrap-greenfield.sh must support --scaffold-app"
+grep -Fq 'p0-platform-skeleton.tar.gz' templates/docs/agents-v0/greenfield-onboarding.md || err "greenfield-onboarding must document the app archive"
+if command -v rg >/dev/null 2>&1; then
+  if rg -n -g '!package-lock.json' -g '!p0-platform-skeleton.tar.gz' -g '!mvnw*' \
+    -e 'CAS-EIS|com\.eis\.|eis-consoles|eis-middleware|eis_schema|5432/eis' templates/app >/dev/null 2>&1; then
+    err "templates/app still contains product-specific EIS strings"
+  fi
+fi
+# Archive must list app/backend, app/frontend, and docker-compose.yml
+tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/backend/pom.xml' || err "app archive missing app/backend/pom.xml"
+tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/frontend/package.json' || err "app archive missing app/frontend/package.json"
+tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'docker-compose.yml' || err "app archive missing docker-compose.yml"
+sh scripts/test-app-template.sh || err "scripts/test-app-template.sh failed"
+
 # Always-on context budget: the rules every session loads must not creep past this size.
 # 36000 covers the roadmap entry, the material ARC line, and the export/deck exception.
 # Procedure stays in the commands and skills.

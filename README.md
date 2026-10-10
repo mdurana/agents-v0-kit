@@ -2,7 +2,7 @@
 
 An agentic delivery kit for **Cursor**. One core (`core/`) installs into `.cursor/` via `scripts/install.sh`, with shared gates, approvals, evidence contracts, and CI checks.
 
-The kit helps agents build and maintain enterprise-grade systems — Spring Boot services, BFFs, and React frontends — through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The map of every command, record, and check is [docs/agents-v0/agents-v0-kit.md](docs/agents-v0/agents-v0-kit.md). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. Build copies the milestone story and writes the N/A design. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
+The kit helps agents build and maintain enterprise-grade systems — Spring Boot services, BFFs, and React frontends — through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The map of every command, record, and check is [templates/docs/agents-v0/agents-v0-kit.md](templates/docs/agents-v0/agents-v0-kit.md) (installed as `docs/agents-v0/agents-v0-kit.md`). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. Build copies the milestone story and writes the N/A design. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
 
 A feature’s progress is `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). `lastApprovedPhase` comes only from an `Approved` row. `activePhase` plus `activeStatus` (`in_progress`, `awaiting_approval`, or `blocked`) is the phase in flight. `/v0-status <feature>` reads that file: `in_progress` or `blocked` runs the same phase again from files already on disk; `awaiting_approval` waits and does not start the next phase. The user names the feature. The newest state file is not assumed to be the one they mean.
 
@@ -20,9 +20,9 @@ Different features may proceed in one checkout only while each writes its own `d
 | `core/skills/`         | 28 playbooks in the standard `SKILL.md` format                                                                     |
 | `core/hooks/`          | Guardrails: `pre-shell.sh`, `pre-edit.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`        |
 | `core/adapters/`       | Cursor `hooks.json`                                                                                                |
-| `docs/agents-v0/` | Kit reference docs (map, user guide, compliance matrix, model routing); installed to `docs/agents-v0/` in target repos |
-| ``           | Project starters: GitLab CI, docs, Maven quality snippets, OpenAPI, Docker starters, `.cursorignore`               |
-| `scripts/`             | `install.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `audit-brownfield-baseline.sh`                         |
+| `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |
+| `templates/docs/agents-v0/` | Kit reference docs (map, user guide, compliance, model routing); installed to `docs/agents-v0/` in target repos |
+| `scripts/`             | `install.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `scaffold-app-template.sh`, `pack-app-template.sh`, `audit-brownfield-baseline.sh` |
 
 
 
@@ -50,8 +50,8 @@ Different features may proceed in one checkout only while each writes its own `d
 
 | Scenario                       | Script / doc                                                                                                                                                                                                                                                          |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New repo (greenfield)**      | Scaffold into `app/backend/`, `app/frontend/`, or `app/bff/` (no application `src/` at the repo root), then `./scripts/bootstrap-greenfield.sh --profile service` (or `ui`, or `app`) `/path/to/target-repo` — see [docs/agents-v0/greenfield-onboarding.md](docs/agents-v0/greenfield-onboarding.md) |
-| **Existing repo (brownfield)** | `./scripts/install.sh /path/to/target-repo` then `./scripts/audit-brownfield-baseline.sh /path/to/target-repo` — see [docs/agents-v0/brownfield-onboarding.md](docs/agents-v0/brownfield-onboarding.md)                                                                                   |
+| **New repo (greenfield)**      | Empty repo, then `./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/target-repo` (extracts `templates/app/p0-platform-skeleton.tar.gz` into `app/`). Profiles: `service`, `ui`, or `app`. See [templates/docs/agents-v0/greenfield-onboarding.md](templates/docs/agents-v0/greenfield-onboarding.md) |
+| **Existing repo (brownfield)** | `./scripts/install.sh /path/to/target-repo` then `./scripts/audit-brownfield-baseline.sh /path/to/target-repo` — do **not** use `--scaffold-app`. See [templates/docs/agents-v0/brownfield-onboarding.md](templates/docs/agents-v0/brownfield-onboarding.md) |
 
 
 
@@ -63,6 +63,10 @@ Different features may proceed in one checkout only while each writes its own `d
 ./scripts/install.sh /path/to/target-repo
 # greenfield / full starters (maven, docker, openapi, …):
 ./scripts/install.sh --with-starters /path/to/target-repo
+# preferred greenfield (kit + P0 app archive under app/):
+./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/new-repo
+# after editing templates/app/{backend,frontend}, repack the install archive:
+./scripts/pack-app-template.sh
 
 # after kit changes: validate, refresh kit-managed files
 ./scripts/install.sh --update /path/to/target-repo
@@ -72,7 +76,7 @@ Seeded only when missing (never clobbered): `README.md` and project templates. A
 
 ## Model routing
 
-The kit routes by **role** — Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, and UX Designer — with default Cursor model IDs in [docs/agents-v0/model-routing-matrix.md](docs/agents-v0/model-routing-matrix.md) (installed to `docs/agents-v0/` in target repos). Build (critical) uses the Plan model. Those IDs match `.cursor/model-config.json`. `scripts/install.sh` seeds `.cursor/model-config.json` and runs `.agents-v0/scripts/update-agents-model.sh` to rewrite agent `model:` lines and sync the installed routing matrix from config (or `KIT_MODEL_*` env vars). Run that script again after you change the config. Kit source agents in `core/agents/` keep the matrix defaults.
+The kit routes by **role** — Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, and UX Designer — with default Cursor model IDs in [templates/docs/agents-v0/model-routing-matrix.md](templates/docs/agents-v0/model-routing-matrix.md) (installed to `docs/agents-v0/` in target repos). Build (critical) uses the Plan model. Those IDs match `.cursor/model-config.json`. `scripts/install.sh` seeds `.cursor/model-config.json` and runs `.agents-v0/scripts/update-agents-model.sh` to rewrite agent `model:` lines and sync the installed routing matrix from config (or `KIT_MODEL_*` env vars). Run that script again after you change the config. Kit source agents in `core/agents/` keep the matrix defaults.
 
 ## Milestone delivery
 
@@ -109,8 +113,8 @@ Milestone programs (P0 Platform Skeleton, P1 Contracts & Data Models, P2 MVP/Cor
 
 Kit checks: rule frontmatter, cross-references, all eleven commands, README counts, agent `model:` fields against the routing matrix, Cursor adapter config, required template artifacts, hook classifications, evidence contracts (Build/Verify), and shell syntax. Target checks: `.cursor/` tree, CI scripts and exec bits, seeded docs, MR template evidence contract, and `!docs/agents-v0/build/` ignore negations. Model availability in Cursor is not verified.
 
-On a target GitLab project, scope `GITLAB_TOKEN` (`read_api`, masked) to the `delivery-approval` environment, replace `@your-team` in `CODEOWNERS`, run `sh .agents-v0/scripts/verify-gitlab-ci-prereqs.sh` before the first pipeline, and set `ENABLE_GITLAB_SAST=1` only when that GitLab provides the SAST template. See [docs/agents-v0/greenfield-onboarding.md](docs/agents-v0/greenfield-onboarding.md).
+On a target GitLab project, scope `GITLAB_TOKEN` (`read_api`, masked) to the `delivery-approval` environment, replace `@your-team` in `CODEOWNERS`, run `sh .agents-v0/scripts/verify-gitlab-ci-prereqs.sh` before the first pipeline, and set `ENABLE_GITLAB_SAST=1` only when that GitLab provides the SAST template. See [templates/docs/agents-v0/greenfield-onboarding.md](templates/docs/agents-v0/greenfield-onboarding.md).
 
 ## Compliance
 
-See `docs/agents-v0/compliance-matrix.md` — every rule clause mapped to the enforcing agent, skill, hook, gate, or CI check. Installed repos keep the same file at `docs/agents-v0/compliance-matrix.md`. Hook rows apply to Cursor; GitLab CI enforces the merge contract.
+See [templates/docs/agents-v0/compliance-matrix.md](templates/docs/agents-v0/compliance-matrix.md) — every rule clause mapped to the enforcing agent, skill, hook, gate, or CI check. Installed repos keep the same file at `docs/agents-v0/compliance-matrix.md`. Hook rows apply to Cursor; GitLab CI enforces the merge contract.
