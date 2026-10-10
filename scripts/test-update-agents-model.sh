@@ -103,14 +103,14 @@ sh "$KIT/scripts/install.sh" "$tmp" >/dev/null
 grep -Fq 'model: remap-plan-model' "$tmp/.cursor/agents/program-planner.md"
 grep -Fq 'model: remap-plan-model' "$tmp/.cursor/agents/requirements-analyst.md"
 grep -Fq 'model: remap-ux-model' "$tmp/.cursor/agents/ux-designer.md"
-grep -Fq 'model: composer-2.5' "$tmp/.cursor/agents/backend-engineer.md"
+grep -Fq 'model: composer-2.5[fast=false]' "$tmp/.cursor/agents/backend-engineer.md"
 grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]' "$tmp/.cursor/agents/code-reviewer.md"
 grep -Fq '`remap-plan-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| backend-engineer     | Build        |' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| ux-design                           | UX Designer | UX spec authoring                | `remap-ux-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| **Build (critical)** | units that hit a security-review trigger, and sagas or consumers | the Plan model' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '`/v0-deliver`, `/v0-status`, `/v0-onboard`' "$tmp/docs/agents-v0/model-routing-matrix.md"
-grep -Fq '| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `composer-2.5`' "$tmp/docs/agents-v0/model-routing-matrix.md"
+grep -Fq '| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `composer-2.5[fast=false]`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 
 KIT_MODEL_BUILD='remap-build-model' sh "$tmp/.agents-v0/scripts/update-agents-model.sh" >/dev/null
 grep -Fq 'model: remap-build-model' "$tmp/.cursor/agents/backend-engineer.md"
@@ -118,7 +118,7 @@ grep -Fq 'model: remap-build-model' "$tmp/.cursor/agents/maintenance-engineer.md
 grep -Fq 'model: remap-plan-model' "$tmp/.cursor/agents/program-planner.md"
 grep -Fq '| backend-engineer     | Build        |' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| **Build**            | services, BFF, frontend, tests, maintenance, release             | `remap-build-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
-grep -Fq '| contract-first-design, quality-gate | Schemas     | schemas + single-file unit tests | `composer-2.5`' "$tmp/docs/agents-v0/model-routing-matrix.md"
+grep -Fq '| contract-first-design, quality-gate | Schemas     | schemas + single-file unit tests | `composer-2.5[fast=false]`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '`/v0-deliver`, `/v0-status`, `/v0-onboard`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 
 plain="$(mktemp -d)"

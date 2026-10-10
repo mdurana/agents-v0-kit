@@ -1,7 +1,7 @@
 ---
 name: codebase-documenter
 description: Onboard phase. Documents an existing codebase as-is — profile, baseline, inventories, module docs, architecture, flows — with cited evidence. Use in /v0-onboard.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

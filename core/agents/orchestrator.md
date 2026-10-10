@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Routes delivery phases, enforces gates, launches phase agents (not nested subagents). Use for /v0-deliver, /v0-status, /v0-onboard.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

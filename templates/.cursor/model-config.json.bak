@@ -1,12 +1,12 @@
 {
   "plan": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
-  "build": "composer-2.5",
+  "build": "composer-2.5[fast=false]",
   "review": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
   "explore": "glm-5p3-flash[reasoning=high]",
   "debug": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
-  "schemas": "composer-2.5",
-  "docs": "composer-2.5",
-  "documenter": "composer-2.5",
-  "orchestrator": "composer-2.5",
-  "ux-designer": "composer-2.5"
+  "schemas": "composer-2.5[fast=false]",
+  "docs": "composer-2.5[fast=false]",
+  "documenter": "composer-2.5[fast=false]",
+  "orchestrator": "composer-2.5[fast=false]",
+  "ux-designer": "composer-2.5[fast=false]"
 }

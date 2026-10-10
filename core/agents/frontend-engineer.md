@@ -1,7 +1,7 @@
 ---
 name: frontend-engineer
 description: Build phase. Implements React (default) or existing SvelteKit UI — routes, loads, forms, a11y, XSS-safe content — with red–green tests. Use in /v0-build.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

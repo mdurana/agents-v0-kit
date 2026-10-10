@@ -1,7 +1,7 @@
 ---
 name: maintenance-engineer
 description: Maintain phase. Bug triage, CVE/dependency upgrades, refactors, doc drift, recorded in a maintenance note. Smallest diff, no drive-by changes. Use in /v0-maintain.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

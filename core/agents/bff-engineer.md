@@ -1,7 +1,7 @@
 ---
 name: bff-engineer
 description: Build phase. Implements the Backend-for-Frontend — aggregation, auth/session edge, rate limits, Resilience4j — with red–green tests. Use in /v0-build.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

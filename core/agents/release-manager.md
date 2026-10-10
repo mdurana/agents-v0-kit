@@ -1,7 +1,7 @@
 ---
 name: release-manager
 description: Release phase. Local checkpoint via /v0-local-release, then merge requests via glab. Never commits or force-pushes without explicit approval. Use in /v0-local-release and /v0-release.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read

@@ -1,7 +1,7 @@
 ---
 name: docs-author
 description: Drafts README, architecture, network, and sequence doc updates from diffs. Docs role per model-routing-matrix.
-model: composer-2.5
+model: composer-2.5[fast=false]
 mode: subagent
 tools:
   - read
