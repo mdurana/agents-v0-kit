@@ -63,6 +63,7 @@ check_approver_binding() {
 }
 
 # Approver is column 4 and Decision is column 5 of the canonical approvals table.
+# When a phase has several rows, the last one is the current decision.
 approval_field() {
   file="$1"
   phase="$2"
@@ -75,10 +76,10 @@ approval_field() {
       gsub(/^[ \t]+|[ \t]+$/, "", c[2])
       if (tolower(c[2]) == tolower(phase) && (col + 0) <= n) {
         gsub(/^[ \t]+|[ \t]+$/, "", c[col])
-        print c[col]
-        exit
+        found = c[col]
       }
     }
+    END { if (found != "") print found }
   ' "$file"
 }
 
@@ -89,7 +90,8 @@ review_phases() {
   for phase in release verify; do
     approver="$(approval_field "$art" "$phase" 4)"
     decision="$(approval_field "$art" "$phase" 5)"
-    if [ -n "$approver" ] && printf '%s' "$decision" | grep -Eqi '^(approved|approve|yes|pass)([^a-z]|$)'; then
+    if [ -n "$approver" ] && printf '%s' "$decision" | grep -Eqi '^(approved|approve|yes|pass)([^a-z]|$)' \
+      && ! printf '%s' "$decision" | grep -Eqi '(condition|provisional|pending|subject to)'; then
       if [ -z "$found" ]; then
         found="$phase"
       else

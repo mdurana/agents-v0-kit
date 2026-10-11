@@ -114,7 +114,10 @@ else:
     phases = ["intake", "design", "build", "verify", "release"]
 active_phases = phases if (onboarding or maintain_note) else phases + ["maintain"]
 statuses = {"in_progress", "awaiting_approval", "blocked"}
-positive = re.compile(r"^(approved|approve|yes|pass)\b", re.I)
+# A conditional approval is not an approval; the last row for a phase is its current decision.
+positive = re.compile(
+    r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
+)
 
 text = open(art, encoding="utf-8").read()
 tier_m = re.search(r"^\s*tier:\s*(\S+)", text, re.I | re.M)
@@ -131,7 +134,7 @@ for line in text.splitlines():
         continue
     cells = [c.strip() for c in line.strip().strip("|").split("|")]
     if len(cells) >= 5 and cells[0].lower() in phases:
-        rows.setdefault(cells[0].lower(), cells)
+        rows[cells[0].lower()] = cells
 
 last_approved = ""
 for phase in phases:

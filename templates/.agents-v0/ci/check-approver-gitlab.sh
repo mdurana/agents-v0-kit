@@ -112,7 +112,7 @@ section="$(awk '
 phases="$(printf '%s' "$phase" | tr ',' ' ')"
 recorded=""
 for one in $phases; do
-  approver="$(printf '%s' "$section" | grep -i "|[[:space:]]*${one}[[:space:]]*|" | head -n1 | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $4); print tolower($4)}')"
+  approver="$(printf '%s' "$section" | grep -i "|[[:space:]]*${one}[[:space:]]*|" | tail -n1 | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $4); print tolower($4)}')"
   [ -n "$approver" ] || continue
   recorded="${recorded:+$recorded; }$one=$approver"
   for login in $humans; do

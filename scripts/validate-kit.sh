@@ -244,7 +244,7 @@ grep -Fq '0000000000000000000000000000000000000000' templates/.agents-v0/hooks/p
 grep -Fq 'check-asyncapi.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must lint asyncapi.yaml when present"
 grep -Fq 'export-audit-pack.sh' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack.sh must exist"
 grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack must emit schema agents-v0-audit-manifest"
-grep -Fq 'check-delivery-gate-local|verify-gitlab-ci-prereqs|delivery-metrics|export-audit-pack' core/hooks/hook-policy.py || err "hook-policy must protect local gate and audit scripts"
+grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.sh (local gate, audit, state, and MR-body scripts)"
 grep -Fq '.agents-v0/hooks/pre-push' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/hooks/pre-push"
 grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX (Node 20 is end-of-life)"
 if grep -Eq 'node:20' templates/.gitlab-ci.yml templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/app/frontend/Dockerfile; then err "Node 20 is end-of-life: CI and Dockerfile starters must use Node 22"; fi
@@ -501,6 +501,26 @@ grep -Fq '\.cursor/(commands|skills)' core/hooks/hook-policy.py || err "hook-pol
 for dir in /.cursor/commands/ /.cursor/skills/; do
   grep -Fq "$dir @" templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover $dir"
 done
+# CODEOWNERS must cover where the gates really live. The CI gate scripts and the kit scripts install
+# under .agents-v0/, and the profile holds the exceptions CI honors (known_failures, coverage_ratchet).
+for owned in /.agents-v0/ /docs/agents-v0/project-profile.md; do
+  grep -Fq "$owned @" templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover $owned"
+done
+if grep -Eq '^/ci/' templates/.gitlab/CODEOWNERS; then err "CODEOWNERS names /ci/, which does not exist in a target repo (the scripts install under /.agents-v0/)"; fi
+# The delivery jobs trust the whole .agents-v0/ci directory from the default branch. A hand-written
+# list leaves out any sibling script the linkage check calls (check-arc.sh once was).
+grep -Fq 'git archive FETCH_HEAD .agents-v0/ci | tar -x -C "$trusted"' templates/.gitlab-ci.yml || err ".gitlab-ci.yml delivery jobs must extract the whole .agents-v0/ci directory from the default branch"
+if grep -Fq 'for s in check-delivery-linkage.sh' templates/.gitlab-ci.yml; then err ".gitlab-ci.yml must not trust a hand-written list of ci scripts"; fi
+for sibling in $(grep -ohE '"\$here/[A-Za-z0-9_-]+\.sh"' templates/.agents-v0/ci/*.sh | sed -E 's#.*\$here/([^"]+)"#\1#' | sort -u); do
+  [ -f "templates/.agents-v0/ci/$sibling" ] || err "a ci script calls \$here/$sibling, which is not in templates/.agents-v0/ci"
+done
+# install.sh --update must refresh every kit script it installs, or a target keeps a stale copy.
+for kit_script in templates/.agents-v0/ci/*.sh templates/.agents-v0/scripts/*.sh; do
+  kit_rel=".agents-v0/${kit_script#templates/.agents-v0/}"
+  awk '/for always in/,/; do/' scripts/install.sh | grep -Fq "$kit_rel" || err "install.sh --update does not refresh $kit_rel"
+done
+# The local container script installs under .agents-v0/scripts, not scripts/.
+if grep -rIlF './scripts/run-local-container.sh' templates README.md >/dev/null 2>&1; then err "docs name ./scripts/run-local-container.sh; the script installs at .agents-v0/scripts/run-local-container.sh"; fi
 # Onboarding: layout-aware, cited, verified, gated.
 for onboard_file in templates/.agents-v0/scripts/discover-codebase.sh templates/.agents-v0/scripts/check-onboarding-docs.sh templates/docs/agents-v0/onboarding/_report.template.md templates/docs/agents-v0/onboarding/_module.template.md; do
   [ -f "$onboard_file" ] || err "required onboarding file missing: $onboard_file"
@@ -528,7 +548,7 @@ grep -Fq 'not steps in this pipeline' core/commands/v0-deliver.md || err "/v0-de
 grep -Fq 'onboard' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the onboard approval"
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-intake.md || err "/v0-intake must wait for the onboard approval on a brownfield repo"
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-plan.md || err "/v0-plan must wait for the onboard approval on a brownfield repo"
-grep -Fq 'check-onboarding-docs' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/scripts/check-onboarding-docs.sh"
+grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/scripts/check-onboarding-docs.sh (every kit script)"
 for onboard_script in discover-codebase.sh check-onboarding-docs.sh; do
   grep -Fq ".agents-v0/scripts/$onboard_script" scripts/install.sh || err "install.sh does not seed .agents-v0/scripts/$onboard_script"
 done
@@ -539,7 +559,7 @@ for maintain_file in templates/.agents-v0/ci/classify-change.sh templates/docs/a
 done
 grep -Fq 'Maintain-Note' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must accept a Maintain-Note"
 grep -Fq 'classify-change.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must run the classifier for a trivial note"
-grep -Fq 'classify-change.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fetch classify-change.sh from the default branch"
+[ -f templates/.agents-v0/ci/classify-change.sh ] && grep -Fq 'git archive FETCH_HEAD .agents-v0/ci' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must read classify-change.sh from the default branch (the whole .agents-v0/ci directory)"
 grep -Fq 'Maintain-Note' templates/.gitlab/merge_request_templates/default.md || err "merge request template must offer Maintain-Note"
 grep -Fq 'docs/agents-v0/maintain/' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover docs/agents-v0/maintain/"
 grep -Fq 'Tier confirmed by' templates/docs/agents-v0/maintain/_note.template.md || err "maintenance note template must require a confirmed tier"
@@ -653,7 +673,7 @@ grep -Fq 'check-architecture-pack.sh' core/skills/program-architecture/SKILL.md 
 grep -Fq 'architecture-review.md' core/commands/v0-architecture.md || err "/v0-architecture must run the independent architecture review"
 grep -Fq 'architecture-review.md' core/agents/design-reviewer.md || err "design-reviewer must write architecture-review.md for the pack"
 grep -Fq 'check-architecture-pack.sh' templates/.agents-v0/ci/check-milestone.sh || err "check-milestone must run check-architecture-pack.sh for an approved architecture row"
-grep -Fq 'check-architecture-pack.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fetch check-architecture-pack.sh from the default branch for the delivery jobs"
+[ -f templates/.agents-v0/ci/check-architecture-pack.sh ] && grep -Fq 'git archive FETCH_HEAD .agents-v0/ci' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must read check-architecture-pack.sh from the default branch for the delivery jobs (the whole .agents-v0/ci directory)"
 grep -Fq '.agents-v0/ci/check-architecture-pack.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-architecture-pack.sh"
 for seed in design/system/ops-readiness.md design/system/_component.template.md design/system/context-map.md; do
   grep -Fq "docs/agents-v0/$seed" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$seed"
@@ -682,7 +702,11 @@ tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/frontend/pack
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'docker-compose.yml' || err "app archive missing docker-compose.yml"
 grep -A2 'jacoco-maven-plugin' templates/app/backend/pom.xml templates/maven/quality-plugins.xml | grep -Eq '<version>0\.8\.(1[4-9]|[2-9][0-9])</version>' || err "JaCoCo must be 0.8.14 or newer (first release with official Java 25 support)"
 grep -A2 'archunit-junit5' templates/app/backend/pom.xml | grep -Eq '<version>1\.(4\.[1-9]|[5-9]\.[0-9]+)</version>' || err "ArchUnit must be 1.4.1 or newer (first release that reads Java 25 class files)"
-sh scripts/test-app-template.sh || err "scripts/test-app-template.sh failed"
+if [ "${KIT_SKIP_APP_TEMPLATE_TEST:-0}" = 1 ]; then
+  printf 'SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)\n'
+else
+  sh scripts/test-app-template.sh || err "scripts/test-app-template.sh failed (offline or air-gapped? set KIT_SKIP_APP_TEMPLATE_TEST=1, or use install.sh --update --quick)"
+fi
 
 # Always-on context budget: the rules every session loads in a target repo must not creep past
 # this size. Only the three installed always-on rules count. AGENTS.md is the kit repo's own

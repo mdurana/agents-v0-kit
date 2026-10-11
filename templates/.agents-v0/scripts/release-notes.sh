@@ -72,7 +72,9 @@ for src in sources:
 
 
 def release_row(text):
+    """The last release row is the current decision."""
     inside = False
+    found = None
     for line in text.splitlines():
         if re.match(r"^#+\s*delivery approvals", line, re.I):
             inside = True
@@ -82,8 +84,8 @@ def release_row(text):
         if inside and line.strip().startswith("|"):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if len(cells) >= 5 and cells[0].lower() == "release":
-                return cells
-    return None
+                found = cells
+    return found
 
 
 entries, skipped = [], []
@@ -93,7 +95,14 @@ for story_id, path in artifacts:
         skipped.append(f"{story_id}: {path} not found")
         continue
     row = release_row(text)
-    approved = bool(row and re.match(r"^(approved|approve|yes|pass)\b", row[3], re.I))
+    approved = bool(
+        row
+        and re.match(
+            r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)",
+            row[3],
+            re.I,
+        )
+    )
     if not approved and not include_all:
         skipped.append(f"{story_id}: no Approved release row in {path}")
         continue

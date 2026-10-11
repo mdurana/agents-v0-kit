@@ -246,11 +246,11 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 | `check-coverage-ratchet.sh` | A coverage exception is approved and not expired |
 | `check-known-failures.sh` | After a verify that exited non-zero, only test failures inside the documented `known_failures` budget are excused. A compile or plugin error is never excused (`--require-failures`) |
 
-On GitLab the gate scripts are read from the default branch, so a merge request cannot rewrite the check that judges it. `.gitlab-ci.yml` supports `CI_IMAGE_PREFIX` for air-gapped container mirrors. `scripts/verify-gitlab-ci-prereqs.sh` checks the scoped token and documents DinD vs host Docker socket. `CODEOWNERS` covers the delivery records, `docs/agents-v0/design/`, `docs/agents-v0/adr/`, `openapi/`, `ci/`, and the installed commands, skills, agents, and rules.
+On GitLab the gate scripts are read from the default branch, so a merge request cannot rewrite the check that judges it. `.gitlab-ci.yml` supports `CI_IMAGE_PREFIX` for air-gapped container mirrors. `scripts/verify-gitlab-ci-prereqs.sh` checks the scoped token and documents DinD vs host Docker socket. `CODEOWNERS` covers the delivery records, `docs/agents-v0/design/`, `docs/agents-v0/adr/`, `openapi/`, `.agents-v0/` (the gate scripts, the kit scripts, and the pre-push hook), the project profile (it holds the `known_failures` and `coverage_ratchet` exceptions that CI honors), and the installed commands, skills, agents, and rules. In the delivery jobs the whole `.agents-v0/ci` directory is read from the default branch, so a script the linkage check calls is trusted too. When a phase has several approval rows, the last one is the current decision, and a conditional approval (`Approved with conditions`, `pending`) is not an approval.
 
 ## Hooks
 
-Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, hard reset, recursive delete, reading secret files, and commands that dump environment variables. They block edits to `ci/*.sh`, `scripts/check-delivery-gate-local.sh`, `scripts/verify-gitlab-ci-prereqs.sh`, `scripts/delivery-metrics.sh`, `scripts/export-audit-pack.sh`, `.agents-v0/hooks/pre-push`, and the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, `git rebase`, `git merge`, `git cherry-pick`, `git revert`, `git stash pop`/`drop`/`clear`, a new branch or worktree, `glab mr create`, `git tag`, and a mutating `glab api` call. Optional `.agents-v0/hooks/pre-push` skips branch-delete pushes (zero SHA). `after-edit.sh` warns on common VAPT mistakes and on new approval rows in delivery artifacts. CI and `CODEOWNERS` enforce the merge contract.
+Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, hard reset, recursive delete, reading secret files (`.env`, SSH and GPG keys, cloud and cluster credentials, `*.pem` and `*.key`, `/proc/*/environ`), and commands that dump environment variables (`env`, `printenv`, `export -p`, `declare -x`, `compgen -e`). They block edits to every `.agents-v0/ci/*.sh` and `.agents-v0/scripts/*.sh`, `.agents-v0/hooks/pre-push`, and the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, `git rebase`, `git merge`, `git cherry-pick`, `git revert`, `git restore` (unless it only unstages), `git stash pop`/`drop`/`clear`, creating, deleting, or renaming a branch, a new worktree, `glab mr create`, `git tag`, a mutating `glab api` call, `sudo`, and piping a download into a shell or interpreter. Optional `.agents-v0/hooks/pre-push` skips branch-delete pushes (zero SHA). `after-edit.sh` warns on common VAPT mistakes and on new approval rows in delivery artifacts. CI and `CODEOWNERS` enforce the merge contract.
 
 ## Rules and skills
 
@@ -264,6 +264,7 @@ Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the
 ./scripts/install.sh /path/to/repo
 ./scripts/install.sh --with-starters /path/to/repo
 ./scripts/install.sh --update /path/to/repo
+./scripts/install.sh --update --quick /path/to/repo   # offline: skips the app-template build test
 ./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/new-repo
 ./scripts/pack-app-template.sh   # after editing templates/app/{backend,frontend}
 ./scripts/validate-kit.sh

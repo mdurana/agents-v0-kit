@@ -1,5 +1,5 @@
 # Local testing stack — build from ./Dockerfile (see docker/README.md).
-# Run: ./scripts/run-local-container.sh
+# Run: sh .agents-v0/scripts/run-local-container.sh
 
 name: local-dev
 

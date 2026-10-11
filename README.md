@@ -70,6 +70,8 @@ Different features may proceed in one checkout only while each writes its own `d
 
 # after kit changes: validate, refresh kit-managed files
 ./scripts/install.sh --update /path/to/target-repo
+# offline or air-gapped (no Maven or network): same checks, minus the app-template build test
+./scripts/install.sh --update --quick /path/to/target-repo
 ```
 
 On an Intel Mac, a missing JDK 21, Node, or npm is installed with MacPorts. PyYAML uses the same script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts): `sh .agents-v0/scripts/host-tools-macports.sh` (see `docs/agents-v0/gold-standards.md` after install).

@@ -5,19 +5,23 @@
 #   install.sh [--with-starters] <target-repo>
 #       First install: seeds .cursor/ adapter tree and project templates only where missing.
 #
-#   install.sh --update <target-repo>
+#   install.sh --update [--quick] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
 #       commands, skills, hooks, CI scripts, reference docs). Target-owned
-#       templates are seeded only when missing.
+#       templates are seeded only when missing. The full validation builds and
+#       tests the bundled app, which needs Maven and network access. --quick skips
+#       that one test (KIT_SKIP_APP_TEMPLATE_TEST=1) and keeps every other check,
+#       for an offline or air-gapped machine.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 UPDATE=0
+QUICK=0
 WITH_STARTERS=0
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--with-starters] [--update] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
 
@@ -208,7 +212,8 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
-        .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh; do
+        .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
+        .agents-v0/scripts/run-local-container.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
@@ -243,6 +248,10 @@ while [ $# -gt 0 ]; do
       UPDATE=1
       shift
       ;;
+    --quick)
+      QUICK=1
+      shift
+      ;;
     --with-starters)
       WITH_STARTERS=1
       shift
@@ -258,6 +267,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$TARGET" ] || usage
+[ "$QUICK" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --quick applies to --update only\n' >&2; usage; }
 [ -d "$TARGET" ] || { printf 'error: target not found: %s\n' "$TARGET" >&2; exit 1; }
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
@@ -270,7 +280,12 @@ require_pyyaml() {
 
 if [ "$UPDATE" = 1 ]; then
   require_pyyaml
-  "$KIT/scripts/validate-kit.sh"
+  if [ "$QUICK" = 1 ]; then
+    printf 'Quick update: validate-kit skips the app-template build test (needs Maven and network).\n'
+    KIT_SKIP_APP_TEMPLATE_TEST=1 "$KIT/scripts/validate-kit.sh"
+  else
+    "$KIT/scripts/validate-kit.sh"
+  fi
   if [ "$TARGET_ABS" = "$KIT" ]; then
     printf 'Kit repo: validate-kit passed.\n'
     exit 0

@@ -10,7 +10,12 @@
 /docs/agents-v0/design/ @your-team
 /docs/agents-v0/adr/ @your-team
 /openapi/ @your-team
-/ci/ @your-team
+# The CI gate scripts, the kit scripts, and the pre-push hook all install under /.agents-v0/. CI runs
+# the gate scripts from the default branch, so a change here is what the next merge request is judged by.
+/.agents-v0/ @your-team
+# The profile holds the verify commands, coverage_ratchet, and the known_failures budget. CI honors
+# those rows, so a merge request must not approve its own exception.
+/docs/agents-v0/project-profile.md @your-team
 /.gitlab-ci.yml @your-team
 /.gitlab/ @your-team
 /.cursor/hooks.json @your-team

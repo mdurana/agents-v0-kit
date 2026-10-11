@@ -17,9 +17,39 @@ SECRET_BASENAMES = frozenset(
         "credentials.json",
         "secrets.yml",
         "secrets.yaml",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        ".netrc",
+        ".npmrc",
+        ".pypirc",
+        ".pgpass",
+        ".git-credentials",
     }
 )
+# Same family as the .gitignore and .cursorignore secret lists.
+SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".jks", ".keystore")
+# Credential locations by directory: SSH and GPG keys, cloud and cluster credentials, the process environment.
+SECRET_PATH_RE = re.compile(
+    r"(^|/)\.(ssh|gnupg)(/|$)"
+    r"|(^|/)\.aws/(credentials|config)$"
+    r"|(^|/)\.kube/config$"
+    r"|(^|/)\.config/gcloud(/|$)"
+    r"|(^|/)\.docker/config\.json$"
+    r"|(^|/)proc/[^/]+/environ$"
+)
 SECRET_BASENAME_RE = re.compile(r"^\.env(\.(?!(example|sample|template|dist)$)[^/]+)?$")
+# curl/wget piped into an interpreter, or an interpreter reading process substitution of a download.
+PIPE_TO_INTERPRETER_RE = re.compile(
+    r"\b(?:curl|wget)\b[^|;&\n]*\|\s*(?:sudo\s+)?(?:sh|bash|zsh|dash|ksh|python3?|perl|ruby|node)\b"
+    r"|\b(?:sh|bash|zsh|dash|ksh)\s+<\(\s*(?:curl|wget)\b"
+)
+# sudo/doas in command position, directly or as the body of sh -c.
+SUDO_RE = re.compile(
+    r"(?:^|[;&|(`]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:sudo|doas)\b"
+    r"|\b(?:sh|bash|zsh|dash|ksh)\s+-l?c\s+[\"']\s*(?:sudo|doas)\b"
+)
 SECRET_READERS = frozenset(
     {
         "cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg",
@@ -173,8 +203,17 @@ def _expand_wrapper(seg: str) -> List[str]:
 
 
 def _path_looks_secret(path: str) -> bool:
-    base = os.path.basename(path.strip().strip("'\""))
+    cleaned = path.strip().strip("'\"")
+    norm = cleaned.replace("\\", "/")
+    base = os.path.basename(norm)
+    if base.endswith(".pub"):
+        return False  # a public key is not a secret
     if base in SECRET_BASENAMES:
+        return True
+    # A negated glob such as '!*.key' excludes files from a search; it does not read them.
+    if base.endswith(SECRET_SUFFIXES) and not cleaned.startswith("!"):
+        return True
+    if SECRET_PATH_RE.search(norm):
         return True
     return bool(SECRET_BASENAME_RE.match(base))
 
@@ -356,9 +395,31 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             listing = not [a for a in args if not a.startswith("-")] or any(a in ("-l", "--list") for a in args)
             if not listing:
                 return "ask", "creating, moving, or deleting a git tag requires explicit user approval."
-        if sub == "restore" and "--staged" not in parts and "--" in parts:
-            return "ask", "git restore may discard work; requires approval."
+        if sub == "restore":
+            staged_only = any(a in ("--staged", "-S") for a in parts) and not any(
+                a in ("--worktree", "-W") for a in parts
+            )
+            if not staged_only:
+                return "ask", "git restore may discard work; requires approval."
         branch_msg = "creating a branch or worktree requires explicit user authorization."
+        if sub == "branch":
+            args = parts[parts.index("branch") + 1 :] if "branch" in parts else []
+            flags = [a for a in args if a.startswith("-")]
+            positional = [a for a in args if not a.startswith("-")]
+            if any(f in ("-d", "-D", "--delete", "-m", "-M", "--move", "-c", "-C", "--copy") for f in flags):
+                return "ask", "deleting, renaming, or copying a branch requires explicit user approval."
+            tracking = any(
+                f.startswith("--set-upstream-to") or f in ("-u", "--unset-upstream", "--edit-description")
+                for f in flags
+            )
+            listing = any(
+                f in ("--list", "--all", "--remotes", "--verbose", "--show-current", "--contains",
+                      "--no-contains", "--merged", "--no-merged")
+                or re.fullmatch(r"-[avrl]+", f)
+                for f in flags
+            )
+            if positional and not listing and not tracking:
+                return "ask", branch_msg
         if sub == "worktree" and "add" in parts[1:]:
             return "ask", branch_msg
         if sub == "checkout" and any(x in parts for x in ("-b", "-B")):
@@ -423,6 +484,12 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         if action == "ask" and worst != "block":
             worst = "ask"
             msg = message or msg
+    # sudo is unwrapped when segments are split, and a pipe splits a download from its interpreter,
+    # so both are judged on the whole command. A block above still wins.
+    if SUDO_RE.search(cmd):
+        worst, msg = "ask", msg or "sudo or doas runs a command as root; requires explicit user approval."
+    elif PIPE_TO_INTERPRETER_RE.search(cmd):
+        worst, msg = "ask", msg or "piping a download into an interpreter requires explicit user approval."
     if worst == "ask":
         return "ask", msg
     return "allow", ""
@@ -454,6 +521,12 @@ def _segment_may_print_secrets(seg: str) -> bool:
     if bin0 == "set" and len(parts) == 1:
         return True
     if bin0 == "export" and (len(parts) == 1 or "-p" in parts[1:]):
+        return True
+    if bin0 in ("declare", "typeset") and any(
+        a.startswith("-") and re.search(r"[xp]", a[1:]) for a in parts[1:]
+    ):
+        return True
+    if bin0 == "compgen" and any(a in ("-e", "-v") for a in parts[1:]):
         return True
     if re.search(r"(?:^|[\s;|&])(?:printenv)\b", seg):
         return True
@@ -491,10 +564,9 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/(commands|skills)/"),
     # Every CI gate script: a new check is protected without editing this list.
     re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.sh$"),
-    re.compile(
-        r"(^|/)\.agents-v0/scripts/(check-attempt-budget|check-onboarding-docs|feature-worktree|"
-        r"check-delivery-gate-local|verify-gitlab-ci-prereqs|delivery-metrics|export-audit-pack)\.sh$"
-    ),
+    # Every kit script: they write the state, the evidence, and the merge-request body that approvers
+    # rely on, and one of them runs sudo. A new script is protected without editing this list.
+    re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.sh$"),
     re.compile(r"(^|/)\.agents-v0/hooks/pre-push$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),

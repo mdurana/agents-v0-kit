@@ -25,7 +25,7 @@
 | Frontend verify | <!-- e.g. npm run verify --> |
 | Frontend verify (fast) | <!-- e.g. cd app/frontend && npm test — required for the red–green loop; gate still uses Frontend verify --> |
 | Lint | <!-- optional --> |
-| Local run | <!-- e.g. ./scripts/run-local-container.sh --> |
+| Local run | <!-- e.g. sh .agents-v0/scripts/run-local-container.sh --> |
 
 ## Layout
 
@@ -75,7 +75,7 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 
 ### known_failures (optional budget for ci/check-known-failures.sh)
 
-A person approves each row. CI excuses test failures up to the first Allowed failure count (the build job after a failed verify, and `check-gate-metrics.sh`). A compile or plugin error is never excused. Leave `0` for no allowance.
+A person approves each row, and CODEOWNERS makes this file a code-owner change, so a merge request cannot approve its own exception. CI excuses test failures up to the first Allowed failure count (the build job after a failed verify, and `check-gate-metrics.sh`). A compile or plugin error is never excused. Leave `0` for no allowance.
 
 | Allowed failure count | Scope / test IDs | Owner | Remove by |
 |----------------------|------------------|-------|-----------|

@@ -276,7 +276,10 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Control | Enforcer |
 |---------|----------|
 | Shell deny/ask (git, secrets, rm, kubectl, protected-path shell writes) | H-B pre-shell.sh; hook-policy.py |
-| Protected path edits (hooks, every `ci/*.sh` gate script, agents, rules, commands and skills, entry files, budget and worktree scripts) | H-B pre-edit.sh; hook-policy.py path; CODEOWNERS |
+| Protected path edits (hooks, every `.agents-v0/ci/*.sh` gate script and every `.agents-v0/scripts/*.sh` kit script, agents, rules, commands and skills, entry files) | H-B pre-edit.sh; hook-policy.py path; CODEOWNERS (`/.agents-v0/`, the project profile) |
+| Credential reads outside the repository (SSH and GPG keys, cloud and cluster credentials, `*.pem` and `*.key`) and environment dumps (`declare -x`, `compgen -e`, `/proc/*/environ`) are blocked; `git restore`, branch create/delete/rename, `sudo`, and a download piped into an interpreter ask first | H-B/H-ask pre-shell.sh; hook-policy.py shell |
+| The delivery jobs read the whole `.agents-v0/ci` directory from the default branch, so every script the linkage check calls is trusted | `.gitlab-ci.yml` (`.delivery-linkage`); validate-kit |
+| When a phase has several approval rows the last one is the current decision, and a conditional approval (`with conditions`, `pending`, `provisional`) is not an approval | CI ci/check-approvals.sh, ci/check-evidence.sh, ci/check-approver-gitlab.sh, ci/check-delivery-linkage.sh, ci/check-feature-state.sh; scripts/sync-feature-state.sh |
 | A green build means the checks ran: a JVM module with no resolved root fails CI | CI ci/check-layout-roots.sh (build and gate-metrics jobs) |
 | Delivery/milestone artifact edits (human gate) | H-ask pre-edit.sh; hook-policy.py path |
 | `git rebase`, `git merge`, `git cherry-pick`, `git revert`, and `git stash pop/drop/clear` ask first | H-ask pre-shell.sh; hook-policy.py shell |

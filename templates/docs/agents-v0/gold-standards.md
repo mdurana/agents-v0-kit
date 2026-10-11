@@ -50,10 +50,10 @@ and the starter `docker-compose.yml`, via Podman or Docker and the kit script.
 2. Ensure `docker-compose.yml` exists (seeded on kit install when missing).
 
 ```bash
-./scripts/run-local-container.sh              # compose up --build -d
-./scripts/run-local-container.sh --skip-build # compose up -d
-./scripts/run-local-container.sh --down       # compose down
-./scripts/run-local-container.sh -p 9090      # sets APP_PORT for compose
+sh .agents-v0/scripts/run-local-container.sh              # compose up --build -d
+sh .agents-v0/scripts/run-local-container.sh --skip-build # compose up -d
+sh .agents-v0/scripts/run-local-container.sh --down       # compose down
+sh .agents-v0/scripts/run-local-container.sh -p 9090      # sets APP_PORT for compose
 ```
 
 Optional Postgres overlay (Spring Boot, `postgres:15-alpine`):  

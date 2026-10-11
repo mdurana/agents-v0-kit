@@ -17,7 +17,7 @@ and in CI.
 - In: repo layout, CI skeleton, quality gate wiring from kit templates, kit install,
   minimal service or app entrypoint, README build/run/test commands, optional local
   local container run via `Dockerfile` + `docker-compose.yml` and
-  `scripts/run-local-container.sh` (Podman or Docker).
+  `.agents-v0/scripts/run-local-container.sh` (Podman or Docker).
 - Out: business features, production deployment, full OpenAPI catalog (P1).
 
 ## Dependencies

@@ -319,6 +319,47 @@ cat > "$d/docs/agents-v0/requirements/b.md" <<'EOF'
 | Intake | docs/agents-v0/requirements/b.md | dev | Approved | 2026-01-01 |
 | Build | docs/agents-v0/build/b/build-report.md | dev | Approved | 2026-01-03 |
 EOF
+# Decision semantics: the last row for a phase is the current decision, and a conditional approval
+# is not an approval.
+mkdir -p "$d/docs/agents-v0/build/dec"
+printf 'commit: abcdef1234567\n' > "$d/docs/agents-v0/build/dec/build-report.md"
+mkdir_dec() { # <name> <rows...>: write docs/agents-v0/requirements/<name>.md with the given approval rows
+  name="$1"; shift
+  {
+    printf '# Dec\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n'
+    for row in "$@"; do printf '%s\n' "$row"; done
+  } > "$d/docs/agents-v0/requirements/$name.md"
+}
+mkdir_dec dec-stale-approved \
+  '| Verify | docs/agents-v0/build/dec/build-report.md | @ada | Approved | 2026-01-01 |' \
+  '| Verify | docs/agents-v0/build/dec/build-report.md | @ada | Re-opened | 2026-01-02 |'
+expect_fail "check-approvals: a later Re-opened row overrides an earlier Approved row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-stale-approved.md verify
+mkdir_dec dec-reapproved \
+  '| Verify | docs/agents-v0/build/dec/build-report.md | @ada | Re-opened | 2026-01-01 |' \
+  '| Verify | docs/agents-v0/build/dec/build-report.md | @ada | Approved | 2026-01-02 |'
+expect_pass "check-approvals: a later Approved row overrides an earlier Re-opened row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-reapproved.md verify
+mkdir_dec dec-conditional '| Design | docs/agents-v0/design/x/design.md | @ada | Approved with conditions: fix X | 2026-01-01 |'
+expect_fail "check-approvals: Approved with conditions is not an approval" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-conditional.md design
+mkdir_dec dec-pending '| Design | docs/agents-v0/design/x/design.md | @ada | Approved, pending review | 2026-01-01 |'
+expect_fail "check-approvals: a pending approval is not an approval" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-pending.md design
+mkdir_dec dec-plain '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-01 |'
+expect_pass "check-approvals: a plain Approved row still passes" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-plain.md design
+mkdir_dec dec-evidence \
+  '| Build | docs/agents-v0/build/missing/build-report.md | @ada | Approved | 2026-01-01 |' \
+  '| Build | docs/agents-v0/build/dec/build-report.md | @ada | Approved | 2026-01-02 |'
+expect_pass "check-evidence reads the last row for a phase" "$d" env VERIFY_STALE=0 sh "$CI/check-evidence.sh" docs/agents-v0/requirements/dec-evidence.md build
+# The state file follows the same rules.
+mkdir_dec dec-state \
+  '| Intake | docs/agents-v0/requirements/dec-state.md | @ada | Approved | 2026-01-01 |' \
+  '| Design | docs/agents-v0/design/x/design.md | @ada | Approved with conditions: fix X | 2026-01-02 |'
+(cd "$d" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-state.md >/dev/null 2>&1)
+if grep -Fq '"lastApprovedPhase": "intake"' "$d/docs/agents-v0/requirements/dec-state.state.json"; then pass "state: a conditional design approval leaves lastApprovedPhase at intake"; else fail "state: a conditional design approval leaves lastApprovedPhase at intake"; fi
+mkdir_dec dec-state2 \
+  '| Intake | docs/agents-v0/requirements/dec-state2.md | @ada | Approved | 2026-01-01 |' \
+  '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-02 |' \
+  '| Design | docs/agents-v0/design/x/design.md | @ada | Re-opened | 2026-01-03 |'
+(cd "$d" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-state2.md >/dev/null 2>&1)
+if grep -Fq '"lastApprovedPhase": "intake"' "$d/docs/agents-v0/requirements/dec-state2.state.json"; then pass "state: a later Re-opened row withdraws an earlier Approved design"; else fail "state: a later Re-opened row withdraws an earlier Approved design"; fi
 expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/milestones/m.md plan
 expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/a.md plan
 expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake

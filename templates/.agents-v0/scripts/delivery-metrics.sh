@@ -18,7 +18,9 @@ import re
 import time
 
 PHASES = ["intake", "design", "build", "verify", "release"]
-POSITIVE = re.compile(r"^(approved|approve|yes|pass)\b", re.I)
+POSITIVE = re.compile(
+    r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
+)
 
 
 def approvals(path):
@@ -35,10 +37,12 @@ def approvals(path):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if len(cells) < 5 or cells[0].lower() not in PHASES + ["maintain", "milestone"]:
                 continue
+            phase = cells[0].lower()
             if not POSITIVE.match(cells[3]):
+                rows.pop(phase, None)  # a later row that is not an approval cancels an earlier one
                 continue
             try:
-                rows.setdefault(cells[0].lower(), dt.date.fromisoformat(cells[4][:10]))
+                rows[phase] = dt.date.fromisoformat(cells[4][:10])
             except ValueError:
                 pass
     return rows

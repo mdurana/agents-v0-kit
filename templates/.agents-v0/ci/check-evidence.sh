@@ -42,7 +42,7 @@ section="$(awk '
 
 [ -n "$section" ] || { printf 'FAIL: %s has no "Delivery approvals" section\n' "$art" >&2; exit 1; }
 
-row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" | head -n1 || true)"
+row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" | tail -n1 || true)"
 [ -n "$row" ] || { printf 'FAIL: no approval row for phase "%s" in %s\n' "$phase" "$art" >&2; exit 1; }
 
 artifacts="$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3}')"

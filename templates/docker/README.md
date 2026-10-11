@@ -1,7 +1,7 @@
 # Local container templates (Dockerfile + Compose)
 
 Standard local testing uses a **Dockerfile** (or **Containerfile**) at the service root
-and **`docker-compose.yml`**, run via `./scripts/run-local-container.sh` (Podman or Docker).
+and **`docker-compose.yml`**, run via `sh .agents-v0/scripts/run-local-container.sh` (Podman or Docker).
 
 ## Pick a Dockerfile starter
 
@@ -35,9 +35,9 @@ docker compose -f docker-compose.yml -f docker/docker-compose.postgres.yml up --
 ## Commands
 
 ```bash
-./scripts/run-local-container.sh           # compose up --build -d
-./scripts/run-local-container.sh --down    # compose down
-./scripts/run-local-container.sh --skip-build
+sh .agents-v0/scripts/run-local-container.sh           # compose up --build -d
+sh .agents-v0/scripts/run-local-container.sh --down    # compose down
+sh .agents-v0/scripts/run-local-container.sh --skip-build
 ```
 
 Podman: `podman compose` when available; otherwise `docker compose` with `DOCKER_HOST`

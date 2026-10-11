@@ -429,12 +429,11 @@ delivery-metrics:
       trusted="$(mktemp -d)"
       if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-delivery-linkage.sh" 2>/dev/null \
         && git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-approver-gitlab.sh" 2>/dev/null; then
-        for s in check-delivery-linkage.sh check-approvals.sh check-evidence.sh check-milestone.sh check-architecture-pack.sh check-approver-gitlab.sh classify-change.sh check-design.sh check-build-plan.sh; do
-          if git cat-file -e "FETCH_HEAD:.agents-v0/ci/${s}" 2>/dev/null; then
-            git show "FETCH_HEAD:.agents-v0/ci/${s}" > "${trusted}/${s}"
-            chmod +x "${trusted}/${s}"
-          fi
-        done
+        # The whole ci directory, not a list: the linkage check calls its siblings (check-arc.sh,
+        # check-design.sh, ...) from its own directory, and a sibling left out of a list is missing.
+        git archive FETCH_HEAD .agents-v0/ci | tar -x -C "$trusted"
+        trusted="$trusted/.agents-v0/ci"
+        chmod +x "$trusted"/*.sh
       fi
       base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
       head="${CI_COMMIT_SHA}"

@@ -22,7 +22,9 @@ art = os.environ["HOOK_ART"]
 state_path = os.environ["HOOK_STATE"]
 phases = ["intake", "design", "build", "verify", "release"]
 statuses = {"", "in_progress", "awaiting_approval", "blocked"}
-positive = re.compile(r"^(approved|approve|yes|pass)\b", re.I)
+positive = re.compile(
+    r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
+)
 
 try:
     state = json.load(open(state_path, encoding="utf-8"))
@@ -50,7 +52,7 @@ for line in text.splitlines():
         continue
     cells = [c.strip() for c in line.strip().strip("|").split("|")]
     if len(cells) >= 5 and cells[0].lower() in phases:
-        rows.setdefault(cells[0].lower(), cells)
+        rows[cells[0].lower()] = cells
 
 last = ""
 for phase in phases:

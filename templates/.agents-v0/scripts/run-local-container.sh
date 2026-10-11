@@ -5,7 +5,7 @@
 # building and running ./Dockerfile (or Containerfile) when no compose file exists.
 #
 # Usage:
-#   ./scripts/run-local-container.sh [--build|--skip-build] [--down] [-p|--port <host_port>]
+#   sh .agents-v0/scripts/run-local-container.sh [--build|--skip-build] [--down] [-p|--port <host_port>]
 set -eu
 
 PORT="${APP_PORT:-}"
@@ -193,7 +193,7 @@ if find_compose_file; then
   host_port="${APP_PORT:-8080}"
   printf '\nStack running (compose).\n'
   printf '  Logs : %s -f %s logs -f\n' "${COMPOSE_FRONT[*]}" "$COMPOSE_FILE"
-  printf '  Down : ./scripts/run-local-container.sh --down\n'
+  printf '  Down : sh .agents-v0/scripts/run-local-container.sh --down\n'
   printf '  URL  : http://localhost:%s (set APP_PORT / APP_CONTAINER_PORT in compose if needed)\n' "$host_port"
   exit 0
 fi

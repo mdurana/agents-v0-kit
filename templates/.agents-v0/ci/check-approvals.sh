@@ -46,8 +46,9 @@ section="$(awk '
 [ -n "$section" ] || { printf 'FAIL: %s has no "Delivery approvals" section\n' "$art" >&2; exit 1; }
 
 # Find the row for the phase; it must exist and record an explicit approval
-# (a real user decision — never inferred).
-row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" || true)"
+# (a real user decision — never inferred). When a phase has several rows, the last one is the
+# current decision: an earlier Approved row does not outlive a later Re-opened row.
+row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" | tail -n1 || true)"
 [ -n "$row" ] || { printf 'FAIL: no approval row for phase "%s" in %s\n' "$phase" "$art" >&2; exit 1; }
 
 # The Decision column is the 4th table field (awk fields: 1 empty, 2 Phase,
@@ -58,5 +59,10 @@ printf '%s' "$decision" | grep -Eqi '^(approved|approve|yes|pass)([^a-z]|$)' || 
   printf 'FAIL: phase "%s" is recorded in %s but has no explicit approval (decision: "%s")\n' "$phase" "$art" "$decision" >&2
   exit 1
 }
+# A conditional approval is not an approval: record Approved once the conditions are met.
+if printf '%s' "$decision" | grep -Eqi '(condition|provisional|pending|subject to)'; then
+  printf 'FAIL: phase "%s" in %s is a conditional approval (decision: "%s"); record Approved after the conditions are met\n' "$phase" "$art" "$decision" >&2
+  exit 1
+fi
 
 printf 'OK: phase "%s" approval recorded in %s\n' "$phase" "$art"

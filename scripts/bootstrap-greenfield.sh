@@ -71,7 +71,7 @@ if [ "$SCAFFOLD_APP" = 1 ]; then
   sh "$KIT/scripts/scaffold-app-template.sh" --profile "$scaffold_profile" "$TARGET_ABS"
 fi
 
-mkdir -p "$TARGET_ABS/docs/milestones"
+mkdir -p "$TARGET_ABS/docs/agents-v0/milestones"
 for m in p0-platform-skeleton p1-contracts-and-data-models p2-mvp-core-features p3-feature-expansion p4-hardening p5-release-readiness; do
   dest="$TARGET_ABS/docs/agents-v0/milestones/$m.md"
   if [ ! -f "$dest" ]; then
