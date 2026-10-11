@@ -68,5 +68,7 @@ public void process(OrderEvent event) {
 
 ## Security at the boundary
 
-- Parameterized queries only.
+- Parameterized queries only. Sort and filter fields come from an allowlist.
+- Writes bind through a request DTO that rejects unknown properties.
+- A user-supplied URL is fetched only when the host is on an allowlist. Redirects stay on that allowlist.
 - No secrets in logs, responses, or client-facing exception messages.

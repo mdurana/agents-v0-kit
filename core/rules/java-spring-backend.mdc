@@ -83,6 +83,8 @@ log.info("Processing topic={}", Encode.forJava(message.getTopic()));
 
 No PII, secrets, or tokens in logs.
 
+Security audit events (`security-baseline.mdc` §12) use the same encoding. Log authentication success and failure, logout, authorization denial, token revocation, admin mutation, and upload accept and reject. Each event includes the correlation id, principal, action, and result.
+
 ## Exceptions
 
 - No empty `catch`; preserve cause on rethrow.

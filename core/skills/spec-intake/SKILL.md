@@ -62,7 +62,7 @@ Then HTTP 404 and no order row is written
 - [ ] `project-delivery-core.mdc`: stack identified; async/messaging/cache justified or omitted.
 - [ ] `frontend-web.mdc`: default UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it.
 - [ ] UX requirements recorded for UI-affecting changes (WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria).
-- [ ] `security-baseline.mdc` §11: applicable regulations and security-review triggers identified.
+- [ ] `security-baseline.mdc` §11: applicable regulations and security-review triggers identified. A sensitive action is named so Design can require step-up.
 - [ ] User story is one sentence: `As a [role], I want [goal], so that [benefit].`
 - [ ] Acceptance criteria are one Gherkin scenario per `AC-*` heading, split from that story and its constraints; out of scope is a separate list.
 - [ ] Each scenario has `Kind: happy`, `negative`, or `edge`. The `Then` names an observable result. Preconditions and a desk check are recorded.

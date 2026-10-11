@@ -135,7 +135,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | **Data lifecycle** | Not prescribed in kit core | Soft-delete mandate, audit timestamps, async purge |
 | **Stateless workloads** | Implicit | Mandatory (K8s/EKS defaults) |
 | **Frontend** | React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | No dedicated frontend rules |
-| **Security** | `security-baseline`, VAPT rules; unchecked VAPT = Critical | Short DoD security bullets; no VAPT pack |
+| **Security** | `security-baseline`, VAPT rules; an always-on miss (F4, F8, F9, F10) is Critical | Short DoD security bullets; no VAPT pack |
 | **Complexity** | Cognitive ≤15, method ≤30 lines, class <300 | `implementation-quality-standards.md` |
 | **Test naming** | `methodName_scenario_expectedOutcome` | `tc<NNN>_method_given_should` + AAA comments |
 | **Git / MR** | Feature branch ↔ artifact; `render-mr-body.sh` | `git-delivery-standards.md`, conventional commits, one branch per ticket |

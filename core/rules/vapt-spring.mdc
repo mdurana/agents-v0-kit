@@ -8,11 +8,15 @@ alwaysApply: false
 
 Apply when editing Java services, REST controllers, security config, or application YAML.
 
+**Always-on:** F4, F8, F9, F10. Review them on every application change. N/A only when the diff cannot affect that control, with the reason. An applicable failure is **Critical**.
+
+**Regression:** F1, F3, F5, F6. HIGH and MEDIUM block merge when the diff touches that surface. LOW (F5, F6) is recorded and blocks only when the diff makes the issue exploitable. A route with no auth or authz is F4, not F5.
+
 ---
 
 ## F1 — Unauthorized Account Access (HIGH)
 
-**OWASP:** A07:2021 · **CWE:** CWE-287 · **Retest:** User A logout → User B login → all API calls show User B
+**OWASP:** A07:2025 · **CWE:** CWE-287, CWE-613 · **Retest:** User A logout → User B login → all API calls show User B
 
 ### MUST
 
@@ -37,7 +41,7 @@ Apply when editing Java services, REST controllers, security config, or applicat
 
 ## F6 — Multiple Active Sessions (LOW)
 
-**OWASP:** A07:2021 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
+**OWASP:** A07:2025 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
 
 ### MUST
 
@@ -55,9 +59,9 @@ Apply when editing Java services, REST controllers, security config, or applicat
 
 ---
 
-## F4 — Improper Access Control (MEDIUM)
+## F4 — Function-level access control (HIGH, always-on)
 
-**OWASP:** A05:2021 · **CWE:** CWE-284 · **Retest:** Restricted role → **403** on direct admin API call
+**OWASP:** A01:2025 · **API:** API5:2023 · **CWE:** CWE-284 · **ASVS:** v5.0.0-8.2.1 · **Retest:** Restricted role → **403** on direct admin API call
 
 ### MUST
 
@@ -65,6 +69,7 @@ Apply when editing Java services, REST controllers, security config, or applicat
 - New controllers include role/permission annotations in the **same PR**
 - BFF validates permissions before proxying to downstream services
 - Use `app.security.permit-all=true` **local dev only** — never lab/SIT/UAT/prod
+- When the policy or entitlement service errors, deny the request
 
 ### MUST NOT
 
@@ -79,9 +84,79 @@ Apply when editing Java services, REST controllers, security config, or applicat
 
 ---
 
+## F8 — Object-level authorization (HIGH, always-on)
+
+**OWASP:** A01:2025 · **API:** API1:2023 · **CWE:** CWE-639 · **ASVS:** v5.0.0-8.2.2 · **Retest:** User A requests User B’s `{id}` → 403 or 404
+
+The caller in the retest has the **same role** as the owner. A missing admin role is F4.
+
+### MUST
+
+- For every `{id}` path, authorize that instance (tenant, org, or user) in the service that owns the data
+- Bind writes through a request DTO that rejects unknown properties
+
+### MUST NOT
+
+- Trust a client-supplied id without an authorized lookup
+- Treat a role annotation as proof of ownership
+
+### Required tests
+
+- Same-role peer requests another principal’s `{id}` → 403 or 404
+- Unknown JSON property on a write DTO → 400
+
+---
+
+## F9 — JWT validation (HIGH, always-on)
+
+**OWASP:** A07:2025 · **ASVS:** v5.0.0-9.1.2, v5.0.0-9.2.1, v5.0.0-9.2.3 · **Retest:** Disallowed `alg`, wrong `aud` or `iss`, or past `exp` is rejected. Blacklist lookup fails closed.
+
+### MUST
+
+- Allowlist the signature algorithm and reject `none`
+- Validate `iss`, `aud`, `exp`, and `nbf` before trusting claims
+- Accept `kid` only for known keys
+- Keep access-token lifetime short
+- Rotate refresh tokens. Reuse of an old refresh token revokes that family
+- Take authorization identity from the validated `sub`
+
+### MUST NOT
+
+- Accept a token because the signature bytes verify while `aud` or `iss` is unchecked
+- Fail open when the blacklist or key source is unavailable
+
+### Required tests
+
+- `alg: none`, wrong `aud`, and expired `exp` each rejected
+- Blacklist store throwing → request denied
+
+---
+
+## F10 — Security audit events (MEDIUM, always-on)
+
+**OWASP:** A09:2025 · **ASVS:** v5.0.0-16.3.1, v5.0.0-16.3.2 · **Retest:** Login, logout, an authorization denial, and an admin or upload action each emit one log line with principal and outcome and without a token or password
+
+An applicable miss is Critical (always-on gate).
+
+### MUST
+
+- Emit an event for authentication success and failure, logout, authorization denial, token revocation, admin mutation, and upload accept and reject
+- Include correlation id, principal, action, and result
+- Encode dynamic fields (`Encode.forJava()`)
+
+### MUST NOT
+
+- Write the token, password, or secret into the event
+
+### Required tests
+
+- One denial and one admin or upload action assert the audit event fields and the absence of the bearer token
+
+---
+
 ## F3 — Insufficient File Upload Validation (MEDIUM)
 
-**OWASP:** A05:2021 · **CWE:** CWE-434 · **Retest:** Renamed wrong-type file rejected server-side (400) before processing
+**OWASP:** A06:2025, A05:2025 · **CWE:** CWE-434 · **Retest:** Renamed wrong-type file rejected server-side (400) before processing
 
 ### MUST
 
@@ -90,8 +165,11 @@ Apply when editing Java services, REST controllers, security config, or applicat
 3. Content validation: magic-byte / MIME sniff (Apache Tika or equivalent)
 4. Structure validation: parse file header/structure (e.g. CSV header row) before business logic
 5. Extension allowlist — **supplemental only**, not sole check
-6. `@PreAuthorize` on admin upload endpoints
-7. Reuse shared validator utility across services
+6. Generated storage name. Reject `..`. The client file name is not a path
+7. Uncompressed-size limit before extraction
+8. `@PreAuthorize` on admin upload endpoints
+9. Virus scan in production (async queue is acceptable)
+10. Reuse shared validator utility across services
 
 ### MUST NOT
 
@@ -109,32 +187,36 @@ Apply when editing Java services, REST controllers, security config, or applicat
 
 ## F5 — Exposed API Calls (LOW)
 
-**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** All endpoints require auth + authz; rate limits on sensitive paths
+**OWASP:** A path visible in the client Network tab is informational. A route without auth or authz is **F4 / A01:2025**, not this finding. **CWE:** CWE-200 for data in the query string. **Retest:** Sensitive params are absent from the query string; auth and admin paths are rate limited.
 
 ### MUST
 
-- Every endpoint protected by authentication and authorization (see F4)
+- Record a missing auth or authz check as F4
 - Rate limiting on auth, admin, and upload paths
 - Sensitive identifiers in request body or headers — not URL query strings
 - Do not leak stack traces, internal hostnames, or schema details in production errors
 
 ### Accept
 
-- API paths visible in client Network tab is normal for SPAs — protect endpoints, do not rely on obscurity
+- API paths visible in the client Network tab are normal for SPAs
 
 ### Required tests
 
-- Unauthenticated request → 401; unauthorized role → 403
-- Sensitive params not in query string for new endpoints
+- Unauthenticated request → 401 (failure of this test is F4)
+- Unauthorized role → 403 (failure of this test is F4)
+- Sensitive params not in the query string for new endpoints
 
 ---
 
 ## Retest summary (Spring)
 
-| Finding | Pass criteria |
-|---------|---------------|
-| F1 | User B identity on all APIs after User A logout + User B login |
-| F4 | Restricted role → 403 on admin endpoints |
-| F3 | Renamed wrong-type file → 400 before processing |
-| F5 | Auth + authz on all endpoints; rate limits active |
-| F6 | Prior session dead on new login (if policy requires) |
+| Finding | Gate | Pass criteria |
+|---------|------|---------------|
+| F4 | Always-on, Critical if applicable | Restricted role → 403 on admin endpoints |
+| F8 | Always-on, Critical if applicable | Same-role peer → 403 or 404 on another `{id}` |
+| F9 | Always-on, Critical if applicable | Disallowed `alg`, wrong `aud`/`iss`, or expired token rejected; blacklist fails closed |
+| F10 | Always-on, Critical if applicable | Auth, denial, and admin/upload events logged without a token |
+| F1 | Regression, High | User B identity on all APIs after User A logout + User B login |
+| F3 | Regression, Medium | Renamed wrong-type file → 400 before processing |
+| F5 | Regression, Low | Query string has no sensitive params; rate limits active. Missing authz is F4 |
+| F6 | Regression, Low | Prior session dead on new login (if policy requires) |

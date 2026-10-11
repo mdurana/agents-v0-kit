@@ -18,7 +18,7 @@ Build phase playbook for the `bff-engineer` agent (`workflow-orchestration.mdc`)
 8. Wire outbound clients: ~10s timeout, retry, circuit breaker; `X-Correlation-ID`; service auth.
 9. Validate permissions **before** proxying admin operations; auth/session changes ship with their VAPT-required tests in the same diff.
 10. Add `@PreAuthorize` on admin/mutation endpoints; no authz bypass flags.
-11. Implement logout: purge session state; blacklist fail-closed; trigger IdP sign-out for SSO.
+11. Implement logout: expire the refresh cookie, purge session state, blacklist fail-closed, and trigger IdP sign-out for SSO. Keep the access token out of the cookie; the browser holds it in memory.
 12. Run the full verify command for the BFF root from `docs/agents-v0/project-profile.md` once for the Build gate (`./mvnw -B clean verify` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
 13. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
 
@@ -27,8 +27,10 @@ Build phase playbook for the `bff-engineer` agent (`workflow-orchestration.mdc`)
 - [ ] `quality-and-testing.mdc`: red–green per behavior unit; methods ≤ 30 lines; cognitive complexity ≤ 15; coverage targets on changed code.
 - [ ] Baseline green before the first edit; red–green loop uses `Backend verify (fast, no OWASP)` when that cell is a real command; quality gate executed once in `./mvnw -B clean verify`.
 - [ ] Contract conformance diff clean (or recorded N/A reason) where the BFF exposes an API.
-- [ ] `vapt-spring.mdc` F1: logout purges session; fail-closed.
-- [ ] `vapt-spring.mdc` F4: `@PreAuthorize` on admin/mutation; no bypass flags.
+- [ ] `vapt-spring.mdc` F1: logout purges session; fail-closed. Access token stays in memory; refresh token is an HttpOnly cookie.
+- [ ] `vapt-spring.mdc` F4: `@PreAuthorize` on admin/mutation; no bypass flags; policy errors deny.
+- [ ] `vapt-spring.mdc` F8: BFF authorizes the `{id}` before proxying.
+- [ ] `vapt-spring.mdc` F9: token validation matches the API (algorithm allowlist, audience, expiry).
 - [ ] `vapt-webapp.mdc` F4: server-side route/module enforcement — not UI hide-only.
 - [ ] `api-and-events.mdc`: one error envelope per surface; idempotency on non-idempotent creates.
 - [ ] `security-baseline.mdc` §2: BOLA authorized lookup; §3: no secrets in client-facing errors.

@@ -51,45 +51,54 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| §1 Authn (OAuth2/JWT, MFA, logout, blacklist fail-closed, dev bypass local) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F1 |
-| §2 Authz (`@PreAuthorize`, server-side, no client role trust, BOLA) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*; H-W after-edit.sh (heuristic only — Verify/Sonar authoritative); R vapt-spring F4, vapt-webapp F4; G Build gate |
-| §3 Secrets (vault/env, no client exposure, PII not in URLs, sanitize logs) | A all build agents; H-B pre-shell.sh (obvious secret-output commands); H-W after-edit.sh (limited public-env heuristic); R vapt-webapp F2 |
-| §4 Cookies and client storage (HttpOnly, Secure, SameSite; no secrets in localStorage) | A frontend-engineer; S implement-frontend; H-W after-edit.sh (`document.cookie` write heuristic); R vapt-webapp F7 |
-| §5 Uploads (size, content sniff, structure, authz) | A backend-engineer; S implement-spring-service; H-W after-edit.sh (filename-validation heuristic); R vapt-spring F3 |
-| §6 Headers (HSTS, nosniff, X-Frame, CSP, Referrer; explicit CORS; no fingerprinting headers) | A backend-engineer, frontend-engineer; H-W after-edit.sh (`nosniff` heuristic); R vapt-webapp F2 |
-| §7 API security (versioned, auth, rate limit, `@Valid`, parameterized SQL, 401/403 not 200-with-error, no stack traces) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt-spring F5 |
+| §1 Authn (OAuth2/JWT, MFA, step-up, logout, blacklist fail-closed, identical recovery responses, dev bypass local) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F1; ASVS v5.0.0-7.4.1, v5.0.0-6.3.8 |
+| §1 JWT (algorithm allowlist, reject `none`, `iss`/`aud`/`exp`/`nbf`, known `kid`, refresh rotation) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F9; G Verify gate; ASVS v5.0.0-9.1.2, v5.0.0-9.2.1, v5.0.0-9.2.3, v5.0.0-10.4.5 |
+| §1 Browser session (access token in memory, refresh token in HttpOnly cookie) | A frontend-engineer, bff-engineer; S implement-frontend, implement-bff; R vapt-webapp F1; ASVS v5.0.0-10.1.1, v5.0.0-3.3.4 |
+| §2 Function-level authz (`@PreAuthorize`, server-side, no client role trust, fail closed on policy errors) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*; H-W after-edit.sh (heuristic only — Verify/Sonar authoritative); R vapt-spring F4, vapt-webapp F4; G Build gate, Verify gate; ASVS v5.0.0-8.2.1, v5.0.0-8.3.1, v5.0.0-16.5.3 |
+| §2 Object-level authz (BOLA; same-role peer retest) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*, contract-first-design; R vapt-spring F8, vapt-webapp F8; G Verify gate; ASVS v5.0.0-8.2.2 |
+| §2 Field-level authz (request DTO rejects unknown properties; `@JsonIgnore` on response secrets) | A backend-engineer; S implement-spring-service; R vapt-spring F8; ASVS v5.0.0-8.2.3, v5.0.0-15.3.3 |
+| §3 Secrets (vault/env, encryption at rest, no client exposure, PII not in URLs, sanitize logs) | A all build agents; H-B pre-shell.sh (obvious secret-output commands); H-W after-edit.sh (limited public-env heuristic); R vapt-webapp F2; ASVS v5.0.0-13.3.1, v5.0.0-14.2.1, v5.0.0-14.2.4 |
+| §4 Cookies and client storage (HttpOnly, Secure, SameSite; access token in memory) | A frontend-engineer; S implement-frontend; H-W after-edit.sh (`document.cookie` write heuristic); R vapt-webapp F1, vapt-webapp F7; ASVS v5.0.0-3.3.4, v5.0.0-14.3.1 |
+| §5 Uploads (size, content sniff, structure, generated name, decompression limit, authz, production virus scan) | A backend-engineer; S implement-spring-service; H-W after-edit.sh (filename-validation heuristic); R vapt-spring F3; ASVS v5.0.0-5.2.2, v5.0.0-5.2.3, v5.0.0-5.3.2, v5.0.0-5.4.3 |
+| §6 Headers (HSTS includeSubDomains, nosniff, X-Frame, CSP frame-ancestors/base-uri/object-src, Referrer, Permissions-Policy; explicit CORS) | A backend-engineer, frontend-engineer; H-W after-edit.sh (`nosniff` heuristic); R vapt-webapp F2; ASVS v5.0.0-3.4.1, v5.0.0-3.4.3, v5.0.0-3.4.6 |
+| §7 API security (versioned, TLS 1.2+, auth, rate limit, `@Valid`, parameterized SQL, sort/filter allowlist, URL allowlist, 401/403 not 200-with-error, no stack traces) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt-spring F5; ASVS v5.0.0-12.1.1, v5.0.0-12.3.2, v5.0.0-1.2.4, v5.0.0-1.3.6, v5.0.0-15.3.2 |
 | §8 Production hygiene (DEBUG off, no demo routes, sourcemaps off, permit-all=false) | A backend-engineer, frontend-engineer; H-W after-edit.sh (permit-all/sourcemap heuristics); R vapt-webapp F2, vapt-spring F4 |
-| §9 Supply chain (dep scanning, SBOM) | A maintenance-engineer; S dependency-upgrade; G Verify gate (CVE check) |
-| §11 Compliance & review triggers | A requirements-analyst, security-reviewer; S spec-intake, vapt-review; G Intake gate, Verify gate |
+| §9 Supply chain (dep scanning, lockfiles, secret detection, SBOM for every shipped service; license policy when compliance requires) | A maintenance-engineer; S dependency-upgrade; G Verify gate (CVE check); ASVS v5.0.0-15.1.2 |
+| §11 Compliance & review triggers (GDPR, BSP, Data Privacy Act; `{id}` paths included) | A requirements-analyst, security-reviewer; S spec-intake, vapt-review; G Intake gate, Verify gate |
+| §12 Security audit events (auth, logout, denial, revocation, admin mutation, upload; correlation id, principal, action, result; no token) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F10; G Verify gate; ASVS v5.0.0-16.3.1, v5.0.0-16.3.2, v5.0.0-16.2.1, v5.0.0-16.4.1 |
 
 ## vapt-spring.mdc
 
 | Finding | Enforcer |
 |---------|----------|
+| F4 Function-level access control (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-*; H-W after-edit.sh (limited heuristic); G Build/Verify gate; ASVS v5.0.0-8.2.1 |
+| F8 Object-level authorization (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-*, vapt-review; G Verify gate; ASVS v5.0.0-8.2.2 |
+| F9 JWT validation (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-spring-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-9.1.2 |
+| F10 Security audit events (MEDIUM, always-on; applicable miss is Critical) | A backend-engineer, bff-engineer, security-reviewer; S implement-spring-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-16.3.1 |
 | F1 Unauthorized Account Access | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; G Verify gate |
 | F3 File Upload Validation | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
-| F4 Improper Access Control | A backend-engineer, bff-engineer, security-reviewer; S implement-*; H-W after-edit.sh (limited heuristic); G Build/Verify gate |
-| F5 Exposed API Calls | A solution-architect, backend-engineer, security-reviewer; S contract-first-design, vapt-review; G Verify gate |
+| F5 Exposed API Calls (missing authz recorded as F4) | A solution-architect, backend-engineer, security-reviewer; S contract-first-design, vapt-review; G Verify gate |
 | F6 Multiple Active Sessions | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; G Verify gate |
 
 ## vapt-webapp.mdc
 
 | Finding | Enforcer |
 |---------|----------|
-| F1 Unauthorized Account Access | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
+| F4 Function-level access control (HIGH, always-on) | A frontend-engineer, bff-engineer, security-reviewer; S implement-frontend, implement-bff, vapt-review; G Verify gate |
+| F8 Object-level authorization (HIGH, always-on) | A frontend-engineer, bff-engineer, security-reviewer; S implement-frontend, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-8.2.2 |
+| F1 Unauthorized Account Access (memory access token, HttpOnly refresh) | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
 | F2 Sensitive Info in Frontend | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
 | F3 File Upload UI | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
-| F4 Improper Access Control | A frontend-engineer, bff-engineer, security-reviewer; S implement-frontend, implement-bff, vapt-review; G Verify gate |
-| F5 Exposed API Calls | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
+| F5 Exposed API Calls (missing authz recorded as F4) | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
 | F6 Multiple Active Sessions | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; G Verify gate |
-| F7 Cookies Without HttpOnly | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
+| F7 Cookies Without HttpOnly (auth-cookie miss blocks merge) | A frontend-engineer, security-reviewer; S implement-frontend, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
 
 ## vapt-pr-review.mdc
 
 | Clause | Enforcer |
 |--------|----------|
-| Full MR checklist with sign-off | A security-reviewer, code-reviewer, release-manager; S vapt-review, pr-review, release-pr; `.gitlab/merge_request_templates/default.md`; G Release gate |
-| Critical = merge blocker | G Verify gate, Release gate |
+| Full MR checklist with sign-off (always-on F4, F8, F9, F10 plus regression) | A security-reviewer, code-reviewer, release-manager; S vapt-review, pr-review, release-pr; `.gitlab/merge_request_templates/default.md`; G Release gate |
+| Always-on miss = Critical; LOW regression blocks only when exploitable | G Verify gate, Release gate |
 
 ## java-spring-backend.mdc
 
@@ -98,7 +107,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Constructor injection, `@Transactional(readOnly=true)` | A backend-engineer; S implement-spring-service |
 | DTOs only, no entities at edge | A backend-engineer; S implement-spring-service; R api-and-events; G Build gate |
 | Flyway migrations | A backend-engineer; S implement-spring-service; G Build gate |
-| `Encode.forJava` log sanitization | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review |
+| `Encode.forJava` log sanitization; §12 security audit events | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review; R security-baseline §12 |
 | No empty catch; domain exceptions via `@ControllerAdvice` | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review |
 | Methods ≤ 30 lines (target ≤ 20), ≤ 4 parameters, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-spring-service, pr-review; G Build/Verify gate |
 | JPA (`@Enumerated(STRING)`, `@Version`, avoid N+1) | A backend-engineer; S implement-spring-service; G Build gate |
@@ -116,7 +125,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Accessibility (semantic HTML, keyboard, ARIA, reduced motion) | A frontend-engineer; S implement-frontend; G Verify gate (a11y check) |
 | XSS: sanitize/avoid innerHTML/{@html}/dangerouslySetInnerHTML | A frontend-engineer; S implement-frontend; A code-reviewer; S pr-review |
 | Loading, error, and empty states; no silent fetch failures | A frontend-engineer; S implement-frontend; G Build gate |
-| No secrets in `localStorage` | A frontend-engineer; S implement-frontend; R security-baseline §4 |
+| Access token in memory; refresh token in an HttpOnly cookie; no secrets in `localStorage` | A frontend-engineer; S implement-frontend; R security-baseline §4 |
 | Forms: Zod plus the project form library | A frontend-engineer; S implement-frontend |
 | Intel Mac host Node: the kit targets Node 22 (22.12+ for Vite 7) and npm; a missing Node or npm is MacPorts `nodejs22` and `npm11` via `sh .agents-v0/scripts/host-tools-macports.sh` | C /v0-build, /v0-maintain; R frontend-web; `docs/agents-v0/gold-standards.md` |
 
@@ -141,7 +150,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | One error envelope per surface | A solution-architect; S contract-first-design; G Design gate |
 | Event schemas with eventVersion; additive evolution | A solution-architect; S contract-first-design; G Design gate |
 | Idempotent consumers (dedupe by eventId) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; G Verify gate |
-| Parameterized queries only | A backend-engineer; H-W after-edit.sh (limited heuristic); R security-baseline §7 |
+| Parameterized queries only; sort/filter allowlist; user-supplied URL allowlist; DTO rejects unknown properties | A backend-engineer; H-W after-edit.sh (limited heuristic); R security-baseline §2, §7 |
 | Bean Validation (`@Valid`) on request DTOs | A backend-engineer; S implement-spring-service; G Build gate |
 | PATCH semantics documented in OpenAPI | A solution-architect; S contract-first-design; G Design gate |
 | Optimistic concurrency (ETag / `If-Match`) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
@@ -158,7 +167,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Coverage ≥ 80% backend lines, branch coverage per JaCoCo/Sonar, 70% frontend | A test-engineer; S quality-gate; G Verify gate |
 | Methods ≤ 30 lines, complexity ≤ 15, class size < ~300 lines, duplication < ~3% | A code-reviewer; S pr-review; G Verify gate |
 | Testcontainers + Pact where repo depends | A test-engineer; S quality-gate |
-| No new high/critical CVEs | A test-engineer, maintenance-engineer; S quality-gate, dependency-upgrade; G Verify gate |
+| No new high/critical CVEs; lockfiles; secret detection; SBOM for a shipped service | A test-engineer, maintenance-engineer; S quality-gate, dependency-upgrade; G Verify gate; R security-baseline §9 |
 | Tests cover happy, error, and edge paths, including every exception handler that changes behavior | A test-engineer; S quality-gate; G Verify gate |
 | Skip tests only when the user explicitly requests no tests | A test-engineer, backend/bff/frontend-engineer; S quality-gate, implement-*; R ai-agent-conduct |
 | Red–green-refactor (TDD where practical), front-loaded into Build | R workflow-orchestration; A backend/bff/frontend-engineer, test-engineer; S implement-*, quality-gate; G Build/Verify gate |
@@ -205,7 +214,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Build evidence persisted under `docs/agents-v0/build/<feature>/` and referenced from approvals | R workflow-orchestration; C /v0-build, /v0-verify; CI ci/check-evidence.sh |
 | Design: feature contract draft at `docs/agents-v0/design/<feature>/openapi.yaml` when the story adds a `/api/v1` operation; org catalog unchanged until Build merges it. P0-A and a no-contract story do not add a draft | R workflow-orchestration; A solution-architect; S contract-first-design; C /v0-design; G Design gate |
 | Design: UX spec and HTML mockups exist (flows, state matrix, per-component defaults, a11y, responsive, design-system conformance, UX acceptance criteria) | R workflow-orchestration; A ux-designer; S ux-design; C /v0-design; G Design gate |
-| Design: threat-model notes (assets, trust boundaries, top risks) for non-trivial security | A solution-architect; S contract-first-design; C /v0-design; G Design gate |
+| Design: threat-model notes (assets, trust boundaries, top risks) for non-trivial security, naming always-on VAPT findings F4, F8, F9, F10 | A solution-architect; S contract-first-design; C /v0-design; G Design gate |
 | Verify: a11y check green and UX acceptance criteria covered for UI-affecting changes | R workflow-orchestration; A test-engineer; S quality-gate; C /v0-verify; G Verify gate |
 | Intake: user story (`As a` / `I want` / `so that`) split into stable `AC-*` headings, one Gherkin scenario each, with `Kind` and an observable `Then` (the analyst and the approver judge the result; `ci/check-intake.sh` checks `Kind`, `Then` length, and the banned phrases only); one negative or edge, or `Negatives: N/A` when no security-review trigger applies; preconditions and a desk check; out of scope listed separately; `Material: yes` or `Material: no`; NFRs recorded; open questions are `none`. P0-A is copied by `/v0-build` from the milestone and skips `ci/check-intake.sh` | A requirements-analyst; S spec-intake; C /v0-intake, /v0-build; G Intake gate; CI ci/check-intake.sh |
 | Intake: one primary surface unless `Vertical slice: yes`; at most `AC-8`, including the negative or edge; oversized stories stop on `## Proposed split`. P0-A is already one story, stays at four criteria, and is not split | A requirements-analyst; S spec-intake; C /v0-intake, /v0-build, /v0-plan; R workflow-orchestration; G Intake gate, Plan gate |

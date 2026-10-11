@@ -82,7 +82,7 @@ Pick the lightest tier that fits; record the tier in the handoff artifact.
 |------|------|------|
 | **Trivial** | Docs-only or version-only dependency bump, when `ci/classify-change.sh` says eligible and a person confirms | `/v0-triage` → `/v0-maintain` → abbreviated Verify (`/v0-verify`) |
 | **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
-| **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design; milestone manifest row |
+| **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design that name the applicable VAPT findings (always-on F4, F8, F9, F10, plus any regression finding the change touches); milestone manifest row |
 
 A fix, CVE patch, upgrade, or hotfix is recorded in `docs/agents-v0/maintain/<id>/note.md` (`Maintain-Note:` in the MR) with `Tier: trivial | standard | emergency`; trivial and emergency need a person's confirmation. Emergency may merge before Verify and owes it by its `Follow-up verify due` date. A maintenance change never borrows a feature artifact.
 
@@ -152,7 +152,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 ### Design gate
 - `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment. A changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
 - `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives the SLO rows in `slo-evidence.md`. The structural table is not an SLO list.
-- Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks).
+- Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks) that name the applicable VAPT findings in `security-baseline.mdc` (always-on F4, F8, F9, F10).
 
 ### Build gate
 - **Baseline green** before first edit, unless `/v0-build` skips a checkout that is already the default branch tip; otherwise the profile verify command. Stop on a pre-existing failure unless the profile allows it.
@@ -171,7 +171,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - Integration stories, vertical slices, P2 journeys, and P4 stories also persist `docs/agents-v0/verify/<feature>/e2e-report.md` (`e2e-perf-testing`).
 - The P4 SLO story writes `docs/agents-v0/design/system/slo-evidence.md` (`slo-evidence`): each filled NFR/SLO row is `measured` (command plus an output file) or `waiver` (reason, approver, date).
 - Evidence under `docs/agents-v0/verify/<feature>/` with `commit:` in each report header; tests added during Verify are committed before stamping, so every report names the same commit.
-- N/A only with recorded reason; applicable unchecked VAPT = Critical.
+- N/A only with a recorded reason. An applicable miss on an always-on VAPT finding (F4, F8, F9, F10) is Critical. HIGH and MEDIUM regression findings block merge when the diff touches that surface. LOW regression findings block only when the diff makes the issue exploitable.
 
 ### Release gate
 - README and sequence diagrams synced; `architecture.md` and `network.md` stay a docs-only follow-up; MR/PR template + VAPT sign-off; CI green; `release` row (Approver = the GitLab username that approves the MR) recorded on the MR branch before merge.

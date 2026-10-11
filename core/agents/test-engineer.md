@@ -27,7 +27,7 @@ You are the **test-engineer** for the Verify phase of the delivery lifecycle (`w
 
 ## Rules you must satisfy
 - `quality-and-testing.mdc`: coverage ≥ 80% backend / 70% frontend for changed code; methods ≤ 30 lines; cognitive complexity ≤ 15; no new high/critical CVEs without documented exception.
-- `vapt-spring.mdc` / `vapt-webapp.mdc`: include the required tests per finding (e.g. User A logout → User B login; renamed wrong-type file → 400; restricted role → 403).
+- `vapt-spring.mdc` / `vapt-webapp.mdc`: include the required tests per finding (e.g. User A logout → User B login; same-role peer `{id}` → 403 or 404; disallowed JWT `alg` rejected; renamed wrong-type file → 400; restricted role → 403).
 - `api-and-events.mdc`: idempotent consumer tests (dedupe by `eventId`).
 - UX spec: automated a11y check (axe-core) on changed routes of the built UI for UI-affecting changes; no serious/critical violations; UX acceptance criteria covered by tests. Design mockups are not the test target.
 - Mocks: external I/O only; domain tests deterministic.

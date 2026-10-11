@@ -8,34 +8,40 @@ alwaysApply: false
 
 Apply when editing React or SvelteKit routes, hooks, server loads, or client components.
 
+**Always-on on this surface:** F4 and F8. An applicable failure is **Critical**. F9 and F10 are recorded on the API or BFF that validates tokens and writes audit events. A client-only diff marks them N/A with that reason.
+
+**Regression:** F1, F2, F3, F5, F6, F7. HIGH and MEDIUM block merge when the diff touches that surface. LOW blocks only when the diff makes the issue exploitable (an auth cookie missing HttpOnly is exploitable). A route with no auth or authz is F4, not F5.
+
 ---
 
 ## F1 — Unauthorized Account Access (HIGH)
 
-**OWASP:** A07:2021 · **CWE:** CWE-287 · **Retest:** User A logout → User B login → UI and API calls show User B
+**OWASP:** A07:2025 · **CWE:** CWE-287, CWE-613 · **Retest:** User A logout → User B login → UI and API calls show User B. Access token is absent from `localStorage` and `sessionStorage`. Refresh cookie is HttpOnly.
 
 ### MUST
 
-- Bind displayed user to validated JWT/server session — not cached bridge/`sessionStorage` alone
-- Clear **all** client state on logout before new login (`sessionStorage`, `localStorage`, cookies, in-memory auth)
-- Call backend logout endpoint and IdP sign-out when SSO is used
+- Bind displayed user to the validated server session — not a cached bridge or `sessionStorage`
+- Keep the access token in memory. Keep the refresh token in an HttpOnly, Secure, SameSite cookie
+- On logout, drop the in-memory token, expire the refresh cookie, and clear leftover client state (`sessionStorage`, `localStorage`, other cookies)
+- Call the backend logout endpoint and IdP sign-out when SSO is used
 - Wire session validation hooks/middleware if present — enable in non-local environments
 
 ### MUST NOT
 
-- Cache user identity in `sessionStorage` across login/logout without explicit invalidation
+- Store access tokens, refresh tokens, or secrets in `localStorage` or `sessionStorage`
 - Ship logout that clears UI only without client storage and backend token revocation
 - Disable session validation hooks in lab/SIT/UAT/prod
 
 ### Required tests
 
 - User A logout → User B login → User B everywhere (UI + network calls)
+- After login, DevTools shows no access token in web storage; the refresh cookie is HttpOnly
 
 ---
 
 ## F6 — Multiple Active Sessions (LOW)
 
-**OWASP:** A07:2021 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
+**OWASP:** A07:2025 · **CWE:** CWE-613 · **Retest:** If single-session policy — prior session invalidated on new login
 
 ### MUST
 
@@ -50,7 +56,7 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ## F2 — Sensitive Information Exposed in Frontend (MEDIUM)
 
-**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** No config/RBAC refs in prod bundle; no unauthenticated config endpoints
+**OWASP:** A02:2025 when the leak is debug or config. A04:2025 when the leak is a secret, key, or personal data. **CWE:** CWE-200 · **Retest:** No config/RBAC refs in prod bundle; no unauthenticated config endpoints
 
 ### MUST
 
@@ -73,9 +79,9 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ---
 
-## F4 — Improper Access Control (MEDIUM)
+## F4 — Function-level access control (HIGH, always-on)
 
-**OWASP:** A05:2021 · **CWE:** CWE-284 · **Retest:** Restricted role blocked on direct route/API access (403 or redirect)
+**OWASP:** A01:2025 · **CWE:** CWE-284 · **ASVS:** v5.0.0-8.2.1 · **Retest:** Restricted role blocked on direct route/API access (403 or redirect)
 
 ### MUST
 
@@ -94,13 +100,35 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ---
 
-## F5 — Exposed API Calls (LOW)
+## F8 — Object-level authorization (HIGH, always-on)
 
-**OWASP:** A05:2021 · **CWE:** CWE-200 · **Retest:** All visible endpoints require auth + authz
+**OWASP:** A01:2025 · **API:** API1:2023 · **CWE:** CWE-639 · **ASVS:** v5.0.0-8.2.2 · **Retest:** User A opens User B’s record URL → server load or BFF returns 403 or 404
+
+The caller has the same role as the owner.
 
 ### MUST
 
-- Protect every client-visible API path with auth + authz (see F4)
+- Server load, hook, or BFF authorizes that `{id}` before rendering or proxying
+- The client treats 403 and 404 as not-found for the caller
+
+### MUST NOT
+
+- Decide ownership from an id in the route after the client has already rendered another user’s data
+- Hide the link and still load the record
+
+### Required tests
+
+- Same-role user navigates directly to another user’s URL → blocked server-side
+
+---
+
+## F5 — Exposed API Calls (LOW)
+
+**OWASP:** A path visible in the Network tab is informational. A route without auth or authz is **F4 / A01:2025**, not this finding. **CWE:** CWE-200 · **Retest:** Sensitive identifiers are in body or headers. Auth and admin paths are rate limited.
+
+### MUST
+
+- Record a missing auth or authz check as F4
 - Put sensitive identifiers in body/headers — not URL query strings
 - Rate limiting on auth and admin paths (edge or BFF)
 
@@ -110,13 +138,16 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ### Required tests
 
-- New client-visible routes require authenticated server load or protected API
+- New client-visible routes require an authenticated server load or a protected API (a miss is F4)
+- New endpoints keep sensitive params out of the query string
 
 ---
 
 ## F7 — Cookies Without HttpOnly (LOW)
 
-**OWASP:** A05:2021 · **CWE:** CWE-1004 · **Retest:** Session cookies show HttpOnly + Secure in DevTools
+**OWASP:** A02:2025 · **CWE:** CWE-1004 · **Retest:** Session cookies show HttpOnly + Secure in DevTools
+
+A missing flag on an auth or refresh cookie is exploitable: treat that miss as a merge blocker.
 
 ### MUST
 
@@ -125,7 +156,7 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ### MUST NOT
 
-- Set auth tokens via `document.cookie` when HttpOnly cookie is appropriate
+- Set auth tokens via `document.cookie` when an HttpOnly cookie is the session mechanism
 - Ship cookie setters missing any of the three flags
 
 ### Required checks
@@ -136,17 +167,17 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ## F3 — File Upload UI (MEDIUM)
 
-**OWASP:** A05:2021 · **CWE:** CWE-434 · **Retest:** Server rejects renamed wrong-type file (400)
+**OWASP:** A06:2025, A05:2025 · **CWE:** CWE-434 · **Retest:** Server rejects renamed wrong-type file (400)
 
 ### MUST
 
-- Client upload UI calls server endpoint with proper auth headers
-- Show user-facing error when server rejects file
+- Client upload UI calls a server endpoint with proper auth headers
+- Show a user-facing error when the server rejects the file
 
 ### MUST NOT
 
 - Rely on HTML `accept` attributes or client filename checks as sole validation
-- Implement upload without matching server-side content validation (Tika + structure parse)
+- Implement upload without matching server-side content validation (Tika + structure parse, generated storage name, decompression limit, production virus scan)
 
 ### Required tests
 
@@ -156,11 +187,13 @@ Apply when editing React or SvelteKit routes, hooks, server loads, or client com
 
 ## Retest summary (Web app)
 
-| Finding | Pass criteria |
-|---------|---------------|
-| F1 | User B everywhere after User A logout + User B login |
-| F2 | No config leak endpoints; no RBAC/internal URLs in prod bundle |
-| F4 | Restricted role blocked on direct route/API access |
-| F5 | Visible endpoints authz-protected |
-| F7 | Session cookies HttpOnly + Secure |
-| F3 | Server rejects invalid uploads (client UI is supplemental) |
+| Finding | Gate | Pass criteria |
+|---------|------|---------------|
+| F4 | Always-on, Critical if applicable | Restricted role blocked on direct route/API access |
+| F8 | Always-on, Critical if applicable | Same-role user blocked on another user’s URL |
+| F1 | Regression, High | User B everywhere after User A logout + User B login; access token not in web storage |
+| F2 | Regression, Medium | No config leak endpoints; no RBAC/internal URLs in prod bundle |
+| F3 | Regression, Medium | Server rejects invalid uploads (client UI is supplemental) |
+| F5 | Regression, Low | Sensitive params not in the query string. Missing authz is F4 |
+| F7 | Regression, Low; blocker if an auth cookie lacks flags | Session cookies HttpOnly + Secure |
+| F6 | Regression, Low | Session policy confirmed with the API |

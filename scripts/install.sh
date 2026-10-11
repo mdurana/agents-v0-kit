@@ -157,6 +157,13 @@ docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
 docs/agents-v0/user-guide.md
 docs/agents-v0/agents-v0-kit.md
+docs/agents-v0/security-standards.md
+docs/agents-v0/security/vapt-prevention-guardrails.md
+docs/agents-v0/security/vapt-pr-checklist.md
+docs/agents-v0/quality-gates.md
+docs/agents-v0/quality-quick-reference.md
+docs/agents-v0/quality-gates-engineering-principles.md
+docs/agents-v0/gold-standards.md
 docs/agents-v0/greenfield-onboarding.md
 docs/agents-v0/brownfield-onboarding.md
 docs/agents-v0/benchmark/reference-project.md
@@ -186,6 +193,11 @@ docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
 docs/agents-v0/user-guide.md
 docs/agents-v0/agents-v0-kit.md
+docs/agents-v0/security-standards.md
+docs/agents-v0/security/vapt-prevention-guardrails.md
+docs/agents-v0/security/vapt-pr-checklist.md
+docs/agents-v0/quality-quick-reference.md
+docs/agents-v0/quality-gates-engineering-principles.md
 docs/agents-v0/greenfield-onboarding.md
 docs/agents-v0/brownfield-onboarding.md
 docs/agents-v0/benchmark/reference-project.md

@@ -20,7 +20,7 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
    - UX spec: per-screen state matrix (loading/error/empty/success), component default behavior (honor an override when the spec records one), and layout matching the linked mockups.
 8. Wire the API client in the app, not in the mockups: call only the OpenAPI operation named on each component row. Those operations come from the feature draft merged into the org catalog. Send Bearer, `X-Correlation-ID`, and `traceparent`; map success, validation error, 401, and 5xx to the states in the spec. 401 refresh/redirect per `frontend-web.mdc`.
 9. Enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.
-10. Logout: clear **all** client state (`sessionStorage`, `localStorage`, cookies, in-memory); call backend logout + IdP sign-out for SSO.
+10. Logout: drop the in-memory access token, expire the refresh cookie, and clear leftover client state (`sessionStorage`, `localStorage`, other cookies). Call backend logout + IdP sign-out for SSO. Access tokens and refresh tokens are not written to web storage.
 11. Cookies: `httpOnly`, `secure` (prod), `sameSite`; no auth tokens via `document.cookie`.
 12. XSS: sanitize/avoid `innerHTML`/`{@html}`/`dangerouslySetInnerHTML`.
 13. No backend URLs/RBAC roles/permission keys in client bundles; no `PUBLIC_*`/`VITE_*` leaking internal config; `sourcemap: false` in prod.
@@ -32,9 +32,10 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 - [ ] `frontend-web.mdc`: structure; `load`; `browser` guard; stores; Zod forms; user-visible fetch errors.
 - [ ] `quality-and-testing.mdc`: red–green per behavior unit; frontend coverage ≥ 70% on changed code.
 - [ ] Baseline green before the first edit; red–green loop uses a real `Frontend verify (fast)` cell; full Frontend verify once at the gate; `check-failure-brief.sh` before attempt three.
-- [ ] `vapt-webapp.mdc` F1: validated session; clear all client state on logout; backend + IdP sign-out.
+- [ ] `vapt-webapp.mdc` F1: access token in memory; refresh token in an HttpOnly cookie; clear leftover client state on logout; backend + IdP sign-out.
 - [ ] `vapt-webapp.mdc` F2: no config/RBAC/internal URLs in client bundle; `sourcemap: false`.
 - [ ] `vapt-webapp.mdc` F4: server-side route enforcement.
+- [ ] `vapt-webapp.mdc` F8: server load or BFF authorizes another user’s `{id}` before render.
 - [ ] `vapt-webapp.mdc` F7: cookie flags; no `document.cookie` auth tokens.
 - [ ] `vapt-webapp.mdc` F3: client upload UI supplemental.
 - [ ] `frontend-web.mdc` (XSS): sanitize/avoid dangerous HTML sinks.

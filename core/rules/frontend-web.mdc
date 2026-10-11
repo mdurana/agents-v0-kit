@@ -13,7 +13,9 @@ Default stack: **React 19, TypeScript 5.9, Vite 7, Vitest 3**. Use SvelteKit onl
 ## Shared client concerns
 
 - **API base URL** from config; send **Bearer**, **X-Correlation-ID**, and **traceparent** (when client participates in tracing) on outbound calls.
-- **401:** refresh or redirect to login — match existing utilities; no secrets in plain `localStorage` without established pattern.
+- **Session:** access token in memory. Refresh token in an HttpOnly, Secure, SameSite cookie (`security-baseline.mdc` §4). Access tokens, refresh tokens, and secrets stay out of `localStorage` and `sessionStorage`.
+- **401:** refresh via the cookie or redirect to login.
+- **Logout:** drop the in-memory token, expire the refresh cookie, clear leftover client storage, and call backend logout plus IdP sign-out when SSO applies.
 - **UX:** loading, error, empty states; lazy routes where supported.
 
 ## Accessibility (WCAG-oriented)
@@ -26,7 +28,7 @@ Default stack: **React 19, TypeScript 5.9, Vite 7, Vitest 3**. Use SvelteKit onl
 ## XSS and untrusted HTML
 
 - Treat server and URL input as untrusted; **sanitize** or **avoid** `innerHTML` / `{@html}` / `dangerouslySetInnerHTML` unless allow-listed or passed through maintained sanitizer policy.
-- CSP per `security-baseline.mdc` and `docs/security-standards.md`.
+- CSP per `security-baseline.mdc` and `docs/agents-v0/security-standards.md`.
 
 ## React (default)
 

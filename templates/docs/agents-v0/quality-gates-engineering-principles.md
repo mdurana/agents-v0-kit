@@ -2,7 +2,7 @@
 
 > Toolchain wiring guidance. Referenced by `quality-and-testing.mdc` §Tooling —
 > "wire before heavy coding." Thresholds: `docs/agents-v0/quality-gates.md`. One-page
-> summary: `docs/quality-quick-reference.md`.
+> summary: `docs/agents-v0/quality-quick-reference.md`.
 
 ## Principle
 
@@ -20,7 +20,7 @@ only from green.
 | SonarQube | Quality gate (coverage, complexity, duplication) | CI analysis step; `sonar.qualitygate` fail on breach |
 | Checkstyle | Style and structural rules (config starter: `maven/checkstyle.xml`) | `verify` phase |
 | SpotBugs | Static bug analysis (correctness, injection) | `verify` phase |
-| OWASP Dependency-Check | CVE scanning of dependencies | CI scan; no new high/critical CVEs (`security-baseline.mdc` §9) |
+| OWASP Dependency-Check | CVE scanning of dependencies | CI scan; no new high/critical CVEs. Lockfiles committed. Secret detection on the merge request. SBOM for a service that ships (`security-baseline.mdc` §9) |
 | OpenAPI contract diff | No breaking drift vs the approved contract | `verify` phase (starter: `maven/contract-conformance.xml`) |
 | ArchUnit | Layer boundaries (domain ≠ web, DTO-only edge, constructor injection) | `test`/`verify` (starter: `maven/archunit/LayerRulesTest.java`) |
 

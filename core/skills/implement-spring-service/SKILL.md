@@ -20,11 +20,13 @@ Build phase playbook for the `backend-engineer` agent (`workflow-orchestration.m
 10. Add Flyway migrations for all schema changes, following `migration-safety`: additive first (expand/contract), a rollback note, and a Testcontainers test that applies the migration to the previous schema.
 11. Wire correlation ID (`X-Correlation-ID` + MDC) and `traceparent` (W3C Trace Context).
 12. Sanitize log values with `Encode.forJava`; no PII/secrets/tokens in logs.
-13. For uploads: non-empty check, explicit size limit, magic-byte sniff + structure parse, extension allowlist supplemental, `@PreAuthorize`.
+13. For uploads: non-empty check, explicit size limit, magic-byte sniff + structure parse, extension allowlist supplemental, generated storage name, decompression limit, `@PreAuthorize`, production virus scan.
 14. For logout: blacklist JWT + purge session state; blacklist fail-closed.
-15. Use parameterized queries/JPA named parameters only.
-16. Run the full Backend verify command from `docs/agents-v0/project-profile.md` once for the Build gate (`./mvnw -B clean verify` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
-17. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
+15. Validate JWTs with an algorithm allowlist, `iss`/`aud`/`exp`/`nbf`, and known `kid` values. Rotate refresh tokens.
+16. Emit security audit events for auth, denial, revocation, admin mutation, and upload outcome (`security-baseline.mdc` §12).
+17. Use parameterized queries/JPA named parameters only. Sort and filter fields come from an allowlist.
+18. Run the full Backend verify command from `docs/agents-v0/project-profile.md` once for the Build gate (`./mvnw -B clean verify` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
+19. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
 
 ## Rule-compliance checklist
 - [ ] `java-spring-backend.mdc`: constructor injection; `@Transactional(readOnly=true)`; `@Enumerated(STRING)`; no N+1; DTOs only; `Encode.forJava`; no empty catch; methods ≤ 30 lines.
@@ -35,9 +37,12 @@ Build phase playbook for the `backend-engineer` agent (`workflow-orchestration.m
 - [ ] Approved feature draft merged into the org catalog, or N/A recorded.
 - [ ] Contract conformance diff clean (or recorded N/A reason); ArchUnit layer rules where wired.
 - [ ] `vapt-spring.mdc` F1: logout blacklists JWT + purges session; fail-closed.
-- [ ] `vapt-spring.mdc` F3: uploads validated server-side (size, content, structure, authz).
-- [ ] `vapt-spring.mdc` F4: `@PreAuthorize` on every admin/mutation method; `permit-all` local dev only.
-- [ ] `api-and-events.mdc`: `/api/v1/`; 201/204; idempotency keys; one error envelope per surface.
-- [ ] `security-baseline.mdc` §2: BOLA authorized lookup; §3: no secrets in code/logs.
+- [ ] `vapt-spring.mdc` F3: uploads validated server-side (size, content, structure, generated name, decompression limit, authz, production virus scan).
+- [ ] `vapt-spring.mdc` F4: `@PreAuthorize` on every admin/mutation method; `permit-all` local dev only; policy errors deny.
+- [ ] `vapt-spring.mdc` F8: same-role peer `{id}` authorized in the owning service; write DTO rejects unknown properties.
+- [ ] `vapt-spring.mdc` F9: JWT algorithm allowlist, `iss`/`aud`/`exp`/`nbf`, known `kid`, refresh rotation, blacklist fail-closed.
+- [ ] `vapt-spring.mdc` F10: audit events for auth, denial, and admin/upload; no token in the log.
+- [ ] `api-and-events.mdc`: `/api/v1/`; 201/204; idempotency keys; one error envelope per surface; sort/filter and URL allowlists.
+- [ ] `security-baseline.mdc` §2: BOLA authorized lookup; §3: no secrets in code/logs; §12: audit events.
 - [ ] Build evidence persisted under `docs/agents-v0/build/<feature>/`; fix attempts bounded.
 - [ ] `workflow-orchestration.mdc`: Build gate criteria met.

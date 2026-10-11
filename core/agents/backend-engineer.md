@@ -30,8 +30,11 @@ You are the **backend-engineer** for the Build phase of the delivery lifecycle (
 ## Rules you must satisfy
 - `java-spring-backend.mdc`: constructor injection, `@Transactional(readOnly=true)` default, `@Enumerated(STRING)`, no N+1, DTOs only, `Encode.forJava` for log values, no empty catch.
 - `quality-and-testing.mdc`: red–green for non-trivial logic; methods ≤ 30 lines; cognitive complexity ≤ 15; coverage targets on changed code.
-- `vapt-spring.mdc` F4: `@PreAuthorize` on **every** admin/mutation controller method; `permit-all` local dev only.
-- `vapt-spring.mdc` F3: uploads — non-empty check, size limit, magic-byte sniff + structure parse, extension allowlist supplemental, `@PreAuthorize`.
+- `vapt-spring.mdc` F4: `@PreAuthorize` on **every** admin/mutation controller method; `permit-all` local dev only; policy errors deny.
+- `vapt-spring.mdc` F8: same-role peer cannot read another `{id}`.
+- `vapt-spring.mdc` F9: JWT algorithm allowlist, `iss`/`aud`/`exp`/`nbf`, known `kid`; blacklist fail-closed.
+- `vapt-spring.mdc` F10: audit events for auth, denial, and admin/upload, with no token in the log.
+- `vapt-spring.mdc` F3: uploads — non-empty check, size limit, magic-byte sniff + structure parse, generated storage name, extension allowlist supplemental, `@PreAuthorize`.
 - `vapt-spring.mdc` F1: logout blacklists JWT + purges session state; blacklist fail-closed.
 - `api-and-events.mdc`: `/api/v1/` URLs, 201/204, idempotency keys on non-idempotent creates, one error envelope per surface.
 - `security-baseline.mdc` §2: BOLA — authorized lookup for every `{id}` path; §3: no secrets in code/logs.

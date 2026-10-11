@@ -30,7 +30,8 @@ You are the **bff-engineer** for the Build phase of the delivery lifecycle (`wor
 - `architecture-and-diagrams.mdc` (BFF): pipeline Auth → rate limit → cache/validation → controller; domain logic in backend services.
 - `quality-and-testing.mdc`: red–green for non-trivial logic; methods ≤ 30 lines; cognitive complexity ≤ 15; coverage targets on changed code.
 - `vapt-spring.mdc` F4: `@PreAuthorize` on admin/mutation endpoints; no authz bypass flags.
-- `vapt-spring.mdc` F1: logout purges session state; blacklist fail-closed.
+- `vapt-spring.mdc` F8: authorize the `{id}` before proxying.
+- `vapt-spring.mdc` F1: logout purges session state; blacklist fail-closed. Browser access token stays in memory; refresh token is an HttpOnly cookie.
 - `vapt-webapp.mdc` F4: server-side route/module enforcement — not UI hide-only.
 - `api-and-events.mdc`: one error envelope per surface; idempotency on non-idempotent creates.
 - `security-baseline.mdc` §2: BOLA — authorized lookup for every `{id}`; §3: no secrets in client-facing errors.

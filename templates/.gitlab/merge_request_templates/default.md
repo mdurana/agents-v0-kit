@@ -13,16 +13,44 @@
 ## VAPT MR checklist
 
 > Required for MRs touching auth, sessions, routes, controllers, uploads, or deployment security config.
-> Flag any unchecked applicable item as **Critical** — must fix before merge.
+> Always-on findings are F4, F8, F9, and F10. An applicable miss is **Critical**.
+> Regression findings keep their severity. HIGH and MEDIUM block merge when the diff touches that surface. LOW blocks only when the diff makes the issue exploitable.
 >
-> Record each finding as **Pass**, **Fail**, or **N/A** with a reason. N/A is valid only when this change does not affect that finding's surface; an applicable unchecked item is Critical and cannot be recorded as N/A.
+> Record each finding as **Pass**, **Fail**, or **N/A** with a reason. N/A is valid only when this change does not affect that finding's surface.
 
 **MR title / link:** _______________
 **Reviewer:** _______________
 **Date:** _______________
 
+### F4 — Function-level access control (HIGH, always-on)
+- [ ] `@PreAuthorize` on every new/changed admin or mutation endpoint
+- [ ] Server-side route/module enforcement
+- [ ] `permit-all` not enabled in lab/SIT/UAT/prod
+- [ ] Policy or entitlement errors deny the request
+- [ ] Test: restricted role → 403
+
+**Result:** Pass / Fail / N/A — reason and evidence: _______________
+
+### F8 — Object-level authorization (HIGH, always-on)
+- [ ] Every `{id}` path authorizes that instance for a same-role peer
+- [ ] Test: User A requests User B’s `{id}` → 403 or 404
+
+**Result:** Pass / Fail / N/A — reason and evidence: _______________
+
+### F9 — JWT validation (HIGH, always-on)
+- [ ] Algorithm allowlist; `iss`, `aud`, `exp`, `nbf` validated; blacklist fails closed
+- [ ] Test: disallowed `alg`, wrong audience, or expired token rejected
+
+**Result:** Pass / Fail / N/A — reason and evidence: _______________
+
+### F10 — Security audit events (MEDIUM, always-on)
+- [ ] Auth, denial, and admin or upload actions logged without a token or password
+
+**Result:** Pass / Fail / N/A — reason and evidence: _______________
+
 ### F1 — Unauthorized Account Access (HIGH)
-- [ ] Logout clears all client state
+- [ ] Access token in memory; refresh token in an HttpOnly cookie
+- [ ] Logout clears in-memory token, refresh cookie, and leftover client state
 - [ ] Identity bound to validated JWT `sub`
 - [ ] Server logout blacklists JWT + purges session + revokes IdP (SSO)
 - [ ] JWT blacklist fails closed
@@ -39,22 +67,15 @@
 **Result:** Pass / Fail / N/A — reason and evidence: _______________
 
 ### F3 — File Upload Validation (MEDIUM)
-- [ ] Server-side: size limit, content sniff, structure parse
+- [ ] Server-side: size limit, content sniff, structure parse, generated storage name
+- [ ] Decompression limit; production virus scan
 - [ ] Extension check supplemental
 - [ ] `@PreAuthorize` on upload endpoints
 
 **Result:** Pass / Fail / N/A — reason and evidence: _______________
 
-### F4 — Improper Access Control (MEDIUM)
-- [ ] `@PreAuthorize` on every new/changed admin or mutation endpoint
-- [ ] Server-side route/module enforcement
-- [ ] `permit-all` not enabled in lab/SIT/UAT/prod
-- [ ] Test: restricted role → 403
-
-**Result:** Pass / Fail / N/A — reason and evidence: _______________
-
 ### F5 — Exposed API Calls (LOW)
-- [ ] New client-visible endpoints have auth + authz
+- [ ] A visible URL is informational; missing authz is F4
 - [ ] No sensitive data in URL query strings
 - [ ] Rate limits on auth/admin paths
 
@@ -68,6 +89,7 @@
 ### F7 — Cookies Without HttpOnly (LOW)
 - [ ] New cookies: `httpOnly`, `secure` (prod), `sameSite`
 - [ ] No auth tokens via `document.cookie`
+- [ ] An auth or refresh cookie missing a flag blocks merge
 
 **Result:** Pass / Fail / N/A — reason and evidence: _______________
 

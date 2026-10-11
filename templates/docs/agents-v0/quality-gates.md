@@ -25,4 +25,4 @@ JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check, plus the OpenAP
 
 ## CVE policy
 
-No new high/critical CVEs without a documented exception. SBOM (CycloneDX/SPDX) when compliance requires (`security-baseline.mdc` §9).
+No new high/critical CVEs without a documented exception. Lockfiles are committed. Secret detection runs on the merge request. A service that ships produces an SBOM (CycloneDX/SPDX). A license policy is documented when compliance requires it (`security-baseline.mdc` §9).

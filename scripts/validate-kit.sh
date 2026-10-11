@@ -328,6 +328,19 @@ for doc in compliance-matrix.md model-routing-matrix.md user-guide.md agents-v0-
   tpl="templates/docs/agents-v0/$doc"
   [ -f "$tpl" ] || err "$tpl missing (install.sh will not seed docs/agents-v0/$doc)"
 done
+# Rules cite these paths. Seed them on install. Refresh the kit-owned copies on --update.
+# quality-gates.md and gold-standards.md stay if the target already filled them.
+for doc in security-standards.md security/vapt-prevention-guardrails.md security/vapt-pr-checklist.md quality-gates.md quality-quick-reference.md quality-gates-engineering-principles.md gold-standards.md; do
+  grep -Fq "docs/agents-v0/$doc" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$doc"
+done
+for doc in security-standards.md security/vapt-prevention-guardrails.md security/vapt-pr-checklist.md quality-quick-reference.md quality-gates-engineering-principles.md; do
+  awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq "docs/agents-v0/$doc" || err "install.sh --update does not refresh docs/agents-v0/$doc"
+done
+if grep -Fq 'docs/security-standards.md' core/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/security-standards.md"; fi
+if grep -Fq 'docs/quality-quick-reference.md' core/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/quality-quick-reference.md"; fi
+grep -Fq 'F4, F8, F9, F10' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit.md must describe the always-on VAPT gate"
+if grep -Fq 'Any applicable VAPT item left unchecked is Critical' templates/docs/agents-v0/agents-v0-kit.md; then err "agents-v0-kit.md still treats every unchecked VAPT item as Critical"; fi
+grep -Fq '## Applicable VAPT findings' templates/docs/agents-v0/design/system/threat-model.md || err "threat-model template must name the always-on VAPT findings"
 
 # 12. Compliance matrix contracts.
 grep -Fq '| Phase | Artifacts | Approver | Decision | Date |' core/skills/spec-intake/SKILL.md || err "spec-intake lacks the canonical Delivery approvals table format"

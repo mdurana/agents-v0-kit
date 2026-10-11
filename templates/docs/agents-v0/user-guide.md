@@ -194,7 +194,7 @@ You usually **do not** review code line by line. Trust this gate for “engineer
 | You should see           | What it means                                                            |
 | ------------------------ | ------------------------------------------------------------------------ |
 | Test results             | Automated tests passed; coverage targets met.                            |
-| Security (VAPT) review   | Checklist for common risks (logout, permissions, uploads, etc.).         |
+| Security (VAPT) review   | Always-on checks (function and object access, JWT, audit events) plus regression checks (logout, uploads, cookies, exposure). |
 | Code review notes        | **Critical** = must fix before release; **Suggestion** = nice to fix.    |
 | UX / accessibility check | Automated accessibility scan green; UX criteria tested (for UI changes). |
 
@@ -290,7 +290,7 @@ Make the portal better.
 | **Build**              | Write and wire the software.                                                                                      |
 | **Verify**             | Automated tests + security + review checklist.                                                                    |
 | **Release**            | Merge request, docs, and readiness to deploy.                                                                     |
-| **VAPT**               | Security review against a standard checklist (auth, permissions, data exposure, etc.).                            |
+| **VAPT**               | Security review. Always-on checks cover function access, object access, JWT validation, and audit events. Regression checks cover logout, uploads, cookies, and exposure. |
 | **BFF**                | A thin layer between screens and backend services — you rarely need to care unless integration is discussed.      |
 | **API / OpenAPI**      | A contract describing how systems exchange data — like a menu of allowed operations.                              |
 | **Merge request (MR)** | The packaged change engineers merge on GitLab after checks pass. |

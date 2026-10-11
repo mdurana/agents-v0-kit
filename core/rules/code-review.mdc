@@ -10,7 +10,7 @@ Use for PRs, diffs, or explicit review requests.
 ## Must verify
 
 - [ ] **Correctness:** happy path, edge cases, failure modes.
-- [ ] **Security:** parameterized SQL; XSS-safe rendering; log injection mitigated (`Encode.forJava` per `java-spring-backend.mdc`); no secrets in code/logs; safe path handling; CSRF/CORS/BOLA per `security-baseline.mdc` when touching auth, cookies, CORS, or resource IDs.
+- [ ] **Security:** parameterized SQL and sort/filter allowlists; XSS-safe rendering; log injection mitigated (`Encode.forJava` per `java-spring-backend.mdc`); no secrets in code/logs; safe path handling; CSRF/CORS/BOLA; JWT claim checks; audit events per `security-baseline.mdc` when touching auth, cookies, CORS, resource IDs, or outbound URLs.
 - [ ] **API/events:** boundary validation; DTOs not entities; idempotent event handling; HTTP semantics per `api-and-events.mdc`.
 - [ ] **Observability:** useful logs at state transitions and external calls; trace context (`traceparent` / OTel) propagated; no PII/secrets in logs.
 - [ ] **Complexity/coverage:** methods ≤30 lines, cognitive complexity ≤15 per `quality-and-testing.mdc`.
@@ -25,4 +25,4 @@ Use for PRs, diffs, or explicit review requests.
 
 ## References
 
-`docs/security-standards.md`, `docs/agents-v0/gold-standards.md`, `docs/quality-quick-reference.md`
+`docs/agents-v0/security-standards.md`, `docs/agents-v0/gold-standards.md`, `docs/agents-v0/quality-quick-reference.md`

@@ -27,9 +27,10 @@ You are the **frontend-engineer** for the Build phase of the delivery lifecycle 
 ## Rules you must satisfy
 - `frontend-web.mdc`: structure, `load`/server loads, `browser` guard, stores, Zod forms, user-visible errors on failed fetch.
 - `quality-and-testing.mdc`: red–green for non-trivial logic; frontend coverage ≥ 70% on changed code.
-- `vapt-webapp.mdc` F1: bind displayed user to validated session; clear **all** client state on logout; call backend logout + IdP sign-out for SSO.
+- `vapt-webapp.mdc` F1: access token in memory; refresh token in an HttpOnly cookie; clear leftover client state on logout; call backend logout + IdP sign-out for SSO.
 - `vapt-webapp.mdc` F2: no backend URLs/RBAC roles/permission keys in client bundles; no `PUBLIC_*`/`VITE_*` leaking internal config; `sourcemap: false` in prod.
 - `vapt-webapp.mdc` F4: enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.
+- `vapt-webapp.mdc` F8: server load or BFF authorizes another user’s `{id}` before render.
 - `vapt-webapp.mdc` F7: app-set cookies `httpOnly`, `secure` (prod), `sameSite`; no auth tokens via `document.cookie`.
 - `vapt-webapp.mdc` F3: client upload UI is supplemental; server validates content.
 - `frontend-web.mdc` (XSS): sanitize/avoid `innerHTML`/`{@html}`/`dangerouslySetInnerHTML`.

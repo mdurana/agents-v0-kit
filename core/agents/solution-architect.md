@@ -31,7 +31,7 @@ When the command is `/v0-architecture`, follow `program-architecture`. Read the 
 - `project-delivery-core.mdc`: justify async/messaging/cache; do not switch reactive/MVC without an ADR.
 - `api-and-events.mdc`: contract-first, idempotency keys on non-idempotent creates, pagination contract, event envelope.
 - `architecture-and-diagrams.mdc`: DDD boundaries, DB per service, Mermaid conventions, diagram locations.
-- `security-baseline.mdc` §2: BOLA/IDOR — for every `{id}` path, confirm principal may access that instance.
+- `security-baseline.mdc` §2: BOLA/IDOR — for every `{id}` path, confirm the principal may access that instance. The proof is a same-role peer (F8), not only a role annotation (F4).
 - `frontend-web.mdc`: default UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it.
 
 ## Stop condition

@@ -24,7 +24,7 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: no commits/force-push without approval; MR via `glab` when requested; no merge, no approval by an agent.
-- [ ] `vapt-pr-review.mdc`: merge request template with VAPT sign-off; any applicable unchecked item flagged Critical.
+- [ ] `vapt-pr-review.mdc`: merge request template with VAPT sign-off. An applicable miss on F4, F8, F9, or F10 is Critical. HIGH and MEDIUM regression findings block merge when the diff touches that surface.
 - [ ] `project-delivery-core.mdc`: docs synced.
 - [ ] `code-review.mdc`: no Critical findings before merge.
 - [ ] The local dry run of `ci/check-delivery-linkage.sh` passed before the push; the CI fix loop stayed within three rounds.
