@@ -74,7 +74,7 @@ has "mr body: VAPT rows are copied verbatim" "$tmp/body.md" "| F4 | pass | Order
 has "mr body: a report's commit stamp is listed" "$tmp/body.md" "bbbbbbb2222222"
 has "mr body: a missing report is marked MISSING" "$tmp/body.md" "MISSING"
 has "mr body: coverage lines come from the test report" "$tmp/body.md" "Line coverage 91%"
-has "mr body: the reviewer's checkboxes stay unticked" "$tmp/body.md" "- [ ] Logout clears all client state"
+has "mr body: the reviewer's checkboxes stay unticked" "$tmp/body.md" "- [ ] Logout clears in-memory token, refresh cookie, and leftover client state"
 lacks "mr body: the placeholder path is gone" "$tmp/body.md" "<feature>.md"
 
 cat > "$r/docs/agents-v0/maintain/fix-1/note.md" <<'EOF'

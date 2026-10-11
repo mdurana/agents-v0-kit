@@ -252,6 +252,13 @@ docs/agents-v0/benchmark/reference-project.md
   fi
   chmod +x "$t/.agents-v0/ci/"*.sh 2>/dev/null || true
   chmod +x "$t/.agents-v0/scripts/"*.sh 2>/dev/null || true
+  # A filled threat model is not replaced. An older copy gains the VAPT table.
+  dest="$t/docs/agents-v0/design/system/threat-model.md"
+  src="$KIT/templates/docs/agents-v0/design/system/threat-model.md"
+  if [ -f "$dest" ] && ! grep -Fq '## Applicable VAPT findings' "$dest"; then
+    printf '\n' >> "$dest"
+    awk 'BEGIN{p=0} /^## Applicable VAPT findings/{p=1} p{print}' "$src" >> "$dest"
+  fi
 }
 
 while [ $# -gt 0 ]; do

@@ -341,6 +341,10 @@ if grep -Fq 'docs/quality-quick-reference.md' core/rules/*.mdc templates/docs/ag
 grep -Fq 'F4, F8, F9, F10' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit.md must describe the always-on VAPT gate"
 if grep -Fq 'Any applicable VAPT item left unchecked is Critical' templates/docs/agents-v0/agents-v0-kit.md; then err "agents-v0-kit.md still treats every unchecked VAPT item as Critical"; fi
 grep -Fq '## Applicable VAPT findings' templates/docs/agents-v0/design/system/threat-model.md || err "threat-model template must name the always-on VAPT findings"
+grep -Fq '("docs/security-standards.md", "docs/agents-v0/security-standards.md")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/security-standards.md"
+grep -Fq '("docs/quality-quick-reference.md", "docs/agents-v0/quality-quick-reference.md")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/quality-quick-reference.md"
+grep -Fq '## Applicable VAPT findings' scripts/install.sh || err "install.sh must add the VAPT section to an existing threat model"
+if awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq 'threat-model.md'; then err "install.sh --update must not overwrite threat-model.md"; fi
 
 # 12. Compliance matrix contracts.
 grep -Fq '| Phase | Artifacts | Approver | Decision | Date |' core/skills/spec-intake/SKILL.md || err "spec-intake lacks the canonical Delivery approvals table format"
