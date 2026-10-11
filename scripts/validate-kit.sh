@@ -680,13 +680,15 @@ fi
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/backend/pom.xml' || err "app archive missing app/backend/pom.xml"
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/frontend/package.json' || err "app archive missing app/frontend/package.json"
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'docker-compose.yml' || err "app archive missing docker-compose.yml"
+grep -A2 'jacoco-maven-plugin' templates/app/backend/pom.xml templates/maven/quality-plugins.xml | grep -Eq '<version>0\.8\.(1[4-9]|[2-9][0-9])</version>' || err "JaCoCo must be 0.8.14 or newer (first release with official Java 25 support)"
+grep -A2 'archunit-junit5' templates/app/backend/pom.xml | grep -Eq '<version>1\.(4\.[1-9]|[5-9]\.[0-9]+)</version>' || err "ArchUnit must be 1.4.1 or newer (first release that reads Java 25 class files)"
 sh scripts/test-app-template.sh || err "scripts/test-app-template.sh failed"
 
-# Always-on context budget: the rules every session loads must not creep past this size.
-# 36000 covers the roadmap entry, the material ARC line, and the export/deck exception.
-# Procedure stays in the commands and skills.
-always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc AGENTS.md | wc -c | tr -d ' ')"
-[ "$always_on_bytes" -le 36000 ] || err "always-on rules are $always_on_bytes bytes (limit 36000): move detail into a command, agent, or skill"
+# Always-on context budget: the rules every session loads in a target repo must not creep past
+# this size. Only the three installed always-on rules count. AGENTS.md is the kit repo's own
+# summary and install.sh does not copy it. Procedure stays in the commands and skills.
+always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc | wc -c | tr -d ' ')"
+[ "$always_on_bytes" -le 32000 ] || err "always-on rules are $always_on_bytes bytes (limit 32000): move detail into a command, agent, or skill"
 for ci_script in check-gate-metrics.sh check-event-schemas.sh; do
   grep -Fq ".agents-v0/ci/$ci_script" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$ci_script"
 done

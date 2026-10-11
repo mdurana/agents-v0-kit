@@ -10,7 +10,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| Canonical stack (Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.0 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`) | A backend-engineer, frontend-engineer; S implement-spring-service, implement-frontend; G Build gate |
+| Canonical stack (Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`) | A backend-engineer, frontend-engineer; S implement-spring-service, implement-frontend; G Build gate |
 | P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service; G validate-kit + test-app-template |
 | Frontend default: React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI ci/resolve-layout.sh |
@@ -118,7 +118,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Loading, error, and empty states; no silent fetch failures | A frontend-engineer; S implement-frontend; G Build gate |
 | No secrets in `localStorage` | A frontend-engineer; S implement-frontend; R security-baseline §4 |
 | Forms: Zod plus the project form library | A frontend-engineer; S implement-frontend |
-| Intel Mac host Node: Vite 7 needs Node 20.19+ or 22.12+ and npm; a missing Node or npm is MacPorts `nodejs22` and `npm11` via `sh .agents-v0/scripts/host-tools-macports.sh` | C /v0-build, /v0-maintain; R frontend-web; `docs/agents-v0/gold-standards.md` |
+| Intel Mac host Node: the kit targets Node 22 (22.12+ for Vite 7) and npm; a missing Node or npm is MacPorts `nodejs22` and `npm11` via `sh .agents-v0/scripts/host-tools-macports.sh` | C /v0-build, /v0-maintain; R frontend-web; `docs/agents-v0/gold-standards.md` |
 
 ## ux-design.mdc (local rule)
 
@@ -287,7 +287,8 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Release or verify approval bound to a human GitLab approver named on either row | CI ci/check-approver-gitlab.sh from the default branch (manual `.gitlab-ci.yml` job `delivery-approval`; `GITLAB_TOKEN` is `read_api` and scoped to that job's environment) |
 | Evidence `commit:` + staleness vs PR head | CI ci/check-evidence.sh |
 | Build failures cannot be masked by log piping | CI `.gitlab-ci.yml` (`set -o pipefail` in build/verify job scripts) |
-| Brownfield test failure budget | CI ci/check-known-failures.sh; docs/agents-v0/project-profile.md |
+| Brownfield test failure budget: after a failed verify only test failures inside the `known_failures` budget are excused, never a compile or plugin error | CI ci/check-known-failures.sh (`--require-failures`), ci/check-gate-metrics.sh; `.gitlab-ci.yml` build job; docs/agents-v0/project-profile.md |
+| Kit scripts named in `.gitlab-ci.yml` resolve under `.agents-v0/`; the CI file parses; JaCoCo, ArchUnit, and Node minimums hold | scripts/validate-kit.sh |
 | Brownfield coverage ratchet | R quality-and-testing; CI ci/check-coverage-ratchet.sh; docs/agents-v0/project-profile.md `coverage_ratchet` |
 | Secret scan | CI `.gitlab-ci.yml` (`Security/Secret-Detection.gitlab-ci.yml` include) |
 | Delivery and hook metrics (approved gates, failed attempts, blocked features per feature) | scripts/delivery-metrics.sh |

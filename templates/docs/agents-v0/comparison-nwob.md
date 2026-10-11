@@ -125,7 +125,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | Topic | agents-v0 | NWOB |
 |-------|-----------|------|
 | **Backend default** | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway | Java (modern); neutral in `constitution-custom.mdc` |
-| **Tests** | JUnit via `spring-boot-starter-test`, ArchUnit 1.4.0, H2 in test profile, Vitest 3 | Project-specific |
+| **Tests** | JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test profile, Vitest 3 | Project-specific |
 | **Local run** | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | Project-specific |
 | **Database** | PostgreSQL 15, Flyway | PostgreSQL, Liquibase |
 | **Messaging** | Kafka/Rabbit/SCS when justified | Kafka + idempotency + DLQ |
@@ -152,7 +152,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | **Multi-service** | Service roots, per-service OpenAPI, `workspace.manifest.json` | `repositories/` + `service-map.md` |
 | **Air-gap** | `CI_IMAGE_PREFIX` mirrors | Not addressed |
 | **IDE** | Cursor | Cursor primary; AGENTS.md mentions Claude Code, Copilot |
-| **Context discipline** | Always-on rules and `AGENTS.md` capped 36 KB | SKILL.md <500 lines; progressive disclosure |
+| **Context discipline** | Always-on rules capped 32 KB | SKILL.md <500 lines; progressive disclosure |
 
 ---
 

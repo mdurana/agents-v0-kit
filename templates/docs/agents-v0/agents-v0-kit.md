@@ -254,7 +254,7 @@ Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, ha
 
 ## Rules and skills
 
-Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size with `AGENTS.md` is capped at 36 KB (`scripts/validate-kit.sh`). The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
+Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB (`scripts/validate-kit.sh`). `AGENTS.md` is the kit repository's own summary and is not installed. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
 
 Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
 

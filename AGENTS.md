@@ -1,6 +1,6 @@
 # Agentic Delivery Workflow (agents-v0)
 
-Delivery kit for **Cursor**. Always-on instructions live in `.cursor/rules/` after `scripts/install.sh`; this file summarizes the lifecycle for the kit repository and optional reference in target repos.
+Delivery kit for **Cursor**. Always-on instructions live in `.cursor/rules/` after `scripts/install.sh`; this file summarizes the lifecycle for the kit repository and is not installed into target repos.
 
 ## Mission
 

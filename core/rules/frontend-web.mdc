@@ -71,7 +71,7 @@ Use only when the repo already ships SvelteKit. Paths under the same UI root.
 
 ## Host Node (Intel Mac)
 
-Vite 7 needs Node 20.19+ or 22.12+, plus npm. On Intel macOS, install a missing Node or npm with MacPorts (`nodejs22`, `npm11`) via `sh .agents-v0/scripts/host-tools-macports.sh`.
+The kit targets Node 22 (22.12+ for Vite 7; CI and the Dockerfile starters use 22, and 20.x is end-of-life), plus npm. On Intel macOS, install a missing Node or npm with MacPorts (`nodejs22`, `npm11`) via `sh .agents-v0/scripts/host-tools-macports.sh`.
 
 ## Globs note
 

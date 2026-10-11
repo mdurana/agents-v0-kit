@@ -6,7 +6,7 @@
 
 On Intel macOS (`uname -m` is `x86_64`), missing host tools are installed with MacPorts. Apple Silicon, Linux, and CI images keep their existing toolchain.
 
-The machine that runs `./mvnw` and `npm` needs JDK 21, Node 20.19+ or 22.12+, npm, and PyYAML (`python3 -c 'import yaml'`). Maven is the wrapper `./mvnw`. Docker and Podman are applications, not MacPorts ports.
+The machine that runs `./mvnw` and `npm` needs JDK 21, Node 22 (22.12+; CI and the Dockerfile starters use 22, and 20.19+ still builds Vite 7 but is end-of-life), npm, and PyYAML (`python3 -c 'import yaml'`). Maven is the wrapper `./mvnw`. Docker and Podman are applications, not MacPorts ports.
 
 ```bash
 sh .agents-v0/scripts/host-tools-macports.sh

@@ -11,7 +11,7 @@
 | Security | <!-- Spring Security --> |
 | Frontend | <!-- React 19, TypeScript 5.9, Vite 7 --> |
 | Database | <!-- PostgreSQL 15, Flyway --> |
-| Tests | <!-- JUnit (spring-boot-starter-test), ArchUnit 1.4.0, H2 test profile, Vitest 3 --> |
+| Tests | <!-- JUnit (spring-boot-starter-test), ArchUnit 1.4.2, H2 test profile, Vitest 3 --> |
 | Local run | <!-- Compose API :8080, UI :8081, postgres:15-alpine --> |
 
 ## Commands

@@ -5,7 +5,7 @@
 
 ## Finding
 
-`workflow-orchestration.mdc` (~22 KB) dominates always-on load (~36 KB with the other always-on files). Trimming it further is the largest *theoretical* per-turn saving, but it is also the highest **accuracy risk**: gate order, never-infer-approval, Material/ARC, attempt budget, design locks, and parallel-feature stops must remain visible even when no phase command is open (`/v0-status`, freeform chat, mid-resume).
+`workflow-orchestration.mdc` (~22 KB) dominates always-on load (~31 KB with the other two always-on rules). Trimming it further is the largest *theoretical* per-turn saving, but it is also the highest **accuracy risk**: gate order, never-infer-approval, Material/ARC, attempt budget, design locks, and parallel-feature stops must remain visible even when no phase command is open (`/v0-status`, freeform chat, mid-resume).
 
 ## Recommendation
 
@@ -17,7 +17,7 @@
 
 ## Revisit when
 
-1. Always-on is over the 36000-byte validate-kit budget again, **and**
+1. Always-on is over the 32000-byte validate-kit budget again, **and**
 2. `validate-kit.sh` asserts a fixed invariant list still present in `workflow-orchestration.mdc` (approval never inferred; attempt budget; failure-brief; story-size; Material/ARC; design lock), **and**
 3. A dry-run `/v0-status` + freeform “continue the feature” session still stops correctly without re-invoking the phase command.
 

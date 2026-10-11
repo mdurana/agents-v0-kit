@@ -131,7 +131,7 @@ if [ "$need_java" -eq 1 ]; then
   printf '  JDK 21 (MacPorts openjdk21). For kit builds set JAVA_HOME from /usr/libexec/java_home -v 21\n'
 fi
 if [ "$need_node" -eq 1 ]; then
-  printf '  Node 20.19+ or 22.12+ (MacPorts nodejs22)\n'
+  printf '  Node 22.12+ (MacPorts nodejs22; CI and the Dockerfile starters use Node 22)\n'
 fi
 if [ "$need_npm" -eq 1 ]; then
   printf '  npm (MacPorts npm11)\n'

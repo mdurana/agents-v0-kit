@@ -51,7 +51,7 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 | Area | Mandatory |
 |------|-----------|
-| Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.0, H2 in test |
+| Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test |
 | Layers | Controllers (`@Valid`, DTOs) → Service → Repository → Domain |
 | Domain | Value objects; aggregates; domain events; repository ports in domain |
 | Security | JWT, SecurityContext, MDC correlation; permit `/health`, `/actuator`, `/v3/api-docs`, `/swagger-ui`; protect `/api/v1/**` |
