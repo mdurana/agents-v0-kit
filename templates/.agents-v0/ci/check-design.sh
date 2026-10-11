@@ -19,9 +19,10 @@
 # Accepted. Citing a superseded ADR fails: point at the successor. Every AC whose requirements block
 # says Kind: negative or Kind: edge is named in Failure modes.
 # Lock: the pin is the design as the person approved it, including the cited ADR. After that, a
-# change to the design or that ADR is an amendment: docs/agents-v0/design/<feature>/amendments.md
-# needs an Approved row naming the first 12 characters of the new hash, and a new pin line. A changed
-# decision supersedes the ADR (ci/check-adr.sh) instead of rewriting it. Pin only after the person approved.
+# change to the design or that ADR is an amendment: run design-reviewer so review.md names the new
+# hash and has no open Critical, then docs/agents-v0/design/<feature>/amendments.md needs an Approved
+# row naming the first 12 characters of that hash, then a new pin line. A changed decision supersedes
+# the ADR (ci/check-adr.sh) instead of rewriting it. Pin only after that review and the person's approval.
 
 set -eu
 
@@ -261,7 +262,8 @@ def verify_lock():
     last = lines[-1].split()
     if len(last) < 2 or last[1] != now:
         fail(f"the design changed since the last pin ({last[1][:12] if len(last) > 1 else '?'} -> {now[:12]}): "
-             f"write an amendment in {base}/amendments.md, get it approved, then pin")
+             f"run design-reviewer so {base}/review.md names {now[:12]} and has no open Critical, "
+             f"add an Approved row in {base}/amendments.md, then pin")
     amendments = read(os.path.join(base, "amendments.md")) or ""
     for line in lines[1:]:
         parts = line.split()

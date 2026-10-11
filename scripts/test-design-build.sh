@@ -277,6 +277,7 @@ run pass "design: restoring the accepted ADR matches the lock" "$d" sh "$CI/chec
 printf 'Also the order list is paged.\n' >> "$d/docs/agents-v0/design/orders/design.md"
 sedi 's/^## Rollout/## Rollout\nPaged list./' "$d/docs/agents-v0/design/orders/design.md"
 run fail "design: a change after the pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+if grep -Fq 'run design-reviewer' "$tmp/out.txt"; then pass "design: a drifted lock says to review before the pin"; else fail "design: a drifted lock says to review before the pin"; fi
 h2="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 printf '| # | Date | Change | Reason | Impacted | Approver | Decision | Hash |\n|---|---|---|---|---|---|---|---|\n| 1 | 2026-01-02 | paged list | consumer asked | AC-2 | dev | Approved | %s |\n' "$(printf '%s' "$h2" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/amendments.md"

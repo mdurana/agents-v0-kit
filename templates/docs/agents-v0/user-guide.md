@@ -80,7 +80,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 
 | What you see | What you do |
 |--------------|-------------|
-| The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved and fills in what is missing. |
+| The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved. A second design run reviews that saved design. A second verify run reuses the test report when the code has not changed, and repeats the checks when it has. |
 | The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
 | You did not name a feature | The AI lists the open features and asks which one you mean. |
 
@@ -145,7 +145,7 @@ This stop applies when the story adds an API, screens, or a public route, and wh
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
-| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops and asks you to approve an amendment. |
+| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops, reviews the changed design, and asks you to approve an amendment before it locks the new version. |
 | ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). Once you accept it, a later change adds a new record and leaves the old one in place. A story with no product decision records that none was needed. |
 | UI stack (if new screens) | Default is **React 19, TypeScript 5.9, Vite 7**. SvelteKit only when the repo already uses it. |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
@@ -199,7 +199,7 @@ You usually **do not** review code line by line. Trust this gate for “engineer
 | UX / accessibility check | Automated accessibility scan green; UX criteria tested (for UI changes). |
 
 
-Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone.
+Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone. If the code changed after you had already approved verify, that approval is reopened until you approve the new run. A re-run on the same code reuses the test report.
 
 **You might say:**  
 

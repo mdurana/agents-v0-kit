@@ -603,7 +603,16 @@ for design_file in templates/docs/agents-v0/design/_design.template.md templates
   grep -Fq "$rel" scripts/install.sh || err "install.sh does not seed $rel"
 done
 grep -Fq 'design-reviewer' core/commands/v0-design.md || err "/v0-design must launch the design-reviewer"
+grep -Fq 'skip steps 1-5' core/commands/v0-design.md || err "/v0-design re-entry must review an existing design without redrafting it"
 grep -Fq 'Amending an approved design' core/commands/v0-design.md || err "/v0-design must define the design amendment path"
+grep -Fq 'design as it stands' templates/docs/agents-v0/design/_amendments.template.md || err "amendment template must review the design before the pin"
+grep -Fq 'design as it stands' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must review an amendment before the pin"
+grep -Fq 'reviews that saved design' templates/docs/agents-v0/user-guide.md || err "user guide must say a second design run reviews the saved design"
+grep -Fq 'run design-reviewer so' templates/.agents-v0/ci/check-design.sh || err "a drifted design lock must say to review before the pin"
+if grep -Fq 'changed parts' templates/docs/agents-v0/design/_amendments.template.md; then err "amendment template must not review only the changed parts"; fi
+if grep -Fq 'get it approved, then pin' templates/.agents-v0/ci/check-design.sh; then err "a drifted design lock must not skip the review"; fi
+grep -Fq 'set an Approved Verify row to Re-opened' templates/.agents-v0/ci/check-evidence.sh || err "stale verify evidence must say to reopen the Verify row"
+if grep -Fq 're-run phase and refresh' templates/.agents-v0/ci/check-evidence.sh; then err "stale evidence must not tell the agent to refresh the stamp"; fi
 grep -Fq 'check-design.sh' core/commands/v0-design.md || err "/v0-design gate must run check-design.sh"
 grep -Fq 'check-openapi.sh' core/commands/v0-design.md || err "/v0-design gate must run check-openapi.sh"
 grep -Fq 'verify-lock' core/commands/v0-build.md || err "/v0-build must verify the design lock"
@@ -662,6 +671,8 @@ grep -Fq 'GitLab username' core/commands/v0-maintain.md || err "/v0-maintain mus
 grep -Fq 'docs/agents-v0/maintain/*/state.json' core/commands/v0-status.md || err "/v0-status must read maintenance state files"
 grep -Fq 'check-design.sh' core/commands/v0-status.md || err "/v0-status must report a drifted design lock"
 grep -Fq 'check-gate-metrics.sh' core/commands/v0-verify.md || err "/v0-verify must run the machine checks CI runs"
+grep -Fq 'write only a missing' core/commands/v0-verify.md || err "/v0-verify re-entry must keep a same-commit test report and fill only a missing reviewer report"
+grep -Fq 'set its Decision to `Re-opened` before the re-run' core/commands/v0-verify.md || err "/v0-verify must reopen an Approved row when the verified commit moved"
 grep -Fq 'Service root:' core/commands/v0-intake.md || err "/v0-intake gate must record Service root for a multi-service repo"
 grep -Fq 'Dependency column' core/commands/v0-intake.md || err "/v0-intake must check milestone story order"
 for cmd in onboard plan; do

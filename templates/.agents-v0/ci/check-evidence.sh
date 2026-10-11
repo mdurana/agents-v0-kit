@@ -70,7 +70,17 @@ check_path() {
           if [ -n "$rep_commit" ] && git cat-file -e "${rep_commit}^{commit}" 2>/dev/null; then
             stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|.*\.(md|mdc|txt|adoc)$)' || true)"
             if [ -n "$stale" ]; then
-              printf 'FAIL: non-doc files changed since evidence commit %s — re-run phase and refresh %s\n' "$rep_commit" "$p" >&2
+              case "$phase" in
+                verify)
+                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-verify; set an Approved Verify row to Re-opened, then stamp %s on the new SHA\n' "$rep_commit" "$p" >&2
+                  ;;
+                build)
+                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-build before using %s\n' "$rep_commit" "$p" >&2
+                  ;;
+                *)
+                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run that phase before using %s\n' "$rep_commit" "$p" >&2
+                  ;;
+              esac
               missing=1
             fi
           fi
