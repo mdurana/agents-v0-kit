@@ -105,6 +105,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-spring-service; G Build gate |
 | Lombok: no `@AllArgsConstructor`, `@ToString`, or `@EqualsAndHashCode` on entities with lazy collections | A backend-engineer, code-reviewer; S implement-spring-service, pr-review |
 | Records and MapStruct only when the repo already uses them | A backend-engineer; S implement-spring-service |
+| Intel Mac host JDK: a missing Java 21 is MacPorts `openjdk21` via `sh .agents-v0/scripts/host-tools-macports.sh`; kit builds set `JAVA_HOME` from `/usr/libexec/java_home -v 21`; Maven is `./mvnw` | C /v0-build, /v0-maintain; R java-spring-backend; `docs/agents-v0/gold-standards.md` |
 
 ## frontend-web.mdc
 
@@ -117,6 +118,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Loading, error, and empty states; no silent fetch failures | A frontend-engineer; S implement-frontend; G Build gate |
 | No secrets in `localStorage` | A frontend-engineer; S implement-frontend; R security-baseline §4 |
 | Forms: Zod plus the project form library | A frontend-engineer; S implement-frontend |
+| Intel Mac host Node: Vite 7 needs Node 20.19+ or 22.12+ and npm; a missing Node or npm is MacPorts `nodejs22` and `npm11` via `sh .agents-v0/scripts/host-tools-macports.sh` | C /v0-build, /v0-maintain; R frontend-web; `docs/agents-v0/gold-standards.md` |
 
 ## ux-design.mdc (local rule)
 
@@ -160,7 +162,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Tests cover happy, error, and edge paths, including every exception handler that changes behavior | A test-engineer; S quality-gate; G Verify gate |
 | Skip tests only when the user explicitly requests no tests | A test-engineer, backend/bff/frontend-engineer; S quality-gate, implement-*; R ai-agent-conduct |
 | Red–green-refactor (TDD where practical), front-loaded into Build | R workflow-orchestration; A backend/bff/frontend-engineer, test-engineer; S implement-*, quality-gate; G Build/Verify gate |
-| `mvn -B clean verify` before merge with the quality gate wired (coverage/static/CVE) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; C /v0-build; G Build/Verify gate |
+| `./mvnw -B clean verify` before merge with the quality gate wired (coverage/static/CVE) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; C /v0-build; G Build/Verify gate |
 
 ## architecture-and-diagrams.mdc
 
@@ -189,7 +191,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Critical findings route back | C /v0-verify, /v0-deliver; G Verify gate |
 | Gate decisions, approver, date, and evidence recorded in the existing handoff artifact | C all phase commands; R workflow-orchestration; CI ci/check-approvals.sh, ci/check-evidence.sh |
 | Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /v0-release, /v0-deliver; A release-manager; S release-pr; R workflow-orchestration |
-| Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs full `mvn -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
+| Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs full `./mvnw -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
 | Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /v0-build; S implement-spring-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-* |

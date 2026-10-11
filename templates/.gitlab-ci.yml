@@ -88,6 +88,21 @@ build:
       sh .agents-v0/ci/check-layout-roots.sh
       mkdir -p ci-artifacts
       : > ci-artifacts/verify.log
+      # A failing verify fails the job. The one exception is a run whose log shows only test
+      # failures, within the known_failures budget in docs/agents-v0/project-profile.md
+      # (check-known-failures.sh --require-failures). A compile or plugin error is never excused.
+      run_verify() {
+        run_log="$(mktemp)"
+        rc_file="$(mktemp)"
+        { set +e; "$@" 2>&1; echo "$?" > "$rc_file"; } | tee "$run_log"
+        cat "$run_log" >> "$repo/ci-artifacts/verify.log"
+        rc="$(cat "$rc_file")"
+        rm -f "$rc_file"
+        if [ "$rc" != "0" ]; then
+          (cd "$repo" && sh .agents-v0/ci/check-known-failures.sh --require-failures "$run_log") || exit 1
+        fi
+        rm -f "$run_log"
+      }
       verify_maven() {
         root="$1"
         [ -n "$root" ] || return 0
@@ -97,16 +112,15 @@ build:
         fi
         cd "$repo/$root"
         if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
-        $MVN -B clean verify 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
+        run_verify "$MVN" -B clean verify
         if grep -q '<id>ci-security</id>' pom.xml; then
-          $MVN -B verify -Pci-security 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
+          run_verify "$MVN" -B verify -Pci-security
         fi
         cd "$repo"
       }
       verify_maven "${BACKEND_ROOT:-}"
       verify_maven "${BFF_ROOT:-}"
       for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
-      if [ -f ci/check-known-failures.sh ]; then sh .agents-v0/ci/check-known-failures.sh ci-artifacts/verify.log; fi
   artifacts:
     when: always
     paths:
@@ -151,7 +165,7 @@ gate-metrics:
       repo="$(pwd)"
       eval "$(sh .agents-v0/ci/resolve-layout.sh)"
       sh .agents-v0/ci/check-layout-roots.sh
-      gate="ci/check-gate-metrics.sh"
+      gate=".agents-v0/ci/check-gate-metrics.sh"
       if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
         git fetch origin "$CI_DEFAULT_BRANCH"
         export DIFF_BASE="origin/$CI_DEFAULT_BRANCH"
@@ -161,7 +175,7 @@ gate-metrics:
           git show "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
           gate="${trusted}/check-gate-metrics.sh"
         else
-          printf 'WARN: using the merge request copy of ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
+          printf 'WARN: using the merge request copy of .agents-v0/ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
         fi
       fi
       for root in ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
@@ -184,14 +198,14 @@ event-schema-compat:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
-        - ci/check-event-schemas.sh
+        - .agents-v0/ci/check-event-schemas.sh
   before_script:
     - apk add --no-cache git python3
   script:
     - |
       set -eu
       git fetch origin "$CI_DEFAULT_BRANCH"
-      check="ci/check-event-schemas.sh"
+      check=".agents-v0/ci/check-event-schemas.sh"
       # Run the check from the default branch so a merge request cannot rewrite its own check.
       if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-event-schemas.sh" 2>/dev/null; then
         trusted="$(mktemp -d)"
@@ -204,11 +218,11 @@ event-schema-compat:
 # merge request cannot rewrite the checks that judge it.
 .trusted-ci: &trusted_ci |
   git fetch origin "$CI_DEFAULT_BRANCH"
-  CI_DIR=ci
+  CI_DIR=.agents-v0/ci
   if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
     rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci
     git archive FETCH_HEAD .agents-v0/ci | tar -x -C /tmp/trusted-ci
-    CI_DIR=/tmp/trusted-ci/ci
+    CI_DIR=/tmp/trusted-ci/.agents-v0/ci
   else
     printf 'WARN: using the merge request copy of ci/ scripts; they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
   fi
@@ -319,7 +333,7 @@ perf:
 
 frontend:
   stage: test
-  image: ${CI_IMAGE_PREFIX}node:20-bookworm
+  image: ${CI_IMAGE_PREFIX}node:22-bookworm
   variables:
     npm_config_cache: "$CI_PROJECT_DIR/.npm"
   cache:

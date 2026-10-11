@@ -147,6 +147,7 @@ install_templates() {
 .agents-v0/scripts/verify-gitlab-ci-prereqs.sh
 .agents-v0/scripts/export-audit-pack.sh
 .agents-v0/scripts/update-agents-model.sh
+.agents-v0/scripts/host-tools-macports.sh
 .agents-v0/hooks/pre-push
 docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
@@ -207,7 +208,7 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
-        .agents-v0/scripts/update-agents-model.sh; do
+        .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
@@ -262,7 +263,7 @@ TARGET_ABS="$(cd "$TARGET" && pwd)"
 
 require_pyyaml() {
   python3 -c 'import yaml' >/dev/null 2>&1 || {
-    printf 'error: PyYAML is required for OpenAPI checks. Install it with: pip install pyyaml   or: apk add py3-yaml\n' >&2
+    printf 'error: PyYAML is required for OpenAPI checks. Install it with: python3 -m pip install pyyaml   or: apk add py3-yaml   or on Intel macOS: sh templates/.agents-v0/scripts/host-tools-macports.sh --install\n' >&2
     exit 1
   }
 }

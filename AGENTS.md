@@ -31,7 +31,7 @@ Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and 
 - Approval decisions go in the existing handoff artifact's `Delivery approvals` table (canonical 5-column format: Phase, Artifacts, Approver, Decision, Date).
 - Merge-request readiness is intermediate: completion is a human-authorized merge with CI green. On GitLab, after the merge request is approved, run the manual `delivery-approval` job. Commits, pushes, and merge-request creation each need their own authorization.
 - Smallest correct diff; no drive-by refactors; no unsolicited files.
-- Build gate: code compiles; `mvn clean verify` or the frontend build passes.
+- Build gate: code compiles; `./mvnw -B clean verify` from the backend root, or the frontend build, passes.
 - No secrets in code, logs, or client bundles; sanitize log values; never dump environment variables.
 
 ## Rule precedence

@@ -1,6 +1,6 @@
 ---
 name: quality-gate
-description: Verify phase playbook. Run mvn -B clean verify / frontend tests, check coverage and CVEs, write AAA tests.
+description: Verify phase playbook. Run ./mvnw -B clean verify / frontend tests, check coverage and CVEs, write AAA tests.
 ---
 
 # quality-gate
@@ -13,7 +13,7 @@ Verify phase playbook for the `test-engineer` agent (`workflow-orchestration.mdc
 3. Cover happy, error, and edge paths; every `@ExceptionHandler`/catch that changes behavior.
 4. Use Testcontainers for integration (API+DB+messaging) and Pact for BFF↔service contracts where the repo already depends on them.
 5. When a single-file unit test or mock data should be drafted by `schema-author`, write `docs/agents-v0/verify/<feature>/helper-brief.md` (`helper: schema-author`) and return. Do not launch the helper (`workflow-orchestration.mdc` Helper agents).
-6. When `git rev-parse HEAD` equals the `commit:` line in `docs/agents-v0/build/<feature>/build-report.md` and this phase is not adding or changing tests, quote that build run. Do not run the full verify command again. Still run `ci/check-gate-metrics.sh` with both `DIFF_BASE` (the ref from `sh .agents-v0/scripts/resolve-integration-branch.sh`) and `REQUIRE_CVE_REPORT=1`, and run OWASP Dependency-Check. If this phase adds or changes tests, run the full `mvn -B clean verify` (Java) or the full frontend verify command from `docs/agents-v0/project-profile.md` once on the new commit. This is the gate command, not the fast red–green loop.
+6. When `git rev-parse HEAD` equals the `commit:` line in `docs/agents-v0/build/<feature>/build-report.md` and this phase is not adding or changing tests, quote that build run. Do not run the full verify command again. Still run `ci/check-gate-metrics.sh` with both `DIFF_BASE` (the ref from `sh .agents-v0/scripts/resolve-integration-branch.sh`) and `REQUIRE_CVE_REPORT=1`, and run OWASP Dependency-Check. If this phase adds or changes tests, run the full `./mvnw -B clean verify` (Java) or the full frontend verify command from `docs/agents-v0/project-profile.md` once on the new commit. This is the gate command, not the fast red–green loop.
 7. Generate JaCoCo report for changed backend/frontend code; confirm coverage ≥ 80% backend / 70% frontend.
 8. Run OWASP Dependency-Check; confirm no new high/critical CVEs (document exceptions).
 9. Add the VAPT-required tests (User A logout → User B login; renamed wrong-type file → 400; restricted role → 403; idempotent consumer dedupe).

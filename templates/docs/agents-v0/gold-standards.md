@@ -2,10 +2,23 @@
 
 > Build, run, test, CI commands for this repo. (`project-delivery-core.mdc`)
 
+## Host tools (Intel Mac)
+
+On Intel macOS (`uname -m` is `x86_64`), missing host tools are installed with MacPorts. Apple Silicon, Linux, and CI images keep their existing toolchain.
+
+The machine that runs `./mvnw` and `npm` needs JDK 21, Node 20.19+ or 22.12+, npm, and PyYAML (`python3 -c 'import yaml'`). Maven is the wrapper `./mvnw`. Docker and Podman are applications, not MacPorts ports.
+
+```bash
+sh .agents-v0/scripts/host-tools-macports.sh
+sh .agents-v0/scripts/host-tools-macports.sh --install
+```
+
+`--install` needs approval. It runs `sudo port -N install` only for what is missing: `openjdk21`, `nodejs22`, `npm11`, and PyYAML (`python3 -m pip install pyyaml`, or `pyXY-yaml` when Python itself is from MacPorts). Put `/opt/local/bin` before other package managers on `PATH`. For kit builds, set `JAVA_HOME` from `/usr/libexec/java_home -v 21`. A later performance story that needs k6 uses `sudo port install k6`.
+
 ## Build
 
 ```bash
-mvn clean verify        # Java, from the backend root in docs/agents-v0/project-profile.md
+./mvnw -B clean verify  # from the backend root in docs/agents-v0/project-profile.md
 npm run build           # frontend (React default; SvelteKit when existing), from the UI root
 ```
 
@@ -14,8 +27,8 @@ Profile `service` uses `cd app/backend && ./mvnw -B clean verify` (or `cd app/bf
 ## Run
 
 ```bash
-mvn spring-boot:run    # or per service
-npm run dev            # frontend
+./mvnw spring-boot:run  # from the backend root, or per service
+npm run dev             # frontend
 ```
 
 ### Local container (Dockerfile + Compose)
@@ -49,8 +62,8 @@ Optional Postgres overlay (Spring Boot, `postgres:15-alpine`):
 ## Test
 
 ```bash
-mvn clean test jacoco:report   # Java + coverage -> target/site/jacoco/index.html
-npm test                      # frontend (Vitest)
+./mvnw -B clean test jacoco:report   # from the backend root; coverage -> target/site/jacoco/index.html
+npm test                             # frontend (Vitest)
 ```
 
 ## CI

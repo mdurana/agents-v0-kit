@@ -2,7 +2,7 @@
 
 > One-page summary. (`quality-and-testing.mdc`)
 
-- **Before merge:** `mvn clean verify` (Java) or `npm test` (frontend).
+- **Before merge:** `./mvnw -B clean verify` from the backend root (Java) or `npm test` (frontend). See `docs/agents-v0/gold-standards.md`.
 - **Coverage:** 80% backend / 70% frontend.
 - **Method:** ≤ 30 lines; cognitive complexity ≤ 15.
 - **Class:** < 300 lines.

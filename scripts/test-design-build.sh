@@ -2,7 +2,7 @@
 # test-design-build.sh — behavior tests for the Design and Build checks (no network).
 # Covers: ci/check-openapi.sh, ci/check-design.sh (checks, pin, lock, amendments),
 # ci/check-ux-spec.sh, ci/check-build-plan.sh, ci/check-endpoint-auth.sh, ci/check-frontend-calls.sh.
-# Run by validate-kit.sh. Needs git, python3, and PyYAML (pip install pyyaml).
+# Run by validate-kit.sh. Needs git, python3, and PyYAML (python3 -m pip install pyyaml).
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,7 +26,7 @@ yaml_run() {
   if [ "$HAVE_YAML" = 1 ]; then
     run "$@"
   else
-    fail "$2 (PyYAML is required: pip install pyyaml, or apk add py3-yaml)"
+    fail "$2 (PyYAML is required: python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS sh templates/.agents-v0/scripts/host-tools-macports.sh)"
   fi
 }
 sedi() { sed -i.bak "$1" "$2" && rm -f "$2.bak"; }

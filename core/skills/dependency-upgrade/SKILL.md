@@ -23,7 +23,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 
 ## Rule-compliance checklist
 - [ ] `security-baseline.mdc` §9: dependency scanning; SBOM when required; no new high/critical CVEs without documented exception.
-- [ ] `quality-and-testing.mdc`: `mvn -B clean verify` green; coverage maintained.
+- [ ] `quality-and-testing.mdc`: `./mvnw -B clean verify` green; coverage maintained.
 - [ ] `ai-agent-conduct.mdc`: smallest diff; no commits without approval.
 - [ ] Release notes read; graph diff recorded in the note; no major bump slipped into a maintenance change.
 - [ ] `architecture-and-diagrams.mdc`: docs updated if topology changed.

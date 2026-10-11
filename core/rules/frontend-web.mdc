@@ -69,6 +69,10 @@ Use only when the repo already ships SvelteKit. Paths under the same UI root.
 </script>
 ```
 
+## Host Node (Intel Mac)
+
+Vite 7 needs Node 20.19+ or 22.12+, plus npm. On Intel macOS, install a missing Node or npm with MacPorts (`nodejs22`, `npm11`) via `sh .agents-v0/scripts/host-tools-macports.sh`.
+
 ## Globs note
 
 Extend globs with `**/src/**/*.ts` scoped to UI packages if you edit many non-route TS modules (hooks, shared clients).

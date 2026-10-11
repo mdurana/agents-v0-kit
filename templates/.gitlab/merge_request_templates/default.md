@@ -80,7 +80,7 @@
 
 ## Quality gate
 
-- [ ] `mvn clean verify` / frontend tests green
+- [ ] `./mvnw -B clean verify` (or `mvn` when the wrapper is absent) / frontend tests green
 - [ ] Coverage ≥ 80% backend / 70% frontend for changed code
 - [ ] No new high/critical CVEs (document any exception)
 - [ ] Docs synced (README, architecture, network, sequence diagrams)

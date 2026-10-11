@@ -14,7 +14,7 @@ err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok() { printf 'OK: %s\n' "$1"; }
 
 python3 -c 'import yaml' >/dev/null 2>&1 \
-  || err "PyYAML is missing (pip install pyyaml, or apk add py3-yaml)"
+  || err "PyYAML is missing (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS: sh .agents-v0/scripts/host-tools-macports.sh)"
 
 token="${GITLAB_TOKEN:-}"
 host="${GITLAB_HOST:-${CI_SERVER_URL:-}}"

@@ -75,6 +75,8 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 
 ### known_failures (optional budget for ci/check-known-failures.sh)
 
+A person approves each row. CI excuses test failures up to the first Allowed failure count (the build job after a failed verify, and `check-gate-metrics.sh`). A compile or plugin error is never excused. Leave `0` for no allowance.
+
 | Allowed failure count | Scope / test IDs | Owner | Remove by |
 |----------------------|------------------|-------|-----------|
 | 0 | | | |

@@ -62,7 +62,7 @@ try:
     for c in catalogs:
         cat_paths += list(((load(c) or {}).get("paths") or {}).keys())
 except ImportError:
-    print("FAIL: PyYAML is required for YAML catalogs (pip install pyyaml, or apk add py3-yaml)", file=sys.stderr)
+    print("FAIL: PyYAML is required for YAML catalogs (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS: sh .agents-v0/scripts/host-tools-macports.sh)", file=sys.stderr)
     raise SystemExit(1)
 cat_segs = [[s for s in p.strip("/").split("/")] for p in cat_paths]
 

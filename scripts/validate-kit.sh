@@ -246,7 +246,18 @@ grep -Fq 'export-audit-pack.sh' templates/.agents-v0/scripts/export-audit-pack.s
 grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack must emit schema agents-v0-audit-manifest"
 grep -Fq 'check-delivery-gate-local|verify-gitlab-ci-prereqs|delivery-metrics|export-audit-pack' core/hooks/hook-policy.py || err "hook-policy must protect local gate and audit scripts"
 grep -Fq '.agents-v0/hooks/pre-push' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/hooks/pre-push"
-grep -Fq '${CI_IMAGE_PREFIX}node:20-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node image with CI_IMAGE_PREFIX"
+grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX (Node 20 is end-of-life)"
+if grep -Eq 'node:20' templates/.gitlab-ci.yml templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/app/frontend/Dockerfile; then err "Node 20 is end-of-life: CI and Dockerfile starters must use Node 22"; fi
+# .gitlab-ci.yml must parse, and the kit scripts it names must resolve. Kit scripts install under
+# .agents-v0/ci and .agents-v0/scripts, so a bare ci/<script> path points at nothing in a target repo.
+python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' templates/.gitlab-ci.yml >/dev/null 2>&1 || err ".gitlab-ci.yml does not parse as YAML"
+if grep -Eq '(^|[^./A-Za-z0-9_-])ci/(check|classify|resolve)[A-Za-z0-9_-]*\.sh' templates/.gitlab-ci.yml; then
+  err ".gitlab-ci.yml names ci/<script> without .agents-v0/ (kit scripts install under .agents-v0/ci/)"
+fi
+for ci_ref in $(grep -oE '\.agents-v0/(ci|scripts)/[A-Za-z0-9_-]+\.sh' templates/.gitlab-ci.yml | sort -u); do
+  [ -f "templates/$ci_ref" ] || err ".gitlab-ci.yml names $ci_ref but templates/$ci_ref does not exist"
+done
+grep -Fq -- '--require-failures' templates/.gitlab-ci.yml || err ".gitlab-ci.yml build job must excuse only known_failures test failures (check-known-failures.sh --require-failures)"
 grep -Fq 'Security/SAST.gitlab-ci.yml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must include GitLab SAST"
 grep -Fq 'ENABLE_GITLAB_SAST' templates/.gitlab-ci.yml || err "SAST include must be conditional so a missing template does not block pipelines"
 grep -Fq 'name: delivery-approval' templates/.gitlab-ci.yml || err "delivery-approval must declare its environment so GITLAB_TOKEN can be scoped to that job"
@@ -266,10 +277,15 @@ grep -Fq 'check-delivery-linkage.sh' templates/.agents-v0/scripts/check-delivery
 grep -Fq 'check-design-contracts.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "check-delivery-gate-local.sh must run design contracts"
 grep -Fq 'check-build-plan.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "check-delivery-gate-local.sh must run the build plan"
 grep -Fq 'check-endpoint-auth.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "check-delivery-gate-local.sh must run endpoint auth"
-python3 -c 'import yaml' >/dev/null 2>&1 || err "PyYAML is required (pip install pyyaml, or apk add py3-yaml). OpenAPI checks do not run without it."
+python3 -c 'import yaml' >/dev/null 2>&1 || err "PyYAML is required (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS sh templates/.agents-v0/scripts/host-tools-macports.sh). OpenAPI checks do not run without it."
 grep -Fq 'model-config.json' scripts/install.sh || err "install.sh must remap agent models from .cursor/model-config.json"
 grep -Fq 'templates/.cursor/model-config.json' scripts/install.sh || err "install.sh must seed .cursor/model-config.json from templates/.cursor/model-config.json"
 grep -Fq 'update-agents-model.sh' scripts/install.sh || err "install.sh must seed and run .agents-v0/scripts/update-agents-model.sh"
+grep -Fq 'host-tools-macports.sh' scripts/install.sh || err "install.sh must seed .agents-v0/scripts/host-tools-macports.sh"
+[ -x templates/.agents-v0/scripts/host-tools-macports.sh ] || err "templates/.agents-v0/scripts/host-tools-macports.sh missing or not executable"
+grep -Fq 'openjdk21' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document MacPorts openjdk21 for Intel Macs"
+grep -Fq 'host-tools-macports.sh' core/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
+grep -Fq 'host-tools-macports.sh' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must document the Intel MacPorts host-tools script"
 [ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
 [ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"
 [ -f scripts/test-update-agents-model.sh ] || err "scripts/test-update-agents-model.sh missing"

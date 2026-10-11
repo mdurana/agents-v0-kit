@@ -72,6 +72,8 @@ Different features may proceed in one checkout only while each writes its own `d
 ./scripts/install.sh --update /path/to/target-repo
 ```
 
+On an Intel Mac, a missing JDK 21, Node, or npm is installed with MacPorts. PyYAML uses the same script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts): `sh .agents-v0/scripts/host-tools-macports.sh` (see `docs/agents-v0/gold-standards.md` after install).
+
 Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`.
 
 ## Model routing

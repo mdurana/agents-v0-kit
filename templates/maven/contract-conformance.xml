@@ -1,6 +1,6 @@
 <!--
   OpenAPI contract-conformance snippet — paste into <build><plugins> of pom.xml, next to
-  maven/quality-plugins.xml. `mvn -B clean verify` boots the service, downloads its runtime
+  maven/quality-plugins.xml. `./mvnw -B clean verify` boots the service, downloads its runtime
   OpenAPI, and diffs it against the approved catalog in BOTH directions
   (workflow-orchestration.mdc Build gate):
     1. approved -> generated: fails when the service dropped or broke something the catalog promises;

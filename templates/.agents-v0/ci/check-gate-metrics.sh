@@ -23,6 +23,9 @@
 #   story id. Unset, diff coverage and a missing CVE report are not failures.
 #   GATE_METRICS_OUT=<f>   JSON summary path (default <module-root>/target/gate-metrics.json)
 #   GATE_REPORT_ONLY=1     measure and write the summary, but exit 0 (brownfield onboarding baseline)
+#   KNOWN_FAILURES_PROFILE=<f>  profile that holds the known_failures table (default
+#                          docs/agents-v0/project-profile.md, relative to the working directory).
+#                          Test failures up to its Allowed failure count are reported, not failed.
 #
 # Exit 0 when every measured gate passes; 1 otherwise.
 
@@ -62,6 +65,25 @@ def number(name, default=None):
         raise SystemExit(1)
 
 
+def known_failures_budget():
+    """Allowed failure count from the known_failures table of the project profile (0 when none)."""
+    path = env("KNOWN_FAILURES_PROFILE") or os.path.join("docs", "agents-v0", "project-profile.md")
+    if not os.path.isfile(path):
+        return 0
+    in_section = False
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                in_section = "known_failures" in stripped
+                continue
+            if in_section and stripped.startswith("|"):
+                cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+                if cells and cells[0].isdigit() and int(cells[0]) > 0:
+                    return int(cells[0])
+    return 0
+
+
 # Executed tests: a green build with zero executed tests is not evidence.
 reports = glob.glob(os.path.join(root, "target", "surefire-reports", "TEST-*.xml"))
 reports += glob.glob(os.path.join(root, "target", "failsafe-reports", "TEST-*.xml"))
@@ -82,7 +104,12 @@ summary["tests"] = {"run": tests, "failures": fails, "errors": errors, "skipped"
 if (not reports or tests == 0) and env("ALLOW_NO_TESTS") != "1":
     failures.append("no executed tests under target/surefire-reports or target/failsafe-reports (ALLOW_NO_TESTS=1 for a module with no tests)")
 if fails + errors > 0:
-    failures.append(f"test failures={fails} errors={errors}")
+    budget = known_failures_budget()
+    if fails + errors <= budget:
+        summary["known_failures_budget"] = budget
+        print(f"tests: {fails + errors} failure(s) within the documented known_failures budget ({budget})")
+    else:
+        failures.append(f"test failures={fails} errors={errors}")
 print(f"tests: run={tests} failures={fails} errors={errors} skipped={skipped}")
 
 # Coverage.

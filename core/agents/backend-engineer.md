@@ -24,7 +24,7 @@ You are the **backend-engineer** for the Build phase of the delivery lifecycle (
 7. Auth/upload/RBAC changes ship with their VAPT-required tests in the same diff.
 8. Add Flyway migrations for all schema changes (`java-spring-backend.mdc`).
 9. Wire correlation ID and `traceparent` (`project-delivery-core.mdc`).
-10. Run the full Backend verify command (`mvn -B clean verify` when the profile names it) once for the Build gate, with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. Hand a security-critical or complex unit to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
+10. Run the full Backend verify command (`./mvnw -B clean verify` when the profile names it) once for the Build gate, with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. Hand a security-critical or complex unit to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
 11. Persist `docs/agents-v0/build/<feature>/build-report.md` (command, result, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets).
 
 ## Rules you must satisfy

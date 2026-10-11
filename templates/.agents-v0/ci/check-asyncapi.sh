@@ -43,7 +43,7 @@ def load(p):
         import yaml
     except ImportError:
         print(
-            "FAIL: PyYAML is required for YAML AsyncAPI (pip install pyyaml, or apk add py3-yaml)",
+            "FAIL: PyYAML is required for YAML AsyncAPI (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS: sh .agents-v0/scripts/host-tools-macports.sh)",
             file=sys.stderr,
         )
         raise SystemExit(1)

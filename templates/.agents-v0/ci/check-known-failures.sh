@@ -1,12 +1,21 @@
 #!/bin/sh
 # check-known-failures.sh — fail if verify log shows failures beyond documented known_failures.
 #
-# Usage: sh .agents-v0/ci/check-known-failures.sh <verify-log-file>
+# Usage: sh .agents-v0/ci/check-known-failures.sh [--require-failures] <verify-log-file>
 # Parses Surefire/JUnit failure counts; compares to docs/agents-v0/project-profile.md known_failures table when present.
+# Run it from the repository root (the profile path is relative).
+#
+# --require-failures  use after a verify command that exited non-zero: a log with no test failure
+#                     is a compile or plugin error, not a known failure, so it fails here.
 #
 # Exit 0 when no failures or documented allow-list matches; 1 otherwise.
 
 set -eu
+require=0
+if [ "${1:-}" = "--require-failures" ]; then
+  require=1
+  shift
+fi
 log="${1:-}"
 profile="docs/agents-v0/project-profile.md"
 [ -f "$log" ] || { printf 'FAIL: verify log not found: %s\n' "$log" >&2; exit 1; }
@@ -14,6 +23,10 @@ profile="docs/agents-v0/project-profile.md"
 fail_line="$(grep -E 'Tests run:.*Failures: [1-9]' "$log" 2>/dev/null | tail -n1 || true)"
 error_line="$(grep -E 'Tests run:.*Errors: [1-9]' "$log" 2>/dev/null | tail -n1 || true)"
 if [ -z "$fail_line" ] && [ -z "$error_line" ]; then
+  if [ "$require" = 1 ]; then
+    printf 'FAIL: verify exited non-zero and the log shows no test failure (build or plugin error, not a known failure)\n' >&2
+    exit 1
+  fi
   printf 'OK: no test failures detected in log\n'
   exit 0
 fi

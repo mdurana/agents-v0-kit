@@ -11,6 +11,8 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 # ./scripts/install.sh --with-starters /path/to/existing-repo
 ```
 
+On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the first build or maintain verify. A missing JDK 21, Node, or npm is installed with MacPorts after you approve `--install`. PyYAML uses that script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts) ([gold-standards.md](gold-standards.md)).
+
 Do **not** run `bootstrap-greenfield.sh --scaffold-app` on an existing codebase. That archive is for empty greenfield repos only; `/v0-onboard` records the tree as it is and does not move source onto `app/backend` / `app/frontend`.
 
 Then run `/v0-onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
@@ -33,7 +35,7 @@ Record the directory layout in the profile **This repo** table (Profile `service
 
 Org rules are installed to `.cursor/rules/org/` and refreshed on `install.sh --update`.
 
-The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch and the `delivery-approval` environment. Scope `GITLAB_TOKEN` (`read_api`, masked) to that environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Optional: `cp .agents-v0/hooks/pre-push .git/.agents-v0/hooks/pre-push && chmod +x .git/.agents-v0/hooks/pre-push` runs the local delivery gate when the branch name matches `docs/agents-v0/requirements/<feature>.md`. See [greenfield-onboarding.md](greenfield-onboarding.md).
+The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch and the `delivery-approval` environment. Scope `GITLAB_TOKEN` (`read_api`, masked) to that environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Optional: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"` (git runs only `hooks/pre-push`) runs the local delivery gate when the branch name matches `docs/agents-v0/requirements/<feature>.md`. See [greenfield-onboarding.md](greenfield-onboarding.md).
 
 ## 2. Audit the baseline (do this before `/v0-build` or `/v0-maintain`)
 

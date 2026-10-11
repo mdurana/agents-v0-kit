@@ -152,7 +152,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | **Multi-service** | Service roots, per-service OpenAPI, `workspace.manifest.json` | `repositories/` + `service-map.md` |
 | **Air-gap** | `CI_IMAGE_PREFIX` mirrors | Not addressed |
 | **IDE** | Cursor | Cursor primary; AGENTS.md mentions Claude Code, Copilot |
-| **Context discipline** | Always-on rules capped 32 KB | SKILL.md <500 lines; progressive disclosure |
+| **Context discipline** | Always-on rules and `AGENTS.md` capped 36 KB | SKILL.md <500 lines; progressive disclosure |
 
 ---
 

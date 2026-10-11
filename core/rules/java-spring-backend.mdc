@@ -102,6 +102,10 @@ try {
 - DTOs: `@Data` / `@Value`, `@Builder` when clarity improves.
 - Avoid `@AllArgsConstructor` on entities; avoid `@ToString` / `@EqualsAndHashCode` on entities with lazy collections unless project standard accounts for it.
 
+## Host JDK (Intel Mac)
+
+Kit builds use Java 21. On Intel macOS, a missing JDK 21 is installed with MacPorts (`openjdk21`) via `sh .agents-v0/scripts/host-tools-macports.sh`. Set `JAVA_HOME` from `/usr/libexec/java_home -v 21`. Maven is `./mvnw`.
+
 ## Performance (when justified)
 
 - Pagination for large datasets; `@Cacheable` for frequent reads; `@Async` for non-blocking side effects.

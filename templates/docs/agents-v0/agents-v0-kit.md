@@ -170,7 +170,7 @@ Verify runs `test-engineer` first. When `HEAD` is still the build report's commi
 
 ## Release
 
-`/v0-release` renders the merge-request body from the evidence (`scripts/render-mr-body.sh`) and dry-runs the local delivery gate with `scripts/check-delivery-gate-local.sh <feature>` (linkage with `CHECK_MR_APPROVER=0`, design contracts, build plan, endpoint authorization). It does not edit `architecture.md` or `network.md`; those stay a docs-only follow-up. When the build and verify reports already name `HEAD`, it does not commit them again. Copy `.agents-v0/hooks/pre-push` to `.git/.agents-v0/hooks/pre-push` to run that gate on push when the branch name matches `docs/agents-v0/requirements/<feature>.md`. The body names either `Feature-Artifact:` or `Maintain-Note:`, not both. Opening the merge request, and every commit and push, each need their own authorization. The CI fix loop stops after three rounds. A code fix in that loop goes back through Verify, because it makes the evidence commit stale.
+`/v0-release` renders the merge-request body from the evidence (`scripts/render-mr-body.sh`) and dry-runs the local delivery gate with `scripts/check-delivery-gate-local.sh <feature>` (linkage with `CHECK_MR_APPROVER=0`, design contracts, build plan, endpoint authorization). It does not edit `architecture.md` or `network.md`; those stay a docs-only follow-up. When the build and verify reports already name `HEAD`, it does not commit them again. To run that gate on push when the branch name matches `docs/agents-v0/requirements/<feature>.md`, a person installs the git hook: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"`. Git runs only `hooks/pre-push`, and the kit's edit hook blocks agent writes there, so the install is manual. The body names either `Feature-Artifact:` or `Maintain-Note:`, not both. Opening the merge request, and every commit and push, each need their own authorization. The CI fix loop stops after three rounds. A code fix in that loop goes back through Verify, because it makes the evidence commit stale.
 
 After Verify or Release approval, teams may run `scripts/export-audit-pack.sh <feature>` to write `docs/agents-v0/release/<feature>/audit-manifest.json` (SHA-256 hashes of delivery evidence) for compliance archives.
 
@@ -240,11 +240,11 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 | `check-endpoint-auth.sh` | No new unannotated endpoint |
 | `check-frontend-calls.sh` | Frontend calls match the catalog |
 | `check-event-schemas.sh` | Event schemas stay additive |
-| `check-gate-metrics.sh` | Tests, diff coverage, CVEs, from the build output |
+| `check-gate-metrics.sh` | Tests, diff coverage, CVEs, from the build output. Test failures up to the `known_failures` budget are reported, not failed |
 | `classify-change.sh` | Whether a trivial note is still trivial |
 | `check-layout-roots.sh` | A build with a `pom.xml` resolved a module to build |
 | `check-coverage-ratchet.sh` | A coverage exception is approved and not expired |
-| `check-known-failures.sh` | Failures stay inside the documented budget |
+| `check-known-failures.sh` | After a verify that exited non-zero, only test failures inside the documented `known_failures` budget are excused. A compile or plugin error is never excused (`--require-failures`) |
 
 On GitLab the gate scripts are read from the default branch, so a merge request cannot rewrite the check that judges it. `.gitlab-ci.yml` supports `CI_IMAGE_PREFIX` for air-gapped container mirrors. `scripts/verify-gitlab-ci-prereqs.sh` checks the scoped token and documents DinD vs host Docker socket. `CODEOWNERS` covers the delivery records, `docs/agents-v0/design/`, `docs/agents-v0/adr/`, `openapi/`, `ci/`, and the installed commands, skills, agents, and rules.
 
@@ -254,7 +254,7 @@ Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, ha
 
 ## Rules and skills
 
-Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
+Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size with `AGENTS.md` is capped at 36 KB (`scripts/validate-kit.sh`). The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
 
 Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
 
@@ -269,6 +269,8 @@ Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the
 ./scripts/validate-kit.sh
 ```
 
+On an Intel Mac, a missing JDK 21, Node, or npm comes from MacPorts. The same script installs PyYAML with `python3 -m pip install pyyaml`, or with a `pyXY-yaml` port when Python itself is from MacPorts: `sh .agents-v0/scripts/host-tools-macports.sh` ([gold-standards.md](gold-standards.md)). Apple Silicon, Linux, and CI images are unchanged. Maven stays `./mvnw`.
+
 `--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. It does **not** copy `templates/app/` (the P0 codebase). Without `--with-starters`, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
 
 A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the kit and extract `templates/app/p0-platform-skeleton.tar.gz` into `app/backend` and `app/frontend` ([greenfield-onboarding.md](greenfield-onboarding.md)). Default stack: Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only. An existing repo starts with install (no `--scaffold-app`), then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)).
@@ -279,6 +281,7 @@ A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the k
 |----------|----------|
 | How do I approve a phase? | [user-guide.md](user-guide.md) |
 | How do I start a new repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
+| Intel Mac host tools? | [gold-standards.md](gold-standards.md) |
 | Design fill-in snippets (less invent) | [snippets/README.md](snippets/README.md) |
 | Should we thin always-on rules? | [token-optimization-assessment.md](token-optimization-assessment.md) |
 | Which check enforces which rule? | [compliance-matrix.md](compliance-matrix.md) |

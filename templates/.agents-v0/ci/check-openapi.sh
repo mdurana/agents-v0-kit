@@ -16,8 +16,9 @@
 # 2xx response, no new required parameter or request field, no removed response property, and no
 # component of the same name with a different definition.
 # merge rewrites the catalog through a YAML library: comments and key layout are not preserved.
-# Review the diff, or merge by hand and run "merged". Needs python3 and PyYAML (pip install pyyaml,
-# or apk add py3-yaml). JSON files need only python3.
+# Review the diff, or merge by hand and run "merged". Needs python3 and PyYAML
+# (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS:
+# sh .agents-v0/scripts/host-tools-macports.sh). JSON files need only python3.
 # Exit 0 when every check passes; 1 otherwise.
 
 set -eu
@@ -57,7 +58,7 @@ def load(path):
     try:
         import yaml
     except ImportError:
-        print("FAIL: PyYAML is required for YAML contracts (pip install pyyaml, or apk add py3-yaml)", file=sys.stderr)
+        print("FAIL: PyYAML is required for YAML contracts (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS: sh .agents-v0/scripts/host-tools-macports.sh)", file=sys.stderr)
         raise SystemExit(1)
     return yaml.safe_load(text)
 

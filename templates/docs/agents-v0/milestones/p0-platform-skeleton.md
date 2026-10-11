@@ -23,7 +23,7 @@ and in CI.
 ## Dependencies
 
 - None (first milestone). P1 depends on this milestone merged with a green
-  `mvn -B clean verify` or frontend equivalent.
+  `./mvnw -B clean verify` or frontend equivalent.
 
 ## Stories
 

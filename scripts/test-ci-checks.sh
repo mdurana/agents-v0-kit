@@ -436,6 +436,38 @@ expect_fail "gate metrics: bundle coverage below MIN_LINE_PCT fails" "$tmp" env 
 printf '<testsuite tests="1" failures="1" errors="0" skipped="0"/>\n' > "$m/target/surefire-reports/TEST-b.xml"
 expect_fail "gate metrics: a failing test fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
 
+# known_failures budget (project profile table): failures up to the count are reported, not failed.
+kf="$tmp/kf"
+mkdir -p "$kf/docs/agents-v0"
+cat > "$kf/docs/agents-v0/project-profile.md" <<'EOF'
+## Brownfield exceptions
+
+### known_failures (optional budget for ci/check-known-failures.sh)
+
+| Allowed failure count | Scope / test IDs | Owner | Remove by |
+|----------------------|------------------|-------|-----------|
+| 1 | services/order | @ada | 2027-01-01 |
+
+### coverage_ratchet
+
+| Scope | Interim minimum | Approver (Security + architecture) | Remove by |
+|-------|-----------------|------------------------------------|-----------|
+| 70 | x | @ada | 2027-01-01 |
+EOF
+expect_pass "gate metrics: one failure within a known_failures budget of 1 passes" "$kf" sh "$CI/check-gate-metrics.sh" "$m"
+printf '<testsuite tests="2" failures="1" errors="0" skipped="0"/>\n' > "$m/target/surefire-reports/TEST-c.xml"
+expect_fail "gate metrics: two failures exceed a known_failures budget of 1" "$kf" sh "$CI/check-gate-metrics.sh" "$m"
+rm -f "$m/target/surefire-reports/TEST-b.xml" "$m/target/surefire-reports/TEST-c.xml"
+
+# check-known-failures.sh: --require-failures after a verify that exited non-zero.
+printf '[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\n' > "$kf/one-failure.log"
+printf '[ERROR] Tests run: 3, Failures: 2, Errors: 0, Skipped: 0\n' > "$kf/two-failures.log"
+printf '[ERROR] COMPILATION ERROR : cannot find symbol\n' > "$kf/compile-error.log"
+expect_pass "known failures: one failure within the budget passes with --require-failures" "$kf" sh "$CI/check-known-failures.sh" --require-failures one-failure.log
+expect_fail "known failures: two failures exceed the budget" "$kf" sh "$CI/check-known-failures.sh" --require-failures two-failures.log
+expect_fail "known failures: a compile error is not a known failure with --require-failures" "$kf" sh "$CI/check-known-failures.sh" --require-failures compile-error.log
+expect_pass "known failures: a log with no test failures still passes without the flag" "$kf" sh "$CI/check-known-failures.sh" compile-error.log
+
 m="$tmp/gate-none"
 mkdir -p "$m/target"
 expect_fail "gate metrics: zero executed tests fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
