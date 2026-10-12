@@ -4,7 +4,8 @@
 # Usage: sh .agents-v0/scripts/discover-codebase.sh [repo-root]
 # Scans the roots that ci/resolve-layout.sh resolves (backend, bff, services, frontend; the repo
 # root when none resolve) and writes docs/agents-v0/discovery/:
-#   endpoints.txt     Spring mappings with file:line and whether a security annotation is near
+#   endpoints.txt     Spring mappings with file:line and whether a security annotation is near.
+#                     The Java scanner is ci/endpoint_scan.py, shared with check-endpoint-auth.sh.
 #   entities.txt      @Entity classes and their tables
 #   migrations.txt    Flyway / Liquibase files
 #   messaging.txt     Kafka / Rabbit / JMS / Stream listeners and producers
@@ -15,7 +16,8 @@
 #   ci-deploy.txt     Dockerfiles, compose, CI, Helm / Kubernetes / Terraform
 #   tests.txt         test file counts per root
 #   security-baseline.md  heuristic snapshot: unannotated endpoints, permit-all, literal secrets
-#   endpoint-stacks.md    proposed FastAPI / Express / Nest / Go rows for the profile
+#   endpoint-stacks.md    proposed dotnet / Nest / Express / FastAPI / Django / Go rows.
+#                     Regexes are the BUILTINS table in ci/endpoint_scan.py.
 #   baseline.md       measured tests / coverage / CVEs per Maven root plus proposed ratchet rows
 # Every list is capped (DISCOVER_MAX, default 500) and says so when it is cut. Rows are
 # heuristics: read the cited line before relying on one. No secret value is ever printed.
@@ -44,6 +46,10 @@ import math
 import os
 import re
 import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.environ["GATE_SCRIPT"]))
+import endpoint_scan
 
 ROOTS = os.environ["DISCOVER_ROOTS"].split()
 COMMIT = os.environ["DISCOVER_COMMIT"]
@@ -107,44 +113,11 @@ def lines_of(path):
     return text_of[path]
 
 
-# ---- Endpoints -------------------------------------------------------------
-MAPPING = re.compile(r"@(Get|Post|Put|Patch|Delete|Request)Mapping\b(.*)")
-QUOTED = re.compile(r'"([^"]*)"')
-SECURITY = re.compile(r"@(PreAuthorize|PostAuthorize|Secured|RolesAllowed|PermitAll|DenyAll)\b")
-CLASS_DECL = re.compile(r"\b(class|interface)\s+\w+")
+# ---- Endpoints (same Java scanner as ci/check-endpoint-auth.sh) ------------
 endpoints, unannotated = [], []
 for path in java:
-    lines = lines_of(path)
-    if not any(re.search(r"@(RestController|Controller)\b", ln) for ln in lines):
-        continue
-    decl = next((i for i, ln in enumerate(lines) if CLASS_DECL.search(ln) and not ln.lstrip().startswith(("*", "//", "/*"))), None)
-    if decl is None:
-        continue
-    header = lines[max(0, decl - 12): decl + 1]
-    class_secured = any(SECURITY.search(ln) for ln in header)
-    base = ""
-    for ln in header:
-        m = MAPPING.search(ln)
-        if m and m.group(1) == "Request":
-            q = QUOTED.search(m.group(2))
-            base = q.group(1) if q else ""
-    for i in range(decl + 1, len(lines)):
-        m = MAPPING.search(lines[i])
-        if not m:
-            continue
-        q = QUOTED.search(m.group(2))
-        sub = q.group(1) if q else ""
-        full = "/" + "/".join(p.strip("/") for p in (base, sub) if p.strip("/"))
-        # This method's annotations only: up to the previous statement end, down to its signature.
-        top = i
-        while top - 1 > decl and not re.search(r"[;{}]\s*$", lines[top - 1].strip()):
-            top -= 1
-        bottom = i
-        while bottom < len(lines) - 1 and bottom - i < 8 and not re.search(r"[{};]\s*$", lines[bottom].strip()):
-            bottom += 1
-        secured = class_secured or any(SECURITY.search(ln) for ln in lines[top: bottom + 1])
-        verb = "ANY" if m.group(1) == "Request" else m.group(1).upper()
-        row = f"{path}:{i + 1}  {verb} {full}  {'annotated' if secured else 'NO-ANNOTATION'}"
+    for line_no, verb, full, secured in endpoint_scan.java_endpoints(lines_of(path)):
+        row = f"{path}:{line_no}  {verb} {full}  {'annotated' if secured else 'NO-ANNOTATION'}"
         endpoints.append(row)
         if not secured:
             unannotated.append(row)
@@ -350,40 +323,15 @@ with open(os.path.join(OUT, "security-baseline.md"), "w", encoding="utf-8") as h
     handle.write("\n".join(doc) + "\n")
 summary.append(("security-baseline.md", len(sec_rows) + len(unannotated), False))
 
-# ---- Extra endpoint stacks (proposed rows; Spring stays built in) ----------
+# ---- Extra endpoint stacks (same BUILTINS table as check-endpoint-auth.sh) --
 # A hit records one row for docs/agents-v0/project-profile.md. Pipes inside regexes have no spaces.
-STACK_HITS = [
-    ("fastapi", ".py", "APIRouter",
-     r"@(?:router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-     r"Depends\(|require_role", r"APIRouter|FastAPI\("),
-    ("express", ".js", r"express\(|Router\(",
-     r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-     r"requireAuth|authenticate|authorize", r"express\(|\bRouter\("),
-    ("express", ".ts", r"express\(|Router\(",
-     r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-     r"requireAuth|authenticate|authorize", r"express\(|\bRouter\("),
-    ("nest", ".ts", "@Controller",
-     r"@(Get|Post|Put|Patch|Delete)\(\s*[\"']?([^\"')]*)",
-     r"@UseGuards|@Public", r"@Controller\b"),
-    ("go", ".go", r"gin\.|chi\.NewRouter|http\.HandleFunc",
-     r"\.(GET|POST|PUT|PATCH|DELETE)\(\s*\"([^\"]+)\"",
-     r"Auth|middleware", r"gin\.|chi\.NewRouter|http\.HandleFunc"),
-]
-seen_stacks = {}
-for path in files:
-    try:
-        blob = open(path, encoding="utf-8", errors="replace").read(8000)
-    except OSError:
-        continue
-    for stack, suffix, marker, mapping, security, detect in STACK_HITS:
-        if stack in seen_stacks or not path.endswith(suffix):
-            continue
-        if re.search(detect, blob):
-            seen_stacks[stack] = (suffix, marker, mapping, security, path.replace(os.sep, "/"))
+seen_stacks = endpoint_scan.proposal_hits(files, lambda path: open(path, encoding="utf-8", errors="replace").read())
+active = endpoint_scan.profile_pack()
 
 stack_doc = ["# Proposed endpoint authorization rows", f"commit: {COMMIT}",
-             "generated by scripts/discover-codebase.sh. Spring (*.java) is built into ci/check-endpoint-auth.sh.",
-             "Copy a row into docs/agents-v0/project-profile.md under Endpoint authorization after a person confirms it.",
+             "generated by scripts/discover-codebase.sh from ci/endpoint_scan.py BUILTINS.",
+             "These regexes are the scanners check-endpoint-auth.sh already runs for that pack.",
+             "Copy a row into Endpoint authorization only when Pack does not already scan that suffix.",
              "Separate columns with ' | '. A pipe inside a regex has no spaces around it.", ""]
 if seen_stacks:
     stack_doc += ["| Stack | Suffix | Marker | Mapping | Security | Evidence |",
@@ -391,7 +339,7 @@ if seen_stacks:
     for stack, (suffix, marker, mapping, security, evidence) in seen_stacks.items():
         stack_doc.append(f"| {stack} | {suffix} | {marker} | {mapping} | {security} | {evidence} |")
 else:
-    stack_doc.append("(no FastAPI, Express, Nest, or Go router found; Spring stays the built-in scanner)")
+    stack_doc.append("(no dotnet, Nest, Express, FastAPI, Django, or Go router found; Pack java stays the built-in scanner)")
 with open(os.path.join(OUT, "endpoint-stacks.md"), "w", encoding="utf-8") as handle:
     handle.write("\n".join(stack_doc) + "\n")
 summary.append(("endpoint-stacks.md", len(seen_stacks), False))
@@ -415,16 +363,18 @@ if seen_stacks and os.path.isfile(profile):
             rows = "\n".join(
                 f"| {stack} | {suffix} | {marker} | {mapping} | {security} |"
                 for stack, (suffix, marker, mapping, security, _ev) in seen_stacks.items()
+                if not endpoint_scan._builtin_covers(active, suffix, mapping)
             )
             placeholder = "| | | | | |"
-            if placeholder in section:
-                section = section.replace(placeholder, rows, 1)
-            else:
-                section = section.rstrip() + "\n" + rows + "\n"
-            new_text = before + heading + section + (("\n## " + after) if sep else "")
-            with open(profile, "w", encoding="utf-8") as handle:
-                handle.write(new_text)
-            print(f"Seeded Endpoint authorization in {profile} ({len(seen_stacks)} stack(s)); a person confirms the rows.")
+            if rows:
+                if placeholder in section:
+                    section = section.replace(placeholder, rows, 1)
+                else:
+                    section = section.rstrip() + "\n" + rows + "\n"
+                new_text = before + heading + section + (("\n## " + after) if sep else "")
+                with open(profile, "w", encoding="utf-8") as handle:
+                    handle.write(new_text)
+                print(f"Seeded Endpoint authorization in {profile}; a person confirms the rows.")
 
 print(f"Discovery written to {OUT}/ for roots: {' '.join(ROOTS)}")
 for name, total, cut in summary:

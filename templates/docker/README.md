@@ -7,7 +7,11 @@ and **`docker-compose.yml`**, run via `sh .agents-v0/scripts/run-local-container
 
 | Stack | Copy to repo root |
 |-------|-------------------|
-| Spring Boot (Maven) | `docker/Dockerfile.spring-boot` → `Dockerfile` |
+| Spring Boot (Maven), pack `java` | `docker/Dockerfile.spring-boot` → `Dockerfile` |
+| ASP.NET Core, pack `dotnet` | `docker/Dockerfile.dotnet` → `Dockerfile` |
+| NestJS, pack `node` | `docker/Dockerfile.nestjs` → `Dockerfile` |
+| FastAPI, pack `python` | `docker/Dockerfile.python` → `Dockerfile` |
+| Gin, pack `go` | `docker/Dockerfile.go` → `Dockerfile` |
 | Static SPA (Vite/React default) | `docker/Dockerfile.static-nginx` → `Dockerfile` and keep `docker/nginx-spa.conf` |
 | Node SSR / existing SvelteKit node adapter | `docker/Dockerfile.node` → `Dockerfile` (adjust `CMD` if needed) |
 

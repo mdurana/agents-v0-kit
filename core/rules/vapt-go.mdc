@@ -32,3 +32,11 @@ Auth middleware runs before the handler. JWT checks `iss`, `aud`, `exp`, and `nb
 ## F10 — Audit
 
 Audit auth, denial, admin mutation, and upload outcome. Do not log the token.
+
+## F5 — Exposed API calls (LOW)
+
+A client bundle must not call an admin route the user cannot use. Hiding a button is not authorization. Record the finding. It blocks only when the diff makes the call exploitable.
+
+## F6 — Multiple sessions (LOW)
+
+Document single-session or multi-session. When the policy is single-session, a new login invalidates the previous token for that user.

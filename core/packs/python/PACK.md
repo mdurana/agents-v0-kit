@@ -3,7 +3,7 @@
 - **Id:** python
 - **Service skill:** implement-python-service
 - **Rules:** python-backend.mdc, vapt-python.mdc
-- **Skills:** implement-python-service
+- **Skills:** implement-python-service, implement-python-bff, scaffold-python-service
 - **Data stores:** PostgreSQL 15
 - **Backend:** Python 3.13, FastAPI, Pydantic v2
 - **HTTP:** FastAPI APIRouter
@@ -16,5 +16,7 @@
 - **Coverage:** coverage.xml
 - **Tests report:** pytest-report.xml
 - **Auth:** a security Depends() or an explicit public dependency on every route
+- **Quality snippet:** python/pytest.ini
+- **Dockerfile:** docker/Dockerfile.python
 
 A new service uses FastAPI. Django stays only when the repo already uses it. Do not add `pom.xml` or a Node service framework. React 19, TypeScript 5.9, and Vite 7 stay the UI.

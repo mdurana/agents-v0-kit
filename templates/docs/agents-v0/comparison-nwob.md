@@ -4,7 +4,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 **Legend:** ✅ full · ◐ partial or indirect · ❌ absent
 
-**Counts (repo snapshot):** agents-v0 — 16 commands, 19 agents, 32 skills, 22 rules, ~25 CI scripts; NWOB — 6 installable personas (+ 3 planned stubs), ~30 `SKILL.md` files, ~28 slash commands, constitution v1.4.0, no CI/hooks in the NWOB package.
+**Counts (repo snapshot):** agents-v0 — 16 commands, 19 agents, 40 skills, 22 rules, ~25 CI scripts; NWOB — 6 installable personas (+ 3 planned stubs), ~30 `SKILL.md` files, ~28 slash commands, constitution v1.4.0, no CI/hooks in the NWOB package.
 
 ---
 
@@ -124,7 +124,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 | Topic | agents-v0 | NWOB |
 |-------|-----------|------|
-| **Backend default** | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway | Java (modern); neutral in `constitution-custom.mdc` |
+| **Backend default** | Pack chosen in `/v0-architecture`: `java` (Java 21, Spring Boot 4.1.1, Maven, the bundled skeleton), `dotnet`, `node`, `python`, or `go` | Java (modern); neutral in `constitution-custom.mdc` |
 | **Tests** | JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test profile, Vitest 3 | Project-specific |
 | **Local run** | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | Project-specific |
 | **Database** | PostgreSQL 15, Flyway | PostgreSQL, Liquibase |
@@ -147,7 +147,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | Concern | agents-v0 | NWOB |
 |---------|-----------|------|
 | **Install** | `install.sh`, `--with-starters`, `--update` | External clone or submodule; `--force`, `--no-scaffold-docs` |
-| **Greenfield** | `bootstrap-greenfield.sh --scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` (canonical stack health/shell) | `nwob init` + `nwob-docs/` scaffold |
+| **Greenfield** | `bootstrap-greenfield.sh --scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` (`java` pack health/shell) | `nwob init` + `nwob-docs/` scaffold |
 | **Brownfield** | `audit-brownfield-baseline.sh`, `/v0-onboard` | Map external SDD in place; no forced copy |
 | **Multi-service** | Service roots, per-service OpenAPI, `workspace.manifest.json` | `repositories/` + `service-map.md` |
 | **Air-gap** | `CI_IMAGE_PREFIX` mirrors | Not addressed |

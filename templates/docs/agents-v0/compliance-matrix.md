@@ -11,7 +11,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Clause | Enforcer |
 |--------|----------|
 | Active pack (`java`, `dotnet`, `node`, `python`, or `go`). The java pack pins Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`. Other packs pin their own list in `.agents-v0/packs/<pack>/PACK.md` | A backend-engineer, frontend-engineer; S the pack's implement-* skill, implement-frontend; C /v0-architecture; CI check-architecture-pack.sh, activate-stack-pack.sh; G Architecture and Build gates |
-| P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service; G validate-kit + test-app-template |
+| P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` when Pack is `java` or empty. Other packs use their scaffold skill and do not extract it | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service, scaffold-aspnet-service, scaffold-node-service, scaffold-python-service, scaffold-go-service; G validate-kit + test-app-template |
 | Frontend default: React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI ci/resolve-layout.sh |
 | Correlation ID propagation | A backend-engineer, bff-engineer, frontend-engineer; S implement-spring-service, implement-bff, implement-frontend; G Build gate |
@@ -23,7 +23,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | API envelopes (success/error) | A solution-architect; S contract-first-design; G Design gate |
 | Async only when justified | A solution-architect; S contract-first-design; G Design gate |
 | Mandated docs: README and sequence diagrams in the feature release. `architecture.md` and `network.md` are written by `/v0-onboard` or the P0 build, then a docs-only follow-up | A maintenance-engineer, release-manager; S doc-sync, release-pr; C /v0-onboard, /v0-build, /v0-release |
-| BFF thin; domain logic in services | A bff-engineer; S implement-bff; R architecture-and-diagrams |
+| BFF thin; domain logic in services | A bff-engineer; S implement-bff, implement-aspnet-bff, implement-node-bff, implement-python-bff, implement-go-bff; R architecture-and-diagrams |
 | Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-spring-service; G Build gate |
 | Cache and YugabyteDB only when requirements justify them | A solution-architect; S contract-first-design; G Design gate |
 | DDD defaults (aggregates, value objects, repository ports) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
@@ -171,7 +171,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Tests cover happy, error, and edge paths, including every exception handler that changes behavior | A test-engineer; S quality-gate; G Verify gate |
 | Skip tests only when the user explicitly requests no tests | A test-engineer, backend/bff/frontend-engineer; S quality-gate, implement-*; R ai-agent-conduct |
 | Red–green-refactor (TDD where practical), front-loaded into Build | R workflow-orchestration; A backend/bff/frontend-engineer, test-engineer; S implement-*, quality-gate; G Build/Verify gate |
-| `./mvnw -B clean verify` before merge with the quality gate wired (coverage/static/CVE) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; C /v0-build; G Build/Verify gate |
+| Profile Backend verify before merge with the quality gate wired (coverage/static/CVE). Pack `java` is `./mvnw -B clean verify` | A backend-engineer, test-engineer; S the pack's implement-* skill, quality-gate; C /v0-build; G Build/Verify gate |
 
 ## architecture-and-diagrams.mdc
 
@@ -180,7 +180,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Diagram locations (architecture, network, sequences, context map, component plans, ops readiness) | A solution-architect, maintenance-engineer; S program-architecture, contract-first-design, doc-sync; G Architecture gate, Release gate |
 | Mermaid conventions | A solution-architect; S contract-first-design; G Design gate |
 | Service boundaries / DB per service | A solution-architect; S contract-first-design; G Design gate |
-| BFF stack/pipeline/thin | A bff-engineer; S implement-bff; G Build gate |
+| BFF stack/pipeline/thin | A bff-engineer; S implement-bff or the pack's implement-*-bff skill; G Build gate |
 
 ## code-review.mdc
 
@@ -200,7 +200,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Critical findings route back | C /v0-verify, /v0-deliver; G Verify gate |
 | Gate decisions, approver, date, and evidence recorded in the existing handoff artifact | C all phase commands; R workflow-orchestration; CI ci/check-approvals.sh, ci/check-evidence.sh |
 | Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /v0-release, /v0-deliver; A release-manager; S release-pr; R workflow-orchestration |
-| Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs full `./mvnw -B clean verify` (coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
+| Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs the profile Backend verify command (pack `java`: full `./mvnw -B clean verify`, coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
 | Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /v0-build; S implement-spring-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-* |

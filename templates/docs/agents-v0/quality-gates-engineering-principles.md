@@ -33,8 +33,8 @@ same principle and thresholds in `docs/agents-v0/quality-gates.md`.
    adapt to the repo's parent POM).
 2. Configure the quality gate so a failing threshold **fails the build**, not
    just warns.
-3. Confirm `./mvnw -B clean verify` from the backend root runs coverage, style, static checks, the
-   contract diff, and layer rules.
+3. For pack `java`, confirm `./mvnw -B clean verify` from the backend root runs coverage, style, static checks, the
+   contract diff, and layer rules. Other packs confirm the Backend verify command in their `PACK.md`.
 4. Add the CVE scan to CI; document any accepted exceptions.
 5. Record the repo's actual thresholds in `docs/agents-v0/quality-gates.md` if they differ
    from the defaults (the repository wins, per `ai-agent-conduct.mdc`).

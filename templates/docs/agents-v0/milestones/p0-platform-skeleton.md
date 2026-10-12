@@ -23,7 +23,7 @@ and in CI.
 ## Dependencies
 
 - None (first milestone). P1 depends on this milestone merged with a green
-  `./mvnw -B clean verify` or frontend equivalent.
+  profile Backend verify command. Pack `java` is `./mvnw -B clean verify`. Another pack uses its `PACK.md` command and does not extract the Java archive.
 
 ## Stories
 

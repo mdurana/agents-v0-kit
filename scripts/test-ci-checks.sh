@@ -561,6 +561,8 @@ printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "$m/Orders.csproj"
 printf '<TestRun><ResultSummary><Counters total="1" executed="1" passed="1" failed="0"/></ResultSummary></TestRun>\n' > "$m/TestResults/test-results.trx"
 printf '<coverage line-rate="0.88"/>\n' > "$m/coverage.cobertura.xml"
 expect_pass "gate metrics: trx and cobertura pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+printf '%s\n' '{"dependencies":[{"vulnerabilities":[{"name":"CVE-2","severity":"HIGH"}]}]}' > "$m/cve-report.json"
+expect_fail "gate metrics: a pack cve-report.json HIGH fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
 
 # activate-stack-pack.sh
 act="$KIT/templates/.agents-v0/scripts/activate-stack-pack.sh"

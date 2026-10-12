@@ -2,7 +2,7 @@
 
 An agentic delivery kit for **Cursor**. One core (`core/`) installs into `.cursor/` via `scripts/install.sh`, with shared gates, approvals, evidence contracts, and CI checks.
 
-The kit helps agents build and maintain enterprise-grade systems — Spring Boot services, BFFs, and React frontends — through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The map of every command, record, and check is [templates/docs/agents-v0/agents-v0-kit.md](templates/docs/agents-v0/agents-v0-kit.md) (installed as `docs/agents-v0/agents-v0-kit.md`). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. Prefer `bootstrap-greenfield.sh --scaffold-app` so the bundled app archive seeds `app/`; Build copies the milestone story, writes the N/A design, and proves that template rather than reinventing it. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
+The kit helps agents build and maintain enterprise-grade systems — one backend pack (`java`, `dotnet`, `node`, `python`, or `go`) and a React frontend — through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The map of every command, record, and check is [templates/docs/agents-v0/agents-v0-kit.md](templates/docs/agents-v0/agents-v0-kit.md) (installed as `docs/agents-v0/agents-v0-kit.md`). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. Prefer `bootstrap-greenfield.sh --scaffold-app` when Pack is `java` or empty, so the bundled app archive seeds `app/`. Another pack's P0-A follows that pack's scaffold skill and does not extract the archive. Build copies the milestone story, writes the N/A design, and proves that shell. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
 
 A feature’s progress is `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). `lastApprovedPhase` comes only from an `Approved` row. `activePhase` plus `activeStatus` (`in_progress`, `awaiting_approval`, or `blocked`) is the phase in flight. `/v0-status <feature>` reads that file: `in_progress` or `blocked` runs the same phase again from files already on disk; `awaiting_approval` waits and does not start the next phase. The user names the feature. The newest state file is not assumed to be the one they mean.
 
@@ -17,7 +17,7 @@ Different features may proceed in one checkout only while each writes its own `d
 | `core/rules/*.mdc`     | Org delivery rules (+ `ux-design`) — single source of truth; installed to `.cursor/rules/org/`                     |
 | `core/agents/*.md`     | 19 subagents with Cursor `model:` frontmatter                                                                      |
 | `core/commands/v0-*.md` | 16 entry points (`/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake` … `/v0-local-release`, `/v0-deliver`, `/v0-onboard`, `/v0-status`, `/v0-triage`, `/v0-export`, `/v0-deck`) — `v0-` avoids Cursor built-in slash collisions |
-| `core/skills/`         | 32 playbooks in the standard `SKILL.md` format                                                                     |
+| `core/skills/`         | 40 playbooks in the standard `SKILL.md` format                                                                     |
 | `core/hooks/`          | Guardrails: `pre-shell.sh`, `pre-edit.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`        |
 | `core/adapters/`       | Cursor `hooks.json`                                                                                                |
 | `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |
@@ -59,8 +59,9 @@ Different features may proceed in one checkout only while each writes its own `d
 ## Install
 
 ```bash
-# install into a target repo (minimal templates)
+# install into a target repo (minimal templates; default pack java)
 ./scripts/install.sh /path/to/target-repo
+# or: ./scripts/install.sh --pack dotnet /path/to/target-repo
 # greenfield / full starters (maven, docker, openapi, …):
 ./scripts/install.sh --with-starters /path/to/target-repo
 # preferred greenfield (kit + P0 app archive under app/):
@@ -76,7 +77,7 @@ Different features may proceed in one checkout only while each writes its own `d
 
 On an Intel Mac, a missing JDK 21, Node, or npm is installed with MacPorts. PyYAML uses the same script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts): `sh .agents-v0/scripts/host-tools-macports.sh` (see `docs/agents-v0/gold-standards.md` after install).
 
-Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`.
+Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`, `ci/endpoint_scan.py`, and `.agents-v0/packs/`. `--update` keeps the profile `Pack` row.
 
 ## Model routing
 

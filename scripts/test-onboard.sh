@@ -22,7 +22,8 @@ expect_fail() { desc="$1"; dir="$2"; shift 2; if (cd "$dir" && "$@") >/dev/null 
 # --- fixture ------------------------------------------------------------------
 r="$tmp/repo"
 mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/docs/agents-v0"
-cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh "$r/.agents-v0/ci/"
+cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh \
+   "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$r/.agents-v0/ci/"
 cp "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
    "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
    "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$r/.agents-v0/scripts/"

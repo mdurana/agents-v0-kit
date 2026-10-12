@@ -7,8 +7,9 @@ delivery kit and **incremental** milestone delivery (P0 → P5).
 
 **Preferred:** create an empty git repo (no application source yet). The kit bundles a
 P0 codebase archive (`templates/app/p0-platform-skeleton.tar.gz`) that matches the
-canonical stack — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
+`java` pack — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
 PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only.
+A program that is not this skeleton chooses `java`, `dotnet`, `node`, `python`, or `go` in `/v0-architecture`.
 
 **Fallback** when you must use an external generator:
 
@@ -42,8 +43,7 @@ Repack the archive after editing `templates/app/{backend,frontend}`:
 ./scripts/pack-app-template.sh
 ```
 
-During P0 build stories, agents follow **`scaffold-service`**: prove the template (or
-harden an external skeleton). Do not reinvent health/shell when the archive was used.
+During P0 build stories, Pack `java` or an empty Pack follows **`scaffold-service`**: prove the template (or harden an external skeleton). Do not reinvent the health shell when the archive was used. Pack `dotnet`, `node`, `python`, or `go` follows `scaffold-aspnet-service`, `scaffold-node-service`, `scaffold-python-service`, or `scaffold-go-service`, copies the Dockerfile and quality snippet named in that pack's `PACK.md`, and does not extract the Java archive.
 **Major** cross-cutting changes use **`system-design`** in `/v0-design`.
 
 Manual equivalent:

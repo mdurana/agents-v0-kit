@@ -252,13 +252,28 @@ def measure_alt(kind):
         record_coverage(gocover_pct(os.path.join(root, "coverage.out")), "coverage.out")
     else:
         failures.append(f"unknown pack {kind}")
-    cve = os.path.join(root, "cve-report.json")
-    if os.path.isfile(cve):
-        print(f"cve: present ({cve})")
-    elif env("REQUIRE_CVE_REPORT") == "1":
-        failures.append("missing cve-report.json (REQUIRE_CVE_REPORT=1)")
-    else:
-        print("cve: SKIP (no cve-report.json)")
+    record_cve(os.path.join(root, "cve-report.json"))
+
+
+def record_cve(path):
+    """Same HIGH/CRITICAL shape as target/dependency-check-report.json."""
+    if not os.path.isfile(path):
+        if env("REQUIRE_CVE_REPORT") == "1":
+            failures.append(f"missing {os.path.basename(path)} (REQUIRE_CVE_REPORT=1)")
+        else:
+            print(f"cve: SKIP (no {os.path.basename(path)})")
+        return
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    found = []
+    for dep in data.get("dependencies", []):
+        for vuln in dep.get("vulnerabilities") or []:
+            if str(vuln.get("severity", "")).upper() in ("HIGH", "CRITICAL"):
+                found.append(str(vuln.get("name", "?")))
+    summary["highCriticalCves"] = sorted(set(found))
+    print(f"cve: {len(set(found))} unsuppressed HIGH/CRITICAL")
+    if found:
+        failures.append("unsuppressed HIGH/CRITICAL CVEs: " + ", ".join(sorted(set(found))))
 
 
 def finish():

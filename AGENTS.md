@@ -4,7 +4,7 @@ Delivery kit for **Cursor**. Always-on instructions live in `.cursor/rules/` aft
 
 ## Mission
 
-Build and maintain enterprise-grade systems — Spring Boot services, BFFs, and React frontends — through a gated delivery lifecycle with recorded human approvals.
+Build and maintain enterprise-grade systems — one backend pack (`java`, `dotnet`, `node`, `python`, or `go`; the bundled skeleton is `java`) and a React frontend — through a gated delivery lifecycle with recorded human approvals.
 
 ## Lifecycle and gates
 
