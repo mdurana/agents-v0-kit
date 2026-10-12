@@ -5,7 +5,7 @@
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOKS="$KIT/core/hooks"
+HOOKS="$KIT/core/common/hooks"
 fail=0
 
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }

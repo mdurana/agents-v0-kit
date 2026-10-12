@@ -14,12 +14,11 @@ Different features may proceed in one checkout only while each writes its own `d
 | Path                   | Purpose                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `AGENTS.md`            | Kit lifecycle summary (reference; Cursor loads rules from `.cursor/rules/`)                                        |
-| `core/rules/*.mdc`     | Org delivery rules (+ `ux-design`) — single source of truth; installed to `.cursor/rules/org/`                     |
-| `core/agents/*.md`     | 19 subagents with Cursor `model:` frontmatter                                                                      |
-| `core/commands/v0-*.md` | 16 entry points (`/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake` … `/v0-local-release`, `/v0-deliver`, `/v0-onboard`, `/v0-status`, `/v0-triage`, `/v0-export`, `/v0-deck`) — `v0-` avoids Cursor built-in slash collisions |
-| `core/skills/`         | 40 playbooks in the standard `SKILL.md` format                                                                     |
-| `core/hooks/`          | Guardrails: `pre-shell.sh`, `pre-edit.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`        |
-| `core/adapters/`       | Cursor `hooks.json`                                                                                                |
+| `core/common/`         | Lifecycle shared by every pack: commands, agents, rules, skills, hooks, Cursor adapter                            |
+| `core/java/` `core/dotnet/` `core/node/` `core/python/` `core/go/` | Pack agents, rules, skills, auth hook, and starters. Install copies one pack plus `common/` |
+| `core/common/commands/v0-*.md` | 16 entry points (`/v0-roadmap` … `/v0-deck`) |
+| `core/common/agents/`  | Shared subagents. `backend-engineer` and `bff-engineer` live in the pack. 19 subagents in all |
+| `core/common/skills/` plus each pack's `skills/` | 40 playbooks |
 | `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |
 | `templates/docs/agents-v0/` | Kit reference docs (map, user guide, compliance, model routing); installed to `docs/agents-v0/` in target repos |
 | `scripts/`             | `install.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `scaffold-app-template.sh`, `pack-app-template.sh`, `audit-brownfield-baseline.sh` |
@@ -81,7 +80,7 @@ Seeded only when missing (never clobbered): `README.md` and project templates. A
 
 ## Model routing
 
-The kit routes by **role** — Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, and UX Designer — with default Cursor model IDs in [templates/docs/agents-v0/model-routing-matrix.md](templates/docs/agents-v0/model-routing-matrix.md) (installed to `docs/agents-v0/` in target repos). Build (critical) uses the Plan model. Those IDs match `.cursor/model-config.json`. `scripts/install.sh` seeds `.cursor/model-config.json` and runs `.agents-v0/scripts/update-agents-model.sh` to rewrite agent `model:` lines and sync the installed routing matrix from config (or `KIT_MODEL_*` env vars). Run that script again after you change the config. Kit source agents in `core/agents/` keep the matrix defaults.
+The kit routes by **role** — Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, and UX Designer — with default Cursor model IDs in [templates/docs/agents-v0/model-routing-matrix.md](templates/docs/agents-v0/model-routing-matrix.md) (installed to `docs/agents-v0/` in target repos). Build (critical) uses the Plan model. Those IDs match `.cursor/model-config.json`. `scripts/install.sh` seeds `.cursor/model-config.json` and runs `.agents-v0/scripts/update-agents-model.sh` to rewrite agent `model:` lines and sync the installed routing matrix from config (or `KIT_MODEL_*` env vars). Run that script again after you change the config. Kit source agents under `core/common/agents/` and `core/<pack>/agents/` keep the matrix defaults.
 
 ## Milestone delivery
 

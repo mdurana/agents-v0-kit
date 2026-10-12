@@ -1,6 +1,6 @@
 # Kit reference
 
-Engineer's map of the agents-v0 delivery kit: the workflow, the records, and what is actually checked. Approvers use [user-guide.md](user-guide.md). This file describes the kit as installed; each phase command (`core/commands/`) is the procedure, and this page is how the pieces fit.
+Engineer's map of the agents-v0 delivery kit: the workflow, the records, and what is actually checked. Approvers use [user-guide.md](user-guide.md). This file describes the kit as installed; each phase command (`core/common/commands/`) is the procedure, and this page is how the pieces fit.
 
 The kit targets **Cursor**. `scripts/install.sh` copies the core into `.cursor/`. Gates, approvals, and CI checks are documented here. Git hosting is on-prem GitLab (`glab`, `.gitlab-ci.yml`).
 
@@ -202,7 +202,7 @@ The profile Layout lists `Service roots` (for example `services/order, services/
 
 ## Agents and models
 
-The model is chosen by role. Cursor IDs are the role table in `docs/agents-v0/model-routing-matrix.md`. The Kit agent mapping in that file names which agent uses which role. `.cursor/model-config.json` holds the same defaults and is seeded on install. `scripts/install.sh` rewrites `.cursor/agents/*/model:` from that file by running `sh .agents-v0/scripts/update-agents-model.sh`. `KIT_MODEL_PLAN`, `KIT_MODEL_BUILD`, and the other `KIT_MODEL_*` variables override the file for that run. After install, edit `.cursor/model-config.json` and run that script again. Kit source under `core/agents/` keeps the matrix defaults.
+The model is chosen by role. Cursor IDs are the role table in `docs/agents-v0/model-routing-matrix.md`. The Kit agent mapping in that file names which agent uses which role. `.cursor/model-config.json` holds the same defaults and is seeded on install. `scripts/install.sh` rewrites `.cursor/agents/*/model:` from that file by running `sh .agents-v0/scripts/update-agents-model.sh`. `KIT_MODEL_PLAN`, `KIT_MODEL_BUILD`, and the other `KIT_MODEL_*` variables override the file for that run. After install, edit `.cursor/model-config.json` and run that script again. Kit source under `core/common/agents/` and `core/<pack>/agents/` keeps the matrix defaults.
 
 | Role | Does |
 |------|------|
@@ -256,7 +256,7 @@ Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, ha
 
 Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB (`scripts/validate-kit.sh`). `AGENTS.md` is the kit repository's own summary and is not installed. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
 
-Skills are the phase playbooks (`core/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
+Skills are the phase playbooks (`core/common/skills/*/SKILL.md` and `core/<pack>/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
 
 ## Install
 
@@ -289,4 +289,4 @@ A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the k
 | Which check enforces which rule? | [compliance-matrix.md](compliance-matrix.md) |
 | Which model runs which role? | [model-routing-matrix.md](model-routing-matrix.md) |
 | How do we measure a first run? | [benchmark/reference-project.md](benchmark/reference-project.md) |
-| What command do I run? | `core/commands/<phase>.md` |
+| What command do I run? | `core/common/commands/<phase>.md` |

@@ -1,0 +1,28 @@
+---
+description: PR and code-review checklist — security, correctness, tests, observability, standards compliance
+alwaysApply: false
+---
+
+# Code review checklist
+
+Use for PRs, diffs, or explicit review requests.
+
+## Must verify
+
+- [ ] **Correctness:** happy path, edge cases, failure modes.
+- [ ] **Security:** parameterized SQL and sort/filter allowlists; XSS-safe rendering; log injection mitigated the way `backend.mdc` says; no secrets in code/logs; safe path handling; CSRF/CORS/BOLA; JWT claim checks; audit events per `security-baseline.mdc` when touching auth, cookies, CORS, resource IDs, or outbound URLs.
+- [ ] **API/events:** boundary validation; DTOs not entities; idempotent event handling; HTTP semantics per `api-and-events.mdc`.
+- [ ] **Observability:** useful logs at state transitions and external calls; trace context (`traceparent` / OTel) propagated; no PII/secrets in logs.
+- [ ] **Complexity/coverage:** methods ≤30 lines, cognitive complexity ≤15 per `quality-and-testing.mdc`.
+- [ ] **Error handling:** no empty catches; exception paths tested.
+- [ ] **Docs/diagrams:** README, architecture, network, sequence docs updated if behavior or topology changed — `architecture-and-diagrams.mdc`.
+
+## Feedback format
+
+- **Critical** — merge blocker
+- **Suggestion** — should fix unless justified
+- **Nice to have** — optional polish
+
+## References
+
+`docs/agents-v0/security-standards.md`, `docs/agents-v0/gold-standards.md`, `docs/agents-v0/quality-quick-reference.md`

@@ -79,25 +79,25 @@ validate_target() {
   fi
 }
 
-# 1. Rules: valid frontmatter (single source of truth in core/rules/*.mdc).
-for f in core/rules/*.mdc; do
+# 1. Rules: valid frontmatter (kernel in core/common/rules, pack rules in core/<pack>/rules).
+for f in core/*/rules/*.mdc; do
   [ -e "$f" ] || continue
   head -n1 "$f" | grep -qx -- '---' || err "$f: missing opening ---"
   awk 'NR<=20 && /^---$/ && NR>1 {found=1; exit} END{exit !found}' "$f" || err "$f: missing closing ---"
 done
 for phase in intake design build verify release; do
-  grep -Fq "\`/v0-$phase\`" core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-$phase"
+  grep -Fq "\`/v0-$phase\`" core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-$phase"
 done
-grep -Fq 'docs/agents-v0/build/' core/rules/workflow-orchestration.mdc || err "workflow rule does not mandate persisted Build evidence"
-grep -Fq 'docs/agents-v0/verify/' core/rules/workflow-orchestration.mdc || err "workflow rule does not mandate persisted Verify evidence"
-grep -Fq 'docs/agents-v0/project-profile.md' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference docs/agents-v0/project-profile.md"
-grep -Fq '/v0-triage' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-triage"
+grep -Fq 'docs/agents-v0/build/' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not mandate persisted Build evidence"
+grep -Fq 'docs/agents-v0/verify/' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not mandate persisted Verify evidence"
+grep -Fq 'docs/agents-v0/project-profile.md' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference docs/agents-v0/project-profile.md"
+grep -Fq '/v0-triage' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-triage"
 
 # 2. Cross-references: every rule/doc named by kit content resolves.
-for ref in $(grep -rhoE '`[a-z-]+\.mdc`' core/rules core/agents core/commands core/skills | tr -d '`' | sort -u); do
-  [ -f "core/rules/$ref" ] || err "kit content references missing rule $ref"
+for ref in $(grep -rhoE '`[a-z-]+\.mdc`' core/common core/java core/dotnet core/node core/python core/go | tr -d '`' | sort -u); do
+  find core -path "*/rules/$ref" | grep -q . || err "kit content references missing rule $ref"
 done
-for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/rules core/agents core/commands core/skills | tr -d '`' | sort -u); do
+for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/common core/java core/dotnet core/node core/python core/go | tr -d '`' | sort -u); do
   # Outputs that /v0-onboard or /v0-architecture write in the target repo are not seeded templates.
   case "$ref" in docs/agents-v0/onboarding/report.md|docs/agents-v0/adr/0000-inherited-decisions.md|docs/agents-v0/discovery/*|docs/agents-v0/design/system/architecture-review.md) continue ;; esac
   if [ -f "$ref" ]; then
@@ -109,16 +109,16 @@ done
 
 # 3. Commands: every phase command exists; workflow rule references the phases; evidence contracts.
 for command in roadmap architecture plan intake design build verify maintain release deliver status onboard triage export deck; do
-  [ -f "core/commands/v0-$command.md" ] || err "missing /v0-$command command"
+  [ -f "core/common/commands/v0-$command.md" ] || err "missing /v0-$command command"
 done
-grep -Fq '`/v0-plan`' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-plan"
-grep -Fq 'docs/agents-v0/requirements/<feature>.md' core/commands/v0-intake.md || err "/v0-intake does not name its requirements artifact"
-grep -Fq 'docs/agents-v0/build/' core/commands/v0-build.md || err "/v0-build does not name persisted build evidence paths"
-grep -Fq 'docs/agents-v0/verify/' core/commands/v0-verify.md || err "/v0-verify does not name persisted evidence paths"
-grep -Fqi 'exist on disk' core/commands/v0-deliver.md || err "/v0-deliver does not verify recorded evidence existence"
+grep -Fq '`/v0-plan`' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-plan"
+grep -Fq 'docs/agents-v0/requirements/<feature>.md' core/common/commands/v0-intake.md || err "/v0-intake does not name its requirements artifact"
+grep -Fq 'docs/agents-v0/build/' core/common/commands/v0-build.md || err "/v0-build does not name persisted build evidence paths"
+grep -Fq 'docs/agents-v0/verify/' core/common/commands/v0-verify.md || err "/v0-verify does not name persisted evidence paths"
+grep -Fqi 'exist on disk' core/common/commands/v0-deliver.md || err "/v0-deliver does not verify recorded evidence existence"
 
 # 4. Agents: name matches file, subagent mode, Cursor model field, referenced.
-for f in core/agents/*.md; do
+for f in core/*/agents/*.md; do
   name="$(basename "$f" .md)"
   grep -Eq "^name:[[:space:]]*$name$" "$f" || err "$f: frontmatter name must match filename"
   grep -Eq '^mode:[[:space:]]*subagent' "$f" || err "$f: missing mode: subagent"
@@ -126,14 +126,14 @@ for f in core/agents/*.md; do
   if grep -Eq '^model_kilo:' "$f" || grep -Eq '^model_claude:' "$f"; then
     err "$f: must not carry model_kilo or model_claude (Cursor-only kit)"
   fi
-  grep -Fqr -- "$name" core/commands core/agents core/skills || err "$name is not referenced by a command, agent, or skill"
+  grep -Fqr -- "$name" core/common core/java core/dotnet core/node core/python core/go || err "$name is not referenced by a command, agent, or skill"
 done
 
 # 5. Skills: standard frontmatter, referenced, no rule fields.
-for f in core/skills/*/SKILL.md; do
+for f in core/*/skills/*/SKILL.md; do
   name="$(basename "$(dirname "$f")")"
   grep -Eq "^name:[[:space:]]*$name$" "$f" || err "$f: frontmatter name must match directory"
-  grep -Fqr -- "$name" core/commands core/agents || err "$name is not referenced by a command or agent"
+  grep -Fqr -- "$name" core/common core/java core/dotnet core/node core/python core/go || err "$name is not referenced by a command or agent"
   if awk 'NR==1 && /^---/{f=1;next} f && /^---/{f=0} f && (/^globs:/||/^alwaysApply:/){print;exit}' "$f" | grep -q .; then
     err "$f: skill frontmatter has rule fields (globs/alwaysApply)"
   fi
@@ -141,7 +141,7 @@ done
 
 # 6. Phase commands carry explicit approval wording.
 for command in intake design build verify release local-release; do
-  grep -Eqi 'explicit.*approval|approval.*explicit' "core/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
+  grep -Eqi 'explicit.*approval|approval.*explicit' "core/common/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
 done
 
 # 7. Model routing: each agent's cursor model matches the Cursor ID of its role row.
@@ -190,7 +190,7 @@ for line in section.splitlines():
     if name and key and name != "Kit agent":
         agents[name] = key
 
-for path in sorted(Path("core/agents").glob("*.md")):
+for path in sorted(Path("core").glob("*/agents/*.md")):
     name = path.stem
     model = ""
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -204,35 +204,35 @@ for path in sorted(Path("core/agents").glob("*.md")):
         sys.exit(f"{name} model {model!r} != {role} Cursor ID {ids.get(role)!r}")
 PY
 # 8. Adapter config exists and wires the right entry points.
-[ -f core/adapters/cursor/hooks.json ] || err "cursor hooks.json missing"
-grep -Fq 'pre-shell.sh' core/adapters/cursor/hooks.json || err "cursor hooks.json does not wire pre-shell"
-grep -Fq '"version": 1' core/adapters/cursor/hooks.json || err "cursor hooks.json must declare version 1"
-[ ! -f core/adapters/claude/settings.json ] && [ ! -f core/adapters/kilo/kilo.json ] || err "remove legacy claude/kilo adapter files (Cursor-only kit)"
+[ -f core/common/adapters/cursor/hooks.json ] || err "cursor hooks.json missing"
+grep -Fq 'pre-shell.sh' core/common/adapters/cursor/hooks.json || err "cursor hooks.json does not wire pre-shell"
+grep -Fq '"version": 1' core/common/adapters/cursor/hooks.json || err "cursor hooks.json must declare version 1"
+[ ! -f core/common/adapters/claude/settings.json ] && [ ! -f core/common/adapters/kilo/kilo.json ] || err "remove legacy claude/kilo adapter files (Cursor-only kit)"
 [ -d .claude ] && err "remove .claude/ from the kit repo (Cursor-only)"
-[ -d core/adapters/claude ] && err "remove core/adapters/claude/ (Cursor-only)"
-[ -d core/adapters/kilo ] && err "remove core/adapters/kilo/ (Cursor-only)"
+[ -d core/common/adapters/claude ] && err "remove core/common/adapters/claude/ (Cursor-only)"
+[ -d core/common/adapters/kilo ] && err "remove core/common/adapters/kilo/ (Cursor-only)"
 
 # 9. Hook classifications are deliberate: pre-shell blocks; after-edit warns; stop is evidence-based.
-grep -Fq 'exit 2' core/hooks/pre-shell.sh || err "pre-shell hook has no blocking exit"
-grep -Eq 'ASK:|ask\\t' core/hooks/pre-shell.sh core/hooks/lib.sh || err "pre-shell hook lacks commit/push approval prompt"
-grep -Fq 'exit 0' core/hooks/after-edit.sh || err "after-edit hook must remain warning-only"
-grep -Fq 'hook_emit_additional_context' core/hooks/after-edit.sh || err "after-edit hook must surface warnings to the agent"
-grep -Fq 'hook_emit_session_context' core/hooks/lib.sh || err "lib.sh must provide session-start context emitter"
-grep -Fq 'agents-v0-stop-reminder' core/hooks/stop.sh || err "stop hook must rate-limit reminders"
-[ -f core/hooks/hook-policy.py ] || err "hook-policy.py missing"
-[ -f core/hooks/pre-edit.sh ] || err "pre-edit.sh missing"
-grep -Fq 'pre-edit.sh' core/adapters/cursor/hooks.json || err "cursor hooks.json must wire pre-edit"
-grep -Fq 'beforeMCPExecution' core/adapters/cursor/hooks.json && err "cursor hooks.json must not wire MCP (kit does not ship MCP)"
-[ -f core/hooks/pre-mcp.sh ] && err "remove core/hooks/pre-mcp.sh (kit does not ship MCP)"
-[ -f core/hooks/mcp-policy.json ] && err "remove core/hooks/mcp-policy.json (kit does not ship MCP)"
+grep -Fq 'exit 2' core/common/hooks/pre-shell.sh || err "pre-shell hook has no blocking exit"
+grep -Eq 'ASK:|ask\\t' core/common/hooks/pre-shell.sh core/common/hooks/lib.sh || err "pre-shell hook lacks commit/push approval prompt"
+grep -Fq 'exit 0' core/common/hooks/after-edit.sh || err "after-edit hook must remain warning-only"
+grep -Fq 'hook_emit_additional_context' core/common/hooks/after-edit.sh || err "after-edit hook must surface warnings to the agent"
+grep -Fq 'hook_emit_session_context' core/common/hooks/lib.sh || err "lib.sh must provide session-start context emitter"
+grep -Fq 'agents-v0-stop-reminder' core/common/hooks/stop.sh || err "stop hook must rate-limit reminders"
+[ -f core/common/hooks/hook-policy.py ] || err "hook-policy.py missing"
+[ -f core/common/hooks/pre-edit.sh ] || err "pre-edit.sh missing"
+grep -Fq 'pre-edit.sh' core/common/adapters/cursor/hooks.json || err "cursor hooks.json must wire pre-edit"
+grep -Fq 'beforeMCPExecution' core/common/adapters/cursor/hooks.json && err "cursor hooks.json must not wire MCP (kit does not ship MCP)"
+[ -f core/common/hooks/pre-mcp.sh ] && err "remove core/common/hooks/pre-mcp.sh (kit does not ship MCP)"
+[ -f core/common/hooks/mcp-policy.json ] && err "remove core/common/hooks/mcp-policy.json (kit does not ship MCP)"
 [ -f docs/mcp-baseline.md ] && err "remove docs/mcp-baseline.md (kit does not ship MCP)"
 [ -f templates/.cursor/mcp.json.example ] && err "remove the MCP example config (kit does not ship MCP)"
-grep -Fq 'session-start.sh' core/adapters/cursor/hooks.json || err "cursor hooks.json must wire session-start"
+grep -Fq 'session-start.sh' core/common/adapters/cursor/hooks.json || err "cursor hooks.json must wire session-start"
 grep -Fq 'pipefail' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run with pipefail (tee masks failures)"
 [ -f templates/.agents-v0/ci/check-approver-github.sh ] && err "remove templates/.agents-v0/ci/check-approver-github.sh (GitLab-only kit)"
 [ -d templates/.github ] && err "remove templates/.github (GitLab-only kit)"
-grep -Fq 'hook_shell_permission_allow' core/hooks/lib.sh || err "lib.sh must emit Cursor permission allow JSON"
-grep -Fq 'hook_shell_permission_allow' core/hooks/pre-edit.sh || err "pre-edit must call hook_shell_permission_allow on allow"
+grep -Fq 'hook_shell_permission_allow' core/common/hooks/lib.sh || err "lib.sh must emit Cursor permission allow JSON"
+grep -Fq 'hook_shell_permission_allow' core/common/hooks/pre-edit.sh || err "pre-edit must call hook_shell_permission_allow on allow"
 grep -Fq 'CI_MERGE_REQUEST_IID' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must pass CI_MERGE_REQUEST_IID to check-delivery-linkage.sh"
 grep -Fq 'check-approver-gitlab.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage.sh must invoke check-approver-gitlab.sh"
 grep -Fq 'review_phases' templates/.agents-v0/ci/check-delivery-linkage.sh || err "MR approval must accept an Approved release or verify approver"
@@ -244,8 +244,8 @@ grep -Fq '0000000000000000000000000000000000000000' templates/.agents-v0/hooks/p
 grep -Fq 'check-asyncapi.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must lint asyncapi.yaml when present"
 grep -Fq 'export-audit-pack.sh' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack.sh must exist"
 grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack must emit schema agents-v0-audit-manifest"
-grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.sh (local gate, audit, state, and MR-body scripts)"
-grep -Fq '.agents-v0/hooks/pre-push' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/hooks/pre-push"
+grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.sh (local gate, audit, state, and MR-body scripts)"
+grep -Fq '.agents-v0/hooks/pre-push' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/hooks/pre-push"
 grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX (Node 20 is end-of-life)"
 if grep -Eq 'node:20' templates/.gitlab-ci.yml templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/app/frontend/Dockerfile; then err "Node 20 is end-of-life: CI and Dockerfile starters must use Node 22"; fi
 # .gitlab-ci.yml must parse, and the kit scripts it names must resolve. Kit scripts install under
@@ -287,7 +287,7 @@ grep -Fq 'update-agents-model.sh' scripts/install.sh || err "install.sh must see
 grep -Fq 'host-tools-macports.sh' scripts/install.sh || err "install.sh must seed .agents-v0/scripts/host-tools-macports.sh"
 [ -x templates/.agents-v0/scripts/host-tools-macports.sh ] || err "templates/.agents-v0/scripts/host-tools-macports.sh missing or not executable"
 grep -Fq 'openjdk21' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document MacPorts openjdk21 for Intel Macs"
-grep -Fq 'host-tools-macports.sh' core/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
+grep -Fq 'host-tools-macports.sh' core/common/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
 grep -Fq 'host-tools-macports.sh' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must document the Intel MacPorts host-tools script"
 [ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
 [ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"
@@ -297,9 +297,9 @@ grep -Fq '## Endpoint authorization' templates/docs/agents-v0/project-profile.md
 grep -Fq 'Secret-Detection.gitlab-ci.yml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must use GitLab Secret Detection"
 grep -Fq 'check-coverage-ratchet.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run the coverage ratchet check"
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck -S error core/hooks/*.sh templates/.agents-v0/ci/*.sh templates/.agents-v0/scripts/*.sh scripts/*.sh || err "shellcheck -S error failed"
+  shellcheck -S error core/common/hooks/*.sh core/*/hooks/*.sh templates/.agents-v0/ci/*.sh templates/.agents-v0/scripts/*.sh scripts/*.sh || err "shellcheck -S error failed"
 fi
-[ -f core/hooks/session-start.sh ] || err "session-start.sh missing"
+[ -f core/common/hooks/session-start.sh ] || err "session-start.sh missing"
 [ -f scripts/test-hooks.sh ] || err "scripts/test-hooks.sh missing"
 [ -f scripts/test-hook-policy.py ] || err "scripts/test-hook-policy.py missing"
 sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
@@ -313,7 +313,7 @@ sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
 [ -f scripts/test-release.sh ] || err "scripts/test-release.sh missing"
 sh scripts/test-release.sh || err "scripts/test-release.sh failed"
-grep -Fq 'git status --porcelain' core/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
+grep -Fq 'git status --porcelain' core/common/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
 # the kit and is seeded into target workspaces.
@@ -324,7 +324,7 @@ grep -Fq 'the repository wins' AGENTS.md || err "AGENTS.md does not state rule p
 grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.md into target workspaces"
 
 # 11. Required template artifacts.
-for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/docs/agents-v0/architecture.md templates/docs/agents-v0/network.md templates/docs/agents-v0/project-profile.md templates/docs/agents-v0/requirements/_state.template.json templates/.gitlab/CODEOWNERS templates/.agents-v0/ci/check-approvals.sh templates/.agents-v0/ci/check-evidence.sh templates/.agents-v0/ci/check-milestone.sh templates/.agents-v0/ci/check-delivery-linkage.sh templates/.agents-v0/ci/check-approver-gitlab.sh templates/.agents-v0/ci/check-coverage-ratchet.sh templates/.agents-v0/ci/check-known-failures.sh templates/.agents-v0/ci/resolve-layout.sh templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh templates/.agents-v0/scripts/check-delivery-gate-local.sh templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh templates/.agents-v0/scripts/export-audit-pack.sh templates/.agents-v0/hooks/pre-push templates/.cursor/model-config.json templates/docs/agents-v0/milestones/_template.md templates/docs/agents-v0/milestones/p0-platform-skeleton.md templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md templates/docs/agents-v0/milestones/p2-mvp-core-features.md templates/docs/agents-v0/milestones/p3-feature-expansion.md templates/docs/agents-v0/milestones/p4-hardening.md templates/docs/agents-v0/milestones/p5-release-readiness.md templates/docs/agents-v0/repo-map.md templates/docs/agents-v0/workspace.manifest.json templates/.agents-v0/scripts/generate-repo-map.sh templates/.agents-v0/scripts/collect-dependency-graphs.sh templates/.agents-v0/scripts/sync-feature-state.sh templates/.agents-v0/scripts/delivery-metrics.sh templates/.agents-v0/ci/check-feature-state.sh templates/docs/agents-v0/greenfield-onboarding.md templates/docs/agents-v0/brownfield-onboarding.md templates/.agents-v0/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md templates/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml templates/maven/checkstyle.xml templates/maven/dependency-check-suppressions.xml templates/maven/quality-plugins-ci-security.xml templates/maven/contract-conformance.xml templates/maven/archunit/LayerRulesTest.java templates/docs/agents-v0/design/ux-spec.md templates/docs/agents-v0/design/system/context-map.md templates/docs/agents-v0/design/system/nfr-slo.md templates/docs/agents-v0/design/system/threat-model.md templates/docs/agents-v0/design/system/slo-evidence.md templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/ci/check-asyncapi.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh; do
+for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/docs/agents-v0/architecture.md templates/docs/agents-v0/network.md templates/docs/agents-v0/project-profile.md templates/docs/agents-v0/requirements/_state.template.json templates/.gitlab/CODEOWNERS templates/.agents-v0/ci/check-approvals.sh templates/.agents-v0/ci/check-evidence.sh templates/.agents-v0/ci/check-milestone.sh templates/.agents-v0/ci/check-delivery-linkage.sh templates/.agents-v0/ci/check-approver-gitlab.sh templates/.agents-v0/ci/check-coverage-ratchet.sh templates/.agents-v0/ci/check-known-failures.sh templates/.agents-v0/ci/resolve-layout.sh templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh templates/.agents-v0/scripts/check-delivery-gate-local.sh templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh templates/.agents-v0/scripts/export-audit-pack.sh templates/.agents-v0/hooks/pre-push templates/.cursor/model-config.json templates/docs/agents-v0/milestones/_template.md templates/docs/agents-v0/milestones/p0-platform-skeleton.md templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md templates/docs/agents-v0/milestones/p2-mvp-core-features.md templates/docs/agents-v0/milestones/p3-feature-expansion.md templates/docs/agents-v0/milestones/p4-hardening.md templates/docs/agents-v0/milestones/p5-release-readiness.md templates/docs/agents-v0/repo-map.md templates/docs/agents-v0/workspace.manifest.json templates/.agents-v0/scripts/generate-repo-map.sh templates/.agents-v0/scripts/collect-dependency-graphs.sh templates/.agents-v0/scripts/sync-feature-state.sh templates/.agents-v0/scripts/delivery-metrics.sh templates/.agents-v0/ci/check-feature-state.sh templates/docs/agents-v0/greenfield-onboarding.md templates/docs/agents-v0/brownfield-onboarding.md templates/.agents-v0/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md core/java/starters/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml core/java/starters/maven/checkstyle.xml core/java/starters/maven/dependency-check-suppressions.xml core/java/starters/maven/quality-plugins-ci-security.xml core/java/starters/maven/contract-conformance.xml core/java/starters/maven/archunit/LayerRulesTest.java templates/docs/agents-v0/design/ux-spec.md templates/docs/agents-v0/design/system/context-map.md templates/docs/agents-v0/design/system/nfr-slo.md templates/docs/agents-v0/design/system/threat-model.md templates/docs/agents-v0/design/system/slo-evidence.md templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/ci/check-asyncapi.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh; do
   [ -f "$artifact" ] || err "required artifact template missing: $artifact"
 done
 for doc in compliance-matrix.md model-routing-matrix.md user-guide.md agents-v0-kit.md greenfield-onboarding.md brownfield-onboarding.md benchmark/reference-project.md; do
@@ -339,8 +339,8 @@ done
 for doc in security-standards.md security/vapt-prevention-guardrails.md security/vapt-pr-checklist.md quality-quick-reference.md quality-gates-engineering-principles.md; do
   awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq "docs/agents-v0/$doc" || err "install.sh --update does not refresh docs/agents-v0/$doc"
 done
-if grep -Fq 'docs/security-standards.md' core/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/security-standards.md"; fi
-if grep -Fq 'docs/quality-quick-reference.md' core/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/quality-quick-reference.md"; fi
+if grep -Fq 'docs/security-standards.md' core/common/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/security-standards.md"; fi
+if grep -Fq 'docs/quality-quick-reference.md' core/common/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/quality-quick-reference.md"; fi
 grep -Fq 'F4, F8, F9, F10' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit.md must describe the always-on VAPT gate"
 if grep -Fq 'Any applicable VAPT item left unchecked is Critical' templates/docs/agents-v0/agents-v0-kit.md; then err "agents-v0-kit.md still treats every unchecked VAPT item as Critical"; fi
 grep -Fq '## Applicable VAPT findings' templates/docs/agents-v0/design/system/threat-model.md || err "threat-model template must name the always-on VAPT findings"
@@ -350,49 +350,49 @@ grep -Fq '## Applicable VAPT findings' scripts/install.sh || err "install.sh mus
 if awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq 'threat-model.md'; then err "install.sh --update must not overwrite threat-model.md"; fi
 
 # 12. Compliance matrix contracts.
-grep -Fq '| Phase | Artifacts | Approver | Decision | Date |' core/skills/spec-intake/SKILL.md || err "spec-intake lacks the canonical Delivery approvals table format"
+grep -Fq '| Phase | Artifacts | Approver | Decision | Date |' core/common/skills/spec-intake/SKILL.md || err "spec-intake lacks the canonical Delivery approvals table format"
 grep -Fq 'check-approvals' templates/.gitlab/merge_request_templates/default.md || err "MR template does not reference the CI approval check"
 grep -Fq 'check-evidence' templates/.gitlab/merge_request_templates/default.md || err "MR template does not reference the CI evidence check"
-grep -Fq 'docs/agents-v0/build/' core/skills/spec-intake/SKILL.md || err "spec-intake does not record per-phase evidence paths"
-grep -Fq 'check-evidence' core/agents/requirements-analyst.md || err "requirements-analyst does not reference the CI evidence check"
+grep -Fq 'docs/agents-v0/build/' core/common/skills/spec-intake/SKILL.md || err "spec-intake does not record per-phase evidence paths"
+grep -Fq 'check-evidence' core/common/agents/requirements-analyst.md || err "requirements-analyst does not reference the CI evidence check"
 grep -Fq 'check-evidence.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must invoke check-evidence.sh"
 grep -Fq 'check-milestone.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must invoke check-milestone.sh"
 
 # 14. Milestone delivery contracts.
 grep -Fq 'milestone' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals does not accept the milestone phase"
-grep -Fq 'Milestone/Story links' core/skills/spec-intake/SKILL.md || err "spec-intake does not record milestone/story links"
-grep -Fq 'so that' core/skills/spec-intake/SKILL.md || err "spec-intake does not require the As a / I want / so that user story"
-grep -Fq 'AC-8' core/skills/spec-intake/SKILL.md || err "spec-intake lacks the acceptance-criteria cap"
-grep -Fq 'Kind: happy' core/skills/spec-intake/SKILL.md || err "spec-intake must require Kind on each scenario"
-grep -Fq 'check-intake.sh' core/skills/spec-intake/SKILL.md || err "spec-intake must run check-intake.sh"
-grep -Fq 'check-intake.sh' core/commands/v0-intake.md || err "/v0-intake gate must run check-intake.sh"
-grep -Fq 'user_story' core/commands/v0-intake.md || err "/v0-intake phase result must copy the user story"
+grep -Fq 'Milestone/Story links' core/common/skills/spec-intake/SKILL.md || err "spec-intake does not record milestone/story links"
+grep -Fq 'so that' core/common/skills/spec-intake/SKILL.md || err "spec-intake does not require the As a / I want / so that user story"
+grep -Fq 'AC-8' core/common/skills/spec-intake/SKILL.md || err "spec-intake lacks the acceptance-criteria cap"
+grep -Fq 'Kind: happy' core/common/skills/spec-intake/SKILL.md || err "spec-intake must require Kind on each scenario"
+grep -Fq 'check-intake.sh' core/common/skills/spec-intake/SKILL.md || err "spec-intake must run check-intake.sh"
+grep -Fq 'check-intake.sh' core/common/commands/v0-intake.md || err "/v0-intake gate must run check-intake.sh"
+grep -Fq 'user_story' core/common/commands/v0-intake.md || err "/v0-intake phase result must copy the user story"
 grep -Fq 'Kind: negative' templates/.agents-v0/ci/check-design.sh || err "check-design.sh must require negative scenarios in Failure modes"
 grep -Fq 'check-intake.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must re-check an approved Intake"
-grep -Fq 'intake <feature>' core/commands/v0-deck.md || err "/v0-deck must accept an intake kind"
-grep -Fq 'Non-technical' core/skills/leadership-deck/SKILL.md || err "leadership-deck must render scenario names for a non-technical audience"
+grep -Fq 'intake <feature>' core/common/commands/v0-deck.md || err "/v0-deck must accept an intake kind"
+grep -Fq 'Non-technical' core/common/skills/leadership-deck/SKILL.md || err "leadership-deck must render scenario names for a non-technical audience"
 [ -f templates/.agents-v0/ci/check-intake.sh ] || err "required Intake check missing: templates/.agents-v0/ci/check-intake.sh"
 grep -Fq '.agents-v0/ci/check-intake.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-intake.sh"
-grep -Fq 'Vertical slice' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the story-size budget"
-grep -Fq 'helper-brief' core/rules/workflow-orchestration.mdc || err "workflow rule lacks helper briefs"
-grep -Fq 'docs/agents-v0/build/<feature>/plan.md' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the build plan"
-grep -Fq 'failure-brief.md' core/commands/v0-build.md || err "/v0-build does not send the second failure to debug-investigator"
-grep -Fq 'check-failure-brief.sh' core/commands/v0-build.md || err "/v0-build must run check-failure-brief.sh before attempt three"
+grep -Fq 'Vertical slice' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks the story-size budget"
+grep -Fq 'helper-brief' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks helper briefs"
+grep -Fq 'docs/agents-v0/build/<feature>/plan.md' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks the build plan"
+grep -Fq 'failure-brief.md' core/common/commands/v0-build.md || err "/v0-build does not send the second failure to debug-investigator"
+grep -Fq 'check-failure-brief.sh' core/common/commands/v0-build.md || err "/v0-build must run check-failure-brief.sh before attempt three"
 [ -f templates/.agents-v0/scripts/check-failure-brief.sh ] || err "missing templates/.agents-v0/scripts/check-failure-brief.sh"
 grep -Fq 'check-failure-brief.sh' scripts/install.sh || err "install.sh does not seed check-failure-brief.sh"
 [ -f templates/docs/agents-v0/snippets/openapi-resource-crud.yaml ] || err "missing OpenAPI CRUD snippet"
 [ -f templates/docs/agents-v0/snippets/adr-sync-vs-async.md ] || err "missing ADR sync-vs-async snippet"
 [ -f templates/docs/agents-v0/snippets/ux-spec-one-screen.md ] || err "missing UX one-screen snippet"
-grep -Fq 'snippets/openapi-resource-crud.yaml' core/skills/contract-first-design/SKILL.md || err "contract-first-design must prefer the OpenAPI snippet"
+grep -Fq 'snippets/openapi-resource-crud.yaml' core/common/skills/contract-first-design/SKILL.md || err "contract-first-design must prefer the OpenAPI snippet"
 grep -Fq 'Frontend verify (fast)' scripts/bootstrap-greenfield.sh || err "bootstrap must fill Frontend verify (fast)"
-grep -Fq 'must** use `Frontend verify (fast)' core/skills/implement-frontend/SKILL.md || err "implement-frontend must require a real fast verify cell"
+grep -Fq 'must** use `Frontend verify (fast)' core/common/skills/implement-frontend/SKILL.md || err "implement-frontend must require a real fast verify cell"
 grep -Fq 'token-optimization-assessment.md' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must link the always-on trim assessment"
-grep -Fq 'phase-result.md' core/agents/orchestrator.md || err "orchestrator does not write the phase result"
-grep -Fq 'together' core/commands/v0-verify.md || err "/v0-verify does not run the read-only reviewers together"
-grep -Fq 'build-output.txt' core/rules/workflow-orchestration.mdc || err "workflow rule does not keep raw verify logs out of the next attempt"
-grep -Fq 'docs/agents-v0/design/<feature>/openapi.yaml' core/skills/contract-first-design/SKILL.md || err "contract-first-design does not draft a feature-local contract"
-grep -Fq 'Backend verify (fast' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service does not use the fast verify loop"
-grep -Fq 'slo-evidence' core/commands/v0-verify.md || err "/v0-verify does not run slo-evidence"
+grep -Fq 'phase-result.md' core/common/agents/orchestrator.md || err "orchestrator does not write the phase result"
+grep -Fq 'together' core/common/commands/v0-verify.md || err "/v0-verify does not run the read-only reviewers together"
+grep -Fq 'build-output.txt' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not keep raw verify logs out of the next attempt"
+grep -Fq 'docs/agents-v0/design/<feature>/openapi.yaml' core/common/skills/contract-first-design/SKILL.md || err "contract-first-design does not draft a feature-local contract"
+grep -Fq 'Backend verify (fast' core/java/skills/implement-service/SKILL.md || err "implement-service does not use the fast verify loop"
+grep -Fq 'slo-evidence' core/common/commands/v0-verify.md || err "/v0-verify does not run slo-evidence"
 grep -Fq 'docs/agents-v0/design/system/slo-evidence.md' templates/.agents-v0/ci/check-milestone.sh || err "check-milestone does not check SLO evidence"
 grep -Fq 'slo-evidence' templates/docs/agents-v0/milestones/p4-hardening.md || err "P4 milestone does not name slo-evidence"
 grep -Fq 'As a [role], I want [goal], so that [benefit].' templates/docs/agents-v0/milestones/_template.md || err "milestone template user story is not As a / I want / so that"
@@ -400,11 +400,11 @@ grep -Fq 'so that' templates/docs/agents-v0/milestones/p0-platform-skeleton.md |
 [ -f templates/docs/agents-v0/milestones/plan.md ] || err "milestones/plan.md missing"
 grep -Fq '| Milestone | Stories | What they cover |' templates/docs/agents-v0/milestones/plan.md || err "plan.md must be the milestone table"
 grep -Fq 'flowchart TD' templates/docs/agents-v0/milestones/plan.md || err "plan.md must include the story flowchart"
-grep -Fq 'docs/agents-v0/milestones/plan.md' core/skills/program-planning/SKILL.md || err "program-planning must write milestones/plan.md"
-grep -Fq 'docs/agents-v0/milestones/plan.md' core/commands/v0-plan.md || err "/v0-plan must present milestones/plan.md"
+grep -Fq 'docs/agents-v0/milestones/plan.md' core/common/skills/program-planning/SKILL.md || err "program-planning must write milestones/plan.md"
+grep -Fq 'docs/agents-v0/milestones/plan.md' core/common/commands/v0-plan.md || err "/v0-plan must present milestones/plan.md"
 grep -Fq 'so that' templates/docs/agents-v0/user-guide.md || err "user guide intake example lacks so that"
-grep -Fq 'milestone' core/commands/v0-intake.md || err "/v0-intake does not mention milestone programs"
-grep -Fq 'Milestone programs' core/rules/workflow-orchestration.mdc || err "workflow rule does not describe milestone programs"
+grep -Fq 'milestone' core/common/commands/v0-intake.md || err "/v0-intake does not mention milestone programs"
+grep -Fq 'Milestone programs' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not describe milestone programs"
 grep -Fq 'H-B pre-shell.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks pre-shell blocking classification"
 grep -Fq 'H-W after-edit.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks after-edit warning classification"
 
@@ -417,22 +417,22 @@ grep -Fq '!docs/agents-v0/verify/' "$ignore" || err "$ignore lacks !docs/agents-
 [ -f templates/.kiloignore ] && err "templates/.kiloignore must be removed (Cursor-only kit)"
 
 # 16. UI/UX design contracts.
-grep -Fq 'ux-designer' core/commands/v0-design.md || err "/v0-design does not launch the ux-designer"
-grep -Fq 'docs/agents-v0/design/' core/commands/v0-design.md || err "/v0-design does not name the UX spec path"
-grep -Fq 'ux-design' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the UX design gate criteria"
-grep -Fq 'docs/agents-v0/design/<feature>/ux-spec.md' core/commands/v0-build.md || err "/v0-build does not require the approved UX spec"
-grep -Fq 'mockups/' core/commands/v0-design.md || err "/v0-design does not require HTML mockups"
-grep -Fq 'Component defaults' core/skills/ux-design/SKILL.md || err "ux-design skill lacks per-component defaults"
+grep -Fq 'ux-designer' core/common/commands/v0-design.md || err "/v0-design does not launch the ux-designer"
+grep -Fq 'docs/agents-v0/design/' core/common/commands/v0-design.md || err "/v0-design does not name the UX spec path"
+grep -Fq 'ux-design' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks the UX design gate criteria"
+grep -Fq 'docs/agents-v0/design/<feature>/ux-spec.md' core/common/commands/v0-build.md || err "/v0-build does not require the approved UX spec"
+grep -Fq 'mockups/' core/common/commands/v0-design.md || err "/v0-design does not require HTML mockups"
+grep -Fq 'Component defaults' core/common/skills/ux-design/SKILL.md || err "ux-design skill lacks per-component defaults"
 grep -Fq 'mockups/' templates/docs/agents-v0/design/ux-spec.md || err "UX spec template lacks mockup links"
-grep -Fq 'ux-report.md' core/commands/v0-verify.md || err "/v0-verify does not name the persisted UX report"
-grep -Fq 'axe-core' core/skills/quality-gate/SKILL.md || err "quality-gate lacks the automated a11y check"
-grep -Fq 'UX/a11y' core/skills/pr-review/SKILL.md || err "pr-review lacks the UX/a11y checklist item"
-grep -Fq 'UX spec' core/skills/implement-frontend/SKILL.md || err "implement-frontend does not implement the UX spec"
-grep -Fq 'ux-designer' core/rules/workflow-orchestration.mdc || err "workflow rule does not list the ux-designer for Design"
-[ -f core/rules/ux-design.mdc ] || err "core/rules/ux-design.mdc missing"
+grep -Fq 'ux-report.md' core/common/commands/v0-verify.md || err "/v0-verify does not name the persisted UX report"
+grep -Fq 'axe-core' core/common/skills/quality-gate/SKILL.md || err "quality-gate lacks the automated a11y check"
+grep -Fq 'UX/a11y' core/common/skills/pr-review/SKILL.md || err "pr-review lacks the UX/a11y checklist item"
+grep -Fq 'UX spec' core/common/skills/implement-frontend/SKILL.md || err "implement-frontend does not implement the UX spec"
+grep -Fq 'ux-designer' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not list the ux-designer for Design"
+[ -f core/common/rules/ux-design.mdc ] || err "core/common/rules/ux-design.mdc missing"
 
 # 13. Shell syntax.
-for f in core/hooks/*.sh templates/.agents-v0/ci/*.sh templates/.agents-v0/scripts/*.sh scripts/audit-brownfield-baseline.sh; do
+for f in core/common/hooks/*.sh core/*/hooks/*.sh templates/.agents-v0/ci/*.sh templates/.agents-v0/scripts/*.sh scripts/audit-brownfield-baseline.sh; do
   [ -e "$f" ] || continue
   sh -n "$f" || err "$f: shell syntax error"
 done
@@ -444,17 +444,17 @@ grep -Fq 'p0-platform-skeleton' scripts/bootstrap-greenfield.sh || err "bootstra
 grep -Fq 'for m in plan ' scripts/bootstrap-greenfield.sh || err "bootstrap-greenfield.sh does not seed milestones/plan.md"
 grep -Fq 'p5-release-readiness' scripts/bootstrap-greenfield.sh || err "bootstrap-greenfield.sh does not seed P5 milestone"
 grep -Fq -- '--profile' scripts/bootstrap-greenfield.sh || err "bootstrap-greenfield.sh does not accept --profile"
-grep -Fq 'Directory profiles' core/rules/project-delivery-core.mdc || err "project-delivery-core.mdc does not define directory profiles"
+grep -Fq 'Directory profiles' core/common/rules/project-delivery-core.mdc || err "project-delivery-core.mdc does not define directory profiles"
 grep -Fq 'resolve-layout.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must resolve the directory profile"
 grep -Fq 'backend/pom.xml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build an app-profile backend/"
 grep -Fq 'app/backend/pom.xml' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build app/backend/"
 grep -Fq 'lastApprovedPhase' templates/docs/agents-v0/requirements/_state.template.json || err "state template must record lastApprovedPhase"
 grep -Fq 'lastApprovedPhase' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state.sh must derive lastApprovedPhase"
-grep -Fq 'Phase resume' core/rules/workflow-orchestration.mdc || err "workflow rule must describe phase resume"
-grep -Fq 'Parallel features' core/rules/workflow-orchestration.mdc || err "workflow rule must describe parallel-feature collisions"
-grep -Fq 'Parallel features' core/commands/v0-build.md || err "/v0-build must stop on a shared-file collision"
-grep -Fq 'Parallel features' core/commands/v0-status.md || err "/v0-status must use the feature the user names"
-grep -Fq 'updatedAt' core/hooks/session-start.sh || err "session-start.sh must pick the newest state file by updatedAt"
+grep -Fq 'Phase resume' core/common/rules/workflow-orchestration.mdc || err "workflow rule must describe phase resume"
+grep -Fq 'Parallel features' core/common/rules/workflow-orchestration.mdc || err "workflow rule must describe parallel-feature collisions"
+grep -Fq 'Parallel features' core/common/commands/v0-build.md || err "/v0-build must stop on a shared-file collision"
+grep -Fq 'Parallel features' core/common/commands/v0-status.md || err "/v0-status must use the feature the user names"
+grep -Fq 'updatedAt' core/common/hooks/session-start.sh || err "session-start.sh must pick the newest state file by updatedAt"
 grep -Fq 'brownfield-onboarding' scripts/audit-brownfield-baseline.sh || err "audit-brownfield-baseline.sh does not reference brownfield onboarding"
 grep -Fq 'docker-compose' templates/.agents-v0/scripts/run-local-container.sh || err "run-local-container.sh must use docker compose"
 grep -Fq 'Dockerfile' templates/.agents-v0/scripts/run-local-container.sh || err "run-local-container.sh must support Dockerfile fallback"
@@ -464,46 +464,46 @@ grep -Fq '.agents-v0/scripts/' scripts/install.sh || err "install.sh must chmod 
 grep -Fq 'Dockerfile and Compose' templates/docs/agents-v0/milestones/p0-platform-skeleton.md || err "P0 milestone must include the local container in the skeleton story"
 
 # 14. Build-hardening contracts survive in core.
-grep -Fq 'TDD' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service lacks the red–green (TDD) requirement"
-grep -Fq 'bounded' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service lacks bounded fix attempts"
-grep -Fq 'docs/agents-v0/build/' core/agents/backend-engineer.md || err "backend-engineer does not persist build evidence"
+grep -Fq 'TDD' core/java/skills/implement-service/SKILL.md || err "implement-service lacks the red–green (TDD) requirement"
+grep -Fq 'bounded' core/java/skills/implement-service/SKILL.md || err "implement-service lacks bounded fix attempts"
+grep -Fq 'docs/agents-v0/build/' core/java/agents/backend-engineer.md || err "backend-engineer does not persist build evidence"
 
 # 17. Consistency between prose and the files it describes (catches drift).
-agent_count="$(ls core/agents/*.md | wc -l | tr -d ' ')"
-command_count="$(ls core/commands/v0-*.md | wc -l | tr -d ' ')"
-skill_count="$(ls -d core/skills/*/ | wc -l | tr -d ' ')"
+agent_count="$(find core -path '*/agents/*.md' -exec basename {} \; | sort -u | wc -l | tr -d ' ')"
+command_count="$(ls core/common/commands/v0-*.md | wc -l | tr -d ' ')"
+skill_count="$(find core -name SKILL.md | wc -l | tr -d ' ')"
 grep -Fq "$agent_count subagents" README.md || err "README.md must say $agent_count subagents"
 grep -Fq "$command_count entry points" README.md || err "README.md must say $command_count entry points"
 grep -Fq "$skill_count playbooks" README.md || err "README.md must say $skill_count playbooks"
 grep -Fq "($agent_count agents)" templates/docs/agents-v0/model-routing-matrix.md || err "routing matrix must say ($agent_count agents)"
-for f in core/agents/*.md; do
+for f in core/*/agents/*.md; do
   name="$(basename "$f" .md)"
   grep -Eq "^\\|[[:space:]]*${name}[[:space:]]*\\|" templates/docs/agents-v0/model-routing-matrix.md || err "$name has no row in the agent mapping of model-routing-matrix.md"
 done
 # Every skill named as `(skill: x)` or `(skills: x, y)` in a command or agent exists.
-for ref in $(grep -rhoE '\(skills?: [^)]*\)' core/commands core/agents | grep -oE '`[a-z-]+`' | tr -d '`' | sort -u); do
-  [ -f "core/skills/$ref/SKILL.md" ] || err "a command or agent names skill $ref, which does not exist"
+for ref in $(grep -rhoE '\(skills?: [^)]*\)' core/common/commands core/*/agents | grep -oE '`[a-z-]+`' | tr -d '`' | sort -u); do
+  find core -path "*/skills/$ref/SKILL.md" | grep -q . || err "a command or agent names skill $ref, which does not exist"
 done
 # Every engineer agent defers to the loop in its implement-* skill instead of restating it.
-grep -Fq 'implement-spring-service` step 6' core/agents/backend-engineer.md || err "backend-engineer must defer to implement-spring-service step 6"
-grep -Fq 'implement-bff` step 6' core/agents/bff-engineer.md || err "bff-engineer must defer to implement-bff step 6"
-grep -Fq 'implement-frontend` step 6' core/agents/frontend-engineer.md || err "frontend-engineer must defer to implement-frontend step 6"
-for f in core/skills/implement-spring-service/SKILL.md core/skills/implement-bff/SKILL.md core/skills/implement-frontend/SKILL.md; do
+grep -Fq 'implement-service` step 6' core/java/agents/backend-engineer.md || err "backend-engineer must defer to implement-service step 6"
+grep -Fq 'implement-bff` step 6' core/java/agents/bff-engineer.md || err "bff-engineer must defer to implement-bff step 6"
+grep -Fq 'implement-frontend` step 6' core/common/agents/frontend-engineer.md || err "frontend-engineer must defer to implement-frontend step 6"
+for f in core/java/skills/implement-service/SKILL.md core/java/skills/implement-bff/SKILL.md core/common/skills/implement-frontend/SKILL.md; do
   grep -Fq 'check-attempt-budget.sh' "$f" || err "$f must run the phase attempt budget check"
 done
 # GitLab-only kit: conduct rule names glab; must not document GitHub/gh as a supported host.
-grep -Fq 'glab' core/rules/ai-agent-conduct.mdc || err "ai-agent-conduct.mdc must name glab (GitLab is the default host)"
-grep -Fq 'gh ' core/rules/ai-agent-conduct.mdc && err "ai-agent-conduct.mdc must not reference gh (GitLab-only kit)"
+grep -Fq 'glab' core/common/rules/ai-agent-conduct.mdc || err "ai-agent-conduct.mdc must name glab (GitLab is the default host)"
+grep -Fq 'gh ' core/common/rules/ai-agent-conduct.mdc && err "ai-agent-conduct.mdc must not reference gh (GitLab-only kit)"
 grep -Eiq 'github|pull request via gh' README.md AGENTS.md templates/docs/agents-v0/agents-v0-kit.md && err "kit docs must not advertise GitHub/gh support"
 
 # 18. Scale contracts: planning, ordering, multi-service layout, machine-read gates, budgets.
-grep -Fq 'Program planning' core/rules/workflow-orchestration.mdc || err "workflow rule lacks Program planning"
-grep -Fq 'Worktree per feature' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the worktree-per-feature convention"
-grep -Fq 'Batch approval' core/rules/workflow-orchestration.mdc || err "workflow rule lacks batch approval"
-grep -Fq 'Phase attempt budget' core/rules/workflow-orchestration.mdc || err "workflow rule lacks the phase attempt budget"
-grep -Fq 'check-gate-metrics' core/rules/workflow-orchestration.mdc || err "workflow rule does not name the machine-read gate metrics"
-grep -Fq '`/v0-plan`' core/agents/orchestrator.md || err "orchestrator does not route /v0-plan"
-grep -Fq 'program-planning' core/agents/program-planner.md || err "program-planner does not follow program-planning"
+grep -Fq 'Program planning' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks Program planning"
+grep -Fq 'Worktree per feature' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks the worktree-per-feature convention"
+grep -Fq 'Batch approval' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks batch approval"
+grep -Fq 'Phase attempt budget' core/common/rules/workflow-orchestration.mdc || err "workflow rule lacks the phase attempt budget"
+grep -Fq 'check-gate-metrics' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not name the machine-read gate metrics"
+grep -Fq '`/v0-plan`' core/common/agents/orchestrator.md || err "orchestrator does not route /v0-plan"
+grep -Fq 'program-planning' core/common/agents/program-planner.md || err "program-planner does not follow program-planning"
 grep -Fq 'check_story_order' templates/.agents-v0/ci/check-milestone.sh || err "check-milestone does not enforce story order"
 grep -Fq 'SERVICE_ROOTS' templates/.agents-v0/ci/resolve-layout.sh || err "resolve-layout does not print SERVICE_ROOTS"
 grep -Fq 'SERVICE_ROOTS' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must build each service root"
@@ -514,16 +514,16 @@ grep -Fq 'docker:' templates/.gitlab-ci.yml || err ".gitlab-ci.yml build job nee
 grep -Fq 'Service roots' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Service roots row"
 grep -Fq 'Phase attempt budget' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Phase attempt budget row"
 grep -Fq 'Deploy' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Deploy table"
-grep -Fq '"worktree"' core/hooks/hook-policy.py || err "hook-policy must ask before creating a worktree"
-grep -Fq '\.agents-v0/ci/[^/]+' core/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/ci/*.sh script, not a named list"
-grep -Fq 'kit.maven.dir' templates/maven/quality-plugins.xml || err "maven quality snippets must read kit.maven.dir (per-service config)"
-grep -Fq 'kit.openapi.catalog' templates/maven/contract-conformance.xml || err "contract-conformance must read kit.openapi.catalog (per-service catalog)"
+grep -Fq '"worktree"' core/common/hooks/hook-policy.py || err "hook-policy must ask before creating a worktree"
+grep -Fq '\.agents-v0/ci/[^/]+' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/ci/*.sh script, not a named list"
+grep -Fq 'kit.maven.dir' core/java/starters/maven/quality-plugins.xml || err "maven quality snippets must read kit.maven.dir (per-service config)"
+grep -Fq 'kit.openapi.catalog' core/java/starters/maven/contract-conformance.xml || err "contract-conformance must read kit.openapi.catalog (per-service catalog)"
 grep -Fq 'Service verify' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Service verify rows"
 grep -Fq 'FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh' templates/.gitlab-ci.yml || err "gate-metrics job must run the script from the default branch"
 [ -f templates/.agents-v0/ci/check-layout-roots.sh ] || err "templates/.agents-v0/ci/check-layout-roots.sh missing"
 grep -Fq '.agents-v0/ci/check-layout-roots.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-layout-roots.sh"
 grep -Fq 'check-layout-roots.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must fail when a JVM module resolves no root"
-grep -Fq '\.cursor/(commands|skills)' core/hooks/hook-policy.py || err "hook-policy must protect .cursor commands and skills (phase procedures and gate checklists)"
+grep -Fq '\.cursor/(commands|skills)' core/common/hooks/hook-policy.py || err "hook-policy must protect .cursor commands and skills (phase procedures and gate checklists)"
 for dir in /.cursor/commands/ /.cursor/skills/; do
   grep -Fq "$dir @" templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover $dir"
 done
@@ -551,30 +551,30 @@ if grep -rIlF './scripts/run-local-container.sh' templates README.md >/dev/null 
 for onboard_file in templates/.agents-v0/scripts/discover-codebase.sh templates/.agents-v0/scripts/check-onboarding-docs.sh templates/docs/agents-v0/onboarding/_report.template.md templates/docs/agents-v0/onboarding/_module.template.md; do
   [ -f "$onboard_file" ] || err "required onboarding file missing: $onboard_file"
 done
-grep -Fq 'codebase-documenter' core/commands/v0-onboard.md || err "/v0-onboard must launch the codebase-documenter"
-grep -Fq 'check-onboarding-docs.sh' core/commands/v0-onboard.md || err "/v0-onboard gate must run check-onboarding-docs.sh"
-grep -Fq 'check-onboarding-docs.sh' core/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run check-onboarding-docs.sh"
-grep -Fq 'discover-codebase.sh' core/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run discover-codebase.sh"
-grep -Fq 'UNVERIFIED' core/agents/codebase-documenter.md || err "codebase-documenter must mark unknowns UNVERIFIED"
+grep -Fq 'codebase-documenter' core/common/commands/v0-onboard.md || err "/v0-onboard must launch the codebase-documenter"
+grep -Fq 'check-onboarding-docs.sh' core/common/commands/v0-onboard.md || err "/v0-onboard gate must run check-onboarding-docs.sh"
+grep -Fq 'check-onboarding-docs.sh' core/common/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run check-onboarding-docs.sh"
+grep -Fq 'discover-codebase.sh' core/common/skills/onboard-discovery/SKILL.md || err "onboard-discovery must run discover-codebase.sh"
+grep -Fq 'UNVERIFIED' core/common/agents/codebase-documenter.md || err "codebase-documenter must mark unknowns UNVERIFIED"
 grep -Fq 'onboard' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the onboard phase"
 grep -Fq 'roadmap' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the roadmap phase"
 grep -Fq '|arc|' templates/.agents-v0/ci/check-approvals.sh || err "check-approvals must accept the arc phase"
 grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must run check-arc.sh for a material story"
 grep -Fq 'check-adr.sh' templates/.agents-v0/ci/check-design-contracts.sh || err "check-design-contracts must run check-adr.sh"
-grep -Fq 'Superseded by ADR' core/skills/contract-first-design/SKILL.md || err "contract-first-design must supersede an accepted ADR instead of rewriting it"
+grep -Fq 'Superseded by ADR' core/common/skills/contract-first-design/SKILL.md || err "contract-first-design must supersede an accepted ADR instead of rewriting it"
 grep -Fq 'Superseded by ADR' templates/.agents-v0/ci/check-adr.sh || err "check-adr.sh must require a superseding ADR"
 grep -Fq 'check-arc.sh' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must run check-arc.sh"
-grep -Fq 'Material: yes' core/commands/v0-design.md || err "/v0-design must stop for a material ARC pack"
-grep -Fq 'Discovery:' core/commands/v0-roadmap.md || err "/v0-roadmap must record the discovery path the user passed"
-grep -Fq 'program-architecture' core/commands/v0-architecture.md || err "/v0-architecture must follow program-architecture"
-grep -Fq 'does not write stories' core/commands/v0-architecture.md || err "/v0-architecture must not write the backlog"
-grep -Fq '/v0-architecture' core/commands/v0-plan.md || err "/v0-plan must wait for /v0-architecture"
-grep -Fq 'tickets-sources.md' core/commands/v0-export.md || err "/v0-export must stamp tickets-sources.md"
-grep -Fq 'not steps in this pipeline' core/commands/v0-deliver.md || err "/v0-deliver must leave export and deck out of the pipeline"
+grep -Fq 'Material: yes' core/common/commands/v0-design.md || err "/v0-design must stop for a material ARC pack"
+grep -Fq 'Discovery:' core/common/commands/v0-roadmap.md || err "/v0-roadmap must record the discovery path the user passed"
+grep -Fq 'program-architecture' core/common/commands/v0-architecture.md || err "/v0-architecture must follow program-architecture"
+grep -Fq 'does not write stories' core/common/commands/v0-architecture.md || err "/v0-architecture must not write the backlog"
+grep -Fq '/v0-architecture' core/common/commands/v0-plan.md || err "/v0-plan must wait for /v0-architecture"
+grep -Fq 'tickets-sources.md' core/common/commands/v0-export.md || err "/v0-export must stamp tickets-sources.md"
+grep -Fq 'not steps in this pipeline' core/common/commands/v0-deliver.md || err "/v0-deliver must leave export and deck out of the pipeline"
 grep -Fq 'onboard' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the onboard approval"
-grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-intake.md || err "/v0-intake must wait for the onboard approval on a brownfield repo"
-grep -Fq 'docs/agents-v0/onboarding/report.md' core/commands/v0-plan.md || err "/v0-plan must wait for the onboard approval on a brownfield repo"
-grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/scripts/check-onboarding-docs.sh (every kit script)"
+grep -Fq 'docs/agents-v0/onboarding/report.md' core/common/commands/v0-intake.md || err "/v0-intake must wait for the onboard approval on a brownfield repo"
+grep -Fq 'docs/agents-v0/onboarding/report.md' core/common/commands/v0-plan.md || err "/v0-plan must wait for the onboard approval on a brownfield repo"
+grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/scripts/check-onboarding-docs.sh (every kit script)"
 for onboard_script in discover-codebase.sh check-onboarding-docs.sh; do
   grep -Fq ".agents-v0/scripts/$onboard_script" scripts/install.sh || err "install.sh does not seed .agents-v0/scripts/$onboard_script"
 done
@@ -589,13 +589,13 @@ grep -Fq 'classify-change.sh' templates/.agents-v0/ci/check-delivery-linkage.sh 
 grep -Fq 'Maintain-Note' templates/.gitlab/merge_request_templates/default.md || err "merge request template must offer Maintain-Note"
 grep -Fq 'docs/agents-v0/maintain/' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover docs/agents-v0/maintain/"
 grep -Fq 'Tier confirmed by' templates/docs/agents-v0/maintain/_note.template.md || err "maintenance note template must require a confirmed tier"
-grep -Fq 'Abbreviated Verify' core/commands/v0-verify.md || err "/v0-verify must define the abbreviated Verify"
-grep -Fq 'classify-change.sh' core/commands/v0-triage.md || err "/v0-triage must qualify a change with the classifier"
-grep -Fq 'classify-change.sh' core/commands/v0-maintain.md || err "/v0-maintain must classify the result"
-grep -Fq 'check-attempt-budget.sh' core/commands/v0-maintain.md || err "/v0-maintain must use the attempt budget"
-grep -Fq 'docs/agents-v0/maintain/<id>/note.md' core/agents/maintenance-engineer.md || err "maintenance-engineer must work from the maintenance note"
-grep -Fq 'graph' core/skills/dependency-upgrade/SKILL.md || err "dependency-upgrade must diff the dependency graph"
-grep -Fq 'check-onboarding-docs.sh' core/skills/doc-sync/SKILL.md || err "doc-sync must re-check onboarding citations"
+grep -Fq 'Abbreviated Verify' core/common/commands/v0-verify.md || err "/v0-verify must define the abbreviated Verify"
+grep -Fq 'classify-change.sh' core/common/commands/v0-triage.md || err "/v0-triage must qualify a change with the classifier"
+grep -Fq 'classify-change.sh' core/common/commands/v0-maintain.md || err "/v0-maintain must classify the result"
+grep -Fq 'check-attempt-budget.sh' core/common/commands/v0-maintain.md || err "/v0-maintain must use the attempt budget"
+grep -Fq 'docs/agents-v0/maintain/<id>/note.md' core/common/agents/maintenance-engineer.md || err "maintenance-engineer must work from the maintenance note"
+grep -Fq 'graph' core/common/skills/dependency-upgrade/SKILL.md || err "dependency-upgrade must diff the dependency graph"
+grep -Fq 'check-onboarding-docs.sh' core/common/skills/doc-sync/SKILL.md || err "doc-sync must re-check onboarding citations"
 grep -Fq 'maintain' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must handle maintenance notes"
 for maintain_script in classify-change.sh; do
   grep -Fq ".agents-v0/ci/$maintain_script" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$maintain_script"
@@ -611,9 +611,9 @@ for design_file in templates/docs/agents-v0/design/_design.template.md templates
   rel="${design_file#templates/}"
   grep -Fq "$rel" scripts/install.sh || err "install.sh does not seed $rel"
 done
-grep -Fq 'design-reviewer' core/commands/v0-design.md || err "/v0-design must launch the design-reviewer"
-grep -Fq 'skip steps 1-5' core/commands/v0-design.md || err "/v0-design re-entry must review an existing design without redrafting it"
-grep -Fq 'Amending an approved design' core/commands/v0-design.md || err "/v0-design must define the design amendment path"
+grep -Fq 'design-reviewer' core/common/commands/v0-design.md || err "/v0-design must launch the design-reviewer"
+grep -Fq 'skip steps 1-5' core/common/commands/v0-design.md || err "/v0-design re-entry must review an existing design without redrafting it"
+grep -Fq 'Amending an approved design' core/common/commands/v0-design.md || err "/v0-design must define the design amendment path"
 grep -Fq 'design as it stands' templates/docs/agents-v0/design/_amendments.template.md || err "amendment template must review the design before the pin"
 grep -Fq 'design as it stands' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must review an amendment before the pin"
 grep -Fq 'reviews that saved design' templates/docs/agents-v0/user-guide.md || err "user guide must say a second design run reviews the saved design"
@@ -622,23 +622,23 @@ if grep -Fq 'changed parts' templates/docs/agents-v0/design/_amendments.template
 if grep -Fq 'get it approved, then pin' templates/.agents-v0/ci/check-design.sh; then err "a drifted design lock must not skip the review"; fi
 grep -Fq 'set an Approved Verify row to Re-opened' templates/.agents-v0/ci/check-evidence.sh || err "stale verify evidence must say to reopen the Verify row"
 if grep -Fq 're-run phase and refresh' templates/.agents-v0/ci/check-evidence.sh; then err "stale evidence must not tell the agent to refresh the stamp"; fi
-grep -Fq 'check-design.sh' core/commands/v0-design.md || err "/v0-design gate must run check-design.sh"
-grep -Fq 'check-openapi.sh' core/commands/v0-design.md || err "/v0-design gate must run check-openapi.sh"
-grep -Fq 'verify-lock' core/commands/v0-build.md || err "/v0-build must verify the design lock"
-grep -Fq 'check-build-plan.sh' core/commands/v0-build.md || err "/v0-build gate must run check-build-plan.sh"
-grep -Fq 'check-endpoint-auth.sh' core/commands/v0-build.md || err "/v0-build gate must run check-endpoint-auth.sh"
-grep -Fq 'check-frontend-calls.sh' core/commands/v0-build.md || err "/v0-build gate must run check-frontend-calls.sh"
-grep -Fq 'ci/check-openapi.sh merged' core/commands/v0-build.md || err "/v0-build must prove the catalog merge"
+grep -Fq 'check-design.sh' core/common/commands/v0-design.md || err "/v0-design gate must run check-design.sh"
+grep -Fq 'check-openapi.sh' core/common/commands/v0-design.md || err "/v0-design gate must run check-openapi.sh"
+grep -Fq 'verify-lock' core/common/commands/v0-build.md || err "/v0-build must verify the design lock"
+grep -Fq 'check-build-plan.sh' core/common/commands/v0-build.md || err "/v0-build gate must run check-build-plan.sh"
+grep -Fq 'check-endpoint-auth.sh' core/common/commands/v0-build.md || err "/v0-build gate must run check-endpoint-auth.sh"
+grep -Fq 'check-frontend-calls.sh' core/common/commands/v0-build.md || err "/v0-build gate must run check-frontend-calls.sh"
+grep -Fq 'ci/check-openapi.sh merged' core/common/commands/v0-build.md || err "/v0-build must prove the catalog merge"
 grep -Fq 'feature_design_and_plan' templates/.agents-v0/ci/check-delivery-linkage.sh || err "check-delivery-linkage must check the design lock and the build plan"
 grep -Fq 'check-design-contracts.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run the design checks"
 grep -Fq 'check-endpoint-auth.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-endpoint-auth.sh"
 grep -Fq 'check-frontend-calls.sh' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must run check-frontend-calls.sh"
-grep -Fq 'spring-boot-maven-plugin' templates/maven/contract-conformance.xml || err "contract-conformance must start the service it reads the spec from"
-grep -Fq 'generated-to-approved' templates/maven/contract-conformance.xml || err "contract-conformance must also diff generated against approved (undocumented endpoints)"
+grep -Fq 'spring-boot-maven-plugin' core/java/starters/maven/contract-conformance.xml || err "contract-conformance must start the service it reads the spec from"
+grep -Fq 'generated-to-approved' core/java/starters/maven/contract-conformance.xml || err "contract-conformance must also diff generated against approved (undocumented endpoints)"
 grep -Fq '/docs/agents-v0/design/' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover docs/agents-v0/design/"
 grep -Fq '/openapi/' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover openapi/"
-grep -Fq 'data-component' core/skills/ux-design/SKILL.md || err "ux-design must require data-component on mockup controls"
-grep -Fq 'migration-safety' core/skills/implement-spring-service/SKILL.md || err "implement-spring-service must follow migration-safety for migrations"
+grep -Fq 'data-component' core/common/skills/ux-design/SKILL.md || err "ux-design must require data-component on mockup controls"
+grep -Fq 'migration-safety' core/java/skills/implement-service/SKILL.md || err "implement-service must follow migration-safety for migrations"
 grep -Fq 'design-reviewer' templates/docs/agents-v0/model-routing-matrix.md || err "routing matrix lacks the design-reviewer"
 # Release and /v0-deliver: thin chain, human merge enforced on the default host, dry run, versioned notes.
 for release_file in templates/.agents-v0/scripts/render-mr-body.sh templates/.agents-v0/scripts/release-notes.sh templates/CHANGELOG.md; do
@@ -648,47 +648,47 @@ for release_script in render-mr-body.sh release-notes.sh; do
   grep -Fq ".agents-v0/scripts/$release_script" scripts/install.sh || err "install.sh does not seed .agents-v0/scripts/$release_script"
 done
 grep -Fq 'CHANGELOG.md' scripts/install.sh || err "install.sh does not seed CHANGELOG.md"
-grep -Fq 'bin0 == "glab"' core/hooks/hook-policy.py || err "hook-policy must cover glab (merge and approve are human acts)"
-grep -Fq 'sub == "tag"' core/hooks/hook-policy.py || err "hook-policy must ask before creating a git tag"
-grep -Fq 'render-mr-body.sh' core/commands/v0-release.md || err "/v0-release must render the MR description from the evidence"
-grep -Fq 'check-delivery-linkage.sh' core/commands/v0-release.md || err "/v0-release must dry-run the delivery gate locally"
-grep -Fq 'GitLab username' core/commands/v0-release.md || err "/v0-release must record the GitLab username as the release Approver"
-grep -Fq 'glab ci trigger delivery-approval' core/commands/v0-release.md || err "/v0-release must say how the delivery-approval job is played"
-grep -Fq 'three rounds' core/commands/v0-release.md || err "/v0-release must cap the CI fix loop"
-grep -Fq 'docs-only follow-up' core/commands/v0-release.md || err "/v0-release must keep deploy records off the default branch"
-grep -Fq 'release-notes.sh' core/commands/v0-release.md || err "/v0-release must produce release notes"
+grep -Fq 'bin0 == "glab"' core/common/hooks/hook-policy.py || err "hook-policy must cover glab (merge and approve are human acts)"
+grep -Fq 'sub == "tag"' core/common/hooks/hook-policy.py || err "hook-policy must ask before creating a git tag"
+grep -Fq 'render-mr-body.sh' core/common/commands/v0-release.md || err "/v0-release must render the MR description from the evidence"
+grep -Fq 'check-delivery-linkage.sh' core/common/commands/v0-release.md || err "/v0-release must dry-run the delivery gate locally"
+grep -Fq 'GitLab username' core/common/commands/v0-release.md || err "/v0-release must record the GitLab username as the release Approver"
+grep -Fq 'glab ci trigger delivery-approval' core/common/commands/v0-release.md || err "/v0-release must say how the delivery-approval job is played"
+grep -Fq 'three rounds' core/common/commands/v0-release.md || err "/v0-release must cap the CI fix loop"
+grep -Fq 'docs-only follow-up' core/common/commands/v0-release.md || err "/v0-release must keep deploy records off the default branch"
+grep -Fq 'release-notes.sh' core/common/commands/v0-release.md || err "/v0-release must produce release notes"
 for phase_command in intake design build verify release; do
-  grep -Fq "\`/v0-$phase_command\`" core/commands/v0-deliver.md || err "/v0-deliver must run /v0-$phase_command rather than restate it"
+  grep -Fq "\`/v0-$phase_command\`" core/common/commands/v0-deliver.md || err "/v0-deliver must run /v0-$phase_command rather than restate it"
 done
-grep -Fq 'Re-opened' core/commands/v0-deliver.md || err "/v0-deliver must define re-entry after a Critical"
-grep -Fqi 'subagents cannot launch subagents' core/commands/v0-deliver.md || err "/v0-deliver must state the fallback when subagents cannot launch subagents"
-if [ "$(wc -l < core/commands/v0-deliver.md | tr -d ' ')" -gt 60 ]; then err "/v0-deliver has grown past 60 lines: it should point at the phase commands, not restate them"; fi
-grep -Fq '## Maintenance change' core/commands/v0-release.md || err "/v0-release must handle a maintenance note"
-[ -f core/commands/v0-local-release.md ] || err "missing /v0-local-release command"
-[ -f core/skills/local-release/SKILL.md ] || err "missing local-release skill"
-grep -Fq '/v0-local-release' core/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-local-release"
-grep -Fq 'Decision `Local`' core/commands/v0-local-release.md || err "/v0-local-release must record Decision Local"
-grep -Fq -- '--clear-active' core/commands/v0-local-release.md || err "/v0-local-release must clear the active phase"
-grep -Fq '/v0-local-release' core/commands/v0-deliver.md || err "/v0-deliver must run /v0-local-release"
+grep -Fq 'Re-opened' core/common/commands/v0-deliver.md || err "/v0-deliver must define re-entry after a Critical"
+grep -Fqi 'subagents cannot launch subagents' core/common/commands/v0-deliver.md || err "/v0-deliver must state the fallback when subagents cannot launch subagents"
+if [ "$(wc -l < core/common/commands/v0-deliver.md | tr -d ' ')" -gt 60 ]; then err "/v0-deliver has grown past 60 lines: it should point at the phase commands, not restate them"; fi
+grep -Fq '## Maintenance change' core/common/commands/v0-release.md || err "/v0-release must handle a maintenance note"
+[ -f core/common/commands/v0-local-release.md ] || err "missing /v0-local-release command"
+[ -f core/common/skills/local-release/SKILL.md ] || err "missing local-release skill"
+grep -Fq '/v0-local-release' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-local-release"
+grep -Fq 'Decision `Local`' core/common/commands/v0-local-release.md || err "/v0-local-release must record Decision Local"
+grep -Fq -- '--clear-active' core/common/commands/v0-local-release.md || err "/v0-local-release must clear the active phase"
+grep -Fq '/v0-local-release' core/common/commands/v0-deliver.md || err "/v0-deliver must run /v0-local-release"
 grep -Fq 'resolve-integration-branch.sh' templates/.agents-v0/scripts/check-delivery-gate-local.sh || err "local delivery gate must resolve its default base"
 grep -Fq 'resolve-integration-branch.sh' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must resolve its default base"
 if grep -Fq 'origin/HEAD' templates/.agents-v0/hooks/pre-push; then err "pre-push must not hardcode origin/HEAD"; fi
 grep -Fq '.agents-v0/scripts/resolve-integration-branch.sh' scripts/install.sh || err "install.sh does not seed resolve-integration-branch.sh"
 grep -Fq -- '--clear-active' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must support --clear-active"
-grep -Fq 'GitLab username' core/commands/v0-verify.md || err "/v0-verify must record the GitLab username as the approver"
-grep -Fq 'GitLab username' core/commands/v0-maintain.md || err "/v0-maintain must record the GitLab username as the approver"
-grep -Fq 'docs/agents-v0/maintain/*/state.json' core/commands/v0-status.md || err "/v0-status must read maintenance state files"
-grep -Fq 'check-design.sh' core/commands/v0-status.md || err "/v0-status must report a drifted design lock"
-grep -Fq 'check-gate-metrics.sh' core/commands/v0-verify.md || err "/v0-verify must run the machine checks CI runs"
-grep -Fq 'write only a missing' core/commands/v0-verify.md || err "/v0-verify re-entry must keep a same-commit test report and fill only a missing reviewer report"
-grep -Fq 'set its Decision to `Re-opened` before the re-run' core/commands/v0-verify.md || err "/v0-verify must reopen an Approved row when the verified commit moved"
-grep -Fq 'Service root:' core/commands/v0-intake.md || err "/v0-intake gate must record Service root for a multi-service repo"
-grep -Fq 'Dependency column' core/commands/v0-intake.md || err "/v0-intake must check milestone story order"
+grep -Fq 'GitLab username' core/common/commands/v0-verify.md || err "/v0-verify must record the GitLab username as the approver"
+grep -Fq 'GitLab username' core/common/commands/v0-maintain.md || err "/v0-maintain must record the GitLab username as the approver"
+grep -Fq 'docs/agents-v0/maintain/*/state.json' core/common/commands/v0-status.md || err "/v0-status must read maintenance state files"
+grep -Fq 'check-design.sh' core/common/commands/v0-status.md || err "/v0-status must report a drifted design lock"
+grep -Fq 'check-gate-metrics.sh' core/common/commands/v0-verify.md || err "/v0-verify must run the machine checks CI runs"
+grep -Fq 'write only a missing' core/common/commands/v0-verify.md || err "/v0-verify re-entry must keep a same-commit test report and fill only a missing reviewer report"
+grep -Fq 'set its Decision to `Re-opened` before the re-run' core/common/commands/v0-verify.md || err "/v0-verify must reopen an Approved row when the verified commit moved"
+grep -Fq 'Service root:' core/common/commands/v0-intake.md || err "/v0-intake gate must record Service root for a multi-service repo"
+grep -Fq 'Dependency column' core/common/commands/v0-intake.md || err "/v0-intake must check milestone story order"
 for cmd in onboard plan; do
-  grep -Fq '## Collision' "core/commands/v0-$cmd.md" || err "/v0-$cmd must stop on a shared-file collision"
+  grep -Fq '## Collision' "core/common/commands/v0-$cmd.md" || err "/v0-$cmd must stop on a shared-file collision"
 done
 for cmd in design build verify; do
-  grep -Fq 'Re-opened' "core/commands/v0-$cmd.md" || err "/v0-$cmd must say what a Re-opened approval row means"
+  grep -Fq 'Re-opened' "core/common/commands/v0-$cmd.md" || err "/v0-$cmd must say what a Re-opened approval row means"
 done
 grep -Fq 'Release owner' templates/docs/agents-v0/project-profile.md || err "project-profile template lacks the Release rows"
 # Architecture pack: complete sections, an independent review, a mechanical check CI re-runs.
@@ -705,18 +705,18 @@ grep -Fq 'Structural fitness' templates/docs/agents-v0/design/system/arc-record.
 for section in '## Build and run ownership' '## Error budget policy' '## Database maintenance and operation' '## Production readiness checklist' '## Runbook template'; do
   grep -Fq "$section" templates/docs/agents-v0/design/system/ops-readiness.md || err "ops-readiness template lacks '$section'"
 done
-grep -Fq 'check-architecture-pack.sh' core/commands/v0-architecture.md || err "/v0-architecture gate must run check-architecture-pack.sh"
-grep -Fq 'activate-stack-pack.sh' core/commands/v0-architecture.md || err "/v0-architecture must activate the stack pack"
-grep -Fq 'Pack:' core/skills/program-architecture/SKILL.md || err "program-architecture must record Pack on the pattern ADR"
+grep -Fq 'check-architecture-pack.sh' core/common/commands/v0-architecture.md || err "/v0-architecture gate must run check-architecture-pack.sh"
+grep -Fq 'activate-stack-pack.sh' core/common/commands/v0-architecture.md || err "/v0-architecture must activate the stack pack"
+grep -Fq 'Pack:' core/common/skills/program-architecture/SKILL.md || err "program-architecture must record Pack on the pattern ADR"
 for pack in java dotnet node python go; do
-  [ -f "core/packs/$pack/PACK.md" ] || err "missing stack pack core/packs/$pack/PACK.md"
+  [ -f "core/$pack/PACK.md" ] || err "missing stack pack core/$pack/PACK.md"
 done
 grep -Fq 'activate-stack-pack.sh' scripts/install.sh || err "install.sh does not seed activate-stack-pack.sh"
 grep -Fq 'fastapi' templates/.agents-v0/ci/check-architecture-pack.sh || err "C4 technology check must name FastAPI"
 grep -Fq '|go)' templates/.agents-v0/ci/check-architecture-pack.sh || err "C4 technology check must name Go"
-grep -Fq 'check-architecture-pack.sh' core/skills/program-architecture/SKILL.md || err "program-architecture must run check-architecture-pack.sh"
-grep -Fq 'architecture-review.md' core/commands/v0-architecture.md || err "/v0-architecture must run the independent architecture review"
-grep -Fq 'architecture-review.md' core/agents/design-reviewer.md || err "design-reviewer must write architecture-review.md for the pack"
+grep -Fq 'check-architecture-pack.sh' core/common/skills/program-architecture/SKILL.md || err "program-architecture must run check-architecture-pack.sh"
+grep -Fq 'architecture-review.md' core/common/commands/v0-architecture.md || err "/v0-architecture must run the independent architecture review"
+grep -Fq 'architecture-review.md' core/common/agents/design-reviewer.md || err "design-reviewer must write architecture-review.md for the pack"
 grep -Fq 'check-architecture-pack.sh' templates/.agents-v0/ci/check-milestone.sh || err "check-milestone must run check-architecture-pack.sh for an approved architecture row"
 [ -f templates/.agents-v0/ci/check-architecture-pack.sh ] && grep -Fq 'git archive FETCH_HEAD .agents-v0/ci' templates/.gitlab-ci.yml || err ".gitlab-ci.yml must read check-architecture-pack.sh from the default branch for the delivery jobs (the whole .agents-v0/ci directory)"
 grep -Fq '.agents-v0/ci/check-architecture-pack.sh' scripts/install.sh || err "install.sh does not seed .agents-v0/ci/check-architecture-pack.sh"
@@ -745,7 +745,7 @@ fi
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/backend/pom.xml' || err "app archive missing app/backend/pom.xml"
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'app/frontend/package.json' || err "app archive missing app/frontend/package.json"
 tar -tzf templates/app/p0-platform-skeleton.tar.gz | grep -Fq 'docker-compose.yml' || err "app archive missing docker-compose.yml"
-grep -A2 'jacoco-maven-plugin' templates/app/backend/pom.xml templates/maven/quality-plugins.xml | grep -Eq '<version>0\.8\.(1[4-9]|[2-9][0-9])</version>' || err "JaCoCo must be 0.8.14 or newer (first release with official Java 25 support)"
+grep -A2 'jacoco-maven-plugin' templates/app/backend/pom.xml core/java/starters/maven/quality-plugins.xml | grep -Eq '<version>0\.8\.(1[4-9]|[2-9][0-9])</version>' || err "JaCoCo must be 0.8.14 or newer (first release with official Java 25 support)"
 grep -A2 'archunit-junit5' templates/app/backend/pom.xml | grep -Eq '<version>1\.(4\.[1-9]|[5-9]\.[0-9]+)</version>' || err "ArchUnit must be 1.4.1 or newer (first release that reads Java 25 class files)"
 if [ "${KIT_SKIP_APP_TEMPLATE_TEST:-0}" = 1 ]; then
   printf 'SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)\n'
@@ -756,7 +756,7 @@ fi
 # Always-on context budget: the rules every session loads in a target repo must not creep past
 # this size. Only the three installed always-on rules count. AGENTS.md is the kit repo's own
 # summary and install.sh does not copy it. Procedure stays in the commands and skills.
-always_on_bytes="$(cat core/rules/workflow-orchestration.mdc core/rules/project-delivery-core.mdc core/rules/ai-agent-conduct.mdc | wc -c | tr -d ' ')"
+always_on_bytes="$(cat core/common/rules/workflow-orchestration.mdc core/common/rules/project-delivery-core.mdc core/common/rules/ai-agent-conduct.mdc | wc -c | tr -d ' ')"
 [ "$always_on_bytes" -le 32000 ] || err "always-on rules are $always_on_bytes bytes (limit 32000): move detail into a command, agent, or skill"
 for ci_script in check-gate-metrics.sh check-event-schemas.sh; do
   grep -Fq ".agents-v0/ci/$ci_script" scripts/install.sh || err "install.sh does not seed .agents-v0/ci/$ci_script"

@@ -43,7 +43,7 @@ Repack the archive after editing `templates/app/{backend,frontend}`:
 ./scripts/pack-app-template.sh
 ```
 
-During P0 build stories, Pack `java` or an empty Pack follows **`scaffold-service`**: prove the template (or harden an external skeleton). Do not reinvent the health shell when the archive was used. Pack `dotnet`, `node`, `python`, or `go` follows `scaffold-aspnet-service`, `scaffold-node-service`, `scaffold-python-service`, or `scaffold-go-service`, copies the Dockerfile and quality snippet named in that pack's `PACK.md`, and does not extract the Java archive.
+During P0 build stories, follow **`scaffold-service`**. Pack `java` or an empty Pack proves the bundled template and does not reinvent the health shell when the archive was used. Another pack copies the Dockerfile and quality snippet named in its `PACK.md` and does not extract the Java archive.
 **Major** cross-cutting changes use **`system-design`** in `/v0-design`.
 
 Manual equivalent:

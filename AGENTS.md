@@ -36,7 +36,7 @@ Build and maintain enterprise-grade systems — one backend pack (`java`, `dotne
 
 ## Rule precedence
 
-If project files contradict a rule, **the repository wins**. Kit org rules are the single source of truth in `core/rules/*.mdc` (installed to `.cursor/rules/org/`). Document approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs; port deliberate kit-wide changes back into this repository.
+If project files contradict a rule, **the repository wins**. Kit org rules live in `core/common/rules/*.mdc` plus the selected pack under `core/<pack>/rules/` (installed to `.cursor/rules/org/`). Document approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs; port deliberate kit-wide changes back into this repository.
 
 ## Reference
 

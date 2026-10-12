@@ -1,6 +1,6 @@
 # VAPT prevention guardrails
 
-> VAPT finding–mapped rules. Authoritative: `vapt-spring.mdc` (Spring Boot), `vapt-webapp.mdc` (web apps), `vapt-pr-review.mdc` (PR review). Controls: `security-baseline.mdc`.
+> VAPT finding–mapped rules. Authoritative: `vapt.mdc` (Spring Boot), `vapt-webapp.mdc` (web apps), `vapt-pr-review.mdc` (PR review). Controls: `security-baseline.mdc`.
 
 Always-on findings are F4, F8, F9, and F10. An applicable miss is Critical. F1–F3 and F5–F7 are regression checks. HIGH and MEDIUM block merge when the diff touches that surface. LOW blocks only when the diff makes the issue exploitable.
 

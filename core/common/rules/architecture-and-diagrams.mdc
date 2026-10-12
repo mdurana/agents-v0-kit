@@ -1,0 +1,106 @@
+---
+description: Platform architecture reference, service boundaries, BFF/OMS, and Mermaid diagram rules
+globs: docs/**/*.md,**/README.md
+alwaysApply: false
+---
+
+# Architecture and diagrams
+
+Service-specific ADRs override this file. Implementation: `backend.mdc`, `frontend-web.mdc`, `api-and-events.mdc`.
+
+## ADR lifecycle
+
+- One decision per file under `docs/agents-v0/adr/<NN>-<slug>.md`.
+- Status is `Proposed`, `Accepted`, or `Superseded by ADR <NN>`.
+- An `Accepted` ADR stays. A later decision writes the next file and changes only the old Status line.
+- `docs/agents-v0/adr/0000-inherited-decisions.md` stays the as-is record (`Accepted (inherited)`). Overriding an inherited decision is a new ADR.
+- `ci/check-adr.sh` rejects a rewritten accepted ADR once an `Accepted` revision is in git history. Until that revision exists, it checks status and successors only. The design pin hashes the ADR a design cites.
+
+## Diagram locations
+
+| Artifact | Location |
+|----------|----------|
+| High-level system | `docs/agents-v0/architecture.md` |
+| Infrastructure, ports | `docs/agents-v0/network.md` |
+| Per-service sequences | `docs/agents-v0/diagrams/sequences/<service-name>.md` |
+| Bounded contexts and service map | `docs/agents-v0/design/system/context-map.md` |
+| Program plan (milestone table and story order) | `docs/agents-v0/milestones/plan.md` |
+| Per-service component plan | `docs/agents-v0/design/system/components/<service-name>.md` |
+| Data flow, data models, state machine, failure domains | `docs/agents-v0/architecture.md` |
+| Operations readiness and runbooks | `docs/agents-v0/design/system/ops-readiness.md` |
+
+## Mermaid conventions
+
+- `flowchart` / `graph` for components; `sequenceDiagram` for request/response and sagas.
+- **Node IDs:** camelCase or PascalCase; no spaces; avoid reserved words (`end`, `subgraph` as ID).
+- **Edge labels** with special chars: quote them — `-->|"retry"|`.
+- **Subgraphs** for boundaries: frontend, BFF, backend, data, messaging.
+- ≤ ~**50 nodes**; split if larger.
+- **Data flow** reuses the C4 Container node IDs and relabels edges only (`transport / payload`). Data models use `erDiagram` (logical: every field; physical: every field with its type, underscores in type tokens). Lifecycles use `stateDiagram-v2`.
+- Renders in Cursor; export to Lucid/draw.io via import or converter.
+
+## Architecture principles
+
+- **Service boundaries:** database per service; versioned APIs and/or events — not shared-DB coupling.
+- **Contract-first:** OpenAPI and/or event schema before cross-service implementation.
+- **DDD:** entities with behavior; immutable value objects; aggregate consistency at root; domain events where used.
+- **Composition** over deep inheritance; explicit dependencies.
+
+---
+
+## Backend (Java Spring Boot)
+
+This table is the `java` pack. When `Pack` is `dotnet`, `node`, `python`, or `go`, follow that pack's `PACK.md` and rule instead.
+
+| Area | Mandatory |
+|------|-----------|
+| Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test |
+| Layers | Controllers (`@Valid`, DTOs) → Service → Repository → Domain |
+| Domain | Value objects; aggregates; domain events; repository ports in domain |
+| Security | JWT, SecurityContext, MDC correlation; permit `/health`, `/actuator`, `/v3/api-docs`, `/swagger-ui`; protect `/api/v1/**` |
+| Resilience | Resilience4j on outbound calls |
+
+## BFF (Backend-for-Frontend)
+
+| Area | Mandatory |
+|------|-----------|
+| Stack | Spring Boot 4.1.1, Spring MVC, Spring Security, Redis, Resilience4j, OpenAPI 3.0 |
+| Role | Aggregation, UI DTOs, auth/session edge, GET cache, rate limit, unified errors |
+| Clients | WebClient/RestClient: ~10s timeout, retry, breaker; `X-Correlation-ID`; service auth |
+| Pipeline | Auth → rate limit → cache (GET) / invalidation (writes) → validation → controller |
+| Rules | Thin BFF; domain logic in backend services; version BFF API independently |
+
+## Frontend stacks (summary)
+
+| Default (React) | Existing (SvelteKit) |
+|-----------------|----------------------|
+| React 19, TypeScript 5.9, Vite 7, Vitest 3, Redux/Zustand, React Query, Router v6, RHF + Zod | Only when the repo already uses it: TS, Vite, stores, load + fetch |
+| Vitest + Testing Library | Vitest + Playwright for critical paths |
+
+Detail: `frontend-web.mdc`.
+
+## Integration and composition
+
+| Area | Mandatory |
+|------|-----------|
+| Principles | DB per service; OpenAPI-first; REST + events |
+| Per service | `/health`, `/ready`, `/live`; Prometheus; OpenAPI; JWT + S2S auth; tracing |
+| Headers | `Authorization`, `X-API-Key` (S2S), `X-Correlation-ID` |
+| Events | `order.created`-style names; idempotent consumers; DLQ + retry |
+| Resilience | Breaker, exponential retry, timeout outbound; BFF may aggregate in parallel |
+
+HTTP detail: `api-and-events.mdc`. Observability defaults: `project-delivery-core.mdc`.
+
+## OMS domain (reference — when relevant)
+
+| Area | Mandatory |
+|------|-----------|
+| Style | Event-driven; DB per service; sagas; idempotency keys on writes |
+| Contexts | Order, Inventory, Payment, Fulfillment, order ops |
+| Orders | `POST /api/v1/orders` with idempotency_key, customer_id, channel, items, addresses; bulk → `202` + `batch_id` |
+| Events | `ORDER_CREATED`, `ORDER_VALIDATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `ORDER_COMPLETED` |
+| Data | Optimistic locking; status history; saga compensations |
+
+## Testing pyramid
+
+Unit → integration (Testcontainers) → E2E critical paths — `quality-and-testing.mdc`.

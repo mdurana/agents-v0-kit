@@ -43,10 +43,10 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "$SCRIPT_DIR/../packs/java/PACK.md" ]; then
   PACKS="$(cd "$SCRIPT_DIR/../packs" && pwd)"
-elif [ -f "$SCRIPT_DIR/../../../core/packs/java/PACK.md" ]; then
-  PACKS="$(cd "$SCRIPT_DIR/../../../core/packs" && pwd)"
+elif [ -f "$SCRIPT_DIR/../../../core/java/PACK.md" ]; then
+  PACKS="$(cd "$SCRIPT_DIR/../../../core" && pwd)"
 else
-  printf 'FAIL: no pack library (.agents-v0/packs or core/packs)\n' >&2
+  printf 'FAIL: no pack library (.agents-v0/packs or core/<pack>)\n' >&2
   exit 1
 fi
 
@@ -276,6 +276,16 @@ def install_cursor(pack_id):
         dest = os.path.join(skills_root, name)
         os.makedirs(dest, exist_ok=True)
         shutil.copyfile(path, os.path.join(dest, "SKILL.md"))
+    agents = os.path.join(".cursor", "agents")
+    os.makedirs(agents, exist_ok=True)
+    for path in glob.glob(os.path.join(packs_root, pack_id, "agents", "*.md")):
+        shutil.copyfile(path, os.path.join(agents, os.path.basename(path)))
+    scan = os.path.join(packs_root, pack_id, "hooks", "pack-scan.sh")
+    if os.path.isfile(scan):
+        hooks = os.path.join(".cursor", "hooks")
+        os.makedirs(hooks, exist_ok=True)
+        shutil.copyfile(scan, os.path.join(hooks, "pack-scan.sh"))
+        os.chmod(os.path.join(hooks, "pack-scan.sh"), 0o755)
 
 
 text = read_profile()

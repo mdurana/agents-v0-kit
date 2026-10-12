@@ -64,56 +64,42 @@ emit_command() {
 install_pack_library() {
   t="$1"
   rm -rf "$t/.agents-v0/packs"
-  for pack_dir in "$KIT"/core/packs/*/; do
-    id="$(basename "$pack_dir")"
-    dest="$t/.agents-v0/packs/$id"
-    mkdir -p "$dest/rules" "$dest/skills"
-    cp "$pack_dir/PACK.md" "$dest/PACK.md"
+  for id in java dotnet node python go; do
+    mkdir -p "$t/.agents-v0/packs/$id"
+    cp -R "$KIT/core/$id/." "$t/.agents-v0/packs/$id/"
   done
-  for f in "$KIT"/core/rules/*.mdc; do
-    id="$(file_pack "$f" || true)"
-    [ -n "$id" ] || continue
-    [ -d "$t/.agents-v0/packs/$id/rules" ] || continue
-    cp "$f" "$t/.agents-v0/packs/$id/rules/$(basename "$f")"
-  done
-  for skill_dir in "$KIT"/core/skills/*/; do
-    skill="$skill_dir/SKILL.md"
-    [ -f "$skill" ] || continue
-    id="$(file_pack "$skill" || true)"
-    [ -n "$id" ] || continue
-    name="$(basename "$skill_dir")"
-    mkdir -p "$t/.agents-v0/packs/$id/skills/$name"
-    cp "$skill" "$t/.agents-v0/packs/$id/skills/$name/SKILL.md"
-  done
+}
+
+install_tree() {
+  src="$1"
+  dest="$2"
+  [ -d "$src" ] || return 0
+  mkdir -p "$dest"
+  cp -R "$src/." "$dest/"
 }
 
 install_rules() {
   dstdir="$1"
   mkdir -p "$dstdir"
-  for f in "$KIT"/core/rules/*.mdc; do
-    id="$(file_pack "$f" || true)"
-    if [ -n "$id" ] && [ "$id" != "$PACK" ]; then
-      rm -f "$dstdir/$(basename "$f")"
-      continue
-    fi
-    cp "$f" "$dstdir/$(basename "$f")"
-  done
+  install_tree "$KIT/core/common/rules" "$dstdir"
+  install_tree "$KIT/core/$PACK/rules" "$dstdir"
 }
 
 install_skills() {
   dstdir="$1"
   mkdir -p "$dstdir"
-  for skill_dir in "$KIT"/core/skills/*/; do
-    name="$(basename "$skill_dir")"
-    skill="$skill_dir/SKILL.md"
-    [ -f "$skill" ] || continue
-    id="$(file_pack "$skill" || true)"
-    if [ -n "$id" ] && [ "$id" != "$PACK" ]; then
-      rm -rf "$dstdir/$name"
-      continue
-    fi
-    mkdir -p "$dstdir/$name"
-    cp "$skill" "$dstdir/$name/SKILL.md"
+  install_tree "$KIT/core/common/skills" "$dstdir"
+  install_tree "$KIT/core/$PACK/skills" "$dstdir"
+}
+
+install_starters() {
+  t="$1"
+  src="$KIT/core/$PACK/starters"
+  [ -d "$src" ] || return 0
+  find "$src" -type f ! -name '.DS_Store' | while IFS= read -r f; do
+    rel="${f#"$src"/}"
+    mkdir -p "$t/$(dirname "$rel")"
+    cp "$f" "$t/$rel"
   done
 }
 
@@ -130,17 +116,21 @@ install_cursor() {
   seed_agent_ignore "$t" .cursorignore
   mkdir -p "$t/.cursor/rules/org" "$t/.cursor/agents" "$t/.cursor/commands" "$t/.cursor/skills" "$t/.cursor/hooks"
   install_rules "$t/.cursor/rules/org"
-  for f in "$KIT"/core/agents/*.md; do
+  for f in "$KIT"/core/common/agents/*.md "$KIT"/core/"$PACK"/agents/*.md; do
+    [ -f "$f" ] || continue
     emit_agent "$f" "$t/.cursor/agents/$(basename "$f")"
   done
-  for f in "$KIT"/core/commands/*.md; do
+  for f in "$KIT"/core/common/commands/*.md; do
     emit_command "$f" "$t/.cursor/commands/$(basename "$f")"
   done
   install_skills "$t/.cursor/skills"
-  cp "$KIT"/core/hooks/*.sh "$KIT"/core/hooks/hook-policy.py "$t/.cursor/hooks/"
+  cp "$KIT"/core/common/hooks/*.sh "$KIT"/core/common/hooks/hook-policy.py "$t/.cursor/hooks/"
+  if [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
+    cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.cursor/hooks/pack-scan.sh"
+  fi
   rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json"
   chmod +x "$t"/.cursor/hooks/*.sh "$t/.cursor/hooks/hook-policy.py"
-  cp "$KIT/core/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
+  cp "$KIT/core/common/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
   if [ -f "$KIT/templates/.cursor/model-config.json" ] && [ ! -f "$t/.cursor/model-config.json" ]; then
     cp "$KIT/templates/.cursor/model-config.json" "$t/.cursor/model-config.json"
   fi
@@ -396,6 +386,9 @@ PACK="${PACK:-java}"
 
 install_templates "$TARGET_ABS"
 install_pack_library "$TARGET_ABS"
+if [ "$WITH_STARTERS" = 1 ]; then
+  install_starters "$TARGET_ABS"
+fi
 install_cursor "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 

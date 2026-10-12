@@ -83,7 +83,7 @@ Notes: <what stopped the kit, what it did well>
 |--------|--------------|---------------|
 | Many `blocked` on Build | attempt budget too low, or the Build-role model is too weak for the unit | `Phase attempt budget`, `Build (critical)` row |
 | Many re-approvals at Design | `/v0-plan` stories too large or contexts unclear | `program-planning`, context map |
-| Critical findings at first Verify, mostly auth | Build ignores `vapt-spring.mdc` | raise those units to Build (critical) |
+| Critical findings at first Verify, mostly auth | Build ignores `vapt.mdc` | raise those units to Build (critical) |
 | Low diff coverage, green build | tests are not written with the code | `implement-*` step 6, `check-gate-metrics.sh` |
 | CI red after green local | local gate differs from CI | project-profile verify commands |
 | Defects after the last merge | integration or resilience gaps | `e2e-perf-testing` |

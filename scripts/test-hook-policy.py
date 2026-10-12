@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-POLICY = os.path.join(ROOT, "core", "hooks", "hook-policy.py")
+POLICY = os.path.join(ROOT, "core", "common", "hooks", "hook-policy.py")
 
 
 def _run(mode: str, env_extra: dict) -> str:

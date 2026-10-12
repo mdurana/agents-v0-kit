@@ -11,23 +11,23 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Clause | Enforcer |
 |--------|----------|
 | Active pack (`java`, `dotnet`, `node`, `python`, or `go`). The java pack pins Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`. Other packs pin their own list in `.agents-v0/packs/<pack>/PACK.md` | A backend-engineer, frontend-engineer; S the pack's implement-* skill, implement-frontend; C /v0-architecture; CI check-architecture-pack.sh, activate-stack-pack.sh; G Architecture and Build gates |
-| P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` when Pack is `java` or empty. Other packs use their scaffold skill and do not extract it | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service, scaffold-aspnet-service, scaffold-node-service, scaffold-python-service, scaffold-go-service; G validate-kit + test-app-template |
+| P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` when Pack is `java` or empty. Other packs use their scaffold skill and do not extract it | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service; G validate-kit + test-app-template |
 | Frontend default: React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI ci/resolve-layout.sh |
-| Correlation ID propagation | A backend-engineer, bff-engineer, frontend-engineer; S implement-spring-service, implement-bff, implement-frontend; G Build gate |
+| Correlation ID propagation | A backend-engineer, bff-engineer, frontend-engineer; S implement-service, implement-bff, implement-frontend; G Build gate |
 | Distributed tracing (traceparent/OTel) | A backend-engineer, bff-engineer, frontend-engineer; G Build gate |
-| Structured logging | A backend-engineer; S implement-spring-service |
-| Metrics (Prometheus/RED) | A backend-engineer; S implement-spring-service |
-| Auth: JWT/S2S, never log tokens | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R security-baseline |
+| Structured logging | A backend-engineer; S implement-service |
+| Metrics (Prometheus/RED) | A backend-engineer; S implement-service |
+| Auth: JWT/S2S, never log tokens | A backend-engineer, bff-engineer; S implement-service, implement-bff; R security-baseline |
 | Resilience: breaker/retry/timeout | A bff-engineer; S implement-bff |
 | API envelopes (success/error) | A solution-architect; S contract-first-design; G Design gate |
 | Async only when justified | A solution-architect; S contract-first-design; G Design gate |
 | Mandated docs: README and sequence diagrams in the feature release. `architecture.md` and `network.md` are written by `/v0-onboard` or the P0 build, then a docs-only follow-up | A maintenance-engineer, release-manager; S doc-sync, release-pr; C /v0-onboard, /v0-build, /v0-release |
-| BFF thin; domain logic in services | A bff-engineer; S implement-bff, implement-aspnet-bff, implement-node-bff, implement-python-bff, implement-go-bff; R architecture-and-diagrams |
-| Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-spring-service; G Build gate |
+| BFF thin; domain logic in services | A bff-engineer; S implement-bff; R architecture-and-diagrams |
+| Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-service; G Build gate |
 | Cache and YugabyteDB only when requirements justify them | A solution-architect; S contract-first-design; G Design gate |
-| DDD defaults (aggregates, value objects, repository ports) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
-| Do not switch MVC and WebFlux without an ADR | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; G Design gate |
+| DDD defaults (aggregates, value objects, repository ports) | A solution-architect, backend-engineer; S contract-first-design, implement-service; G Design/Build gate |
+| Do not switch MVC and WebFlux without an ADR | A backend-engineer, bff-engineer; S implement-service, implement-bff; G Design gate |
 | OMS / order domain only when the task touches that domain | A solution-architect; S contract-first-design; R architecture-and-diagrams |
 
 ## ai-agent-conduct.mdc
@@ -51,34 +51,34 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| §1 Authn (OAuth2/JWT, MFA, step-up, logout, blacklist fail-closed, identical recovery responses, dev bypass local) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F1; ASVS v5.0.0-7.4.1, v5.0.0-6.3.8 |
-| §1 JWT (algorithm allowlist, reject `none`, `iss`/`aud`/`exp`/`nbf`, known `kid`, refresh rotation) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F9; G Verify gate; ASVS v5.0.0-9.1.2, v5.0.0-9.2.1, v5.0.0-9.2.3, v5.0.0-10.4.5 |
+| §1 Authn (OAuth2/JWT, MFA, step-up, logout, blacklist fail-closed, identical recovery responses, dev bypass local) | A backend-engineer, bff-engineer; S implement-service, implement-bff; R vapt.mdc F1; ASVS v5.0.0-7.4.1, v5.0.0-6.3.8 |
+| §1 JWT (algorithm allowlist, reject `none`, `iss`/`aud`/`exp`/`nbf`, known `kid`, refresh rotation) | A backend-engineer, bff-engineer; S implement-service, implement-bff; R vapt.mdc F9; G Verify gate; ASVS v5.0.0-9.1.2, v5.0.0-9.2.1, v5.0.0-9.2.3, v5.0.0-10.4.5 |
 | §1 Browser session (access token in memory, refresh token in HttpOnly cookie) | A frontend-engineer, bff-engineer; S implement-frontend, implement-bff; R vapt-webapp F1; ASVS v5.0.0-10.1.1, v5.0.0-3.3.4 |
-| §2 Function-level authz (`@PreAuthorize`, server-side, no client role trust, fail closed on policy errors) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*; H-W after-edit.sh (heuristic only — Verify/Sonar authoritative); R vapt-spring F4, vapt-webapp F4; G Build gate, Verify gate; ASVS v5.0.0-8.2.1, v5.0.0-8.3.1, v5.0.0-16.5.3 |
-| §2 Object-level authz (BOLA; same-role peer retest) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*, contract-first-design; R vapt-spring F8, vapt-webapp F8; G Verify gate; ASVS v5.0.0-8.2.2 |
-| §2 Field-level authz (request DTO rejects unknown properties; `@JsonIgnore` on response secrets) | A backend-engineer; S implement-spring-service; R vapt-spring F8; ASVS v5.0.0-8.2.3, v5.0.0-15.3.3 |
+| §2 Function-level authz (`@PreAuthorize`, server-side, no client role trust, fail closed on policy errors) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*; H-W after-edit.sh (heuristic only — Verify/Sonar authoritative); R vapt.mdc F4, vapt-webapp F4; G Build gate, Verify gate; ASVS v5.0.0-8.2.1, v5.0.0-8.3.1, v5.0.0-16.5.3 |
+| §2 Object-level authz (BOLA; same-role peer retest) | A backend-engineer, bff-engineer, frontend-engineer; S implement-*, contract-first-design; R vapt.mdc F8, vapt-webapp F8; G Verify gate; ASVS v5.0.0-8.2.2 |
+| §2 Field-level authz (request DTO rejects unknown properties; `@JsonIgnore` on response secrets) | A backend-engineer; S implement-service; R vapt.mdc F8; ASVS v5.0.0-8.2.3, v5.0.0-15.3.3 |
 | §3 Secrets (vault/env, encryption at rest, no client exposure, PII not in URLs, sanitize logs) | A all build agents; H-B pre-shell.sh (obvious secret-output commands); H-W after-edit.sh (limited public-env heuristic); R vapt-webapp F2; ASVS v5.0.0-13.3.1, v5.0.0-14.2.1, v5.0.0-14.2.4 |
 | §4 Cookies and client storage (HttpOnly, Secure, SameSite; access token in memory) | A frontend-engineer; S implement-frontend; H-W after-edit.sh (`document.cookie` write heuristic); R vapt-webapp F1, vapt-webapp F7; ASVS v5.0.0-3.3.4, v5.0.0-14.3.1 |
-| §5 Uploads (size, content sniff, structure, generated name, decompression limit, authz, production virus scan) | A backend-engineer; S implement-spring-service; H-W after-edit.sh (filename-validation heuristic); R vapt-spring F3; ASVS v5.0.0-5.2.2, v5.0.0-5.2.3, v5.0.0-5.3.2, v5.0.0-5.4.3 |
+| §5 Uploads (size, content sniff, structure, generated name, decompression limit, authz, production virus scan) | A backend-engineer; S implement-service; H-W after-edit.sh (filename-validation heuristic); R vapt.mdc F3; ASVS v5.0.0-5.2.2, v5.0.0-5.2.3, v5.0.0-5.3.2, v5.0.0-5.4.3 |
 | §6 Headers (HSTS includeSubDomains, nosniff, X-Frame, CSP frame-ancestors/base-uri/object-src, Referrer, Permissions-Policy; explicit CORS) | A backend-engineer, frontend-engineer; H-W after-edit.sh (`nosniff` heuristic); R vapt-webapp F2; ASVS v5.0.0-3.4.1, v5.0.0-3.4.3, v5.0.0-3.4.6 |
-| §7 API security (versioned, TLS 1.2+, auth, rate limit, `@Valid`, parameterized SQL, sort/filter allowlist, URL allowlist, 401/403 not 200-with-error, no stack traces) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt-spring F5; ASVS v5.0.0-12.1.1, v5.0.0-12.3.2, v5.0.0-1.2.4, v5.0.0-1.3.6, v5.0.0-15.3.2 |
-| §8 Production hygiene (DEBUG off, no demo routes, sourcemaps off, permit-all=false) | A backend-engineer, frontend-engineer; H-W after-edit.sh (permit-all/sourcemap heuristics); R vapt-webapp F2, vapt-spring F4 |
+| §7 API security (versioned, TLS 1.2+, auth, rate limit, `@Valid`, parameterized SQL, sort/filter allowlist, URL allowlist, 401/403 not 200-with-error, no stack traces) | A solution-architect, backend-engineer, bff-engineer; S contract-first-design, implement-*; H-W after-edit.sh (Java SQL-concatenation heuristic); R vapt.mdc F5; ASVS v5.0.0-12.1.1, v5.0.0-12.3.2, v5.0.0-1.2.4, v5.0.0-1.3.6, v5.0.0-15.3.2 |
+| §8 Production hygiene (DEBUG off, no demo routes, sourcemaps off, permit-all=false) | A backend-engineer, frontend-engineer; H-W after-edit.sh (permit-all/sourcemap heuristics); R vapt-webapp F2, vapt.mdc F4 |
 | §9 Supply chain (dep scanning, lockfiles, secret detection, SBOM for every shipped service; license policy when compliance requires) | A maintenance-engineer; S dependency-upgrade; G Verify gate (CVE check); ASVS v5.0.0-15.1.2 |
 | §11 Compliance & review triggers (GDPR, BSP, Data Privacy Act; `{id}` paths included) | A requirements-analyst, security-reviewer; S spec-intake, vapt-review; G Intake gate, Verify gate |
-| §12 Security audit events (auth, logout, denial, revocation, admin mutation, upload; correlation id, principal, action, result; no token) | A backend-engineer, bff-engineer; S implement-spring-service, implement-bff; R vapt-spring F10; G Verify gate; ASVS v5.0.0-16.3.1, v5.0.0-16.3.2, v5.0.0-16.2.1, v5.0.0-16.4.1 |
+| §12 Security audit events (auth, logout, denial, revocation, admin mutation, upload; correlation id, principal, action, result; no token) | A backend-engineer, bff-engineer; S implement-service, implement-bff; R vapt.mdc F10; G Verify gate; ASVS v5.0.0-16.3.1, v5.0.0-16.3.2, v5.0.0-16.2.1, v5.0.0-16.4.1 |
 
-## vapt-spring.mdc
+## vapt.mdc
 
 | Finding | Enforcer |
 |---------|----------|
 | F4 Function-level access control (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-*; H-W after-edit.sh (limited heuristic); G Build/Verify gate; ASVS v5.0.0-8.2.1 |
 | F8 Object-level authorization (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-*, vapt-review; G Verify gate; ASVS v5.0.0-8.2.2 |
-| F9 JWT validation (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-spring-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-9.1.2 |
-| F10 Security audit events (MEDIUM, always-on; applicable miss is Critical) | A backend-engineer, bff-engineer, security-reviewer; S implement-spring-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-16.3.1 |
-| F1 Unauthorized Account Access | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; G Verify gate |
-| F3 File Upload Validation | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
+| F9 JWT validation (HIGH, always-on) | A backend-engineer, bff-engineer, security-reviewer; S implement-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-9.1.2 |
+| F10 Security audit events (MEDIUM, always-on; applicable miss is Critical) | A backend-engineer, bff-engineer, security-reviewer; S implement-service, implement-bff, vapt-review; G Verify gate; ASVS v5.0.0-16.3.1 |
+| F1 Unauthorized Account Access | A backend-engineer, security-reviewer; S implement-service, vapt-review; G Verify gate |
+| F3 File Upload Validation | A backend-engineer, security-reviewer; S implement-service, vapt-review; H-W after-edit.sh (limited heuristic); G Verify gate |
 | F5 Exposed API Calls (missing authz recorded as F4) | A solution-architect, backend-engineer, security-reviewer; S contract-first-design, vapt-review; G Verify gate |
-| F6 Multiple Active Sessions | A backend-engineer, security-reviewer; S implement-spring-service, vapt-review; G Verify gate |
+| F6 Multiple Active Sessions | A backend-engineer, security-reviewer; S implement-service, vapt-review; G Verify gate |
 
 ## vapt-webapp.mdc
 
@@ -100,21 +100,21 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Full MR checklist with sign-off (always-on F4, F8, F9, F10 plus regression) | A security-reviewer, code-reviewer, release-manager; S vapt-review, pr-review, release-pr; `.gitlab/merge_request_templates/default.md`; G Release gate |
 | Always-on miss = Critical; LOW regression blocks only when exploitable | G Verify gate, Release gate |
 
-## java-spring-backend.mdc
+## backend.mdc
 
 | Clause | Enforcer |
 |--------|----------|
-| Constructor injection, `@Transactional(readOnly=true)` | A backend-engineer; S implement-spring-service |
-| DTOs only, no entities at edge | A backend-engineer; S implement-spring-service; R api-and-events; G Build gate |
-| Flyway migrations | A backend-engineer; S implement-spring-service; G Build gate |
-| `Encode.forJava` log sanitization; §12 security audit events | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review; R security-baseline §12 |
-| No empty catch; domain exceptions via `@ControllerAdvice` | A backend-engineer; S implement-spring-service; A code-reviewer; S pr-review |
-| Methods ≤ 30 lines (target ≤ 20), ≤ 4 parameters, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-spring-service, pr-review; G Build/Verify gate |
-| JPA (`@Enumerated(STRING)`, `@Version`, avoid N+1) | A backend-engineer; S implement-spring-service; G Build gate |
-| Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-spring-service; G Build gate |
-| Lombok: no `@AllArgsConstructor`, `@ToString`, or `@EqualsAndHashCode` on entities with lazy collections | A backend-engineer, code-reviewer; S implement-spring-service, pr-review |
-| Records and MapStruct only when the repo already uses them | A backend-engineer; S implement-spring-service |
-| Intel Mac host JDK: a missing Java 21 is MacPorts `openjdk21` via `sh .agents-v0/scripts/host-tools-macports.sh`; kit builds set `JAVA_HOME` from `/usr/libexec/java_home -v 21`; Maven is `./mvnw` | C /v0-build, /v0-maintain; R java-spring-backend; `docs/agents-v0/gold-standards.md` |
+| Constructor injection, `@Transactional(readOnly=true)` | A backend-engineer; S implement-service |
+| DTOs only, no entities at edge | A backend-engineer; S implement-service; R api-and-events; G Build gate |
+| Flyway migrations | A backend-engineer; S implement-service; G Build gate |
+| `Encode.forJava` log sanitization; §12 security audit events | A backend-engineer; S implement-service; A code-reviewer; S pr-review; R security-baseline §12 |
+| No empty catch; domain exceptions via `@ControllerAdvice` | A backend-engineer; S implement-service; A code-reviewer; S pr-review |
+| Methods ≤ 30 lines (target ≤ 20), ≤ 4 parameters, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-service, pr-review; G Build/Verify gate |
+| JPA (`@Enumerated(STRING)`, `@Version`, avoid N+1) | A backend-engineer; S implement-service; G Build gate |
+| Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-service; G Build gate |
+| Lombok: no `@AllArgsConstructor`, `@ToString`, or `@EqualsAndHashCode` on entities with lazy collections | A backend-engineer, code-reviewer; S implement-service, pr-review |
+| Records and MapStruct only when the repo already uses them | A backend-engineer; S implement-service |
+| Intel Mac host JDK: a missing Java 21 is MacPorts `openjdk21` via `sh .agents-v0/scripts/host-tools-macports.sh`; kit builds set `JAVA_HOME` from `/usr/libexec/java_home -v 21`; Maven is `./mvnw` | C /v0-build, /v0-maintain; R backend.mdc; `docs/agents-v0/gold-standards.md` |
 
 ## frontend-web.mdc
 
@@ -144,20 +144,20 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Clause | Enforcer |
 |--------|----------|
 | Contract-first OpenAPI | A solution-architect; S contract-first-design; G Design gate |
-| `/api/v1/`, 201/204 | A backend-engineer; S implement-spring-service; G Build gate |
-| DTOs only | A backend-engineer; S implement-spring-service; G Build gate |
-| Idempotency keys on non-idempotent creates | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
+| `/api/v1/`, 201/204 | A backend-engineer; S implement-service; G Build gate |
+| DTOs only | A backend-engineer; S implement-service; G Build gate |
+| Idempotency keys on non-idempotent creates | A solution-architect, backend-engineer; S contract-first-design, implement-service; G Design/Build gate |
 | One error envelope per surface | A solution-architect; S contract-first-design; G Design gate |
 | Event schemas with eventVersion; additive evolution | A solution-architect; S contract-first-design; G Design gate |
-| Idempotent consumers (dedupe by eventId) | A backend-engineer, test-engineer; S implement-spring-service, quality-gate; G Verify gate |
+| Idempotent consumers (dedupe by eventId) | A backend-engineer, test-engineer; S implement-service, quality-gate; G Verify gate |
 | Parameterized queries only; sort/filter allowlist; user-supplied URL allowlist; DTO rejects unknown properties | A backend-engineer; H-W after-edit.sh (limited heuristic); R security-baseline §2, §7 |
-| Bean Validation (`@Valid`) on request DTOs | A backend-engineer; S implement-spring-service; G Build gate |
+| Bean Validation (`@Valid`) on request DTOs | A backend-engineer; S implement-service; G Build gate |
 | PATCH semantics documented in OpenAPI | A solution-architect; S contract-first-design; G Design gate |
-| Optimistic concurrency (ETag / `If-Match`) | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
-| Pagination: offset or cursor, matching the contract | A solution-architect, backend-engineer; S contract-first-design, implement-spring-service; G Design/Build gate |
-| Correlation and request IDs in error payloads | A backend-engineer; S implement-spring-service; G Build gate |
-| Bounded event retries and a DLQ; never swallow failures | A backend-engineer; S implement-spring-service; G Build gate |
-| Transactional outbox when the domain write and the event commit together | A backend-engineer; S implement-spring-service; G Build gate |
+| Optimistic concurrency (ETag / `If-Match`) | A solution-architect, backend-engineer; S contract-first-design, implement-service; G Design/Build gate |
+| Pagination: offset or cursor, matching the contract | A solution-architect, backend-engineer; S contract-first-design, implement-service; G Design/Build gate |
+| Correlation and request IDs in error payloads | A backend-engineer; S implement-service; G Build gate |
+| Bounded event retries and a DLQ; never swallow failures | A backend-engineer; S implement-service; G Build gate |
+| Transactional outbox when the domain write and the event commit together | A backend-engineer; S implement-service; G Build gate |
 
 ## quality-and-testing.mdc
 
@@ -202,7 +202,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Merge-request readiness is intermediate; completion is an authorized human merge, with no follow-up commit to record it | C /v0-release, /v0-deliver; A release-manager; S release-pr; R workflow-orchestration |
 | Build: green baseline before edits, skipped when the checkout is already the default branch tip with a clean tree; red–green loop may use the profile fast verify command; the gate still runs the profile Backend verify command (pack `java`: full `./mvnw -B clean verify`, coverage/static/CVE) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: tests ship with new behavior (red–green; VAPT-required tests in the same diff) | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*, quality-gate; G Build gate |
-| Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /v0-build; S implement-spring-service, implement-bff; G Build gate |
+| Build: contract conformance and ArchUnit layer rules | R workflow-orchestration; C /v0-build; S implement-service, implement-bff; G Build gate |
 | Build: bounded fix attempts and escalation instead of loops | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-* |
 | Build: `docs/agents-v0/build/<feature>/plan.md` has one row per approved `AC-*`; rows are not added or rewritten | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer; S implement-*; G Build gate |
 | Build: second red result of the same test writes `failure-brief.md`; `debug-investigator` runs before attempt three; `check-failure-brief.sh` must pass | R workflow-orchestration; C /v0-build; A backend/bff/frontend-engineer, debug-investigator; S implement-*; `scripts/check-failure-brief.sh` |
@@ -228,7 +228,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Architecture owners review `docs/agents-v0/design/`, `docs/agents-v0/adr/`, and the `openapi/` catalog | CODEOWNERS |
 | The catalog merge is proven: the catalog contains every operation and component of the approved draft | C /v0-build; S implement-*; CI ci/check-openapi.sh merged |
 | Build plan is real: one row per AC, each done row names an existing test with a red card first | C /v0-build; S implement-*; CI ci/check-build-plan.sh (via ci/check-delivery-linkage.sh) |
-| No new Spring endpoint without a security annotation (`@PermitAll` marks a public one) | C /v0-build; S implement-spring-service; CI ci/check-endpoint-auth.sh |
+| No new Spring endpoint without a security annotation (`@PermitAll` marks a public one) | C /v0-build; S implement-service; CI ci/check-endpoint-auth.sh |
 | The frontend calls only operations the catalog lists | C /v0-build; S implement-frontend; CI ci/check-frontend-calls.sh |
 | Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /v0-build; `maven/contract-conformance.xml` |
 | `/v0-deliver` runs the phase commands in order and holds no phase detail of its own; resumes from the state file; a reopened phase is marked `Re-opened` until re-approved. P0-A skips `/v0-intake` and `/v0-design` and stops once at Release. Build copies the milestone story. A no-contract story does not stop at Design | C /v0-deliver; A orchestrator; R workflow-orchestration |
