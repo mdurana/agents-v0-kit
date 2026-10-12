@@ -1,6 +1,7 @@
 ---
 name: implement-bff
 description: Build phase playbook. Implement a thin BFF — aggregation, auth/session edge, rate limits, Resilience4j — with red–green tests.
+pack: java
 ---
 
 # implement-bff

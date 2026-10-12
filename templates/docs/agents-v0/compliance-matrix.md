@@ -10,7 +10,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| Canonical stack (Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`) | A backend-engineer, frontend-engineer; S implement-spring-service, implement-frontend; G Build gate |
+| Active pack (`java`, `dotnet`, `node`, `python`, or `go`). The java pack pins Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine`. Other packs pin their own list in `.agents-v0/packs/<pack>/PACK.md` | A backend-engineer, frontend-engineer; S the pack's implement-* skill, implement-frontend; C /v0-architecture; CI check-architecture-pack.sh, activate-stack-pack.sh; G Architecture and Build gates |
 | P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) extracted by `--scaffold-app` | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service; G validate-kit + test-app-template |
 | Frontend default: React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI ci/resolve-layout.sh |

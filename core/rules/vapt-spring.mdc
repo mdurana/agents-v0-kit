@@ -2,6 +2,7 @@
 description: VAPT guardrails for Spring Boot APIs — auth, session, access control, file uploads, API hardening
 globs: "**/*.java,**/application*.yml,**/application*.yaml"
 alwaysApply: false
+pack: java
 ---
 
 # VAPT Guardrails — Spring Boot

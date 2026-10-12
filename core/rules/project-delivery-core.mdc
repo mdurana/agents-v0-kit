@@ -1,27 +1,13 @@
 ---
-description: Canonical stack, observability, cross-cutting API/resilience, documentation and security entry points
+description: Active stack pack, observability, cross-cutting API/resilience, documentation and security entry points
 alwaysApply: true
 ---
 
 # Project delivery core
 
-## Stack (canonical)
+## Stack (active pack)
 
-| Layer | Default | Notes |
-|-------|---------|--------|
-| Backend | Java 21, Spring Boot 4.1.1, Maven wrapper | Constructor injection; API → service → repository → domain |
-| HTTP | Spring MVC, embedded Tomcat 11.0.26 | |
-| Security | Spring Security | |
-| API | OpenAPI 3.0, `/api/v1/` | Contract-first when introducing or changing APIs |
-| DB | PostgreSQL 15, Flyway | |
-| Frontend | React 19, TypeScript 5.9, Vite 7 | SvelteKit only if already used |
-| Tests | JUnit (`spring-boot-starter-test`), ArchUnit 1.4.2, H2 test profile, Vitest 3 | |
-| Local run | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | |
-| Distributed SQL | YugabyteDB | Only when scale-out / HA topology requires it |
-| Messaging | Kafka / RabbitMQ / Spring Cloud Stream | When async, sagas, or loose coupling required — not by default |
-| Cache | Redis / Caffeine / Hazelcast | Redis shared; Caffeine in-process; Hazelcast when clustered cache fits |
-
-Event-driven and caching: only when justified.
+The `Pack` row in `docs/agents-v0/project-profile.md` is the backend: `java`, `dotnet`, `node`, `python`, or `go`. Versions, layers, auth, migrations, and verify commands are in `.agents-v0/packs/<pack>/PACK.md`. `/v0-architecture` records `Pack:` on the pattern ADR and runs `sh .agents-v0/scripts/activate-stack-pack.sh`. Any other stack stops before `/v0-plan`. `/v0-onboard` records the pack already on disk and does not replace it. P0-A uses `java`. The UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it. OpenAPI 3.0 uses `/api/v1/`. Events and cache only when the ADR justifies them. The directory table below is the java layout; another pack uses the layout in its `PACK.md`.
 
 ## Directory profiles
 

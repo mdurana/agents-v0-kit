@@ -703,6 +703,14 @@ for section in '## Build and run ownership' '## Error budget policy' '## Databas
   grep -Fq "$section" templates/docs/agents-v0/design/system/ops-readiness.md || err "ops-readiness template lacks '$section'"
 done
 grep -Fq 'check-architecture-pack.sh' core/commands/v0-architecture.md || err "/v0-architecture gate must run check-architecture-pack.sh"
+grep -Fq 'activate-stack-pack.sh' core/commands/v0-architecture.md || err "/v0-architecture must activate the stack pack"
+grep -Fq 'Pack:' core/skills/program-architecture/SKILL.md || err "program-architecture must record Pack on the pattern ADR"
+for pack in java dotnet node python go; do
+  [ -f "core/packs/$pack/PACK.md" ] || err "missing stack pack core/packs/$pack/PACK.md"
+done
+grep -Fq 'activate-stack-pack.sh' scripts/install.sh || err "install.sh does not seed activate-stack-pack.sh"
+grep -Fq 'fastapi' templates/.agents-v0/ci/check-architecture-pack.sh || err "C4 technology check must name FastAPI"
+grep -Fq '|go)' templates/.agents-v0/ci/check-architecture-pack.sh || err "C4 technology check must name Go"
 grep -Fq 'check-architecture-pack.sh' core/skills/program-architecture/SKILL.md || err "program-architecture must run check-architecture-pack.sh"
 grep -Fq 'architecture-review.md' core/commands/v0-architecture.md || err "/v0-architecture must run the independent architecture review"
 grep -Fq 'architecture-review.md' core/agents/design-reviewer.md || err "design-reviewer must write architecture-review.md for the pack"

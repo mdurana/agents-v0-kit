@@ -50,6 +50,8 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 
 ## Backend (Java Spring Boot)
 
+This table is the `java` pack. When `Pack` is `dotnet`, `node`, `python`, or `go`, follow that pack's `PACK.md` and rule instead.
+
 | Area | Mandatory |
 |------|-----------|
 | Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test |

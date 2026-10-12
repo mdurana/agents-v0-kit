@@ -1,0 +1,23 @@
+---
+description: FastAPI or existing Django service — layers, Alembic, REST, logging
+globs: "**/*.py"
+alwaysApply: false
+pack: python
+---
+
+# Python service
+
+Quality thresholds: **`quality-and-testing.mdc`**. API/HTTP semantics: **`api-and-events.mdc`**. Security: **`security-baseline.mdc`**. Pins: `.agents-v0/packs/python/PACK.md`.
+
+## Source layout
+
+A new service is FastAPI under the backend root: `app/api`, `app/service`, `app/repository`, `app/domain`. Alembic migrations live in `alembic/versions`. An existing Django app keeps its layout. Do not add FastAPI beside Django, or `pom.xml`, or a Node service.
+
+## Shape
+
+- Routers depend on services through function arguments. No hidden globals for the database or the current user.
+- Routers validate a Pydantic model and call the service. Do not return ORM entities.
+- SQLAlchemy uses bound parameters. Sort and filter fields come from an allowlist.
+- Log with the standard logger. Do not interpolate secrets into the message. Do not log tokens or raw PII.
+- No bare `except`. Functions ≤ 30 lines.
+- Correlation id and `traceparent` on every request.

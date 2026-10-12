@@ -6,6 +6,7 @@
 
 | Layer | Value |
 |-------|--------|
+| Pack | <!-- java, dotnet, node, python, or go --> |
 | Backend | <!-- Java 21, Spring Boot 4.1.1, Maven wrapper --> |
 | HTTP | <!-- Spring MVC, embedded Tomcat 11.0.26 --> |
 | Security | <!-- Spring Security --> |
@@ -89,7 +90,7 @@ A person approves each row, and CODEOWNERS makes this file a code-owner change, 
 
 ## Endpoint authorization
 
-Spring (`*.java`, `@*Mapping`, `@PreAuthorize` / `@PermitAll`) is built in. Add a row to scan another stack. Columns: Stack, Suffix (`.py`), Marker (file must match this regex, or `(any)`), Mapping (regex; group 1 is the verb, group 2 the path), Security (regex near the mapping). Separate columns with ` | `. A pipe inside a regex has no spaces around it.
+The Pack row selects the built-in scanner: java (`*.java`, `@PreAuthorize` / `@PermitAll`), dotnet (`[Authorize]` / `[AllowAnonymous]`), node (Nest guards or Express middleware), python (FastAPI dependencies, or Django when that app already exists), go (Gin, chi, or `http.HandleFunc`). A missing Pack scans java. Add a row only for a file type that scanner does not already cover. Columns: Stack, Suffix (`.py`), Marker (file must match this regex, or `(any)`), Mapping (regex; group 1 is the verb, group 2 the path), Security (regex near the mapping). Separate columns with ` | `. A pipe inside a regex has no spaces around it.
 
 | Stack | Suffix | Marker | Mapping | Security |
 |-------|--------|--------|---------|----------|

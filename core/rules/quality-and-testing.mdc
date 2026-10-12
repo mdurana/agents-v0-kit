@@ -1,6 +1,6 @@
 ---
 description: Tests, coverage, CI quality gates, Sonar limits, integration and contract testing
-globs: "**/*Test.java,**/*Tests.java,**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx"
+globs: "**/*Test.java,**/*Tests.java,**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,**/*_test.go,**/test_*.py,**/*Tests.cs"
 alwaysApply: false
 ---
 
@@ -17,7 +17,7 @@ alwaysApply: false
 ## Workflow
 
 1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`).
-2. Before merge: **`./mvnw -B clean verify`** from the backend root (or the profile Backend verify command) or the full frontend verify command — see `docs/agents-v0/gold-standards.md`. The fast loop does not replace this gate.
+2. Before merge: the profile Backend verify command (for Pack `java`, **`./mvnw -B clean verify`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `PACK.md`. The fast loop does not replace this gate. The coverage table below applies to every pack.
 3. Coverage gaps: `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without documented exception (OWASP Dependency-Check / Dependabot).
 5. Lockfiles are committed. GitLab secret detection runs on the merge request; a committed secret fails the pipeline. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).

@@ -2,6 +2,8 @@
 
 Discovery: <repo-relative path the user passed to /v0-roadmap>
 
+<!-- Stack preference: copy a discovery line `Stack preference: java|dotnet|node|python|go` here when that file has one. Otherwise delete this comment. It does not activate a pack. -->
+
 ## Problem
 
 <copied from the discovery file>

@@ -1,0 +1,23 @@
+---
+description: NestJS or existing Express service — layers, migrations, REST, logging
+globs: "**/*.controller.ts,**/*.module.ts,**/*.guard.ts,**/routes/**/*.{ts,js}"
+alwaysApply: false
+pack: node
+---
+
+# Node service
+
+Quality thresholds: **`quality-and-testing.mdc`**. API/HTTP semantics: **`api-and-events.mdc`**. Security: **`security-baseline.mdc`**. Pins: `.agents-v0/packs/node/PACK.md`.
+
+## Source layout
+
+A new service is NestJS under the backend root: `src/api`, `src/service`, `src/repository`, `src/domain`. TypeORM migrations live with the repository. An existing Express app keeps its layout. Do not add Nest beside Express, or `pom.xml`, or a `.csproj`.
+
+## Shape
+
+- Constructor injection through the Nest module. No imported singletons that hide dependencies.
+- Controllers validate a DTO and call the service. Do not return entities.
+- Parameterized queries only. Sort and filter fields come from an allowlist.
+- Log with a structured logger. Do not log tokens, secrets, or raw PII.
+- No empty catch. Methods ≤ 30 lines.
+- Correlation id and `traceparent` on every request.

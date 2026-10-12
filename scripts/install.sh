@@ -2,8 +2,11 @@
 # install.sh — install the agents-v0 delivery kit into a target repo (Cursor).
 #
 # Usage:
-#   install.sh [--with-starters] <target-repo>
+#   install.sh [--pack java|dotnet|node|python|go] [--with-starters] <target-repo>
 #       First install: seeds .cursor/ adapter tree and project templates only where missing.
+#       --pack chooses which stack rules and skills land in .cursor (default: the
+#       profile Pack row, or java). Every pack is still copied to .agents-v0/packs
+#       so /v0-architecture can activate another one.
 #
 #   install.sh --update [--quick] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
@@ -18,11 +21,16 @@ KIT="$(cd "$(dirname "$0")/.." && pwd)"
 UPDATE=0
 QUICK=0
 WITH_STARTERS=0
+PACK=""
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack java|dotnet|node|python|go] [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
+}
+
+file_pack() {
+  awk 'NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{exit} fm && /^pack:/{print $2; exit}' "$1"
 }
 
 strip_frontmatter() {
@@ -53,12 +61,42 @@ emit_command() {
   strip_frontmatter "$src" > "$dst"
 }
 
+install_pack_library() {
+  t="$1"
+  rm -rf "$t/.agents-v0/packs"
+  for pack_dir in "$KIT"/core/packs/*/; do
+    id="$(basename "$pack_dir")"
+    dest="$t/.agents-v0/packs/$id"
+    mkdir -p "$dest/rules" "$dest/skills"
+    cp "$pack_dir/PACK.md" "$dest/PACK.md"
+  done
+  for f in "$KIT"/core/rules/*.mdc; do
+    id="$(file_pack "$f" || true)"
+    [ -n "$id" ] || continue
+    [ -d "$t/.agents-v0/packs/$id/rules" ] || continue
+    cp "$f" "$t/.agents-v0/packs/$id/rules/$(basename "$f")"
+  done
+  for skill_dir in "$KIT"/core/skills/*/; do
+    skill="$skill_dir/SKILL.md"
+    [ -f "$skill" ] || continue
+    id="$(file_pack "$skill" || true)"
+    [ -n "$id" ] || continue
+    name="$(basename "$skill_dir")"
+    mkdir -p "$t/.agents-v0/packs/$id/skills/$name"
+    cp "$skill" "$t/.agents-v0/packs/$id/skills/$name/SKILL.md"
+  done
+}
+
 install_rules() {
   dstdir="$1"
   mkdir -p "$dstdir"
   for f in "$KIT"/core/rules/*.mdc; do
-    name="$(basename "$f" .mdc)"
-    cp "$f" "$dstdir/$name.mdc"
+    id="$(file_pack "$f" || true)"
+    if [ -n "$id" ] && [ "$id" != "$PACK" ]; then
+      rm -f "$dstdir/$(basename "$f")"
+      continue
+    fi
+    cp "$f" "$dstdir/$(basename "$f")"
   done
 }
 
@@ -67,8 +105,15 @@ install_skills() {
   mkdir -p "$dstdir"
   for skill_dir in "$KIT"/core/skills/*/; do
     name="$(basename "$skill_dir")"
+    skill="$skill_dir/SKILL.md"
+    [ -f "$skill" ] || continue
+    id="$(file_pack "$skill" || true)"
+    if [ -n "$id" ] && [ "$id" != "$PACK" ]; then
+      rm -rf "$dstdir/$name"
+      continue
+    fi
     mkdir -p "$dstdir/$name"
-    cp "$skill_dir/SKILL.md" "$dstdir/$name/SKILL.md"
+    cp "$skill" "$dstdir/$name/SKILL.md"
   done
 }
 
@@ -152,6 +197,7 @@ install_templates() {
 .agents-v0/scripts/export-audit-pack.sh
 .agents-v0/scripts/update-agents-model.sh
 .agents-v0/scripts/host-tools-macports.sh
+.agents-v0/scripts/activate-stack-pack.sh
 .agents-v0/hooks/pre-push
 docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
@@ -225,6 +271,7 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
+        .agents-v0/scripts/activate-stack-pack.sh \
         .agents-v0/scripts/run-local-container.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
@@ -275,6 +322,11 @@ while [ $# -gt 0 ]; do
       WITH_STARTERS=1
       shift
       ;;
+    --pack)
+      [ $# -ge 2 ] || usage
+      PACK="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       ;;
@@ -286,6 +338,10 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$TARGET" ] || usage
+case "$PACK" in
+  ""|java|dotnet|node|python|go) ;;
+  *) printf 'error: --pack must be java, dotnet, node, python, or go\n' >&2; exit 1 ;;
+esac
 [ "$QUICK" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --quick applies to --update only\n' >&2; usage; }
 [ -d "$TARGET" ] || { printf 'error: target not found: %s\n' "$TARGET" >&2; exit 1; }
 TARGET_ABS="$(cd "$TARGET" && pwd)"
@@ -316,7 +372,28 @@ if [ "$TARGET_ABS" = "$KIT" ]; then
 fi
 
 require_pyyaml
+if [ -z "$PACK" ] && [ -f "$TARGET_ABS/docs/agents-v0/project-profile.md" ]; then
+  PACK="$(python3 - "$TARGET_ABS/docs/agents-v0/project-profile.md" <<'PY'
+import sys
+text = open(sys.argv[1], encoding="utf-8").read()
+if "## Stack" not in text:
+    raise SystemExit(0)
+body = text.split("## Stack", 1)[1].split("\n## ", 1)[0]
+allowed = {"java", "dotnet", "node", "python", "go"}
+for line in body.splitlines():
+    if not line.startswith("|"):
+        continue
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if cells and cells[0] == "Pack" and len(cells) > 1 and cells[1] in allowed:
+        print(cells[1])
+        break
+PY
+)"
+fi
+PACK="${PACK:-java}"
+
 install_templates "$TARGET_ABS"
+install_pack_library "$TARGET_ABS"
 install_cursor "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 

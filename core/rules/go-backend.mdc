@@ -1,0 +1,23 @@
+---
+description: Go service — Gin or an existing chi or net/http router, layers, migrations, logging
+globs: "**/*.go"
+alwaysApply: false
+pack: go
+---
+
+# Go service
+
+Quality thresholds: **`quality-and-testing.mdc`**. API/HTTP semantics: **`api-and-events.mdc`**. Security: **`security-baseline.mdc`**. Pins: `.agents-v0/packs/go/PACK.md`.
+
+## Source layout
+
+A new service uses Gin. Packages under the module: `api`, `service`, `repository`, `domain`. golang-migrate SQL lives in `db/migrations`. An existing chi or `net/http` router stays. Do not add Gin beside it, or `pom.xml`.
+
+## Shape
+
+- Handlers take a service constructed in `main`. No package-level database handle.
+- Handlers decode a request struct and call the service. Do not return repository rows.
+- SQL uses placeholders. Sort and filter fields come from an allowlist.
+- `log/slog` with structured fields. Do not log tokens, secrets, or raw PII.
+- No empty error discard. Functions ≤ 30 lines.
+- Correlation id and `traceparent` on every request.

@@ -2,6 +2,7 @@
 description: Java/Spring Boot implementation — style, layers, JPA, REST, logging, exceptions, modern Java
 globs: "**/*.java"
 alwaysApply: false
+pack: java
 ---
 
 # Java and Spring Boot

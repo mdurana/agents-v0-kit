@@ -1,11 +1,13 @@
 #!/bin/sh
-# check-gate-metrics.sh — read machine output for one Maven module instead of trusting
+# check-gate-metrics.sh — read machine output for one module instead of trusting
 # numbers an agent wrote into a report (workflow-orchestration.mdc Verify gate).
 #
 # Usage: sh .agents-v0/ci/check-gate-metrics.sh <module-root>
-#   <module-root>  directory that holds pom.xml and target/ (e.g. backend, services/order)
+#   <module-root>  the service root. A pom.xml or target/ directory uses the Java
+#   reports below. Otherwise a *.csproj, go.mod, pyproject.toml, or package.json
+#   selects the dotnet, go, python, or node reports named in that pack's PACK.md.
 #
-# Reads, under <module-root>/target:
+# Java, under <module-root>/target:
 #   surefire-reports/TEST-*.xml, failsafe-reports/TEST-*.xml  executed tests, failures, errors
 #   site/jacoco/jacoco.xml                                    line coverage, optional diff coverage
 #   dependency-check-report.json                              unsuppressed HIGH/CRITICAL CVEs
@@ -82,6 +84,209 @@ def known_failures_budget():
                 if cells and cells[0].isdigit() and int(cells[0]) > 0:
                     return int(cells[0])
     return 0
+
+
+def module_kind(path):
+    """Java when this root already looks like a Maven module. Other packs only when it does not."""
+    if os.path.isdir(os.path.join(path, "target")) or os.path.isfile(os.path.join(path, "pom.xml")):
+        return "java"
+    if glob.glob(os.path.join(path, "*.csproj")) or glob.glob(os.path.join(path, "*.sln")):
+        return "dotnet"
+    if os.path.isfile(os.path.join(path, "go.mod")):
+        return "go"
+    if os.path.isfile(os.path.join(path, "pyproject.toml")) or os.path.isfile(os.path.join(path, "pytest.ini")):
+        return "python"
+    if os.path.isfile(os.path.join(path, "package.json")):
+        return "node"
+    return "java"
+
+
+def junit_totals(paths):
+    tests = fails = errors = skipped = 0
+    used = False
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        used = True
+        try:
+            top = ET.parse(path).getroot()
+        except ET.ParseError:
+            failures.append(f"unreadable test report: {path}")
+            continue
+        suites = [top] if top.tag == "testsuite" or top.tag.endswith("testsuite") else [
+            node for node in top.iter() if node.tag == "testsuite" or node.tag.endswith("testsuite")
+        ]
+        for suite in suites:
+            tests += int(suite.get("tests", 0))
+            fails += int(suite.get("failures", 0))
+            errors += int(suite.get("errors", 0))
+            skipped += int(suite.get("skipped", 0))
+    return tests, fails, errors, skipped, used
+
+
+def record_tests(tests, fails, errors, skipped, used):
+    summary["tests"] = {"run": tests, "failures": fails, "errors": errors, "skipped": skipped}
+    if (not used or tests == 0) and env("ALLOW_NO_TESTS") != "1":
+        failures.append("no executed tests (ALLOW_NO_TESTS=1 for a module with no tests)")
+    if fails + errors > 0:
+        budget = known_failures_budget()
+        if fails + errors <= budget:
+            summary["known_failures_budget"] = budget
+            print(f"tests: {fails + errors} failure(s) within the documented known_failures budget ({budget})")
+        else:
+            failures.append(f"test failures={fails} errors={errors}")
+    print(f"tests: run={tests} failures={fails} errors={errors} skipped={skipped}")
+
+
+def record_coverage(pct, missing_name):
+    if pct is None:
+        print(f"coverage: SKIP (no {missing_name})")
+        if env("DIFF_BASE"):
+            failures.append(f"DIFF_BASE is set but {missing_name} is missing")
+        return
+    summary["lineCoveragePct"] = round(pct, 2)
+    print(f"coverage: bundle lines {pct:.2f}%")
+    minimum = number("MIN_LINE_PCT")
+    if minimum is not None and pct < minimum:
+        failures.append(f"bundle line coverage {pct:.2f}% < {minimum:g}%")
+
+
+def cobertura_pct(path):
+    if not path or not os.path.isfile(path):
+        return None
+    rate = ET.parse(path).getroot().get("line-rate")
+    return None if rate is None else float(rate) * 100.0
+
+
+def jest_pct(path):
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    pct = (data.get("total") or {}).get("lines", {}).get("pct")
+    return float(pct) if isinstance(pct, (int, float)) else None
+
+
+def gocover_pct(path):
+    if not os.path.isfile(path):
+        return None
+    covered = total = 0
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.split()
+            if len(parts) != 3 or parts[0].startswith("mode:"):
+                continue
+            stmts, hits = int(parts[1]), int(parts[2])
+            total += stmts
+            if hits > 0:
+                covered += stmts
+    return None if total == 0 else 100.0 * covered / total
+
+
+def trx_totals(paths):
+    tests = fails = errors = 0
+    used = False
+    for path in paths:
+        used = True
+        try:
+            tree = ET.parse(path)
+        except ET.ParseError:
+            failures.append(f"unreadable test report: {path}")
+            continue
+        for el in tree.iter():
+            if el.tag.endswith("Counters"):
+                tests += int(el.get("executed") or el.get("total") or 0)
+                fails += int(el.get("failed") or 0)
+                errors += int(el.get("error") or 0)
+    return tests, fails, errors, 0, used
+
+
+def go_json_totals(path):
+    if not os.path.isfile(path):
+        return 0, 0, 0, 0, False
+    tests = fails = 0
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not obj.get("Test"):
+                continue
+            if obj.get("Action") == "pass":
+                tests += 1
+            elif obj.get("Action") == "fail":
+                tests += 1
+                fails += 1
+    return tests, fails, 0, 0, True
+
+
+def measure_alt(kind):
+    if kind == "dotnet":
+        trx = glob.glob(os.path.join(root, "TestResults", "**", "*.trx"), recursive=True)
+        trx += glob.glob(os.path.join(root, "*.trx"))
+        record_tests(*trx_totals(trx))
+        cobertura = glob.glob(os.path.join(root, "**", "coverage.cobertura.xml"), recursive=True)
+        record_coverage(cobertura_pct(cobertura[0]) if cobertura else None, "coverage.cobertura.xml")
+    elif kind == "python":
+        reports = [path for path in (
+            os.path.join(root, "pytest-report.xml"),
+            os.path.join(root, "test-results.xml"),
+            os.path.join(root, "junit.xml"),
+        ) if os.path.isfile(path)]
+        record_tests(*junit_totals(reports))
+        record_coverage(cobertura_pct(os.path.join(root, "coverage.xml")), "coverage.xml")
+    elif kind == "node":
+        reports = [path for path in (
+            os.path.join(root, "junit.xml"),
+            os.path.join(root, "test-results.xml"),
+            os.path.join(root, "reports", "junit.xml"),
+        ) if os.path.isfile(path)]
+        record_tests(*junit_totals(reports))
+        record_coverage(jest_pct(os.path.join(root, "coverage", "coverage-summary.json")), "coverage/coverage-summary.json")
+    elif kind == "go":
+        record_tests(*go_json_totals(os.path.join(root, "go-test.json")))
+        record_coverage(gocover_pct(os.path.join(root, "coverage.out")), "coverage.out")
+    else:
+        failures.append(f"unknown pack {kind}")
+    cve = os.path.join(root, "cve-report.json")
+    if os.path.isfile(cve):
+        print(f"cve: present ({cve})")
+    elif env("REQUIRE_CVE_REPORT") == "1":
+        failures.append("missing cve-report.json (REQUIRE_CVE_REPORT=1)")
+    else:
+        print("cve: SKIP (no cve-report.json)")
+
+
+def finish():
+    out = env("GATE_METRICS_OUT") or os.path.join(root, "target", "gate-metrics.json")
+    if not os.path.isdir(os.path.join(root, "target")):
+        out = env("GATE_METRICS_OUT") or os.path.join(root, "gate-metrics.json")
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    summary["failures"] = failures
+    with open(out, "w", encoding="utf-8") as handle:
+        json.dump(summary, handle, indent=2)
+        handle.write("\n")
+    if failures:
+        report_only = env("GATE_REPORT_ONLY") == "1"
+        for item in failures:
+            print(f"{'WARN' if report_only else 'FAIL'}: {item}", file=sys.stderr)
+        if report_only:
+            print(f"REPORT-ONLY: measured {root}; no gate applied (summary: {out})")
+            raise SystemExit(0)
+        raise SystemExit(1)
+    print(f"OK: gate metrics for {root} (summary: {out})")
+    raise SystemExit(0)
+
+
+kind = module_kind(root)
+summary["kind"] = kind
+if kind != "java":
+    measure_alt(kind)
+    finish()
 
 
 # Executed tests: a green build with zero executed tests is not evidence.
@@ -206,20 +411,5 @@ elif env("REQUIRE_CVE_REPORT") == "1":
 else:
     print("cve: SKIP (no target/dependency-check-report.json)")
 
-out = env("GATE_METRICS_OUT") or os.path.join(root, "target", "gate-metrics.json")
-os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-summary["failures"] = failures
-with open(out, "w", encoding="utf-8") as handle:
-    json.dump(summary, handle, indent=2)
-    handle.write("\n")
-
-if failures:
-    report_only = env("GATE_REPORT_ONLY") == "1"
-    for item in failures:
-        print(f"{'WARN' if report_only else 'FAIL'}: {item}", file=sys.stderr)
-    if report_only:
-        print(f"REPORT-ONLY: measured {root}; no gate applied (summary: {out})")
-        raise SystemExit(0)
-    raise SystemExit(1)
-print(f"OK: gate metrics for {root} (summary: {out})")
+finish()
 PY

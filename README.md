@@ -17,7 +17,7 @@ Different features may proceed in one checkout only while each writes its own `d
 | `core/rules/*.mdc`     | Org delivery rules (+ `ux-design`) — single source of truth; installed to `.cursor/rules/org/`                     |
 | `core/agents/*.md`     | 19 subagents with Cursor `model:` frontmatter                                                                      |
 | `core/commands/v0-*.md` | 16 entry points (`/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake` … `/v0-local-release`, `/v0-deliver`, `/v0-onboard`, `/v0-status`, `/v0-triage`, `/v0-export`, `/v0-deck`) — `v0-` avoids Cursor built-in slash collisions |
-| `core/skills/`         | 28 playbooks in the standard `SKILL.md` format                                                                     |
+| `core/skills/`         | 32 playbooks in the standard `SKILL.md` format                                                                     |
 | `core/hooks/`          | Guardrails: `pre-shell.sh`, `pre-edit.sh`, `session-start.sh`, `after-edit.sh`, `stop.sh`, `hook-policy.py`        |
 | `core/adapters/`       | Cursor `hooks.json`                                                                                                |
 | `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |

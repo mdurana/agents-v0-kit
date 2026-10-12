@@ -1,0 +1,28 @@
+---
+description: ASP.NET Core implementation — layers, EF Core, REST, logging, exceptions
+globs: "**/*.cs"
+alwaysApply: false
+pack: dotnet
+---
+
+# ASP.NET Core
+
+Quality thresholds: **`quality-and-testing.mdc`**. API/HTTP semantics: **`api-and-events.mdc`**. Security: **`security-baseline.mdc`**. Pins: `.agents-v0/packs/dotnet/PACK.md`.
+
+## Source layout
+
+Paths are relative to the backend root in `docs/agents-v0/project-profile.md`. Do not add `src/` or `pom.xml` at the repo root. Do not add a Java or Node service project.
+
+- **Projects:** `Api`, `Service`, `Infrastructure`, `Domain`. Tests live in a `*.Tests` project.
+- **Migrations:** EF Core, under the infrastructure project. Follow `migration-safety`.
+- **Namespaces** mirror those projects.
+
+## Shape
+
+- Constructor injection. No service locator.
+- Controllers or minimal-API handlers bind a request DTO, validate it, and call the service. Do not return entities.
+- Services own transactions. Reads use a read-only query path.
+- `ILogger` message templates. Do not log tokens, secrets, or raw PII.
+- No empty catch. Methods ≤ 30 lines.
+- Parameterized queries only. Sort and filter fields come from an allowlist.
+- Correlation id and `traceparent` on every request.

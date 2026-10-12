@@ -201,6 +201,8 @@ EOF
 # ADR 01: pattern
 
 - **Status:** Proposed
+
+Pack: java
 EOF
   cat > "$p/docs/agents-v0/design/system/arc-record.md" <<'EOF'
 # ARC record
@@ -538,6 +540,49 @@ printf 'package com.acme;\nclass A {\nint x;\nint y;\n}\n' > "$m/src/main/java/c
 expect_fail "gate metrics: diff coverage 50% fails the default 80%" "$tmp" env DIFF_BASE="$diff_base" sh "$CI/check-gate-metrics.sh" "$m"
 expect_pass "gate metrics: diff coverage 50% passes MIN_DIFF_LINE_PCT=40" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=40 sh "$CI/check-gate-metrics.sh" "$m"
 
+m="$tmp/gate-python"
+mkdir -p "$m"
+printf '[project]\nname = "orders"\n' > "$m/pyproject.toml"
+printf '<testsuite tests="2" failures="0" errors="0" skipped="0"/>\n' > "$m/pytest-report.xml"
+printf '<coverage line-rate="0.91"/>\n' > "$m/coverage.xml"
+expect_pass "gate metrics: pytest and coverage.xml pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+
+m="$tmp/gate-go"
+mkdir -p "$m"
+printf 'module example.com/orders\n\ngo 1.26\n' > "$m/go.mod"
+expect_fail "gate metrics: a Go module with no test report fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+printf '%s\n' '{"Action":"pass","Package":"example.com/orders","Test":"TestPlace"}' > "$m/go-test.json"
+printf 'mode: set\nexample.com/orders/a.go:1.1,2.2 1 1\n' > "$m/coverage.out"
+expect_pass "gate metrics: go test json and coverage.out pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+
+m="$tmp/gate-dotnet"
+mkdir -p "$m/TestResults"
+printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "$m/Orders.csproj"
+printf '<TestRun><ResultSummary><Counters total="1" executed="1" passed="1" failed="0"/></ResultSummary></TestRun>\n' > "$m/TestResults/test-results.trx"
+printf '<coverage line-rate="0.88"/>\n' > "$m/coverage.cobertura.xml"
+expect_pass "gate metrics: trx and cobertura pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+
+# activate-stack-pack.sh
+act="$KIT/templates/.agents-v0/scripts/activate-stack-pack.sh"
+d="$tmp/activate-java"
+mkdir -p "$d/docs/agents-v0" "$d/app/backend"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+printf '<project/>\n' > "$d/app/backend/pom.xml"
+expect_pass "activate-stack-pack --detect binds java" "$d" sh "$act" --detect
+grep -Fq '| Pack | java |' "$d/docs/agents-v0/project-profile.md" \
+  && pass "activate-stack-pack writes the Pack row" || fail "activate-stack-pack writes the Pack row"
+expect_fail "activate-stack-pack refuses to replace java with go" "$d" sh "$act" go
+d="$tmp/activate-ambiguous"
+mkdir -p "$d/docs/agents-v0"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+printf '<project/>\n' > "$d/pom.xml"
+printf 'module example.com/orders\n\ngo 1.26\n' > "$d/go.mod"
+if (cd "$d" && sh "$act" --detect) >/dev/null 2>&1; then
+  fail "activate-stack-pack --detect rejects two backend markers (expected non-zero)"
+else
+  pass "activate-stack-pack --detect rejects two backend markers"
+fi
+
 # --- check-layout-roots.sh ---------------------------------------------------
 d="$tmp/roots-unknown"
 mkdir -p "$d/app"
@@ -772,6 +817,26 @@ d="$tmp/pack-tech"
 write_pack "$d"
 sedi 's/MessageBus\[Message bus\]/MessageBus[Kafka topic]/' "$d/docs/agents-v0/architecture.md"
 expect_fail "check-architecture-pack rejects a product name in C4" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-go"
+write_pack "$d"
+sedi 's/OrderService\[Order service\]/OrderService[Go service]/' "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack rejects Go in C4" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-fastapi"
+write_pack "$d"
+sedi 's/OrderService\[Order service\]/OrderService[FastAPI service]/' "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack rejects FastAPI in C4" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-nopack"
+write_pack "$d"
+sedi '/^Pack: java$/d' "$d/docs/agents-v0/adr/01-pattern.md"
+expect_fail "check-architecture-pack requires Pack on the pattern ADR" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-rust"
+write_pack "$d"
+sedi 's/^Pack: java$/Pack: rust/' "$d/docs/agents-v0/adr/01-pattern.md"
+expect_fail "check-architecture-pack rejects a stack with no pack" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-topology"
 write_pack "$d"

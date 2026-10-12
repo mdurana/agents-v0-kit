@@ -5,13 +5,13 @@
 #   sh .agents-v0/ci/check-endpoint-auth.sh <base> [<head>]   fail on a mapping the change adds without a security annotation
 #   sh .agents-v0/ci/check-endpoint-auth.sh --list [<root>...]  print every mapping: file:line  VERB /path  annotated|NO-ANNOTATION
 #
-# Spring (*.java) is built in: a mapping counts as annotated when its own annotations, or its
-# controller class, carry @PreAuthorize, @PostAuthorize, @Secured, @RolesAllowed, @PermitAll, or
-# @DenyAll. A deliberately public endpoint says so with @PermitAll. Authorization enforced only in
-# configuration (SecurityFilterChain matchers) is not seen here.
-# Other stacks: add a row under "## Endpoint authorization" in docs/agents-v0/project-profile.md
-# (Stack, Suffix, Marker, Mapping, Security). Spring stays the built-in scanner; those rows add
-# file types. The Spring scan feeds scripts/discover-codebase.sh (keep the two in step).
+# The built-in scanner follows the Pack row in docs/agents-v0/project-profile.md.
+# java (and a missing Pack) scans *.java for @PreAuthorize, @PostAuthorize, @Secured,
+# @RolesAllowed, @PermitAll, or @DenyAll. A deliberately public endpoint says so with @PermitAll.
+# dotnet scans [Authorize] / [AllowAnonymous]. node scans Nest guards and Express middleware.
+# python scans FastAPI dependencies. go scans Gin, chi, and http.HandleFunc.
+# Extra rows under "## Endpoint authorization" still add file types. They do not turn the
+# Spring scanner back on when Pack is not java.
 # <head> omitted compares <base> with the working tree.
 
 set -eu
@@ -80,6 +80,62 @@ def git(*a):
     return proc.returncode, proc.stdout
 
 
+def profile_pack():
+    """Pack row under ## Stack. Missing or blank stays java so existing repos keep that scanner."""
+    path = "docs/agents-v0/project-profile.md"
+    if not os.path.isfile(path):
+        return "java"
+    text = open(path, encoding="utf-8", errors="replace").read()
+    if "## Stack" not in text:
+        return "java"
+    body = text.split("## Stack", 1)[1].split("\n## ", 1)[0]
+    for line in body.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells and cells[0] == "Pack" and len(cells) > 1 and cells[1] in {"java", "dotnet", "node", "python", "go"}:
+            return cells[1]
+    return "java"
+
+
+# suffix, marker, mapping, security, name. Mapping group 1 is the verb and group 2 the path,
+# unless the regex has a single group, which is the path.
+BUILTINS = {
+    "dotnet": [
+        (".cs", r"\[Http(Get|Post|Put|Patch|Delete)",
+         r"\[Http(Get|Post|Put|Patch|Delete)(?:\(\s*\"([^\"]*)\"\))?",
+         r"\[Authorize|\[AllowAnonymous\]", "dotnet"),
+    ],
+    "node": [
+        (".ts", r"@(Get|Post|Put|Patch|Delete)\(",
+         r"@(Get|Post|Put|Patch|Delete)\(\s*[\"']?([^\"')]*)",
+         r"@UseGuards|@Public", "nest"),
+        (".ts", r"express\(|Router\(",
+         r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
+         r"requireAuth|authenticate|authorize|publicRoute", "express"),
+        (".js", r"express\(|Router\(",
+         r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
+         r"requireAuth|authenticate|authorize|publicRoute", "express"),
+    ],
+    "python": [
+        (".py", r"APIRouter|FastAPI\(",
+         r"@(?:router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
+         r"Depends\(|require_role", "fastapi"),
+        (".py", r"urlpatterns",
+         r"\bpath\(\s*[\"']([^\"']+)",
+         r"login_required|permission_classes|IsAuthenticated", "django"),
+    ],
+    "go": [
+        (".go", r"gin\.|chi\.NewRouter",
+         r"\.(GET|POST|PUT|PATCH|DELETE)\(\s*\"([^\"]+)\"",
+         r"Auth|middleware", "go"),
+        (".go", r"http\.HandleFunc",
+         r"http\.HandleFunc\(\s*\"([^\"]+)\"",
+         r"Auth|middleware", "go-stdlib"),
+    ],
+}
+
+
 def profile_stacks():
     """Extra stacks from docs/agents-v0/project-profile.md. Spring stays built in."""
     path = "docs/agents-v0/project-profile.md"
@@ -136,21 +192,38 @@ def extra_endpoints(lines, spec):
             continue
         window = lines[max(0, i - 12): i + 9]
         ok = file_secured or any(security_re.search(w) for w in window)
-        verb = match.group(1).upper() if match.lastindex and match.group(1) else "ANY"
-        route = match.group(2) if match.lastindex and match.lastindex >= 2 and match.group(2) else match.group(0)
+        verbs = {"get", "post", "put", "patch", "delete"}
+        if match.lastindex and match.lastindex >= 2 and match.group(1):
+            verb = match.group(1).upper()
+            route = match.group(2) or ""
+        elif match.lastindex == 1 and match.group(1):
+            token = match.group(1)
+            if token.lower() in verbs:
+                verb, route = token.upper(), ""
+            else:
+                verb, route = "ANY", token
+        else:
+            verb, route = "ANY", match.group(0)
         yield i + 1, verb, route.strip(" '\"")[:120], ok
 
 
 def scan_file(path, lines):
-    if path.endswith(".java"):
+    pack = profile_pack()
+    if pack == "java" and path.endswith(".java"):
         yield from endpoints(lines)
+    for spec in BUILTINS.get(pack, []):
+        if path.endswith(spec[0]):
+            yield from extra_endpoints(lines, spec)
     for spec in STACKS:
         if path.endswith(spec[0]):
             yield from extra_endpoints(lines, spec)
 
 
 def watched(path):
-    if path.endswith(".java"):
+    pack = profile_pack()
+    if pack == "java" and path.endswith(".java"):
+        return True
+    if any(path.endswith(spec[0]) for spec in BUILTINS.get(pack, [])):
         return True
     return any(path.endswith(spec[0]) for spec in STACKS)
 

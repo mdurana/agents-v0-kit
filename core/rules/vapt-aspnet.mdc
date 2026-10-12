@@ -1,0 +1,34 @@
+---
+description: VAPT guardrails for ASP.NET Core APIs — auth, session, access control, uploads
+globs: "**/*.cs"
+alwaysApply: false
+pack: dotnet
+---
+
+# VAPT Guardrails — ASP.NET Core
+
+Apply when editing controllers, auth, or upload code. **Always-on:** F4, F8, F9, F10. **Regression:** F1, F3. An applicable failure is Critical.
+
+## F1 — Session end
+
+Logout clears the auth cookie and the server session. A denylist or session store fails closed.
+
+## F3 — Uploads
+
+Validate size, content type, and structure on the server. Store a generated name. Cap decompression. Require authorization. Production scans for malware.
+
+## F4 — Authorization
+
+`[Authorize]` on every admin or mutation action. Anonymous access is `[AllowAnonymous]` and local-dev only. Policy failures deny. A missing attribute is not public.
+
+## F8 — Object access
+
+A same-role caller cannot read or write another owner's `{id}`. The owning service checks it. Write DTOs reject unknown properties.
+
+## F9 — Authentication
+
+Authentication middleware runs before handlers. JWT checks `iss`, `aud`, `exp`, and `nbf`. Fail closed.
+
+## F10 — Audit
+
+Audit auth, denial, admin mutation, and upload outcome. Do not log the token.

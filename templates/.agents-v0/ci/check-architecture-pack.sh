@@ -165,7 +165,11 @@ def node_ids(diagram):
 TECH = re.compile(
     r"\b(kafka|rabbitmq|activemq|postgres(?:ql)?|mysql|mariadb|mongodb|dynamodb|redis|memcached|"
     r"elasticsearch|kubernetes|k8s|eks|aws|azure|gcp|spring(?: boot)?|svelte(?:kit)?|angular|"
-    r"java|kotlin|nginx|docker|terraform|hazelcast|caffeine|yugabyte(?:db)?|flyway|liquibase)\b", re.I)
+    r"java|kotlin|nginx|docker|terraform|hazelcast|caffeine|yugabyte(?:db)?|flyway|liquibase|"
+    r"dotnet|asp\.net|csharp|entity framework|ef core|nodejs|node\.js|node|nestjs|express|typescript|"
+    r"python|fastapi|django|pydantic|alembic|golang|gin|chi|go)\b", re.I)
+PACK_LINE = re.compile(r"^Pack:\s*(\S+)\s*$", re.M)
+PACKS = {"java", "dotnet", "node", "python", "go"}
 
 text = read(arch)
 h2 = split_sections(text, 2)
@@ -285,6 +289,12 @@ if body is not None:
         value = (status.group(1) or status.group(2)).strip() if status else ""
         if approved and not re.match(r"Accepted", value):
             fail(f"{adr}: Status is '{value or '?'}'; the pattern ADR must be Accepted once the architecture row is Approved")
+        packs = PACK_LINE.findall(adr_text)
+        if not packs:
+            fail(f"{adr}: pattern ADR must record Pack: java, dotnet, node, python, or go")
+        for pack in packs:
+            if pack not in PACKS:
+                fail(f"{adr}: Pack '{pack}' has no pack; stop before Plan")
     if not adr_paths:
         fail(f"{path}: Options must name the pattern ADR under docs/agents-v0/adr/")
     fitness = split_sections(body, 2).get("fitness functions", "")

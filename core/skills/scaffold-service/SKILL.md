@@ -1,6 +1,7 @@
 ---
 name: scaffold-service
 description: Greenfield scaffold playbook. Prove the bundled P0 app template (or an external skeleton) — health, security, quality gates, containers.
+pack: java
 ---
 
 # scaffold-service

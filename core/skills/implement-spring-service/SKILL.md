@@ -1,6 +1,7 @@
 ---
 name: implement-spring-service
 description: Build phase playbook. Implement a layered Spring Boot service with Flyway migrations, auth, tracing, and red–green tests.
+pack: java
 ---
 
 # implement-spring-service
