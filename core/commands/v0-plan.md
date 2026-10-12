@@ -15,7 +15,7 @@ A plan whose only story is the seeded P0-A row does not require a roadmap or an 
 Continue from the milestone manifests already on disk. Do not recreate story rows. The context map is an input from `/v0-architecture`. A program has no per-feature state file (`workflow-orchestration.mdc` Program planning).
 
 ## Collision
-Planning writes milestone manifests. It does not write `docs/agents-v0/design/system/` or ADRs. Stop before editing a manifest that `git status` already shows modified by a feature in flight, and ask which checkout owns it.
+Planning writes milestone manifests and `docs/agents-v0/milestones/plan.md`. It does not write `docs/agents-v0/design/system/` or ADRs. Stop before editing a manifest that `git status` already shows modified by a feature in flight, and ask which checkout owns it.
 
 ## Instructions
 1. Launch the `program-planner` subagent with the approved roadmap. A P0-A-only plan may start from the seeded milestone instead.
@@ -28,7 +28,7 @@ Planning writes milestone manifests. It does not write `docs/agents-v0/design/sy
    - Every story fits the story-size budget: one surface, at most eight acceptance criteria, including the negative or edge Intake will add. Seeded P0-A stays at four.
    - Every pair of bounded contexts that talk to each other has an integration story that depends on both sides.
    - Hardening stories (P4) exist for every filled NFR/SLO row.
-5. **Stop** and present the manifests and the story graph. The context map is the approved input, not a plan deliverable. After explicit approval, append a `plan` row (Decision: `Approved`, approver, date, the manifest and roadmap paths) to the `Delivery approvals` table of each manifest in scope. Do not start `/v0-intake` for any story without that approval.
+5. **Stop** and present `docs/agents-v0/milestones/plan.md` (the milestone table and the story flowchart). The context map is the approved input, not a plan deliverable. After explicit approval, append a `plan` row (Decision: `Approved`, approver, date, `docs/agents-v0/milestones/plan.md`, the manifest, and the roadmap path) to the `Delivery approvals` table of each manifest in scope. Do not start `/v0-intake` for any story without that approval.
 
 ## Rules
 `workflow-orchestration.mdc`, `project-delivery-core.mdc`, `architecture-and-diagrams.mdc`, `security-baseline.mdc` §11.

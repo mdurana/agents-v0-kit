@@ -74,7 +74,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | `/v0-onboard` | An existing repo, once | `docs/agents-v0/onboarding/report.md` |
 | `/v0-roadmap` | A new program. Pass the discovery file path | `docs/agents-v0/roadmap/<program>.md` |
 | `/v0-architecture` | After the roadmap, before any story | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
-| `/v0-plan` | More than one story, after architecture | `docs/agents-v0/milestones/<milestone>.md` |
+| `/v0-plan` | More than one story, after architecture | `docs/agents-v0/milestones/plan.md`, `docs/agents-v0/milestones/<milestone>.md` |
 | `/v0-intake` | One story's requirements, Gherkin `AC-*` with a failure case, or `Negatives: N/A` when no security trigger applies | `docs/agents-v0/requirements/<feature>.md` |
 | `/v0-design` | Contract and design before code. ARC when `Material: yes` | `docs/agents-v0/design/<feature>/`, and `docs/agents-v0/design/system/arc-record.md` when material |
 | `/v0-export` | When someone asks for a Jira copy | `docs/agents-v0/backlog/tickets.csv` |
@@ -97,7 +97,7 @@ Resume is the same in every phase. `scripts/sync-feature-state.sh` writes the st
 | Feature | `docs/agents-v0/requirements/<feature>.state.json` | the requirements artifact, one row per phase |
 | Onboarding | `docs/agents-v0/onboarding/state.json` | `docs/agents-v0/onboarding/report.md`, phase `onboard` |
 | Maintenance | `docs/agents-v0/maintain/<id>/state.json` | the note, phases `maintain` and `verify` |
-| Program | none | a `roadmap` row, then an `architecture` row on `docs/agents-v0/architecture.md`, then a `plan` row on each milestone manifest |
+| Program | none | a `roadmap` row, then an `architecture` row on `docs/agents-v0/architecture.md`, then a `plan` row on each milestone manifest. The picture they approve is `docs/agents-v0/milestones/plan.md` |
 | ARC | none | an `arc` row on `docs/agents-v0/design/system/arc-record.md`, only when a material story amends the recommendation |
 | Milestone go/no-go | none | a `milestone` row on the manifest |
 

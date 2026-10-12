@@ -31,7 +31,7 @@ Start from an empty repo with `./scripts/bootstrap-greenfield.sh --profile app -
 | P2-F | UI: order list, detail, place order | P2-E |
 | P4-A | hardening: SLO evidence for placement, k6 under `perf/` | P2-F |
 
-A plan passes when it has these stories (names may differ), no cycle, Surface and Size filled, one surface per story, at most eight acceptance criteria each, including the negative or edge Intake will add, an integration story for every service pair, a `Roadmap:` line whose file has an `Approved` `roadmap` row, and `Architecture: docs/agents-v0/architecture.md` with an `Approved` `architecture` row. Every story goal is an in-scope item from that discovery file and names a context already on the context map.
+A plan passes when `docs/agents-v0/milestones/plan.md` has the milestone table and a `flowchart TD` of these story ids, the manifests have these stories (names may differ), no cycle, Surface and Size filled, one surface per story, at most eight acceptance criteria each, including the negative or edge Intake will add, an integration story for every service pair, a `Roadmap:` line whose file has an `Approved` `roadmap` row, and `Architecture: docs/agents-v0/architecture.md` with an `Approved` `architecture` row. Every story goal is an in-scope item from that discovery file and names a context already on the context map.
 
 ## Run protocol
 

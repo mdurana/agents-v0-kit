@@ -24,6 +24,7 @@ Service-specific ADRs override this file. Implementation: `java-spring-backend.m
 | Infrastructure, ports | `docs/agents-v0/network.md` |
 | Per-service sequences | `docs/agents-v0/diagrams/sequences/<service-name>.md` |
 | Bounded contexts and service map | `docs/agents-v0/design/system/context-map.md` |
+| Program plan (milestone table and story order) | `docs/agents-v0/milestones/plan.md` |
 | Per-service component plan | `docs/agents-v0/design/system/components/<service-name>.md` |
 | Data flow, data models, state machine, failure domains | `docs/agents-v0/architecture.md` |
 | Operations readiness and runbooks | `docs/agents-v0/design/system/ops-readiness.md` |

@@ -33,7 +33,7 @@ mkdir -p /path/to/your-new-repo && git -C /path/to/your-new-repo init
 and/or `app/frontend` (and seeds `docker-compose.yml` for profile `app`) without
 overwriting existing trees. `--profile` is `service`, `ui`, or `app`. Omit `--profile`
 to infer from the tree after extract. This also runs `install.sh --with-starters`, seeds
-milestone manifests **P0–P5** when missing, and fills Layout / verify commands in
+milestone manifests **P0–P5** and `docs/agents-v0/milestones/plan.md` when missing, and fills Layout / verify commands in
 `docs/agents-v0/project-profile.md` when those cells are still placeholders.
 
 Repack the archive after editing `templates/app/{backend,frontend}`:

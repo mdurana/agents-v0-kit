@@ -24,11 +24,14 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
 6. Add an integration story for each pair of contexts that call each other. It depends on both sides, covers the contract and the failure modes, and is the place for consumer-driven contract tests.
 7. Order the stories as a graph with no cycle. A story starts Build only after every story it names has its Verify approval (`ci/check-milestone.sh` enforces this).
 8. Map each filled NFR/SLO row to a P4 hardening story.
-9. Present the context map, the manifests, and the story graph (Mermaid `flowchart` of story IDs). Wait for explicit approval. Then append the `plan` row to each manifest's `Delivery approvals` table:
+9. Write `docs/agents-v0/milestones/plan.md` from the manifests. Two parts only:
+   - A table with columns `Milestone`, `Stories`, and `What they cover`. One row per milestone in the plan, from P0 when it is in scope. `Stories` lists the story ids in dependency order. `What they cover` is one line, not the user-story sentence.
+   - A `flowchart TD` of every story. The node id is the story id with the hyphen removed (`P2-F` → `P2F`). The label is the story id (`P2F[P2-F]`). One arrow per dependency, including edges that cross milestones. A story with no dependency is a node with no incoming arrow.
+10. Present `docs/agents-v0/milestones/plan.md`. Wait for explicit approval. Then append the `plan` row to each manifest's `Delivery approvals` table:
 
    | Phase | Artifacts | Approver | Decision | Date |
    |-------|-----------|----------|----------|------|
-   | plan | docs/agents-v0/milestones/&lt;milestone&gt;.md, docs/agents-v0/design/system/context-map.md, the roadmap path | &lt;name&gt; | Approved | &lt;date&gt; |
+   | plan | docs/agents-v0/milestones/plan.md, docs/agents-v0/milestones/&lt;milestone&gt;.md, docs/agents-v0/design/system/context-map.md, the roadmap path | &lt;name&gt; | Approved | &lt;date&gt; |
 
 ## Rule-compliance checklist
 - [ ] `architecture-and-diagrams.mdc`: contexts, database per service, Mermaid conventions.
@@ -36,4 +39,5 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
 - [ ] Every story sentence is complete; every story fits the size budget.
 - [ ] Every cross-context call has an integration story with both sides as dependencies.
 - [ ] The dependency graph has no cycle.
+- [ ] `docs/agents-v0/milestones/plan.md` is the milestone table and the story flowchart.
 - [ ] `workflow-orchestration.mdc`: Plan gate met; stopped for approval.

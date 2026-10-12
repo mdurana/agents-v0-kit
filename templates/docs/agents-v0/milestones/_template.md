@@ -56,7 +56,7 @@
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| plan | <this manifest, docs/agents-v0/design/system/context-map.md> | <name> | Approved | <date> |
+| plan | docs/agents-v0/milestones/plan.md, <this manifest, docs/agents-v0/design/system/context-map.md> | <name> | Approved | <date> |
 | milestone | <this manifest, story artifacts> | <name> | Approved | <date> |
 
 > The `plan` row is the `/v0-plan` approval, verified at merge by
