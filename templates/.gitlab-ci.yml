@@ -79,6 +79,8 @@ build:
         - "**/go.mod"
         - "**/pyproject.toml"
         - "**/package.json"
+        - "**/build.gradle"
+        - "**/build.gradle.kts"
         - "**/.agents-v0/packs/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
@@ -94,6 +96,8 @@ build:
         - "**/go.mod"
         - "**/pyproject.toml"
         - "**/package.json"
+        - "**/build.gradle"
+        - "**/build.gradle.kts"
         - "**/.agents-v0/packs/*/pack.json"
   script:
     - |
@@ -146,10 +150,25 @@ build:
       fi
       if [ -n "$pack_cmd" ]; then
         run_verify sh -c "$pack_cmd"
+      elif [ -z "${BACKEND_ROOT:-}${BFF_ROOT:-}${SERVICE_ROOTS:-}" ]; then
+        printf 'no backend root; skip backend verify\n'
       else
-        verify_maven "${BACKEND_ROOT:-}"
-        verify_maven "${BFF_ROOT:-}"
-        for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
+        # An empty Pack does not run Maven. java is the only marker that still does.
+        plan="$(BACKEND_ROOT="${BACKEND_ROOT:-}" BFF_ROOT="${BFF_ROOT:-}" SERVICE_ROOTS="${SERVICE_ROOTS:-}" sh .agents-v0/ci/unbound-verify-plan.sh)"
+        kind="$(printf '%s\n' "$plan" | head -n 1)"
+        if [ "$kind" = "java" ]; then
+          verify_maven "${BACKEND_ROOT:-}"
+          verify_maven "${BFF_ROOT:-}"
+          for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
+        else
+          plan_file="$(mktemp)"
+          printf '%s\n' "$plan" | tail -n +2 > "$plan_file"
+          while IFS="$(printf '\t')" read -r root cmd; do
+            [ -n "$root" ] || continue
+            (cd "$repo/$root" && run_verify sh -c "$cmd")
+          done < "$plan_file"
+          rm -f "$plan_file"
+        fi
       fi
       sh .agents-v0/ci/collect-gate-reports.sh
   artifacts:
@@ -185,6 +204,8 @@ gate-metrics:
         - "**/go.mod"
         - "**/pyproject.toml"
         - "**/package.json"
+        - "**/build.gradle"
+        - "**/build.gradle.kts"
         - "**/.agents-v0/packs/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
@@ -200,6 +221,8 @@ gate-metrics:
         - "**/go.mod"
         - "**/pyproject.toml"
         - "**/package.json"
+        - "**/build.gradle"
+        - "**/build.gradle.kts"
         - "**/.agents-v0/packs/*/pack.json"
   before_script:
     - apk add --no-cache git python3
@@ -428,6 +451,11 @@ frontend:
         exit 0
       fi
       mkdir -p "$repo/ci-artifacts"
+      ui_image="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib; p=packlib.profile_pack(); d=packlib.load(p) if p else None; ui=(d or {}).get("uiPack") or {}; print(ui.get("ciImage") or "")')"
+      if [ -n "$ui_image" ] && [ "$ui_image" != "node:22-bookworm" ] && [ -z "${CI_UI_IMAGE:-}" ]; then
+        printf 'FAIL: UI pack image is %s. Set CI_UI_IMAGE. The default image is the React example.\n' "$ui_image" >&2
+        exit 1
+      fi
       front_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
       if [ -n "$front_cmd" ]; then
         case "$front_cmd" in

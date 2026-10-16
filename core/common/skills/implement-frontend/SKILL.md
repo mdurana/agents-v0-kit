@@ -17,7 +17,7 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 7. Implement routes/loads/components using the UI pack's `layout`. The React example (`frontend-web.mdc`) uses `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/slices` under the frontend root, and RHF + Zod. An existing SvelteKit repo keeps `src/routes/` + `src/lib/`; prefer `load`/server loads; `browser` guard before `localStorage`.
    - UX spec: per-screen state matrix (loading/error/empty/success), component default behavior (honor an override when the spec records one), and layout matching the linked mockups.
 8. Wire the API client in the app, not in the mockups: call only the OpenAPI operation named on each component row. Those operations come from the feature draft merged into the org catalog. Send Bearer, `X-Correlation-ID`, and `traceparent`; map success, validation error, 401, and 5xx to the states in the spec. 401 refresh/redirect per `frontend-web.mdc`.
-9. Enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.
+9. Enforce route/module access on the server or in the BFF, not by hiding a control. The React example uses a route wrapper. An existing SvelteKit repo uses `+layout.server.ts`.
 10. Logout: drop the in-memory access token, expire the refresh cookie, and clear leftover client state (`sessionStorage`, `localStorage`, other cookies). Call backend logout + IdP sign-out for SSO. Access tokens and refresh tokens are not written to web storage.
 11. Cookies: `httpOnly`, `secure` (prod), `sameSite`; no auth tokens via `document.cookie`.
 12. XSS: sanitize/avoid `innerHTML`/`{@html}`/`dangerouslySetInnerHTML`.

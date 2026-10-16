@@ -251,6 +251,19 @@ if grep -Eq 'node:20' templates/.gitlab-ci.yml templates/docker/Dockerfile.node 
 # .gitlab-ci.yml must parse, and the kit scripts it names must resolve. Kit scripts install under
 # .agents-v0/ci and .agents-v0/scripts, so a bare ci/<script> path points at nothing in a target repo.
 python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' templates/.gitlab-ci.yml >/dev/null 2>&1 || err ".gitlab-ci.yml does not parse as YAML"
+python3 - <<'PY' || err "a pack detect marker is missing from .gitlab-ci.yml exists rules (or add **/.agents-v0/packs/*/pack.json, which is the custom-pack trigger)"
+import glob, json
+ci = open("templates/.gitlab-ci.yml", encoding="utf-8").read()
+missing = []
+for path in glob.glob("core/*/pack.json"):
+    data = json.load(open(path, encoding="utf-8"))
+    for pattern in data.get("detect") or []:
+        name = pattern[1:] if pattern.startswith("*") else pattern
+        if name not in ci:
+            missing.append(data.get("id", path) + ":" + pattern)
+if missing:
+    raise SystemExit("missing " + ", ".join(missing))
+PY
 if grep -Eq '(^|[^./A-Za-z0-9_-])ci/(check|classify|resolve)[A-Za-z0-9_-]*\.sh' templates/.gitlab-ci.yml; then
   err ".gitlab-ci.yml names ci/<script> without .agents-v0/ (kit scripts install under .agents-v0/ci/)"
 fi

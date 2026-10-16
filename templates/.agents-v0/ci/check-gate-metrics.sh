@@ -438,8 +438,21 @@ def measure_alt(kind):
     record_cve(os.path.join(root, "cve-report.json"))
 
 
+def cve_names(data):
+    """HIGH/CRITICAL names. OWASP uses dependencies[].vulnerabilities[]. A pack may use a top-level vulnerabilities list."""
+    found = []
+    entries = list(data.get("vulnerabilities") or [])
+    for dep in data.get("dependencies") or []:
+        if isinstance(dep, dict):
+            entries.extend(dep.get("vulnerabilities") or [])
+    for vuln in entries:
+        if isinstance(vuln, dict) and str(vuln.get("severity", "")).upper() in ("HIGH", "CRITICAL"):
+            found.append(str(vuln.get("name", "?")))
+    return found
+
+
 def record_cve(path):
-    """Same HIGH/CRITICAL shape as target/dependency-check-report.json."""
+    """HIGH/CRITICAL findings. See cve_names for the two accepted shapes."""
     if not os.path.isfile(path):
         if env("REQUIRE_CVE_REPORT") == "1":
             failures.append(f"missing {os.path.basename(path)} (REQUIRE_CVE_REPORT=1)")
@@ -448,11 +461,7 @@ def record_cve(path):
         return
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
-    found = []
-    for dep in data.get("dependencies", []):
-        for vuln in dep.get("vulnerabilities") or []:
-            if str(vuln.get("severity", "")).upper() in ("HIGH", "CRITICAL"):
-                found.append(str(vuln.get("name", "?")))
+    found = cve_names(data)
     summary["highCriticalCves"] = sorted(set(found))
     print(f"cve: {len(set(found))} unsuppressed HIGH/CRITICAL")
     if found:
@@ -711,11 +720,7 @@ dependency_report = os.path.join(root, "target", "dependency-check-report.json")
 if os.path.isfile(dependency_report):
     with open(dependency_report, encoding="utf-8") as handle:
         data = json.load(handle)
-    found = []
-    for dep in data.get("dependencies", []):
-        for vuln in dep.get("vulnerabilities") or []:
-            if str(vuln.get("severity", "")).upper() in ("HIGH", "CRITICAL"):
-                found.append(str(vuln.get("name", "?")))
+    found = cve_names(data)
     summary["highCriticalCves"] = sorted(set(found))
     print(f"cve: {len(set(found))} unsuppressed HIGH/CRITICAL")
     if found:

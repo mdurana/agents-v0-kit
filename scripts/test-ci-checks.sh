@@ -575,6 +575,30 @@ expect_fail "gate metrics: a Go module with no test report fails" "$tmp" sh "$CI
 printf '%s\n' '{"Action":"pass","Package":"example.com/orders","Test":"TestPlace"}' > "$m/go-test.json"
 printf 'mode: set\nexample.com/orders/a.go:1.1,2.2 1 1\n' > "$m/coverage.out"
 expect_pass "gate metrics: go test json and coverage.out pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+printf '%s\n' '{"vulnerabilities":[{"name":"CVE-9","severity":"CRITICAL"}]}' > "$m/cve-report.json"
+expect_fail "gate metrics: a top-level vulnerabilities list fails" "$tmp" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" "$m"
+
+d="$tmp/unbound-go"
+mkdir -p "$d/app/backend"
+printf 'module example.com/orders\n\ngo 1.26\n' > "$d/app/backend/go.mod"
+plan="$(cd "$d" && BACKEND_ROOT=app/backend sh "$CI/unbound-verify-plan.sh")"
+printf '%s\n' "$plan" | head -n 1 | grep -qx go \
+  && pass "unbound plan: a go.mod tree selects go" || fail "unbound plan: a go.mod tree selects go"
+printf '%s\n' "$plan" | grep -q 'go test' \
+  && pass "unbound plan: the go verify command is the pack command" || fail "unbound plan: the go verify command is the pack command"
+d="$tmp/unbound-java"
+mkdir -p "$d/app/backend"
+printf '<project/>\n' > "$d/app/backend/pom.xml"
+plan="$(cd "$d" && BACKEND_ROOT=app/backend sh "$CI/unbound-verify-plan.sh")"
+printf '%s\n' "$plan" | grep -qx java \
+  && pass "unbound plan: a pom tree selects the java example" || fail "unbound plan: a pom tree selects the java example"
+d="$tmp/unbound-none"
+mkdir -p "$d"
+if (cd "$d" && sh "$CI/unbound-verify-plan.sh") >/dev/null 2>&1; then
+  fail "unbound plan: no marker does not select a pack"
+else
+  pass "unbound plan: no marker does not select a pack"
+fi
 
 m="$tmp/gate-dotnet"
 mkdir -p "$m/TestResults"
