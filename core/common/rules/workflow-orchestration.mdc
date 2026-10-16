@@ -189,4 +189,4 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 ## Rule precedence
 
-If project files contradict a rule, **the repository wins**. Record approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs. Change org-wide kit rules only in `core/rules/*.mdc`.
+If project files contradict a rule, **the repository wins**. Record approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs. Change org-wide kit rules only in `core/common/rules/*.mdc`, and pack rules in `core/<pack>/rules/`.
