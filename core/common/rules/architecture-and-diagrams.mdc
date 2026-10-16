@@ -14,7 +14,7 @@ Service-specific ADRs override this file. Implementation: `backend.mdc`, `fronte
 - Status is `Proposed`, `Accepted`, or `Superseded by ADR <NN>`.
 - An `Accepted` ADR stays. A later decision writes the next file and changes only the old Status line.
 - `docs/agents-v0/adr/0000-inherited-decisions.md` stays the as-is record (`Accepted (inherited)`). Overriding an inherited decision is a new ADR.
-- `ci/check-adr.sh` rejects a rewritten accepted ADR once an `Accepted` revision is in git history. Until that revision exists, it checks status and successors only. The design pin hashes the ADR a design cites.
+- `.agents-v0/ci/check-adr.sh` rejects a rewritten accepted ADR once an `Accepted` revision is in git history. Until that revision exists, it checks status and successors only. The design pin hashes the ADR a design cites.
 
 ## Diagram locations
 

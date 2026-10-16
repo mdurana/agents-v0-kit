@@ -29,7 +29,7 @@ codebase as it is today, with every statement cited to code or marked `UNVERIFIE
 | Inventories: endpoints with authorization annotation, entities, migrations, messaging, scheduled work, outbound clients, configuration **key names**, frontend routes, CI and deploy files, tests | `docs/agents-v0/discovery/*.txt` |
 | Baseline numbers and proposed `known_failures` / `coverage_ratchet` rows | `docs/agents-v0/discovery/baseline.md` |
 | Security baseline snapshot (triage list; nothing is fixed) | `docs/agents-v0/discovery/security-baseline.md` |
-| Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `ci/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
+| Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `.agents-v0/ci/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
 | As-is architecture, network, context map, inherited decisions, flows you name | `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/adr/0000-inherited-decisions.md`, `docs/agents-v0/diagrams/sequences/` |
 
 When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. No marker asks the person to name the pack id and to write its `pack.json`. Two markers stop so a person can choose. A `Pack` cell that already names an id stays, including an id that is not a kit example. A later roadmap or architecture does not replace that pack. Set `CI_PACK_IMAGE` to that pack's `ciImage`.

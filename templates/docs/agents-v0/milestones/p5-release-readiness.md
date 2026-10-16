@@ -5,7 +5,7 @@ Production readiness: docs, runbooks, CI/CD, release checklist, milestone go/no-
 
 ## Readiness checklist
 
-P5-A ticks the boxes in `docs/agents-v0/design/system/ops-readiness.md`. A box stays open only with a named reason in that file. `ci/check-architecture-pack.sh` checks that the sections exist. It does not check the boxes.
+P5-A ticks the boxes in `docs/agents-v0/design/system/ops-readiness.md`. A box stays open only with a named reason in that file. `.agents-v0/ci/check-architecture-pack.sh` checks that the sections exist. It does not check the boxes.
 
 ## Stories
 

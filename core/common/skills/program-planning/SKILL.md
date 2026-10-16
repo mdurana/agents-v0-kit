@@ -22,7 +22,7 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
    - The user-story sentence states an outcome the approved roadmap already names. Do not add a theme.
 5. Record `Roadmap:` and `Architecture: docs/agents-v0/architecture.md` on each manifest in scope. Omit both lines only when the plan's only story is seeded P0-A. Size every story: one surface and at most eight acceptance criteria, including that negative or edge. Split a larger story into rows here. Use `Vertical slice: yes` only when the user asked for one journey across surfaces. Do not split the seeded P0-A platform skeleton row. It is already one story. Surface `vertical slice` and Size `4`.
 6. Add an integration story for each pair of contexts that call each other. It depends on both sides, covers the contract and the failure modes, and is the place for consumer-driven contract tests.
-7. Order the stories as a graph with no cycle. A story starts Build only after every story it names has its Verify approval (`ci/check-milestone.sh` enforces this).
+7. Order the stories as a graph with no cycle. A story starts Build only after every story it names has its Verify approval (`.agents-v0/ci/check-milestone.sh` enforces this).
 8. Map each filled NFR/SLO row to a P4 hardening story.
 9. Write `docs/agents-v0/milestones/plan.md` from the manifests. Two parts only:
    - A table with columns `Milestone`, `Stories`, and `What they cover`. One row per milestone in the plan, from P0 when it is in scope. `Stories` lists the story ids in dependency order. `What they cover` is one line, not the user-story sentence.

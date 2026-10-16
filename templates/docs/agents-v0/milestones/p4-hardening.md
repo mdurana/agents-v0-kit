@@ -5,7 +5,7 @@ Security, performance, and reliability hardening with integrated `/v0-verify` on
 
 ## SLO evidence
 
-P4 `verify` and `release` require `docs/agents-v0/design/system/slo-evidence.md` (`slo-evidence` skill). `ci/check-milestone.sh` reads that path from this manifest. Every filled row in `docs/agents-v0/design/system/nfr-slo.md` is `measured` (command and an output file) or `waiver` (reason, approver, date). The ARC record points its SLO targets at that table. The structural fitness-function table in the same section is not an SLO list, and this milestone does not close it.
+P4 `verify` and `release` require `docs/agents-v0/design/system/slo-evidence.md` (`slo-evidence` skill). `.agents-v0/ci/check-milestone.sh` reads that path from this manifest. Every filled row in `docs/agents-v0/design/system/nfr-slo.md` is `measured` (command and an output file) or `waiver` (reason, approver, date). The ARC record points its SLO targets at that table. The structural fitness-function table in the same section is not an SLO list, and this milestone does not close it.
 
 ## Stories
 

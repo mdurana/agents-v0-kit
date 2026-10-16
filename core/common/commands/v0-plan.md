@@ -24,7 +24,7 @@ Planning writes milestone manifests and `docs/agents-v0/milestones/plan.md`. It 
 4. Check the **Plan gate** (`workflow-orchestration.mdc`):
    - The context map from `/v0-architecture` already names every bounded context in scope. Plan reads it and does not write it.
    - Each milestone manifest in scope exists under `docs/agents-v0/milestones/` with concrete stories: a full `As a [role], I want [goal], so that [benefit].` sentence, a feature artifact path, a dependency column that names story IDs, and Surface and Size filled. Each manifest records `Roadmap:` and `Architecture: docs/agents-v0/architecture.md`, except a P0-A-only plan.
-   - Dependencies form an acyclic order (`ci/check-milestone.sh` enforces it once stories are approved).
+   - Dependencies form an acyclic order (`.agents-v0/ci/check-milestone.sh` enforces it once stories are approved).
    - Every story fits the story-size budget: one surface, at most eight acceptance criteria, including the negative or edge Intake will add. Seeded P0-A stays at four.
    - Every pair of bounded contexts that talk to each other has an integration story that depends on both sides.
    - Hardening stories (P4) exist for every filled NFR/SLO row.

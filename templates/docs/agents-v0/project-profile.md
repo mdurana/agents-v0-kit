@@ -19,10 +19,10 @@
 
 | Purpose | Command |
 |---------|---------|
-| Backend verify | <!-- e.g. ./mvnw -B clean verify --> |
-| Backend verify (fast, no OWASP) | <!-- e.g. ./mvnw -B clean verify -P!ci-security --> |
-| Service verify | <!-- multi-service repos only; {root} = the story's Service root, e.g. ./mvnw -B -f {root}/pom.xml clean verify --> |
-| Service verify (fast, no OWASP) | <!-- e.g. ./mvnw -B -f {root}/pom.xml clean verify -P!ci-security --> |
+| Backend verify | <!-- from pack.json; Pack java: cd app/backend && ./mvnw -B clean verify --> |
+| Backend verify (fast, no OWASP) | <!-- Pack java: cd app/backend && ./mvnw -B clean verify -P!ci-security --> |
+| Service verify | <!-- multi-service repos only; {root} = the story's Service root. Pack java: ./mvnw -B -f {root}/pom.xml clean verify --> |
+| Service verify (fast, no OWASP) | <!-- Pack java: ./mvnw -B -f {root}/pom.xml clean verify -P!ci-security --> |
 | Frontend verify | <!-- e.g. npm run verify --> |
 | Frontend verify (fast) | <!-- e.g. cd app/frontend && npm test — required for the red–green loop; gate still uses Frontend verify --> |
 | Lint | <!-- optional --> |
@@ -30,7 +30,7 @@
 
 ## Layout
 
-Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that is the only Spring module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `ci/resolve-layout.sh` reads the two-column rows below.
+Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that is the only Spring module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `.agents-v0/ci/resolve-layout.sh` reads the two-column rows below.
 
 | Profile | When | Code roots |
 |---------|------|------------|
@@ -74,7 +74,7 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 
 ## Brownfield exceptions
 
-### known_failures (optional budget for ci/check-known-failures.sh)
+### known_failures (optional budget for .agents-v0/ci/check-known-failures.sh)
 
 A person approves each row, and CODEOWNERS makes this file a code-owner change, so a merge request cannot approve its own exception. CI excuses test failures up to the first Allowed failure count (the build job after a failed verify, and `check-gate-metrics.sh`). A compile or plugin error is never excused. Leave `0` for no allowance.
 

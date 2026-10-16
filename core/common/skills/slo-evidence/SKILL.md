@@ -16,7 +16,7 @@ Run when the requirements artifact is the P4 SLO story, or when it cites `docs/a
 3. `measured`: put the command in **Command or waiver** and a repo-relative output file in **Output or approver**. The file must exist and must not contain `..`. Put the run date as `YYYY-MM-DD`.
 4. `waiver`: put the reason in **Command or waiver**, the approver's name in **Output or approver**, and the date as `YYYY-MM-DD`. A waiver is a recorded decision, not a measurement.
 5. When `nfr-slo.md` has no filled rows, write one `waiver` row whose surface is `none`, reason `no SLO rows recorded`, with an approver and a date.
-6. Stop if any filled row has no evidence row. `ci/check-milestone.sh` fails P4 `verify` and `release` when this file is missing or a row is incomplete.
+6. Stop if any filled row has no evidence row. `.agents-v0/ci/check-milestone.sh` fails P4 `verify` and `release` when this file is missing or a row is incomplete.
 
 ## Evidence table
 

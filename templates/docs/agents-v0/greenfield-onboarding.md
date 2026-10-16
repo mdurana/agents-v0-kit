@@ -97,11 +97,11 @@ P0 is one story (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`):
 2. `/v0-verify` then `/v0-release`. Do not stop for a separate approval at Build or Verify. The one approval is at Release, after the test report exists and `glab mr create` has returned a URL. Optional `/v0-local-release` may run after Verify instead of waiting for that URL; Release then writes only the Release row. The local delivery gate runs in both commands.
 
 Record approvals in each feature artifact’s `Delivery approvals` table. CI uses
-`ci/check-approvals.sh` and `ci/check-evidence.sh`.
+`.agents-v0/ci/check-approvals.sh` and `.agents-v0/ci/check-evidence.sh`.
 
 ## 5. Advance milestones
 
-After P0 go/no-go (`milestone` row approved, `check-milestone.sh` green), a program of more than one story starts with `/v0-roadmap` and the path of the discovery document. That file may live anywhere in the repository. `/v0-architecture` then writes the C4-through-operations pack and the ARC record. `ci/check-architecture-pack.sh` and `design-reviewer` must pass, and it stops for one approval, before any story. Plan reads that pack and fills Surface and Size on each story row. It does not rewrite the pack. A story that adds a service, a datastore, a security boundary, or a breaking API is `Material: yes`. Design cites `docs/agents-v0/design/system/arc-record.md` when the program recommendation already covers it. An `arc` row is written only when the story amends that recommendation. Who skips `/v0-architecture`: `workflow-orchestration.mdc` Architecture.
+After P0 go/no-go (`milestone` row approved, `check-milestone.sh` green), a program of more than one story starts with `/v0-roadmap` and the path of the discovery document. That file may live anywhere in the repository. `/v0-architecture` then writes the C4-through-operations pack and the ARC record. `.agents-v0/ci/check-architecture-pack.sh` and `design-reviewer` must pass, and it stops for one approval, before any story. Plan reads that pack and fills Surface and Size on each story row. It does not rewrite the pack. A story that adds a service, a datastore, a security boundary, or a breaking API is `Material: yes`. Design cites `docs/agents-v0/design/system/arc-record.md` when the program recommendation already covers it. An `arc` row is written only when the story amends that recommendation. Who skips `/v0-architecture`: `workflow-orchestration.mdc` Architecture.
 
 `/v0-export` and `/v0-deck` are optional. They do not gate a merge.
 

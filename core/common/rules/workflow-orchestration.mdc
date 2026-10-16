@@ -27,7 +27,7 @@ Phases: **Intake → Design → Build → Verify → Release**, with **Maintain*
 
 ## Roadmap
 
-Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` set to the path. It does not copy the file. A missing path or a placeholder heading stops. The `roadmap` row (`ci/check-approvals.sh <roadmap> roadmap`) covers the sequence. The discovery file has no kit approval row.
+Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` set to the path. It does not copy the file. A missing path or a placeholder heading stops. The `roadmap` row (`.agents-v0/ci/check-approvals.sh <roadmap> roadmap`) covers the sequence. The discovery file has no kit approval row.
 
 ### Roadmap gate
 Now, Next, and Later are in-scope items copied from the discovery file. A discovery line `Stack preference:` is copied onto the roadmap as written and does not select the pack. Stop for explicit user approval before Architecture.
@@ -38,10 +38,10 @@ Now, Next, and Later are in-scope items copied from the discovery file. A discov
 
 ## Program planning
 
-`/v0-plan` turns an approved roadmap and that architecture pack into milestone manifests before any `/v0-intake`. It does not rewrite the pack. `program-planner` follows `program-planning` and writes `docs/agents-v0/milestones/`, including `docs/agents-v0/milestones/plan.md` (milestone table and story flowchart). A program has no state file. Its approval is a `plan` row (`ci/check-approvals.sh <manifest> plan`). P0-A alone needs no roadmap and no architecture pack. Any other program waits for the `roadmap` row and the `architecture` row. Each manifest records `Roadmap:` and `Architecture:`; `ci/check-milestone.sh` checks them.
+`/v0-plan` turns an approved roadmap and that architecture pack into milestone manifests before any `/v0-intake`. It does not rewrite the pack. `program-planner` follows `program-planning` and writes `docs/agents-v0/milestones/`, including `docs/agents-v0/milestones/plan.md` (milestone table and story flowchart). A program has no state file. Its approval is a `plan` row (`.agents-v0/ci/check-approvals.sh <manifest> plan`). P0-A alone needs no roadmap and no architecture pack. Any other program waits for the `roadmap` row and the `architecture` row. Each manifest records `Roadmap:` and `Architecture:`; `.agents-v0/ci/check-milestone.sh` checks them.
 
 ### Plan gate
-Every story fits a context already on the approved context map; story-ID dependencies have no cycle; Surface and Size on each row; one surface and at most eight criteria, including the negative; an integration story for each pair of contexts that call each other; every story goal taken from the roadmap; the `plan` row after explicit user approval. `ci/check-milestone.sh` fails a story with a `build` approval while a story it depends on has no `verify` approval (`MILESTONE_ORDER=0` turns that off).
+Every story fits a context already on the approved context map; story-ID dependencies have no cycle; Surface and Size on each row; one surface and at most eight criteria, including the negative; an integration story for each pair of contexts that call each other; every story goal taken from the roadmap; the `plan` row after explicit user approval. `.agents-v0/ci/check-milestone.sh` fails a story with a `build` approval while a story it depends on has no `verify` approval (`MILESTONE_ORDER=0` turns that off).
 
 ## Phase resume
 
@@ -72,7 +72,7 @@ Before `/v0-build`, `/v0-verify`, `/v0-release`, or `/v0-maintain`, stop if `git
 
 `/v0-status` and phase commands use the feature name the user gives. When the user does not name one, list the state files and ask. Do not assume the newest `*.state.json` is the feature they mean.
 
-**Milestone programs:** `docs/agents-v0/milestones/<milestone>.md` manifests group user stories (P0 skeleton, P1 contracts, P2 MVP, P3 features, P4 hardening, P5 readiness). Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `ci/check-approvals.sh` + `ci/check-milestone.sh`. A P4 manifest that names `docs/agents-v0/design/system/slo-evidence.md` also needs that file at `verify` and `release` (Verify gate). Record each story as passed or blocked from its own state file. Do not merge those checkouts.
+**Milestone programs:** `docs/agents-v0/milestones/<milestone>.md` manifests group user stories. Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `.agents-v0/ci/check-approvals.sh` + `.agents-v0/ci/check-milestone.sh`. A P4 manifest that names `docs/agents-v0/design/system/slo-evidence.md` also needs that file at `verify` and `release`. Record each story as passed or blocked from its own state file. Do not merge those checkouts.
 
 ## Change tiers
 
@@ -80,7 +80,7 @@ Pick the lightest tier that fits; record the tier in the handoff artifact.
 
 | Tier | When | Path |
 |------|------|------|
-| **Trivial** | Docs-only or version-only dependency bump, when `ci/classify-change.sh` says eligible and a person confirms | `/v0-triage` → `/v0-maintain` → abbreviated Verify (`/v0-verify`) |
+| **Trivial** | Docs-only or version-only dependency bump, when `.agents-v0/ci/classify-change.sh` says eligible and a person confirms | `/v0-triage` → `/v0-maintain` → abbreviated Verify (`/v0-verify`) |
 | **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design that name the applicable VAPT findings (always-on F4, F8, F9, F10, plus any regression finding the change touches); milestone manifest row |
 
@@ -145,13 +145,13 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 ### Intake gate
 - User story recorded as `As a [role], I want [goal], so that [benefit].`
-- Acceptance criteria (`### AC-1` …) follow `spec-intake`. `ci/check-intake.sh` must pass: `Kind`, the `Then`, one `negative` or `edge` (or `Negatives: N/A` with no security trigger), preconditions, a desk check, NFRs, and regulations. Open questions are `none`. `Material: yes` or `no`. P0-A skips the check.
+- Acceptance criteria (`### AC-1` …) follow `spec-intake`. `.agents-v0/ci/check-intake.sh` must pass: `Kind`, the `Then`, one `negative` or `edge` (or `Negatives: N/A` with no security trigger), preconditions, a desk check, NFRs, and regulations. Open questions are `none`. `Material: yes` or `no`. P0-A skips the check.
 - **Story size.** One primary surface (`Surfaces: backend`, `bff`, or `frontend`), one bounded context, at most eight acceptance criteria (`AC-1` through `AC-8`), including the negative. A larger story stops on `## Proposed split` (`spec-intake`). `Vertical slice: yes` only when the user asks for one journey across surfaces.
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
 - `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment. A changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
-- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design. `ci/check-arc.sh` checks it. P4 measures or waives the SLO rows in `slo-evidence.md`. The structural table is not an SLO list.
+- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design. `.agents-v0/ci/check-arc.sh` checks it. P4 measures or waives the SLO rows in `slo-evidence.md`. The structural table is not an SLO list.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks) that name the applicable VAPT findings in `security-baseline.mdc` (always-on F4, F8, F9, F10).
 
 ### Build gate

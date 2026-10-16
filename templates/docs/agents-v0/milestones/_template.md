@@ -35,16 +35,16 @@
 >   Out of scope stays a separate list. Intake does not invent a role, goal, or benefit.
 > - Surface is `backend`, `bff`, `frontend`, or `vertical slice`. Size is the number of
 >   acceptance criteria, at most 8, including that negative or edge. `/v0-plan` fills both.
->   `ci/check-milestone.sh` does not read them. Seeded P0-A stays at 4.
+>   `.agents-v0/ci/check-milestone.sh` does not read them. Seeded P0-A stays at 4.
 > - Each linked feature artifact records `Milestone: <Pn-name>`,
 >   `Milestone file: docs/agents-v0/milestones/<this-file>.md`, and `Story: <story-id>`
 >   under its title (`spec-intake` skill) for traceability.
 > - Status is prose (planned / in-flight / done); the machine check is evidence-based:
->   `ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
+>   `.agents-v0/ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
 >   exist and record the phase approval — build/verify also require the recorded evidence
->   paths to exist (`ci/check-evidence.sh`).
+>   paths to exist (`.agents-v0/ci/check-evidence.sh`).
 > - Dependency lists story IDs of this manifest, comma-separated (`P2-A, P2-B`). A
->   build-approved story fails `ci/check-milestone.sh` until each story it names has a
+>   build-approved story fails `.agents-v0/ci/check-milestone.sh` until each story it names has a
 >   `verify` approval. Milestone names (`P1`) and a dash are prose and are not checked.
 >   `/v0-plan` writes these rows (`program-planning` skill).
 > - Rows with placeholder paths (`<...>`) or no path are skipped — a milestone go/no-go
@@ -60,6 +60,6 @@
 | milestone | <this manifest, story artifacts> | <name> | Approved | <date> |
 
 > The `plan` row is the `/v0-plan` approval, verified at merge by
-> `ci/check-approvals.sh <manifest> plan`. The `milestone` row is the go/no-go decision, verified at merge by
-> `ci/check-approvals.sh <manifest> milestone`; the per-story approvals are verified
-> by `ci/check-milestone.sh <manifest> verify`.
+> `.agents-v0/ci/check-approvals.sh <manifest> plan`. The `milestone` row is the go/no-go decision, verified at merge by
+> `.agents-v0/ci/check-approvals.sh <manifest> milestone`; the per-story approvals are verified
+> by `.agents-v0/ci/check-milestone.sh <manifest> verify`.

@@ -36,6 +36,6 @@ Design phase playbook for the `solution-architect` agent (`workflow-orchestratio
 - [ ] `architecture-and-diagrams.mdc`: DDD boundaries; DB per service; ADR with alternatives; an Accepted ADR superseded rather than rewritten; Mermaid conventions; diagram locations.
 - [ ] `project-delivery-core.mdc`: async/messaging/cache justified; no reactive/MVC switch without ADR.
 - [ ] `security-baseline.mdc` §2: BOLA — authorized lookup for every `{id}` path, retested as a same-role peer (F8). Non-trivial security names always-on findings F4, F8, F9, F10 in the threat-model notes.
-- [ ] `ci/check-openapi.sh lint`/`compat`, `ci/check-asyncapi.sh lint` (when asyncapi.yaml exists), and `ci/check-design.sh` pass.
-- [ ] `Material: yes` cites the ARC record. `ci/check-arc.sh` passes. An `arc` row exists only when this story amended the recommendation.
+- [ ] `.agents-v0/ci/check-openapi.sh lint`/`compat`, `.agents-v0/ci/check-asyncapi.sh lint` (when asyncapi.yaml exists), and `.agents-v0/ci/check-design.sh` pass.
+- [ ] `Material: yes` cites the ARC record. `.agents-v0/ci/check-arc.sh` passes. An `arc` row exists only when this story amended the recommendation.
 - [ ] `workflow-orchestration.mdc`: Design gate criteria met; stopped for approval.

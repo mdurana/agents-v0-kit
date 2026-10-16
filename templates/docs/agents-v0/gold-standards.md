@@ -6,7 +6,7 @@
 
 On Intel macOS (`uname -m` is `x86_64`), missing host tools are installed with MacPorts. Apple Silicon, Linux, and CI images keep their existing toolchain.
 
-The machine that runs `./mvnw` and `npm` needs JDK 21, Node 22 (22.12+; CI and the Dockerfile starters use 22, and 20.19+ still builds Vite 7 but is end-of-life), npm, and PyYAML (`python3 -c 'import yaml'`). Maven is the wrapper `./mvnw`. Docker and Podman are applications, not MacPorts ports.
+The machine that runs the profile verify command needs the toolchain that command names. Pack `java` needs JDK 21 and the wrapper `./mvnw`. The React example needs Node 22 (22.12+; CI and the Dockerfile starters use 22, and 20.19+ still builds Vite 7 but is end-of-life) and npm. PyYAML is `python3 -c 'import yaml'`. Docker and Podman are applications, not MacPorts ports.
 
 ```bash
 sh .agents-v0/scripts/host-tools-macports.sh
@@ -17,18 +17,20 @@ sh .agents-v0/scripts/host-tools-macports.sh --install
 
 ## Build
 
+The commands in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`.agents-v0/ci/resolve-layout.sh`). They come from the bound pack's `pack.json`. Pack `java` is:
+
 ```bash
-./mvnw -B clean verify  # from the backend root in docs/agents-v0/project-profile.md
-npm run build           # frontend (React default; SvelteKit when existing), from the UI root
+cd app/backend && ./mvnw -B clean verify
+cd app/frontend && npm run build   # React example; SvelteKit when the repo already uses it
 ```
 
-Profile `service` uses `cd app/backend && ./mvnw -B clean verify` (or `cd app/bff && ./mvnw -B clean verify` for a BFF-only repo). Profile `ui` uses `cd app/frontend && npm run verify`. Profile `app` runs both. Fast loops: `Backend verify (fast, no OWASP)` (`./mvnw -B clean verify -P!ci-security`) and `Frontend verify (fast)` (`npm test`) — bootstrap `--scaffold-app` fills these; the red–green loop must not use a placeholder cell. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. The commands recorded in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`ci/resolve-layout.sh`). Those commands come from the bound pack's `pack.json`. The Maven lines above are the `java` example. Set `CI_PACK_IMAGE` to that manifest's `ciImage`.
+Profile `service` runs the Backend verify row from the backend or BFF root. Profile `ui` runs the Frontend verify row. Profile `app` runs both. Fast loops use `Backend verify (fast, no OWASP)` and `Frontend verify (fast)`. Pack `java` fills those with `./mvnw -B clean verify -P!ci-security` and `npm test`. Bootstrap `--scaffold-app` fills the Java example; the red–green loop must not use a placeholder cell. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. Set `CI_PACK_IMAGE` to that manifest's `ciImage`.
 
 ## Run
 
 ```bash
-./mvnw spring-boot:run  # from the backend root, or per service
-npm run dev             # frontend
+./mvnw spring-boot:run  # Pack java, from the backend root, or per service
+npm run dev             # React example
 ```
 
 ### Local container (Dockerfile + Compose)
@@ -66,12 +68,12 @@ Optional Postgres overlay (Spring Boot, `postgres:15-alpine`):
 ## Test
 
 ```bash
-./mvnw -B clean test jacoco:report   # from the backend root; coverage -> target/site/jacoco/index.html
-npm test                             # frontend (Vitest)
+./mvnw -B clean test jacoco:report   # Pack java; coverage -> target/site/jacoco/index.html
+npm test                             # React example (Vitest)
 ```
 
 ## CI
 
-- Build → test → JaCoCo → Sonar → OWASP Dependency-Check → (deploy).
+- Build → the profile verify command → the pack coverage report → the pack CVE scan → (deploy). Pack `java` uses JaCoCo, Sonar, and OWASP Dependency-Check. Other packs use the report formats in `pack.json`.
 - Coverage gate: 80% backend, 70% frontend (`quality-and-testing.mdc`).
 - No new high/critical CVEs without documented exception.

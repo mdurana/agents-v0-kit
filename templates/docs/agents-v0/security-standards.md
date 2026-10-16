@@ -27,7 +27,7 @@
 - No backend URLs/keys/roles in client bundles.
 - `PUBLIC_*`/`VITE_*` only for intentionally public values.
 - PII/tokens in body/headers, not query strings.
-- Sanitize log values (`Encode.forJava`).
+- Sanitize log values the way the pack `backend.mdc` says (Pack `java`: `Encode.forJava`).
 
 ## Cookies
 
@@ -36,7 +36,7 @@
 
 ## Uploads
 
-- Server-side: size limit, magic-byte sniff + structure parse, generated storage name, decompression limit, `@PreAuthorize`.
+- Server-side: size limit, magic-byte sniff + structure parse, generated storage name, decompression limit, and the pack auth marker (Pack `java`: `@PreAuthorize`).
 - Extension allowlist is supplemental. Production virus scan is required.
 
 ## Headers

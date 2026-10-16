@@ -40,4 +40,4 @@ Discovery: <repo-relative path the user passed to /v0-roadmap>
 
 > The `roadmap` row covers the sequence. The discovery file has no kit approval row.
 > `/v0-architecture` runs next and does not write stories. `/v0-plan` then reads this file and does not add a theme it does not name.
-> `ci/check-approvals.sh <this file> roadmap` checks the row.
+> `.agents-v0/ci/check-approvals.sh <this file> roadmap` checks the row.

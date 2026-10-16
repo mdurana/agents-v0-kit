@@ -25,7 +25,7 @@ You are the **requirements-analyst** for the Intake phase of the delivery lifecy
    - Security-review triggers (auth changes, new upload endpoints, RBAC changes, new public routes, any `{id}` path — `security-baseline.mdc` §11). Name a sensitive action when the story has one, so Design can require step-up.
    - Open questions for the user. Before the gate, that section is `none`.
    - Story size: `Surfaces:` (`backend`, `bff`, or `frontend`) and `Vertical slice: yes` only when the user asked for one journey across surfaces. The seeded P0-A platform skeleton is that case, and this agent is not launched for it: `/v0-build` copies `Vertical slice: yes` and only `AC-1` through `AC-4` from its milestone. At most eight acceptance criteria (`AC-1` through `AC-8`). Over budget, write `## Proposed split` and stop; do not present the gate. Do not split P0-A.
-   - A `Delivery approvals` section in the canonical table format defined by the `spec-intake` skill (`| Phase | Artifacts | Approver | Decision | Date |`, required by the CI checks `ci/check-approvals.sh` and `ci/check-evidence.sh`). Record only actual user decisions; never infer approval.
+   - A `Delivery approvals` section in the canonical table format defined by the `spec-intake` skill (`| Phase | Artifacts | Approver | Decision | Date |`, required by the CI checks `.agents-v0/ci/check-approvals.sh` and `.agents-v0/ci/check-evidence.sh`). Record only actual user decisions; never infer approval.
 
 ## Rules you must satisfy
 - `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report; ask the user only when blocked by material ambiguity.

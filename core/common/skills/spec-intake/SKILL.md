@@ -24,7 +24,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - **Open questions** — resolve them with the user. Before the gate the section is the single word `none`.
    - **Milestone file** — when `Milestone:` is set, also record `Milestone file: docs/agents-v0/milestones/<milestone>.md` and `Story: <story-id>`. The manifest must name that story id.
    - **Milestone/Story links** — `Milestone: <Pn-name>` and `Story: <story-id>` under the title when the story belongs to a milestone program (`docs/agents-v0/milestones/<milestone>.md`).
-   - **Delivery approvals** — record only actual user decisions, in this canonical table format (required by the CI checks `ci/check-approvals.sh` and `ci/check-evidence.sh`):
+   - **Delivery approvals** — record only actual user decisions, in this canonical table format (required by the CI checks `.agents-v0/ci/check-approvals.sh` and `.agents-v0/ci/check-evidence.sh`):
 
      | Phase | Artifacts | Approver | Decision | Date |
      |-------|-----------|----------|----------|------|

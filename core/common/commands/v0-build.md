@@ -33,7 +33,7 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
 8. Each agent then runs the full verify command once (`./mvnw -B clean verify` when the profile's Backend verify row names it, or the full Frontend verify command) with **bounded fix attempts (≤ 3 per failure)**. On exhaustion, stop and present the blocker; hand security-critical or complex units to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
 9. Check the **Build gate** (`workflow-orchestration.mdc`):
    - Baseline green on the full verify command; the gate run is that same full command, with the quality plugins executed (coverage/static/CVE fail machine-side). The fast command is only the red–green loop.
-   - Approved feature draft merged into the org catalog (`ci/check-openapi.sh merged` passes), or N/A recorded.
+   - Approved feature draft merged into the org catalog (`.agents-v0/ci/check-openapi.sh merged` passes), or N/A recorded.
    - Mechanical checks pass: `sh .agents-v0/ci/check-build-plan.sh <feature> --complete` (every AC has a row; each done row names an existing test and has a red card first), `sh .agents-v0/ci/check-endpoint-auth.sh <base>` (no new endpoint without a security annotation; `@PermitAll` marks a public one on purpose), `sh .agents-v0/ci/check-frontend-calls.sh` (the frontend calls only catalog operations), and `sh .agents-v0/ci/check-design.sh <feature> --verify-lock`.
    - New/changed behavior covered by tests; contract-conformance diff has no breaking change (or a recorded N/A reason); ArchUnit layer rules where wired.
    - Methods ≤ 30 lines; cognitive complexity ≤ 15.
@@ -42,7 +42,7 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
    - DTOs only at the edge; migrations use the pack `migrationTool`, written with `migration-safety` (expand/contract, an up-migration test).
    - No secrets in code; log values sanitized.
    - UI changes implement the approved UX spec: per-screen state matrix, component defaults (including an override when one is recorded), layout matching the linked mockups, WCAG 2.1 AA a11y, design-system conformance. API integration uses the named OpenAPI operations. It does not add endpoints the contract does not list.
-10. Evidence commits, in this order. Ask once: that approval covers the code commit and the reports commit. Do not stop between them for a second chat approval. The hook still asks on each `git commit`. `ci/check-evidence.sh` ignores later doc-only commits and rejects non-doc changes after the stamped SHA.
+10. Evidence commits, in this order. Ask once: that approval covers the code commit and the reports commit. Do not stop between them for a second chat approval. The hook still asks on each `git commit`. `.agents-v0/ci/check-evidence.sh` ignores later doc-only commits and rejects non-doc changes after the stamped SHA.
     1. Commit the code.
     2. Write `docs/agents-v0/build/<feature>/build-report.md` with `commit:` set to that full SHA (command, result, per-criterion **file:line citations**, and the attempt cards). Optional `build-output.txt` — prefer CI artifacts for raw logs (no secrets). Do not read that log back on the next attempt.
     3. Commit the reports with `git commit -m "<message>" -- docs/agents-v0/build/<feature>`. That path is the evidence commit: the hook does not ask again. Do not change code after the stamp. A stamp for an earlier tree, or reports left uncommitted while code moved on, is stale.

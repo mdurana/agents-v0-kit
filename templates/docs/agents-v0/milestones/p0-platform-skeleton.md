@@ -47,5 +47,5 @@ and in CI.
 |-------|-----------|----------|----------|------|
 | milestone | docs/agents-v0/milestones/p0-platform-skeleton.md, story artifacts | | | |
 
-> Go/no-go: `ci/check-approvals.sh docs/agents-v0/milestones/p0-platform-skeleton.md milestone`
-> and `ci/check-milestone.sh docs/agents-v0/milestones/p0-platform-skeleton.md verify`.
+> Go/no-go: `.agents-v0/ci/check-approvals.sh docs/agents-v0/milestones/p0-platform-skeleton.md milestone`
+> and `.agents-v0/ci/check-milestone.sh docs/agents-v0/milestones/p0-platform-skeleton.md verify`.
