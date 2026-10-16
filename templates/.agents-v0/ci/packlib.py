@@ -10,6 +10,9 @@ import os
 import re
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+# Readers in check-gate-metrics.sh. A new format is a new reader, registered here.
+COVERAGE_FORMATS = ("jacoco", "cobertura", "go-cover", "jest-summary")
+TEST_FORMATS = ("junit", "pytest", "trx", "go-json")
 REQUIRED = (
     "id",
     "verify",
@@ -106,6 +109,8 @@ def errors_of(data, kind):
         if not coverage.get("path") or not coverage.get("format"):
             missing.append("coverage.path")
             missing.append("coverage.format")
+        elif coverage.get("format") not in COVERAGE_FORMATS:
+            missing.append("coverage.format unsupported")
         return missing
     for key in REQUIRED:
         if key not in data or data.get(key) in ("", None, [], {}):
@@ -116,9 +121,13 @@ def errors_of(data, kind):
     if not coverage.get("path") or not coverage.get("format"):
         missing.append("coverage.path")
         missing.append("coverage.format")
+    elif coverage.get("format") not in COVERAGE_FORMATS:
+        missing.append("coverage.format unsupported")
     if not report.get("path") or not report.get("format"):
         missing.append("testsReport.path")
         missing.append("testsReport.format")
+    elif report.get("format") not in TEST_FORMATS:
+        missing.append("testsReport.format unsupported")
     if not cve.get("path"):
         missing.append("cve.path")
     endpoints = data.get("endpoints") if isinstance(data.get("endpoints"), list) else []

@@ -7,7 +7,7 @@
 | Area | Minimum | CI / stretch |
 |------|---------|--------------|
 | Backend lines | 80% | 90% where gates require |
-| Backend branches | JaCoCo / Sonar rules | |
+| Backend branches | the pack coverage report (Pack java: JaCoCo / Sonar) | |
 | Frontend | 70% | raise if CI gate exists |
 
 ## Complexity and size (Java)

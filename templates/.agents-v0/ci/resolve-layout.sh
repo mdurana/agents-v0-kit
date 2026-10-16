@@ -99,16 +99,37 @@ EOF
   printf '%s\n' "$res"
 }
 
-has_jvm() {
-  dir="$1"
-  [ -f "$dir/pom.xml" ] || [ -f "$dir/build.gradle" ] || [ -f "$dir/build.gradle.kts" ]
+# Directories that contain a pack detect marker. Loaded on first use so a filled
+# Layout table does not need python3. Without python3, the five example markers
+# still match so a JDK image can resolve a Maven tree.
+LAYOUT_HERE="$(cd "$(dirname "$0")" && pwd)"
+MARKERS=""
+USE_PACK_MARKERS=0
+markers_loaded=0
+
+load_markers() {
+  [ "$markers_loaded" = 1 ] && return 0
+  markers_loaded=1
+  if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$LAYOUT_HERE/packlib.py" ]; then
+    return 0
+  fi
+  if MARKERS="$(PACKLIB_DIR="$LAYOUT_HERE" python3 - <<'PY'
+import os
+import sys
+sys.path.insert(0, os.environ["PACKLIB_DIR"])
+import packlib
+print("\n".join(packlib.marker_roots(".", 4)))
+PY
+)"; then
+    USE_PACK_MARKERS=1
+  else
+    MARKERS=""
+  fi
 }
 
-# A backend module is any pack detect marker, not only a JVM build file.
-has_marker() {
+has_marker_shell() {
   dir="$1"
-  [ -d "$dir" ] || return 1
-  if has_jvm "$dir"; then
+  if [ -f "$dir/pom.xml" ] || [ -f "$dir/build.gradle" ] || [ -f "$dir/build.gradle.kts" ]; then
     return 0
   fi
   [ -f "$dir/go.mod" ] && return 0
@@ -120,6 +141,19 @@ has_marker() {
     return 0
   fi
   return 1
+}
+
+# A backend module is any directory marker_roots reported for the packs on disk.
+has_marker() {
+  dir="${1%/}"
+  [ -d "$dir" ] || return 1
+  load_markers
+  if [ "$USE_PACK_MARKERS" = 1 ]; then
+    [ -n "$MARKERS" ] || return 1
+    printf '%s\n' "$MARKERS" | grep -Fxq -- "$dir"
+    return $?
+  fi
+  has_marker_shell "$dir"
 }
 
 normalize() {

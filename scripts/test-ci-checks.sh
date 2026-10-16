@@ -635,6 +635,19 @@ else
   fail "resolve-layout: app/backend/go.mod resolves as the backend root"
 fi
 
+d="$tmp/roots-cargo"
+mkdir -p "$d/app/backend" "$d/.agents-v0/packs/rust"
+printf '[package]\nname = "orders"\n' > "$d/app/backend/Cargo.toml"
+cat > "$d/.agents-v0/packs/rust/pack.json" <<'EOF'
+{"id":"rust","detect":["Cargo.toml"]}
+EOF
+expect_pass "layout roots: a Cargo.toml pack marker is a backend root" "$d" sh "$CI/check-layout-roots.sh"
+if (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "BACKEND_ROOT='app/backend'"; then
+  pass "resolve-layout: Cargo.toml resolves as the backend root"
+else
+  fail "resolve-layout: Cargo.toml resolves as the backend root"
+fi
+
 # activate-stack-pack.sh
 act="$KIT/templates/.agents-v0/scripts/activate-stack-pack.sh"
 d="$tmp/activate-java"
@@ -945,6 +958,8 @@ cat > "$rust/pack.json" <<'EOF'
 }
 EOF
 expect_pass "check-architecture-pack accepts a complete custom pack" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/"cobertura"/"llvm"/' "$rust/pack.json"
+expect_fail "check-architecture-pack rejects an unmeasured coverage format" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-topology"
 write_pack "$d"

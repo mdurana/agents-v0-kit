@@ -95,18 +95,113 @@ for m in plan p0-platform-skeleton p1-contracts-and-data-models p2-mvp-core-feat
   fi
 done
 
-has_jvm_at() {
-  dir="$1"
-  [ -f "$dir/pom.xml" ] || [ -f "$dir/build.gradle" ] || [ -f "$dir/build.gradle.kts" ]
+load_markers() {
+  MARKERS=""
+  if [ ! -f "$TARGET_ABS/.agents-v0/ci/packlib.py" ]; then
+    return 0
+  fi
+  MARKERS="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/ci" python3 - "$TARGET_ABS" <<'PY'
+import os
+import sys
+os.chdir(sys.argv[1])
+sys.path.insert(0, os.environ["PACKLIB_DIR"])
+import packlib
+print("\n".join(packlib.marker_roots(".", 4)))
+PY
+)"
+}
+
+has_backend_at() {
+  rel="$1"
+  case "$rel" in
+    "$TARGET_ABS") rel="." ;;
+    "$TARGET_ABS"/*) rel="${rel#"$TARGET_ABS"/}" ;;
+  esac
+  rel="${rel%/}"
+  [ -n "${MARKERS:-}" ] || return 1
+  printf '%s\n' "$MARKERS" | grep -Fxq -- "$rel"
+}
+
+apply_root() {
+  cmd="$1"
+  root="${2%/}"
+  body="$(printf '%s\n' "$cmd" | sed -E 's/^cd[[:space:]]+[^[:space:]]+[[:space:]]+&&[[:space:]]+//')"
+  printf 'cd %s && %s' "$root" "$body"
+}
+
+load_pack_commands() {
+  PACK_VERIFY=""
+  PACK_VERIFY_FAST=""
+  UI_VERIFY=""
+  UI_VERIFY_FAST=""
+  if [ -z "$PACK" ] || [ ! -f "$KIT/core/$PACK/pack.json" ]; then
+    return 0
+  fi
+  eval "$(python3 - "$KIT/core/$PACK/pack.json" "$KIT/core/ui" <<'PY'
+import json
+import os
+import sys
+pack = json.load(open(sys.argv[1], encoding="utf-8"))
+ui = {}
+ui_id = pack.get("ui") if isinstance(pack.get("ui"), str) else ""
+ui_path = os.path.join(sys.argv[2], ui_id, "pack.json") if ui_id else ""
+if ui_path and os.path.isfile(ui_path):
+    ui = json.load(open(ui_path, encoding="utf-8"))
+
+def quote(value):
+    return "'" + str(value).replace("'", "'\"'\"'") + "'"
+
+print("PACK_VERIFY=" + quote(pack.get("verify") or ""))
+print("PACK_VERIFY_FAST=" + quote(pack.get("verifyFast") or ""))
+print("UI_VERIFY=" + quote(ui.get("verify") or ""))
+print("UI_VERIFY_FAST=" + quote(ui.get("verifyFast") or ""))
+PY
+)"
+}
+
+backend_verify_for() {
+  root="$1"
+  if [ -n "${PACK_VERIFY:-}" ]; then
+    apply_root "$PACK_VERIFY" "$root"
+  else
+    printf 'cd %s && ./mvnw -B clean verify' "${root%/}"
+  fi
+}
+
+backend_fast_for() {
+  root="$1"
+  if [ -n "${PACK_VERIFY_FAST:-}" ]; then
+    apply_root "$PACK_VERIFY_FAST" "$root"
+  else
+    printf 'cd %s && ./mvnw -B clean verify -P!ci-security' "${root%/}"
+  fi
+}
+
+frontend_verify_for() {
+  root="$1"
+  if [ -n "${UI_VERIFY:-}" ]; then
+    apply_root "$UI_VERIFY" "$root"
+  else
+    printf 'cd %s && npm run verify' "${root%/}"
+  fi
+}
+
+frontend_fast_for() {
+  root="$1"
+  if [ -n "${UI_VERIFY_FAST:-}" ]; then
+    apply_root "$UI_VERIFY_FAST" "$root"
+  else
+    printf 'cd %s && npm test' "${root%/}"
+  fi
 }
 
 infer_profile() {
   be=0
   fe=0
   bff=0
-  if has_jvm_at "$TARGET_ABS/app/backend" || has_jvm_at "$TARGET_ABS/backend"; then be=1; fi
+  if has_backend_at "$TARGET_ABS/app/backend" || has_backend_at "$TARGET_ABS/backend"; then be=1; fi
   if [ -f "$TARGET_ABS/app/frontend/package.json" ] || [ -f "$TARGET_ABS/frontend/package.json" ]; then fe=1; fi
-  if has_jvm_at "$TARGET_ABS/app/bff" || has_jvm_at "$TARGET_ABS/bff"; then bff=1; fi
+  if has_backend_at "$TARGET_ABS/app/bff" || has_backend_at "$TARGET_ABS/bff"; then bff=1; fi
   if [ "$be" = 1 ] && [ "$fe" = 1 ] && [ "$bff" = 1 ]; then
     printf 'app-bff\n'
   elif [ "$be" = 1 ] && [ "$fe" = 1 ]; then
@@ -155,11 +250,11 @@ module_root() {
       return 0
     fi
   else
-    if has_jvm_at "$TARGET_ABS/app/$name"; then
+    if has_backend_at "$TARGET_ABS/app/$name"; then
       printf 'app/%s/' "$name"
       return 0
     fi
-    if has_jvm_at "$TARGET_ABS/$name"; then
+    if has_backend_at "$TARGET_ABS/$name"; then
       printf '%s/' "$name"
       return 0
     fi
@@ -189,7 +284,7 @@ fill_layout() {
       ;;
   esac
   if [ -z "$chosen" ]; then
-    if has_jvm_at "$TARGET_ABS" || [ -f "$TARGET_ABS/package.json" ]; then
+    if has_backend_at "$TARGET_ABS" || [ -f "$TARGET_ABS/package.json" ]; then
       printf 'Source at the repo root is not a greenfield layout. Move it under app/backend/, app/bff/, or app/frontend/, then re-run with --profile service|ui|app\n'
     else
       printf 'Layout profile not inferred. Re-run with --profile service|ui|app\n'
@@ -202,8 +297,8 @@ fill_layout() {
       backend_root="$(module_root backend jvm)"
       frontend_root='n/a'
       bff_root='n/a'
-      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
-      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
+      backend_verify="$(backend_verify_for "$backend_root")"
+      backend_fast="$(backend_fast_for "$backend_root")"
       frontend_verify='n/a'
       frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
@@ -213,8 +308,8 @@ fill_layout() {
       backend_root="$(module_root backend jvm)"
       frontend_root='n/a'
       bff_root="$(module_root bff jvm)"
-      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
-      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
+      backend_verify="$(backend_verify_for "$backend_root")"
+      backend_fast="$(backend_fast_for "$backend_root")"
       frontend_verify='n/a'
       frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
@@ -224,8 +319,8 @@ fill_layout() {
       backend_root='n/a'
       frontend_root='n/a'
       bff_root="$(module_root bff jvm)"
-      backend_verify="cd ${bff_root%/} && ./mvnw -B clean verify"
-      backend_fast="cd ${bff_root%/} && ./mvnw -B clean verify -P!ci-security"
+      backend_verify="$(backend_verify_for "$bff_root")"
+      backend_fast="$(backend_fast_for "$bff_root")"
       frontend_verify='n/a'
       frontend_fast='n/a'
       openapi='openapi/api-v1.yaml'
@@ -237,8 +332,8 @@ fill_layout() {
       bff_root='n/a'
       backend_verify='n/a'
       backend_fast='n/a'
-      frontend_verify="cd ${frontend_root%/} && npm run verify"
-      frontend_fast="cd ${frontend_root%/} && npm test"
+      frontend_verify="$(frontend_verify_for "$frontend_root")"
+      frontend_fast="$(frontend_fast_for "$frontend_root")"
       openapi='n/a'
       ;;
     app|app-bff)
@@ -246,10 +341,10 @@ fill_layout() {
       backend_root="$(module_root backend jvm)"
       frontend_root="$(module_root frontend ui)"
       if [ "$chosen" = app-bff ]; then bff_root="$(module_root bff jvm)"; else bff_root='n/a'; fi
-      backend_verify="cd ${backend_root%/} && ./mvnw -B clean verify"
-      backend_fast="cd ${backend_root%/} && ./mvnw -B clean verify -P!ci-security"
-      frontend_verify="cd ${frontend_root%/} && npm run verify"
-      frontend_fast="cd ${frontend_root%/} && npm test"
+      backend_verify="$(backend_verify_for "$backend_root")"
+      backend_fast="$(backend_fast_for "$backend_root")"
+      frontend_verify="$(frontend_verify_for "$frontend_root")"
+      frontend_fast="$(frontend_fast_for "$frontend_root")"
       openapi='openapi/api-v1.yaml'
       ;;
   esac
@@ -297,14 +392,19 @@ fill_layout() {
   printf 'Recorded layout profile %s in %s\n' "$chosen" "$file"
 }
 
+load_markers
+load_pack_commands
 if [ -z "$PROFILE" ]; then
   PROFILE="$(infer_profile)"
 fi
 fill_layout "$PROFILE"
 
 printf '\nGreenfield bootstrap complete.\n'
-if [ "$SCAFFOLD_APP" = 1 ] && { [ -z "$PACK" ] || [ "$PACK" = "java" ]; }; then
-  printf 'App template extracted from templates/app/p0-platform-skeleton.tar.gz (java example).\n'
+if [ "$SCAFFOLD_APP" = 1 ] && [ -z "$PACK" ]; then
+  printf 'No --pack was given. Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
+  printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
+elif [ "$SCAFFOLD_APP" = 1 ] && [ "$PACK" = "java" ]; then
+  printf 'Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
   printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
 elif [ "$SCAFFOLD_APP" = 1 ]; then
   printf 'P0-A: follow the %s scaffold-service skill. The Java archive was not extracted.\n' "$PACK"

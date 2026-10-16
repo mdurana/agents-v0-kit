@@ -482,10 +482,6 @@ def finish():
 
 bound_pack = {}
 
-COVERAGE_FORMATS = ("jacoco", "cobertura", "go-cover", "jest-summary")
-TEST_FORMATS = ("junit", "pytest", "trx", "go-json")
-
-
 def files_for(relpath):
     """Pack paths are relative to the module. CI may have copied them under ci-artifacts/gate/."""
     if not relpath:
@@ -522,14 +518,16 @@ def jacoco_report(path):
 
 def measure_manifest(data):
     """Read the files and formats named on the bound pack. Do not remap them to another language."""
+    sys.path.insert(0, os.environ.get("PACKLIB_DIR") or "")
+    import packlib
     coverage = data.get("coverage") or {}
     report = data.get("testsReport") or {}
     cov_fmt = coverage.get("format") or ""
     rep_fmt = report.get("format") or ""
     pack_id = data.get("id") or "?"
-    if cov_fmt not in COVERAGE_FORMATS:
+    if cov_fmt not in packlib.COVERAGE_FORMATS:
         failures.append(f"Pack {pack_id} coverage format {cov_fmt or '(empty)'} is not measured")
-    if rep_fmt not in TEST_FORMATS:
+    if rep_fmt not in packlib.TEST_FORMATS:
         failures.append(f"Pack {pack_id} test report format {rep_fmt or '(empty)'} is not measured")
     if failures:
         return

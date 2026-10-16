@@ -34,7 +34,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 - [ ] API-backed components name an operation in `docs/agents-v0/design/<feature>/openapi.yaml`. No new endpoint in the UX spec.
 - [ ] UX spec complete: flows, per-screen state matrix, WCAG 2.1 AA accessibility, responsive/device matrix, design-system conformance; N/A determinations reasoned.
 - [ ] UX acceptance criteria name the screen and the mockup.
-- [ ] `frontend-web.mdc`: state matrix; accessibility; React default (or existing SvelteKit) honored.
+- [ ] `frontend-web.mdc`: state matrix; accessibility; the bound pack's `ui` id (the React example is `frontend-web.mdc`).
 - [ ] `architecture-and-diagrams.mdc`: Mermaid conventions for flows.
 - [ ] `quality-and-testing.mdc`: UX acceptance criteria are testable on the built UI.
 - [ ] `workflow-orchestration.mdc`: Design gate criteria met; stopped for approval.

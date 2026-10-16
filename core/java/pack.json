@@ -23,7 +23,7 @@
   "publicMarker": "@PreAuthorize(\"permitAll()\")",
   "ciImage": "eclipse-temurin:21-jdk",
   "dockerfile": "docker/Dockerfile.spring-boot",
-  "detect": ["pom.xml"],
+  "detect": ["pom.xml", "build.gradle", "build.gradle.kts"],
   "ui": "react",
   "endpoints": [
     {"suffix": ".java", "parser": "spring", "name": "java"}

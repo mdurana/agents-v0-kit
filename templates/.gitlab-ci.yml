@@ -395,7 +395,8 @@ perf:
 
 frontend:
   stage: test
-  image: ${CI_IMAGE_PREFIX}node:22-bookworm
+  # CI_UI_IMAGE overrides the React example image when the UI pack is not Node.
+  image: ${CI_UI_IMAGE:-${CI_IMAGE_PREFIX}node:22-bookworm}
   variables:
     npm_config_cache: "$CI_PROJECT_DIR/.npm"
   cache:
@@ -408,11 +409,13 @@ frontend:
         - package.json
         - frontend/package.json
         - app/frontend/package.json
+        - "**/.agents-v0/ui/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
         - package.json
         - frontend/package.json
         - app/frontend/package.json
+        - "**/.agents-v0/ui/*/pack.json"
   script:
     - |
       set -eu
@@ -424,16 +427,30 @@ frontend:
         printf 'SKIP: layout has no frontend root\n'
         exit 0
       fi
-      if [ ! -f "$repo/$root/package.json" ]; then
-        printf 'FAIL: layout frontend root %s has no package.json\n' "$root" >&2
-        exit 1
-      fi
-      cd "$repo/$root"
       mkdir -p "$repo/ci-artifacts"
-      npm ci
-      if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-      elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-      else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      front_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
+      if [ -n "$front_cmd" ]; then
+        case "$front_cmd" in
+          *npm*)
+            if [ ! -f "$repo/$root/package.json" ]; then
+              printf 'FAIL: Frontend verify uses npm but %s has no package.json\n' "$root" >&2
+              exit 1
+            fi
+            (cd "$repo/$root" && npm ci)
+            ;;
+        esac
+        (cd "$repo" && sh -c "$front_cmd") 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      else
+        if [ ! -f "$repo/$root/package.json" ]; then
+          printf 'FAIL: layout frontend root %s has no package.json\n' "$root" >&2
+          exit 1
+        fi
+        cd "$repo/$root"
+        npm ci
+        if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+        elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+        else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+        fi
       fi
       if [ -f "$repo/.agents-v0/ci/check-known-failures.sh" ]; then sh "$repo/.agents-v0/ci/check-known-failures.sh" "$repo/ci-artifacts/verify-frontend.log"; fi
   artifacts:
