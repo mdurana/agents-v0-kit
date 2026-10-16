@@ -134,8 +134,8 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 - Authentication on all non-health endpoints
 - TLS 1.2 or 1.3 on every outbound call, with certificate verification
 - Rate limiting at edge or BFF for auth, admin, and upload endpoints
-- Input validation at API boundary (`@Valid`, Bean Validation)
-- Parameterized queries / JPA named parameters only — no SQL string concatenation
+- Input validation at the API boundary before the handler uses the body. Pack `java` uses `@Valid` and Bean Validation. .NET uses data annotations. Python uses Pydantic. Go checks the request struct.
+- Parameterized queries only. Pack `java` uses JPA named parameters. .NET uses `SqlParameter` or EF Core. Python uses SQLAlchemy binds. Go uses `database/sql` arguments. No SQL string concatenation.
 - Sort and filter fields come from an allowlist
 - A user-supplied URL is fetched only when the host is on an allowlist. Redirects stay on that allowlist
 - Appropriate HTTP status codes (401/403/405/406 — not 200 with error body)

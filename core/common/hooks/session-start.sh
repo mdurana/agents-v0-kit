@@ -11,7 +11,7 @@ lines=""
 "
 state=""
 newest_ts=""
-if [ -d docs/requirements ]; then
+if [ -d docs/agents-v0/requirements ]; then
   for f in docs/agents-v0/requirements/*.state.json; do
     [ -f "$f" ] || continue
     ts="$(sed -n 's/.*"updatedAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -n 1)"

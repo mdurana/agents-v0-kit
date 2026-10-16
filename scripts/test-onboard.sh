@@ -190,6 +190,44 @@ else
   fail "dependency graphs: the failing root is named"
 fi
 
+pack_graph() {
+  name="$1"
+  dir="$tmp/graph-$name"
+  mkdir -p "$dir/.agents-v0/ci" "$dir/.agents-v0/scripts" "$dir/docs/agents-v0" "$dir/bin"
+  cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$dir/.agents-v0/ci/"
+  cp "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$dir/.agents-v0/scripts/"
+  printf '%s' "$dir"
+}
+d="$(pack_graph dotnet)"
+printf '<Project Sdk="Microsoft.NET.Sdk" />\n' > "$d/App.csproj"
+cat > "$d/bin/dotnet" <<'EOF'
+#!/bin/sh
+printf '   > Newtonsoft.Json                 13.0.3\n'
+EOF
+chmod +x "$d/bin/dotnet"
+expect_pass "dependency graphs: dotnet list package writes a graph" "$d" env PATH="$d/bin:$PATH" sh .agents-v0/scripts/collect-dependency-graphs.sh
+has "dependency graphs: dotnet graph names the package" "$d/docs/agents-v0/discovery/dotnet-graph.txt" "Newtonsoft.Json"
+
+d="$(pack_graph go)"
+printf 'module example.com/app\n\ngo 1.26\n' > "$d/go.mod"
+cat > "$d/bin/go" <<'EOF'
+#!/bin/sh
+printf 'example.com/app\nexample.com/dep v1.2.3\n'
+EOF
+chmod +x "$d/bin/go"
+expect_pass "dependency graphs: go list writes a graph" "$d" env PATH="$d/bin:$PATH" sh .agents-v0/scripts/collect-dependency-graphs.sh
+has "dependency graphs: go graph names the module" "$d/docs/agents-v0/discovery/go-graph.txt" "example.com/dep"
+
+d="$(pack_graph python)"
+printf '[project]\nname = "app"\n' > "$d/pyproject.toml"
+cat > "$d/bin/python3" <<'EOF'
+#!/bin/sh
+printf 'fastapi==0.115.0\n'
+EOF
+chmod +x "$d/bin/python3"
+expect_pass "dependency graphs: pip freeze writes a graph" "$d" env PATH="$d/bin:$PATH" sh .agents-v0/scripts/collect-dependency-graphs.sh
+has "dependency graphs: python graph names the package" "$d/docs/agents-v0/discovery/python-graph.txt" "fastapi==0.115.0"
+
 # --- check-onboarding-docs.sh ------------------------------------------------
 mkdir -p "$r/docs/agents-v0/onboarding/modules"
 cite='`services/order/src/main/java/com/acme/order/OrderController.java:7`'

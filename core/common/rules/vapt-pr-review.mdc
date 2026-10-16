@@ -1,6 +1,6 @@
 ---
 description: VAPT PR review checklist. The vapt-review skill applies this at Verify and Release. Globs attach it when those surfaces are edited.
-globs: "**/*.java,**/*.ts,**/*.tsx,**/*.svelte,**/application*.yml,**/application*.yaml,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+server.ts,**/hooks.server.ts,**/hooks.server.tsx"
+globs: "**/*.java,**/*.cs,**/*.py,**/*.go,**/*.ts,**/*.tsx,**/*.svelte,**/application*.yml,**/application*.yaml,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+server.ts,**/hooks.server.ts,**/hooks.server.tsx"
 alwaysApply: false
 ---
 
@@ -20,7 +20,7 @@ Use on every PR touching **auth, sessions, routes, controllers, uploads, or depl
 
 ## F4 — Function-level access control (HIGH, always-on)
 
-- [ ] `@PreAuthorize` on every new/changed admin or mutation endpoint (Spring)
+- [ ] The pack auth marker on every new or changed admin or mutation endpoint (`@PreAuthorize`, `[Authorize]`, a security `Depends()`, or Go auth middleware)
 - [ ] Server-side route/module enforcement — not UI hide-only (web app)
 - [ ] `app.security.permit-all` not enabled in lab/SIT/UAT/prod overlays
 - [ ] No authz bypass flags in shared environments
@@ -88,7 +88,7 @@ An applicable miss is Critical.
 - [ ] Server-side: size limit, content sniff (Tika/magic-byte), structure parse
 - [ ] Generated storage name; `..` rejected; decompression limit; production virus scan
 - [ ] Extension check is supplemental — not sole validation
-- [ ] `@PreAuthorize` or equivalent on upload endpoints (Spring)
+- [ ] The pack auth marker on upload endpoints (`@PreAuthorize`, `[Authorize]`, a security `Depends()`, or Go auth middleware)
 - [ ] Client `accept` is supplemental only (web app)
 - [ ] Test: renamed wrong-type file → 400 before processing
 
