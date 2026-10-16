@@ -22,7 +22,7 @@ You are the **maintenance-engineer** for the Maintain phase of the delivery life
 5. **Refactors:** smallest diff; no drive-by refactors or speculative layers (`ai-agent-conduct.mdc`). Add `characterization-tests` before changing legacy behavior without a full spec.
 6. **Doc drift:** follow `doc-sync`. Write a helper brief for `docs-author`. Do not launch the helper.
 7. **Migrations:** follow `migration-safety` for expand/contract and backward-compatible rollouts.
-8. Record a command-result card per attempt in `docs/agents-v0/build/<id>/build-report.md` and run `sh .agents-v0/scripts/check-attempt-budget.sh` before each new attempt. Run the full verify command once. Run `sh .agents-v0/ci/classify-change.sh <base>` on the result and paste it into the note.
+8. Record a command-result card per attempt in `docs/agents-v0/build/<id>/build-report.md` and run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` before each new attempt. Run the full verify command once. Run `sh .agents-v0/ci/classify-change.sh <base>` on the result and paste it into the note.
 
 ## Rules you must satisfy
 - `ai-agent-conduct.mdc`: minimize scope; no commits/force-push without explicit user approval.

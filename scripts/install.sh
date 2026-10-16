@@ -303,6 +303,9 @@ docs/agents-v0/benchmark/reference-project.md
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
+    if [ -L "$dest" ]; then
+      return 0
+    fi
     if [ "$overwrite" = 1 ] || [ ! -f "$dest" ]; then
       mkdir -p "$(dirname "$dest")"
       cp "$KIT/templates/$rel" "$dest"
@@ -324,8 +327,14 @@ docs/agents-v0/benchmark/reference-project.md
       copy_template_file "$rel"
     done
   fi
-  chmod +x "$t/.agents-v0/ci/"*.sh 2>/dev/null || true
-  chmod +x "$t/.agents-v0/scripts/"*.sh 2>/dev/null || true
+  chmod_regular() {
+    for f in "$@"; do
+      [ -e "$f" ] || continue
+      [ -L "$f" ] && continue
+      chmod +x "$f"
+    done
+  }
+  chmod_regular "$t"/.agents-v0/ci/*.sh "$t"/.agents-v0/scripts/*.sh
   # A filled threat model is not replaced. An older copy gains the VAPT table.
   dest="$t/docs/agents-v0/design/system/threat-model.md"
   src="$KIT/templates/docs/agents-v0/design/system/threat-model.md"
@@ -429,6 +438,11 @@ if [ "$LINK" = 1 ]; then
   [ -z "$LINK_PATH" ] || set -- "$@" --path "$LINK_PATH"
   [ "$LINK_FORCE" = 0 ] || set -- "$@" --force
   sh "$KIT/scripts/link-project.sh" "$@" "$TARGET_ABS"
+  install_templates "$TARGET_ABS"
+  if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
+    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml. Scope GITLAB_TOKEN to the delivery-approval environment (read_api, masked), or that token is visible to every job.\n' >&2
+  fi
+  printf 'Linked agents-v0 into %s (kit files stay in the pinned checkout).\n' "$TARGET_ABS"
   exit 0
 fi
 

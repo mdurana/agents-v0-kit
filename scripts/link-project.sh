@@ -51,7 +51,23 @@ else
   [ -d "$PATH_ARG" ] || { printf 'FAIL: kit path not found: %s\n' "$PATH_ARG" >&2; exit 1; }
   abs="$(cd "$PATH_ARG" && pwd -P)"
   git -C "$abs" rev-parse --verify "${COMMIT}^{commit}" >/dev/null
-  pin_path="$abs"
+  pin_path=""
+  for project_base in "$(cd "$PROJECT" && pwd)" "$(cd "$PROJECT" && pwd -P)"; do
+    candidate="$(python3 - "$project_base" "$abs" <<'PY'
+import os, sys
+print(os.path.relpath(sys.argv[2], sys.argv[1]))
+PY
+)"
+    case "$candidate" in
+      /*) continue ;;
+    esac
+    if ( cd "$PROJECT" && [ -d "$candidate" ] ); then
+      pin_path="$candidate"
+      break
+    fi
+  done
+  [ -n "$pin_path" ] || { printf 'FAIL: kit path is not a relative path from the project\n' >&2; exit 1; }
+  pin_url="$(git -C "$abs" remote get-url origin 2>/dev/null || true)"
 fi
 
 mkdir -p "$PROJECT/docs/agents-v0"
@@ -60,7 +76,11 @@ pin="$PROJECT/docs/agents-v0/kit-pin"
   if [ -n "$URL" ]; then
     printf 'url: %s\n' "$URL"
   else
+    printf 'local: yes\n'
     printf 'path: %s\n' "$pin_path"
+    if [ -n "$pin_url" ]; then
+      printf 'url: %s\n' "$pin_url"
+    fi
   fi
   printf 'commit: %s\n' "$COMMIT"
 } > "$pin"
@@ -131,3 +151,6 @@ PY
 printf 'Linked %s at %s\n' "$PROJECT" "$root"
 printf 'Pack files stay in %s/.agents-v0/packs/<id>/\n' "$PROJECT"
 printf 'Commit docs/agents-v0/kit-pin in the project. Do not commit kit files.\n'
+if [ -z "$URL" ]; then
+  printf 'WARN: --path is a local checkout. CI on another machine needs --url so the runner can fetch that commit.\n'
+fi

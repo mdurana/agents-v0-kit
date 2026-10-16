@@ -225,6 +225,186 @@ def go_json_totals(path):
     return tests, fails, 0, 0, True
 
 
+def git_added(glob_pattern, base):
+    """Lines added since DIFF_BASE for one pathspec. Empty dict when the diff cannot be read."""
+    try:
+        merge_base = subprocess.run(
+            ["git", "-C", root, "merge-base", base, "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        diff = subprocess.run(
+            ["git", "-C", root, "diff", "-U0", "--relative", merge_base, "HEAD", "--", glob_pattern],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError) as exc:
+        failures.append(f"DIFF_BASE {base} could not be diffed: {exc}")
+        return {}
+    added, current = {}, None
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            target = line[4:]
+            current = target[2:] if target.startswith("b/") else None
+            continue
+        hunk = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if hunk and current:
+            start = int(hunk.group(1))
+            count = int(hunk.group(2)) if hunk.group(2) is not None else 1
+            added.setdefault(current.replace("\\", "/"), set()).update(range(start, start + count))
+    return added
+
+
+def lookup_lines(tracked, path, source_root):
+    norm = path.replace("\\", "/")
+    if source_root and source_root.strip("/") not in norm:
+        return None
+    if norm in tracked:
+        return tracked[norm]
+    tail = norm.split(source_root.strip("/") + "/", 1)[-1] if source_root else norm
+    for key, lines in tracked.items():
+        key_norm = key.replace("\\", "/")
+        if key_norm == tail or norm.endswith("/" + key_norm) or key_norm.endswith("/" + tail):
+            return lines
+    return None
+
+
+def score_diff(tracked, glob_pattern, source_root):
+    """Changed-line coverage. No DIFF_BASE means the gate does not apply."""
+    base = env("DIFF_BASE")
+    if not base:
+        return
+    if tracked is None:
+        failures.append("DIFF_BASE is set but the coverage report has no line data")
+        return
+    minimum = number("MIN_DIFF_LINE_PCT", 80.0)
+    added = git_added(glob_pattern, base)
+    covered_n = missed_n = 0
+    for path, numbers in added.items():
+        lines = lookup_lines(tracked, path, source_root)
+        if lines is None:
+            continue
+        for n in numbers:
+            if n in lines:
+                if lines[n]:
+                    covered_n += 1
+                else:
+                    missed_n += 1
+    total = covered_n + missed_n
+    if total:
+        diff_pct = 100.0 * covered_n / total
+        summary["diffCoveragePct"] = round(diff_pct, 2)
+        print(f"coverage: changed lines {covered_n}/{total} = {diff_pct:.2f}% (minimum {minimum:g}%)")
+        if diff_pct < minimum:
+            failures.append(f"diff coverage {diff_pct:.2f}% < {minimum:g}%")
+    else:
+        print("coverage: no measurable changed lines since the merge base")
+
+
+def cobertura_lines(path):
+    if not os.path.isfile(path):
+        return None
+    tracked = {}
+    for cls in ET.parse(path).iter():
+        if cls.tag != "class" and not cls.tag.endswith("}class"):
+            continue
+        filename = (cls.get("filename") or "").replace("\\", "/")
+        lines = {}
+        for ln in list(cls):
+            if ln.tag != "line" and not ln.tag.endswith("}line"):
+                for nested in ln.iter():
+                    if nested.tag == "line" or nested.tag.endswith("}line"):
+                        number = nested.get("number")
+                        if number and number.isdigit():
+                            hits = nested.get("hits")
+                            lines[int(number)] = hits is None or int(float(hits)) > 0
+                continue
+            number = ln.get("number")
+            if number and number.isdigit():
+                hits = ln.get("hits")
+                lines[int(number)] = hits is None or int(float(hits)) > 0
+        if filename and lines:
+            tracked[filename] = lines
+    return tracked
+
+
+def go_lines(path):
+    if not os.path.isfile(path):
+        return None
+    tracked = {}
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("mode:") or ":" not in line:
+                continue
+            match = re.match(r"(.+):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)", line.strip())
+            if not match:
+                continue
+            file, start, end, count = match.group(1), int(match.group(2)), int(match.group(3)), int(match.group(4))
+            bucket = tracked.setdefault(file.replace("\\", "/"), {})
+            for n in range(start, end + 1):
+                bucket[n] = bucket.get(n, False) or count > 0
+    return tracked
+
+
+def lcov_lines(path):
+    if not os.path.isfile(path):
+        return None
+    tracked, current = {}, None
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("SF:"):
+                current = line[3:].strip().replace("\\", "/")
+                tracked.setdefault(current, {})
+            elif line.startswith("DA:") and current:
+                number, hits = line[3:].split(",")[:2]
+                tracked[current][int(number)] = int(hits) > 0
+    return tracked
+
+
+def node_lines():
+    lcov = os.path.join(root, "coverage", "lcov.info")
+    if os.path.isfile(lcov):
+        return lcov_lines(lcov)
+    final = os.path.join(root, "coverage", "coverage-final.json")
+    if not os.path.isfile(final):
+        return None
+    tracked = {}
+    with open(final, encoding="utf-8") as handle:
+        data = json.load(handle)
+    for path, info in data.items():
+        lines = {}
+        counts = info.get("s") or {}
+        for key, span in (info.get("statementMap") or {}).items():
+            start = (span.get("start") or {}).get("line")
+            end = (span.get("end") or {}).get("line") or start
+            if not start:
+                continue
+            hit = int(counts.get(key) or 0) > 0
+            for n in range(int(start), int(end) + 1):
+                lines[n] = lines.get(n, False) or hit
+        if lines:
+            tracked[path.replace("\\", "/")] = lines
+    return tracked
+
+
+def alt_diff(kind):
+    spec = (bound_pack or {}).get("diffCoverage") or {}
+    glob_pattern = spec.get("glob") or {
+        "dotnet": "*.cs", "python": "*.py", "node": "*.ts", "go": "*.go",
+    }.get(kind, "*")
+    source_root = spec.get("sourceRoot") or ""
+    if kind == "dotnet":
+        reports = glob.glob(os.path.join(root, "**", "coverage.cobertura.xml"), recursive=True)
+        tracked = cobertura_lines(reports[0]) if reports else None
+    elif kind == "python":
+        tracked = cobertura_lines(os.path.join(root, "coverage.xml"))
+    elif kind == "node":
+        tracked = node_lines()
+    elif kind == "go":
+        tracked = go_lines(os.path.join(root, "coverage.out"))
+    else:
+        tracked = None
+    score_diff(tracked, glob_pattern, source_root)
+
+
 def measure_alt(kind):
     if kind == "dotnet":
         trx = glob.glob(os.path.join(root, "TestResults", "**", "*.trx"), recursive=True)
@@ -253,6 +433,7 @@ def measure_alt(kind):
         record_coverage(gocover_pct(os.path.join(root, "coverage.out")), "coverage.out")
     else:
         failures.append(f"unknown pack {kind}")
+    alt_diff(kind)
     record_cve(os.path.join(root, "cve-report.json"))
 
 
@@ -298,6 +479,9 @@ def finish():
     raise SystemExit(0)
 
 
+bound_pack = {}
+
+
 def kind_from_pack():
     """A bound Pack selects the report format. An empty Pack leaves detection alone."""
     sys.path.insert(0, os.environ["PACKLIB_DIR"])
@@ -309,6 +493,8 @@ def kind_from_pack():
     if data is None or packlib.errors_of(data, "backend"):
         failures.append(f"Pack {pack_id} has no complete manifest")
         return "missing"
+    global bound_pack
+    bound_pack = data
     report = (data.get("testsReport") or {}).get("format")
     coverage = (data.get("coverage") or {}).get("format")
     summary["pack"] = pack_id

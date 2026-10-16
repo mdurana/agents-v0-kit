@@ -1,0 +1,17 @@
+# Pipeline for this kit repository. It is not installed into a target project.
+# A target project uses templates/.gitlab-ci.yml.
+
+stages:
+  - validate
+
+validate-kit:
+  stage: validate
+  image: eclipse-temurin:21-jdk
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends shellcheck python3 python3-yaml git ca-certificates
+  script:
+    - sh scripts/validate-kit.sh

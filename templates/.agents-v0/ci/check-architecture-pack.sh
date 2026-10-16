@@ -170,7 +170,7 @@ TECH = re.compile(
     r"\b(kafka|rabbitmq|activemq|postgres(?:ql)?|mysql|mariadb|mongodb|dynamodb|redis|memcached|"
     r"elasticsearch|kubernetes|k8s|eks|aws|azure|gcp|spring(?: boot)?|svelte(?:kit)?|angular|"
     r"java|kotlin|nginx|docker|terraform|hazelcast|caffeine|yugabyte(?:db)?|flyway|liquibase|"
-    r"dotnet|asp\.net|csharp|entity framework|ef core|nodejs|node\.js|node|nestjs|express|typescript|"
+    r"dotnet|asp\.net|csharp|entity framework|ef core|nodejs|node\.js|nestjs|express|typescript|"
     r"python|fastapi|django|pydantic|alembic|golang|gin|chi|go)\b", re.I)
 PACK_LINE = re.compile(r"^Pack:\s*(\S+)\s*$", re.M)
 

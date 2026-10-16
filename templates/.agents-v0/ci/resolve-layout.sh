@@ -137,8 +137,20 @@ if [ -n "$profile" ]; then
     service) [ -n "$backend" ] || [ -n "$bff" ] || [ -n "$services" ] || backend="backend" ;;
     ui) [ -n "$frontend" ] || frontend="frontend" ;;
     app)
-      [ -n "$backend" ] || [ -n "$services" ] || backend="backend"
-      [ -n "$frontend" ] || frontend="frontend"
+      if [ -z "$backend" ] && [ -z "$services" ]; then
+        if has_jvm "app/backend" || ! has_jvm "backend"; then
+          backend="app/backend"
+        else
+          backend="backend"
+        fi
+      fi
+      if [ -z "$frontend" ]; then
+        if [ -f app/frontend/package.json ] || [ ! -f frontend/package.json ]; then
+          frontend="app/frontend"
+        else
+          frontend="frontend"
+        fi
+      fi
       ;;
   esac
 fi

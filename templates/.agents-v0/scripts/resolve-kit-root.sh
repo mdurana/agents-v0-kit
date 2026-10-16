@@ -25,13 +25,20 @@ path="$(printf '%s' "$path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 commit="$(printf '%s' "$commit" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 [ -n "$commit" ] || { printf 'FAIL: %s has no commit\n' "$pin" >&2; exit 1; }
 
-if [ -n "$path" ]; then
-  [ -d "$path" ] || { printf 'FAIL: kit path not found: %s\n' "$path" >&2; exit 1; }
-  root="$(cd "$path" && pwd)"
+if [ -n "$path" ] && [ -d "$path" ]; then
+  root="$(cd "$path" && pwd -P)"
 elif [ -d kit ]; then
-  root="$(cd kit && pwd)"
+  root="$(cd kit && pwd -P)"
+elif [ "${AGENTS_V0_FETCH_KIT:-0}" = 1 ] && [ -n "$url" ]; then
+  root="/tmp/agents-v0-kit-${commit}"
+  if [ ! -d "$root/.git" ]; then
+    rm -rf "$root"
+    git clone "$url" "$root"
+  fi
+  git -C "$root" fetch --tags origin
+  git -C "$root" checkout "$commit"
 else
-  printf 'FAIL: %s names a url but there is no kit/ checkout\n' "$pin" >&2
+  printf 'FAIL: kit checkout for %s is not on this machine\n' "$commit" >&2
   exit 1
 fi
 

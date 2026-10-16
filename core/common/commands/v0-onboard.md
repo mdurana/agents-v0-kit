@@ -10,7 +10,7 @@ You are entering the **Onboard** phase for an **existing** repo after `scripts/i
 Copy `docs/agents-v0/onboarding/_report.template.md` to `docs/agents-v0/onboarding/report.md` when it is absent, then run `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status in_progress`. If the phase is already `in_progress` or `blocked`, continue from files on disk; do not recreate them. On a blocker (uncommitted application changes, a red environment you cannot fix), re-run with `--status blocked --reason "<one line>"` and stop. When the gate is ready for the user, re-run with `--status awaiting_approval` and stop. Do not add an `Approved` row until the user approves.
 
 ## Collision
-Onboarding rewrites shared files (`docs/agents-v0/project-profile.md`, `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`). Stop before the first edit when `git status` shows another feature's code, or a shared-file edit that is not this onboarding's. Record `--status blocked` with those paths and ask for a clean tree or a worktree (`scripts/feature-worktree.sh`).
+Onboarding rewrites shared files (`docs/agents-v0/project-profile.md`, `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`). Stop before the first edit when `git status` shows another feature's code, or a shared-file edit that is not this onboarding's. Record `--status blocked` with those paths and ask for a clean tree or a worktree (`sh .agents-v0/scripts/feature-worktree.sh <feature>`).
 
 ## Instructions
 1. Launch the `codebase-documenter` subagent (skill: `onboard-discovery`).

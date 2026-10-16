@@ -547,6 +547,27 @@ printf '<testsuite tests="2" failures="0" errors="0" skipped="0"/>\n' > "$m/pyte
 printf '<coverage line-rate="0.91"/>\n' > "$m/coverage.xml"
 expect_pass "gate metrics: pytest and coverage.xml pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
 
+m="$tmp/gate-python-diff"
+mkdir -p "$m"
+printf '[project]\nname = "orders"\n' > "$m/pyproject.toml"
+printf '<testsuite tests="1" failures="0" errors="0" skipped="0"/>\n' > "$m/pytest-report.xml"
+cat > "$m/coverage.xml" <<'EOF'
+<coverage line-rate="0.5"><packages><package><classes><class filename="app.py"><lines><line number="1" hits="1"/><line number="2" hits="0"/></lines></class></classes></package></packages></coverage>
+EOF
+printf 'x = 1\n' > "$m/app.py"
+(
+  cd "$m"
+  git init -q
+  git add -A && git_commit base
+)
+py_base="$(cd "$m" && git rev-parse HEAD)"
+printf 'x = 1\ny = 2\n' > "$m/app.py"
+(
+  cd "$m"
+  git add -A && git_commit change
+)
+expect_fail "gate metrics: python diff coverage 50% fails the default 80%" "$tmp" env DIFF_BASE="$py_base" sh "$CI/check-gate-metrics.sh" "$m"
+
 m="$tmp/gate-go"
 mkdir -p "$m"
 printf 'module example.com/orders\n\ngo 1.26\n' > "$m/go.mod"
@@ -833,6 +854,11 @@ d="$tmp/pack-go"
 write_pack "$d"
 sedi 's/OrderService\[Order service\]/OrderService[Go service]/' "$d/docs/agents-v0/architecture.md"
 expect_fail "check-architecture-pack rejects Go in C4" "$d" sh "$CI/check-architecture-pack.sh"
+
+d="$tmp/pack-node-word"
+write_pack "$d"
+sedi 's/OrderService\[Order service\]/OrderService[order node]/' "$d/docs/agents-v0/architecture.md"
+expect_pass "check-architecture-pack allows the word node" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-fastapi"
 write_pack "$d"

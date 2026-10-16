@@ -222,6 +222,16 @@ def install_cursor(data):
         os.chmod(os.path.join(hooks, "pack-scan.sh"), 0o755)
 
 
+def with_backend_root(text, command):
+    """Run the pack command in the profile Backend root when that cell is filled."""
+    root = row_value(text, "Layout", "Backend root")
+    if not root or "<!--" in root or root.strip().lower() in ("n/a", "na"):
+        return command
+    root = root.strip().strip("`").rstrip("/")
+    body = re.sub(r"^cd\s+\S+\s+&&\s+", "", command)
+    return f"cd {root} && {body}"
+
+
 text = read_profile()
 existing = packlib.profile_pack(profile_path)
 if detect:
@@ -259,7 +269,10 @@ if ui.get("verifyFast"):
 for heading, row, value in mapping:
     if not value:
         fail(f"{requested} pack.json has no {row}", 1)
-    text = set_row(text, heading, row, value, force)
+    owned = heading == "Commands" and row.startswith("Backend verify")
+    if owned:
+        value = with_backend_root(text, value)
+    text = set_row(text, heading, row, value, force or owned)
 os.makedirs(os.path.dirname(profile_path), exist_ok=True)
 with open(profile_path, "w", encoding="utf-8") as handle:
     handle.write(text)

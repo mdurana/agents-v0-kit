@@ -162,7 +162,7 @@ audit_root() {
   cd "$TARGET_ABS"
 }
 
-if [ -f ci/resolve-layout.sh ]; then
+if [ -f .agents-v0/ci/resolve-layout.sh ]; then
   eval "$(sh .agents-v0/ci/resolve-layout.sh)"
   printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
   audit_root "${BACKEND_ROOT:-}"

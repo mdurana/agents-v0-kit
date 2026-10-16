@@ -43,4 +43,4 @@ Write `docs/agents-v0/design/system/architecture-review.md`. First line: `agent:
 - The design changes whenever a Critical is fixed, so the hash changes: review again before the gate.
 
 ## Stop condition
-Stop when `review.md` is written. Report the Critical findings. The gate cannot be pinned (`ci/check-design.sh <feature> --pin`) while a Critical is open or the report's `design-hash` is not the current design's.
+Stop when the report for this review is written: `docs/agents-v0/design/<feature>/review.md` for a feature, or `docs/agents-v0/design/system/architecture-review.md` for `/v0-architecture`. Report the Critical findings. A feature gate cannot be pinned (`ci/check-design.sh <feature> --pin`) while a Critical is open or the report's `design-hash` is not the current design's. An architecture row cannot be recorded while a Critical in `architecture-review.md` is open.

@@ -30,8 +30,11 @@ default:
 
 # Air-gapped or private registry mirrors: set CI_IMAGE_PREFIX (e.g. registry.example.com/)
 # in GitLab CI/CD variables or docs/agents-v0/project-profile.md guidance. Empty = pull from public hubs.
+# A linked project records the kit commit in docs/agents-v0/kit-pin.
+# recursive checks out kit/ when that pin is a submodule (--url).
 variables:
   CI_IMAGE_PREFIX: ""
+  GIT_SUBMODULE_STRATEGY: recursive
 
 workflow:
   rules:
@@ -71,6 +74,12 @@ build:
         - app/bff/pom.xml
         - services/*/pom.xml
         - app/services/*/pom.xml
+        - "**/*.csproj"
+        - "**/*.sln"
+        - "**/go.mod"
+        - "**/pyproject.toml"
+        - "**/package.json"
+        - "**/.agents-v0/packs/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
         - pom.xml
@@ -80,6 +89,12 @@ build:
         - app/bff/pom.xml
         - services/*/pom.xml
         - app/services/*/pom.xml
+        - "**/*.csproj"
+        - "**/*.sln"
+        - "**/go.mod"
+        - "**/pyproject.toml"
+        - "**/package.json"
+        - "**/.agents-v0/packs/*/pack.json"
   script:
     - |
       set -eu
@@ -154,6 +169,12 @@ gate-metrics:
         - app/bff/pom.xml
         - services/*/pom.xml
         - app/services/*/pom.xml
+        - "**/*.csproj"
+        - "**/*.sln"
+        - "**/go.mod"
+        - "**/pyproject.toml"
+        - "**/package.json"
+        - "**/.agents-v0/packs/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
         - pom.xml
@@ -163,6 +184,12 @@ gate-metrics:
         - app/bff/pom.xml
         - services/*/pom.xml
         - app/services/*/pom.xml
+        - "**/*.csproj"
+        - "**/*.sln"
+        - "**/go.mod"
+        - "**/pyproject.toml"
+        - "**/package.json"
+        - "**/.agents-v0/packs/*/pack.json"
   before_script:
     - apk add --no-cache git python3
   script:
@@ -224,9 +251,10 @@ event-schema-compat:
 # merge request cannot rewrite the checks that judge it.
 .trusted-ci: &trusted_ci |
   git fetch origin "$CI_DEFAULT_BRANCH"
+  if [ -f .gitmodules ]; then git submodule update --init --recursive; fi
+  export AGENTS_V0_FETCH_KIT=1
   CI_DIR=.agents-v0/ci
-  if [ -f docs/agents-v0/kit-pin ]; then
-    KIT_ROOT="$(sh .agents-v0/scripts/resolve-kit-root.sh)"
+  if [ -f docs/agents-v0/kit-pin ] && KIT_ROOT="$(sh .agents-v0/scripts/resolve-kit-root.sh)"; then
     CI_DIR="$KIT_ROOT/templates/.agents-v0/ci"
   elif git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
     rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci

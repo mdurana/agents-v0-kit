@@ -39,7 +39,7 @@ Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If
    - Methods ≤ 30 lines; cognitive complexity ≤ 15.
    - Every endpoint has authentication and authorization using the pack's auth marker. A public route uses the pack's public marker. `check-endpoint-auth.sh` reads that pack's `pack.json`.
    - Correlation ID and `traceparent` wired in.
-   - DTOs only at the edge; Flyway migrations present, written with `migration-safety` (expand/contract, an up-migration test).
+   - DTOs only at the edge; migrations use the pack `migrationTool`, written with `migration-safety` (expand/contract, an up-migration test).
    - No secrets in code; log values sanitized.
    - UI changes implement the approved UX spec: per-screen state matrix, component defaults (including an override when one is recorded), layout matching the linked mockups, WCAG 2.1 AA a11y, design-system conformance. API integration uses the named OpenAPI operations. It does not add endpoints the contract does not list.
 10. Evidence commits, in this order. Ask once: that approval covers the code commit and the reports commit. Do not stop between them for a second chat approval. The hook still asks on each `git commit`. `ci/check-evidence.sh` ignores later doc-only commits and rejects non-doc changes after the stamped SHA.

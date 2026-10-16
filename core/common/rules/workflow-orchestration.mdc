@@ -23,7 +23,7 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A named ticket, and a milestone that already has an `Approved` `plan` row, start at Intake. P0-A starts at Build. Commands: `/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`, or `/v0-deliver`. `/v0-local-release` is optional after Verify. `/v0-export` and `/v0-deck` are not phases. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Release**, with **Maintain** feeding back into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A named ticket, and a milestone that already has an `Approved` `plan` row, start at Intake. P0-A starts at Build. Commands: `/v0-roadmap`, `/v0-architecture`, `/v0-plan`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-maintain`, `/v0-release`, `/v0-onboard`, `/v0-status`, `/v0-triage`, or `/v0-deliver`. `/v0-local-release` is optional after Verify. `/v0-export` and `/v0-deck` are not phases. Resume file: `docs/agents-v0/requirements/<feature>.state.json` (`sh .agents-v0/scripts/sync-feature-state.sh`). The full map is `docs/agents-v0/agents-v0-kit.md`.
 
 ## Roadmap
 
@@ -45,7 +45,7 @@ Every story fits a context already on the approved context map; story-ID depende
 
 ## Phase resume
 
-The state file separates the last approval from the phase in flight. `scripts/sync-feature-state.sh` derives `lastApprovedPhase` from `Approved` rows. It never writes an approval.
+The state file separates the last approval from the phase in flight. `sh .agents-v0/scripts/sync-feature-state.sh` derives `lastApprovedPhase` from `Approved` rows. It never writes an approval.
 
 | Field | Meaning |
 |-------|---------|
@@ -167,7 +167,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 ### Verify gate
 - `test-engineer` finishes first and may change tests. Then `security-reviewer` and `code-reviewer` run together. Each writes only its own report (`vapt-checklist.md`, `review-notes.md`). Wait for both, including when one finds a Critical item. Gather one Critical list into `docs/agents-v0/requirements/<feature>.phase-result.md`, then route back to Build or Maintain.
 - Quality, security (VAPT), UX (axe-core + UX AC tests), code review — no Critical findings.
-- Numbers come from machine output. CI runs `ci/check-gate-metrics.sh` per Maven module (zero executed tests, test failures, diff coverage under 80% on merge requests, unsuppressed HIGH/CRITICAL CVEs) and `ci/check-event-schemas.sh` (non-additive event schema changes). Reports quote those results; they do not replace them.
+- Numbers come from machine output. CI runs `.agents-v0/ci/check-gate-metrics.sh` per layout root (zero executed tests, test failures, diff coverage under 80% on merge requests, unsuppressed HIGH/CRITICAL CVEs) and `.agents-v0/ci/check-event-schemas.sh` (non-additive event schema changes). Reports quote those results; they do not replace them.
 - Integration stories, vertical slices, P2 journeys, and P4 stories also persist `docs/agents-v0/verify/<feature>/e2e-report.md` (`e2e-perf-testing`).
 - The P4 SLO story writes `docs/agents-v0/design/system/slo-evidence.md` (`slo-evidence`): each filled NFR/SLO row is `measured` (command plus an output file) or `waiver` (reason, approver, date).
 - Evidence under `docs/agents-v0/verify/<feature>/` with `commit:` in each report header; tests added during Verify are committed before stamping, so every report names the same commit.
