@@ -266,8 +266,24 @@ if ui.get("verify"):
     mapping.append(("Commands", "Frontend verify", ui["verify"]))
 if ui.get("verifyFast"):
     mapping.append(("Commands", "Frontend verify (fast)", ui["verifyFast"]))
+if info.get("serviceVerify"):
+    mapping.append(("Commands", "Service verify", info["serviceVerify"]))
+if info.get("serviceVerifyFast"):
+    mapping.append(("Commands", "Service verify (fast, no OWASP)", info["serviceVerifyFast"]))
+# Descriptive stack rows are optional. A pack that passed errors_of still binds.
+optional = {
+    ("Stack", "Backend"),
+    ("Stack", "HTTP"),
+    ("Stack", "Security"),
+    ("Stack", "Database"),
+    ("Stack", "Tests"),
+    ("Stack", "Local run"),
+    ("Stack", "Frontend"),
+}
 for heading, row, value in mapping:
     if not value:
+        if (heading, row) in optional:
+            continue
         fail(f"{requested} pack.json has no {row}", 1)
     owned = heading == "Commands" and row.startswith("Backend verify")
     if owned:

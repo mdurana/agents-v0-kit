@@ -2,11 +2,12 @@
 # bootstrap-greenfield.sh — install agents-v0 into a new repo and seed the P0 milestone manifest.
 #
 # Usage:
-#   bootstrap-greenfield.sh [--profile service|ui|app] [--scaffold-app] <target-repo>
+#   bootstrap-greenfield.sh [--profile service|ui|app] [--pack <id>] [--scaffold-app] <target-repo>
 #
-# Prerequisite: <target-repo> exists (may be empty). Default greenfield path uses
-# --scaffold-app to extract templates/app/p0-platform-skeleton.tar.gz. External
-# generators (Spring Initializr, Vite) remain a fallback. Guide in the kit repo:
+# Prerequisite: <target-repo> exists (may be empty). --scaffold-app extracts
+# templates/app/p0-platform-skeleton.tar.gz when --pack is omitted or is java.
+# Any other --pack skips that archive and points at that pack's scaffold-service skill.
+# Guide in the kit repo:
 # templates/docs/agents-v0/greenfield-onboarding.md (installed as
 # docs/agents-v0/greenfield-onboarding.md).
 # --profile fills docs/agents-v0/project-profile.md Layout and verify commands when those
@@ -15,11 +16,12 @@ set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE=""
+PACK=""
 SCAFFOLD_APP=0
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--profile service|ui|app] [--scaffold-app] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--profile service|ui|app] [--pack <id>] [--scaffold-app] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
 
@@ -28,6 +30,11 @@ while [ $# -gt 0 ]; do
     --profile)
       [ $# -ge 2 ] || usage
       PROFILE="$2"
+      shift 2
+      ;;
+    --pack)
+      [ $# -ge 2 ] || usage
+      PACK="$2"
       shift 2
       ;;
     --scaffold-app)
@@ -60,15 +67,23 @@ esac
 
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
-"$KIT/scripts/install.sh" --with-starters "$TARGET_ABS"
+if [ -n "$PACK" ]; then
+  "$KIT/scripts/install.sh" --with-starters --pack "$PACK" "$TARGET_ABS"
+else
+  "$KIT/scripts/install.sh" --with-starters "$TARGET_ABS"
+fi
 
 if [ "$SCAFFOLD_APP" = 1 ]; then
-  scaffold_profile="$PROFILE"
-  case "$scaffold_profile" in
-    service|ui|app) ;;
-    *) scaffold_profile=app ;;
-  esac
-  sh "$KIT/scripts/scaffold-app-template.sh" --profile "$scaffold_profile" "$TARGET_ABS"
+  if [ -z "$PACK" ] || [ "$PACK" = "java" ]; then
+    scaffold_profile="$PROFILE"
+    case "$scaffold_profile" in
+      service|ui|app) ;;
+      *) scaffold_profile=app ;;
+    esac
+    sh "$KIT/scripts/scaffold-app-template.sh" --profile "$scaffold_profile" "$TARGET_ABS"
+  else
+    printf 'Pack %s does not use the Java archive. Follow core/%s/skills/scaffold-service/SKILL.md for P0-A.\n' "$PACK" "$PACK"
+  fi
 fi
 
 mkdir -p "$TARGET_ABS/docs/agents-v0/milestones"
@@ -288,12 +303,14 @@ fi
 fill_layout "$PROFILE"
 
 printf '\nGreenfield bootstrap complete.\n'
-if [ "$SCAFFOLD_APP" = 1 ]; then
-  printf 'App template extracted from templates/app/p0-platform-skeleton.tar.gz.\n'
+if [ "$SCAFFOLD_APP" = 1 ] && { [ -z "$PACK" ] || [ "$PACK" = "java" ]; }; then
+  printf 'App template extracted from templates/app/p0-platform-skeleton.tar.gz (java example).\n'
   printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
+elif [ "$SCAFFOLD_APP" = 1 ]; then
+  printf 'P0-A: follow the %s scaffold-service skill. The Java archive was not extracted.\n' "$PACK"
 else
   printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with scaffold-service.\n'
-  printf '      wire Maven quality snippets from maven/ if Java; see docker/README.md\n'
+  printf '      wire the reports named in pack.json; Pack java uses maven/. See docker/README.md\n'
 fi
 printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
 printf 'Then start P0-A with /v0-build or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md\n'

@@ -27,12 +27,12 @@ From the **agents-v0** kit repo:
 
 ```bash
 mkdir -p /path/to/your-new-repo && git -C /path/to/your-new-repo init
-./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/your-new-repo
+./scripts/bootstrap-greenfield.sh --profile app --pack java --scaffold-app /path/to/your-new-repo
 ```
 
-`--scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` into `app/backend`
+`--pack java` (or no `--pack`) with `--scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` into `app/backend`
 and/or `app/frontend` (and seeds `docker-compose.yml` for profile `app`) without
-overwriting existing trees. `--profile` is `service`, `ui`, or `app`. Omit `--profile`
+overwriting existing trees. `--pack dotnet` (or any other id) does not extract that archive. `--profile` is `service`, `ui`, or `app`. Omit `--profile`
 to infer from the tree after extract. This also runs `install.sh --with-starters`, seeds
 milestone manifests **P0–P5** and `docs/agents-v0/milestones/plan.md` when missing, and fills Layout / verify commands in
 `docs/agents-v0/project-profile.md` when those cells are still placeholders.

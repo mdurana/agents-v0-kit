@@ -134,7 +134,16 @@ build:
         fi
         cd "$repo"
       }
+      pack_id="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib; print(packlib.profile_pack())')"
+      if [ -n "$pack_id" ] && [ -z "${CI_PACK_IMAGE:-}" ]; then
+        printf 'FAIL: Pack %s is bound. Set CI_PACK_IMAGE to that pack json ciImage. The default image is the java example.\n' "$pack_id" >&2
+        exit 1
+      fi
       pack_cmd="$(sh .agents-v0/ci/run-backend-verify.sh || true)"
+      if [ -n "$pack_id" ] && [ -z "$pack_cmd" ]; then
+        printf 'FAIL: Pack %s is bound but the Backend verify cell is empty. Refusing the Maven fallback.\n' "$pack_id" >&2
+        exit 1
+      fi
       if [ -n "$pack_cmd" ]; then
         run_verify sh -c "$pack_cmd"
       else
@@ -142,6 +151,7 @@ build:
         verify_maven "${BFF_ROOT:-}"
         for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
       fi
+      sh .agents-v0/ci/collect-gate-reports.sh
   artifacts:
     when: always
     paths:
@@ -150,9 +160,10 @@ build:
       - "**/target/surefire-reports/TEST-*.xml"
       - "**/target/failsafe-reports/TEST-*.xml"
       - "**/target/dependency-check-report.json"
+      - "**/gate-metrics.json"
     expire_in: 1 week
 
-# Reads the build artifacts (JaCoCo, Surefire, OWASP JSON) instead of trusting numbers an
+# Reads the build artifacts (the pack's coverage, test, and CVE reports) instead of trusting numbers an
 # agent wrote into a report. Diff coverage is measured on merge requests.
 gate-metrics:
   stage: security
@@ -206,20 +217,29 @@ gate-metrics:
         if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" 2>/dev/null; then
           trusted="$(mktemp -d)"
           git show "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
+          git show "FETCH_HEAD:.agents-v0/ci/packlib.py" > "${trusted}/packlib.py"
           gate="${trusted}/check-gate-metrics.sh"
         else
           printf 'WARN: using the merge request copy of .agents-v0/ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
         fi
       fi
+      cve_required="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib
+      pack = packlib.profile_pack()
+      data = packlib.load(pack) if pack else None
+      print("1" if data and (data.get("cve") or {}).get("path") else "0")')"
       for root in ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
         export REQUIRE_CVE_REPORT=0
-        if grep -q '<id>ci-security</id>' "$repo/$root/pom.xml"; then export REQUIRE_CVE_REPORT=1; fi
+        if [ "$cve_required" = 1 ]; then
+          export REQUIRE_CVE_REPORT=1
+        elif [ -f "$repo/$root/pom.xml" ] && grep -q '<id>ci-security</id>' "$repo/$root/pom.xml"; then
+          export REQUIRE_CVE_REPORT=1
+        fi
         sh "$gate" "$repo/$root"
       done
   artifacts:
     when: always
     paths:
-      - "**/target/gate-metrics.json"
+      - "**/gate-metrics.json"
     expire_in: 1 week
 
 # Contract and event checks that do not need the application to run.

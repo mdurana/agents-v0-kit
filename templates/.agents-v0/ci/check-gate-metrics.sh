@@ -3,14 +3,14 @@
 # numbers an agent wrote into a report (workflow-orchestration.mdc Verify gate).
 #
 # Usage: sh .agents-v0/ci/check-gate-metrics.sh <module-root>
-#   <module-root>  the service root. A pom.xml or target/ directory uses the Java
-#   reports below. Otherwise a *.csproj, go.mod, pyproject.toml, or package.json
-#   selects the dotnet, go, python, or node reports named in that pack's PACK.md.
+#   <module-root>  the service root. A bound Pack reads coverage.path, testsReport.path,
+#   and cve.path from that pack's pack.json. The format selects the reader
+#   (jacoco, cobertura, go-cover, jest-summary, junit, trx, go-json).
+#   An empty Pack uses a module marker when one is present (pom.xml or target/,
+#   *.csproj, go.mod, pyproject.toml, package.json). No marker does not assume Java.
 #
-# Java, under <module-root>/target:
-#   surefire-reports/TEST-*.xml, failsafe-reports/TEST-*.xml  executed tests, failures, errors
-#   site/jacoco/jacoco.xml                                    line coverage, optional diff coverage
-#   dependency-check-report.json                              unsuppressed HIGH/CRITICAL CVEs
+# Reports may also be under ci-artifacts/gate/<module-root>/, where
+# collect-gate-reports.sh publishes them for a later CI job.
 #
 # Environment:
 #   ALLOW_NO_TESTS=1       do not fail when no test report exists (module with no tests)
@@ -88,7 +88,7 @@ def known_failures_budget():
 
 
 def module_kind(path):
-    """Java when this root already looks like a Maven module. Other packs only when it does not."""
+    """A marker selects a known reader. No marker does not assume Java."""
     if os.path.isdir(os.path.join(path, "target")) or os.path.isfile(os.path.join(path, "pom.xml")):
         return "java"
     if glob.glob(os.path.join(path, "*.csproj")) or glob.glob(os.path.join(path, "*.sln")):
@@ -99,7 +99,7 @@ def module_kind(path):
         return "python"
     if os.path.isfile(os.path.join(path, "package.json")):
         return "node"
-    return "java"
+    return ""
 
 
 def junit_totals(paths):
@@ -359,11 +359,12 @@ def lcov_lines(path):
     return tracked
 
 
-def node_lines():
-    lcov = os.path.join(root, "coverage", "lcov.info")
+def node_lines(base=None):
+    base = base or root
+    lcov = os.path.join(base, "coverage", "lcov.info")
     if os.path.isfile(lcov):
         return lcov_lines(lcov)
-    final = os.path.join(root, "coverage", "coverage-final.json")
+    final = os.path.join(base, "coverage", "coverage-final.json")
     if not os.path.isfile(final):
         return None
     tracked = {}
@@ -481,10 +482,98 @@ def finish():
 
 bound_pack = {}
 
+COVERAGE_FORMATS = ("jacoco", "cobertura", "go-cover", "jest-summary")
+TEST_FORMATS = ("junit", "pytest", "trx", "go-json")
+
+
+def files_for(relpath):
+    """Pack paths are relative to the module. CI may have copied them under ci-artifacts/gate/."""
+    if not relpath:
+        return []
+    bases = [root]
+    rel_root = os.path.relpath(os.path.abspath(root), os.getcwd())
+    if not rel_root.startswith(".."):
+        bases.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_root))
+    found = []
+    for base in bases:
+        pattern = os.path.join(base, relpath)
+        for match in glob.glob(pattern, recursive=True):
+            if os.path.isfile(match):
+                found.append(match)
+    return list(dict.fromkeys(found))
+
+
+def jacoco_report(path):
+    if not os.path.isfile(path):
+        return None, None
+    report = ET.parse(path).getroot()
+    line_pct = None
+    for counter in report.findall("counter"):
+        if counter.get("type") == "LINE":
+            missed, covered = int(counter.get("missed") or 0), int(counter.get("covered") or 0)
+            line_pct = 100.0 * covered / (missed + covered) if missed + covered else 100.0
+    tracked = {}
+    for package in report.iter("package"):
+        for source in package.findall("sourcefile"):
+            key = (package.get("name") or "") + "/" + (source.get("name") or "")
+            tracked[key] = {int(ln.get("nr")): int(ln.get("ci", 0)) > 0 for ln in source.findall("line")}
+    return line_pct, tracked
+
+
+def measure_manifest(data):
+    """Read the files and formats named on the bound pack. Do not remap them to another language."""
+    coverage = data.get("coverage") or {}
+    report = data.get("testsReport") or {}
+    cov_fmt = coverage.get("format") or ""
+    rep_fmt = report.get("format") or ""
+    pack_id = data.get("id") or "?"
+    if cov_fmt not in COVERAGE_FORMATS:
+        failures.append(f"Pack {pack_id} coverage format {cov_fmt or '(empty)'} is not measured")
+    if rep_fmt not in TEST_FORMATS:
+        failures.append(f"Pack {pack_id} test report format {rep_fmt or '(empty)'} is not measured")
+    if failures:
+        return
+    test_files = files_for(report.get("path") or "")
+    if rep_fmt in ("junit", "pytest"):
+        record_tests(*junit_totals(test_files))
+    elif rep_fmt == "trx":
+        record_tests(*trx_totals(test_files))
+    else:
+        record_tests(*go_json_totals(test_files[0] if test_files else os.path.join(root, report.get("path") or "")))
+    cov_files = files_for(coverage.get("path") or "")
+    cov_file = cov_files[0] if cov_files else os.path.join(root, coverage.get("path") or "")
+    tracked = None
+    if cov_fmt == "jacoco":
+        pct, tracked = jacoco_report(cov_file)
+    elif cov_fmt == "cobertura":
+        pct = cobertura_pct(cov_file)
+        tracked = cobertura_lines(cov_file)
+    elif cov_fmt == "go-cover":
+        pct = gocover_pct(cov_file)
+        tracked = go_lines(cov_file)
+    else:
+        pct = jest_pct(cov_file)
+        tracked = node_lines(os.path.dirname(os.path.dirname(cov_file)) if cov_files else root)
+    record_coverage(pct, coverage.get("path") or cov_fmt)
+    spec = data.get("diffCoverage") or {}
+    score_diff(tracked, spec.get("glob") or "*", spec.get("sourceRoot") or "")
+    cve_rel = (data.get("cve") or {}).get("path") or ""
+    if cve_rel:
+        cve_files = files_for(cve_rel)
+        record_cve(cve_files[0] if cve_files else os.path.join(root, cve_rel))
+    else:
+        print("cve: SKIP (pack has no cve.path)")
+
 
 def kind_from_pack():
-    """A bound Pack selects the report format. An empty Pack leaves detection alone."""
-    sys.path.insert(0, os.environ["PACKLIB_DIR"])
+    """A bound Pack selects its own report paths. An empty Pack leaves marker detection alone."""
+    for candidate in (
+        os.environ.get("PACKLIB_DIR") or "",
+        os.path.join(os.getcwd(), ".agents-v0", "ci"),
+    ):
+        if candidate and os.path.isfile(os.path.join(candidate, "packlib.py")):
+            sys.path.insert(0, candidate)
+            break
     import packlib
     pack_id = packlib.profile_pack()
     if not pack_id:
@@ -495,26 +584,21 @@ def kind_from_pack():
         return "missing"
     global bound_pack
     bound_pack = data
-    report = (data.get("testsReport") or {}).get("format")
-    coverage = (data.get("coverage") or {}).get("format")
     summary["pack"] = pack_id
-    if coverage == "jacoco":
-        return "java"
-    if coverage == "go-cover" or report == "go-json":
-        return "go"
-    if coverage == "jest-summary":
-        return "node"
-    if report == "trx":
-        return "dotnet"
-    if coverage == "cobertura" or report in ("junit", "pytest"):
-        return "python"
-    failures.append(f"Pack {pack_id} coverage format {coverage} is not measured")
-    return "missing"
+    return "manifest"
 
 
-kind = kind_from_pack() or module_kind(root)
+kind = kind_from_pack()
+if not kind:
+    kind = module_kind(root)
 summary["kind"] = kind
 if kind == "missing":
+    finish()
+if kind == "manifest":
+    measure_manifest(bound_pack)
+    finish()
+if not kind:
+    failures.append("no Pack and no module marker; gate metrics does not assume a language")
     finish()
 if kind != "java":
     measure_alt(kind)

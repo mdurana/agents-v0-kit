@@ -108,7 +108,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | DTOs only, no entities at edge | A backend-engineer; S implement-service; R api-and-events; G Build gate |
 | Pack `migrationTool` (Pack `java`: Flyway) | A backend-engineer; S implement-service; G Build gate |
 | Log sanitization the way `backend.mdc` says (Pack `java`: `Encode.forJava`); §12 security audit events | A backend-engineer; S implement-service; A code-reviewer; S pr-review; R security-baseline §12 |
-| No empty catch; domain exceptions via `@ControllerAdvice` | A backend-engineer; S implement-service; A code-reviewer; S pr-review |
+| No empty catch; domain exceptions the way the pack's `backend.mdc` says (Pack `java`: `@ControllerAdvice`) | A backend-engineer; S implement-service; A code-reviewer; S pr-review |
 | Methods ≤ 30 lines (target ≤ 20), ≤ 4 parameters, complexity ≤ 15 | A backend-engineer, code-reviewer; S implement-service, pr-review; G Build/Verify gate |
 | JPA (`@Enumerated(STRING)`, `@Version`, avoid N+1) | A backend-engineer; S implement-service; G Build gate |
 | Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-service; G Build gate |
@@ -228,7 +228,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Architecture owners review `docs/agents-v0/design/`, `docs/agents-v0/adr/`, and the `openapi/` catalog | CODEOWNERS |
 | The catalog merge is proven: the catalog contains every operation and component of the approved draft | C /v0-build; S implement-*; CI .agents-v0/ci/check-openapi.sh merged |
 | Build plan is real: one row per AC, each done row names an existing test with a red card first | C /v0-build; S implement-*; CI .agents-v0/ci/check-build-plan.sh (via .agents-v0/ci/check-delivery-linkage.sh) |
-| No new Spring endpoint without a security annotation (`@PermitAll` marks a public one) | C /v0-build; S implement-service; CI .agents-v0/ci/check-endpoint-auth.sh |
+| No new endpoint without the pack's auth marker (Pack `java`: a security annotation; `@PermitAll` marks a public one) | C /v0-build; S implement-service; CI .agents-v0/ci/check-endpoint-auth.sh |
 | The frontend calls only operations the catalog lists | C /v0-build; S implement-frontend; CI .agents-v0/ci/check-frontend-calls.sh |
 | Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /v0-build; `maven/contract-conformance.xml` |
 | `/v0-deliver` runs the phase commands in order and holds no phase detail of its own; resumes from the state file; a reopened phase is marked `Re-opened` until re-approved. P0-A skips `/v0-intake` and `/v0-design` and stops once at Release. Build copies the milestone story. A no-contract story does not stop at Design | C /v0-deliver; A orchestrator; R workflow-orchestration |

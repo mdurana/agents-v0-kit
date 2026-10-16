@@ -30,11 +30,11 @@
 
 ## Layout
 
-Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that is the only Spring module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `.agents-v0/ci/resolve-layout.sh` reads the two-column rows below.
+Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that directory is the only service module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `.agents-v0/ci/resolve-layout.sh` reads the two-column rows below.
 
 | Profile | When | Code roots |
 |---------|------|------------|
-| service | Spring Boot only | `app/backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. Packages: `api`, `service`, `repository`, `domain`. BFF-only: `app/bff/` instead |
+| service | The bound pack | `app/backend/`. Pack `java` uses `src/main/java`, `src/main/resources/db/migration`, `src/test/java`, packages `api`, `service`, `repository`, `domain`. BFF-only: `app/bff/` instead |
 | ui | The pack's `ui` id. The React example uses `src/pages/`, `src/features/`, `src/components/`, `src/services/api`, `src/store/` | `app/frontend/` |
 | app | Service and UI in one repo | `app/backend/` and `app/frontend/`. `app/bff/` only when a BFF is in scope. `docs/`, `openapi/` at the repo root |
 

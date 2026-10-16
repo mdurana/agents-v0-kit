@@ -4,10 +4,11 @@
 # Usage: eval "$(sh .agents-v0/ci/resolve-layout.sh [docs/agents-v0/project-profile.md])"
 #
 # Reads the two-column "This repo" rows under ## Layout. When Profile is
-# service, ui, or app, those rows win. Otherwise detect pom.xml / package.json
+# service, ui, or app, those rows win. Otherwise detect a pack marker
+# (pom.xml, Gradle, *.csproj, go.mod, pyproject.toml, or a Nest/Express package.json)
 # under app/backend/, app/frontend/, and app/bff/ (else backend/, frontend/, and bff/),
-# and JVM modules under app/services/*/ (else services/*/). A root
-# pom.xml or package.json is a legacy tree only; greenfield profiles never put
+# and the same markers under app/services/*/ (else services/*/). A root
+# marker or package.json is a legacy tree only; greenfield profiles never put
 # source at the repo root.
 # Output variables: LAYOUT_PROFILE, BACKEND_ROOT, FRONTEND_ROOT, BFF_ROOT, and
 # SERVICE_ROOTS (space-separated; one entry per deployable service when the repo
@@ -103,6 +104,24 @@ has_jvm() {
   [ -f "$dir/pom.xml" ] || [ -f "$dir/build.gradle" ] || [ -f "$dir/build.gradle.kts" ]
 }
 
+# A backend module is any pack detect marker, not only a JVM build file.
+has_marker() {
+  dir="$1"
+  [ -d "$dir" ] || return 1
+  if has_jvm "$dir"; then
+    return 0
+  fi
+  [ -f "$dir/go.mod" ] && return 0
+  [ -f "$dir/pyproject.toml" ] && return 0
+  if find "$dir" -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) -print -quit 2>/dev/null | grep -q .; then
+    return 0
+  fi
+  if [ -f "$dir/package.json" ] && grep -Eq '"(@nestjs/core|express)"' "$dir/package.json"; then
+    return 0
+  fi
+  return 1
+}
+
 normalize() {
   v="$1"
   if is_na "$v"; then
@@ -138,7 +157,7 @@ if [ -n "$profile" ]; then
     ui) [ -n "$frontend" ] || frontend="frontend" ;;
     app)
       if [ -z "$backend" ] && [ -z "$services" ]; then
-        if has_jvm "app/backend" || ! has_jvm "backend"; then
+        if has_marker "app/backend" || ! has_marker "backend"; then
           backend="app/backend"
         else
           backend="backend"
@@ -172,18 +191,18 @@ collect_services() {
   for d in "$parent"/*/; do
     [ -d "$d" ] || continue
     mod="${d%/}"
-    if has_jvm "$mod"; then
+    if has_marker "$mod"; then
       auto_services="${auto_services:+$auto_services }$mod"
     fi
   done
 }
 
 jvm_at() {
-  if has_jvm "app/$1"; then
+  if has_marker "app/$1"; then
     printf 'app/%s' "$1"
     return 0
   fi
-  if has_jvm "$1"; then
+  if has_marker "$1"; then
     printf '%s' "$1"
     return 0
   fi
@@ -229,8 +248,8 @@ elif [ -n "$frontend" ]; then
   profile="ui"
 elif [ -n "$bff" ]; then
   profile="service"
-elif has_jvm . || [ -f package.json ]; then
-  if has_jvm .; then backend="."; fi
+elif has_marker . || [ -f package.json ]; then
+  if has_marker .; then backend="."; fi
   if [ -f package.json ]; then frontend="."; fi
 fi
 

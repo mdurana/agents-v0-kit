@@ -2,5 +2,10 @@
   "id": "react",
   "stack": "React 19, TypeScript 5.9, Vite 7",
   "verify": "npm run verify",
-  "verifyFast": "npm test"
+  "verifyFast": "npm test",
+  "tests": "Vitest 3",
+  "layout": "src/pages/, src/features/, src/components/{layout,common}, src/services/api, src/store/slices",
+  "coverage": {"path": "coverage/coverage-summary.json", "format": "jest-summary"},
+  "hostChecks": ["node", "npm"],
+  "hostPorts": ["nodejs22", "npm11"]
 }

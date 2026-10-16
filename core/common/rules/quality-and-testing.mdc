@@ -22,9 +22,9 @@ alwaysApply: false
 4. No new high/critical CVEs without documented exception (Pack `java`: OWASP Dependency-Check; other packs: `cve-report.json`).
 5. Lockfiles are committed. GitLab secret detection runs on the merge request; a committed secret fails the pipeline. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
 
-## Tooling (Java pipeline)
+## Tooling
 
-JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check — wire before heavy coding per `docs/agents-v0/quality-gates-engineering-principles.md`.
+Wire the coverage, test, and CVE reports named in the bound pack's `pack.json` before heavy coding (`docs/agents-v0/quality-gates-engineering-principles.md`). Pack `java` wires JaCoCo, Checkstyle, SpotBugs, and OWASP Dependency-Check on `verify`.
 
 ## Coverage targets
 
@@ -36,21 +36,9 @@ JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check — wire before 
 
 **Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
 
-## Complexity and size (Java)
+## Complexity and size
 
-| Metric | Limit |
-|--------|-------|
-| Cognitive complexity | ≤ **15** / method |
-| Method length | target ≤ **20**, max ≤ **30** lines |
-| Class size | < ~300 lines |
-| Duplication | within Sonar gate (< ~3%) |
-
-Extract nested logic:
-
-```java
-// BAD: if (a) { if (b) { if (c) { ... } } }
-// GOOD: if (a && b && c) { handleCoreCase(); }
-```
+Language limits live in the bound pack's `backend.mdc`. Pack `java`: cognitive complexity ≤ **15** per method, methods ≤ **30** lines, classes under ~300 lines, duplication inside the Sonar gate. Extract nested conditionals into a named function.
 
 ## Test standards
 

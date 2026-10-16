@@ -21,7 +21,7 @@ Greenfield repos use one profile. Record it under **Layout** in `docs/agents-v0/
 
 The repo root holds `docs/agents-v0/`, `.agents-v0/ci/`, and `openapi/`. No root `src/`, `pom.xml`, or `package.json`. `/v0-onboard` may record `.` when a legacy repo already has source at the root.
 
-**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `app/services/order, app/services/inventory`) instead of one `Backend root`; `app/services/*/` JVM modules are auto-detected. Each root is its own build and database, scanned by CI (`.agents-v0/ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
+**Several services in one repo.** List them in `Service roots` (comma-separated, relative: `app/services/order, app/services/inventory`) instead of one `Backend root`. `app/services/*/` directories that contain a pack detect marker are auto-detected. Each root is its own build and database, scanned by CI (`.agents-v0/ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). The Service verify command is the pack's `serviceVerify`, with `{root}` replaced by that directory. CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
 
 The `java` example uses packages `api`, `service`, `repository`, and `domain`. Any other pack uses the layout in its `pack.json` and rules. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands are the profile rows, run inside the code root. CI reads the Layout table via `.agents-v0/ci/resolve-layout.sh`.
 
@@ -60,9 +60,8 @@ Authoritative refs (repo paths win if they differ): `docs/agents-v0/security-sta
 
 ## BFF and frontends
 
-- **BFF:** aggregation, auth/session handoff, safe GET caching, rate limits, DTO mapping — **thin**; domain rules in domain services.
-- Use **Spring MVC** or **WebFlux** per existing service — do not switch reactive/MVC without an architectural decision.
-- **Frontend:** React default per `frontend-web.mdc`; API client, correlation + trace headers, 401 handling.
+- **BFF:** aggregation, auth/session handoff, safe GET caching, rate limits, DTO mapping — **thin**; domain rules in domain services. The HTTP stack is the bound pack's.
+- **Frontend:** the bound pack's `ui` id. API client, correlation + trace headers, 401 handling. The React example is `frontend-web.mdc`.
 
 ## OMS / order domain (when relevant)
 

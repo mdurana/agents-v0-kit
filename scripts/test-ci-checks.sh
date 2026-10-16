@@ -585,6 +585,56 @@ expect_pass "gate metrics: trx and cobertura pass" "$tmp" sh "$CI/check-gate-met
 printf '%s\n' '{"dependencies":[{"vulnerabilities":[{"name":"CVE-2","severity":"HIGH"}]}]}' > "$m/cve-report.json"
 expect_fail "gate metrics: a pack cve-report.json HIGH fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
 
+m="$tmp/gate-empty"
+mkdir -p "$m"
+if (cd "$tmp" && sh "$CI/check-gate-metrics.sh" "$m" 2>&1) | grep -Fq "does not assume a language"; then
+  pass "gate metrics: no marker does not assume a language"
+else
+  fail "gate metrics: no marker does not assume a language"
+fi
+
+repo="$tmp/gate-rust-repo"
+mod="$repo/service"
+mkdir -p "$repo/docs/agents-v0" "$repo/.agents-v0/packs/rust" "$mod"
+cat > "$repo/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | rust |
+EOF
+cat > "$repo/.agents-v0/packs/rust/pack.json" <<'EOF'
+{
+  "id": "rust",
+  "verify": "cargo test",
+  "verifyFast": "cargo test",
+  "coverage": {"path": "coverage.xml", "format": "cobertura"},
+  "testsReport": {"path": "junit.xml", "format": "junit"},
+  "cve": {"path": "cve-report.json"},
+  "authMarker": "auth",
+  "publicMarker": "public",
+  "migrationTool": "sqlx",
+  "ciImage": "rust:1",
+  "endpoints": [{"suffix": ".rs", "mapping": "#\\[(get)\\]\\(\"([^\"]+)\"\\)", "security": "auth", "name": "rust"}]
+}
+EOF
+printf '<testsuite tests="2" failures="0" errors="0" skipped="0"/>\n' > "$mod/junit.xml"
+printf '<coverage line-rate="0.90"/>\n' > "$mod/coverage.xml"
+expect_pass "gate metrics: a rust pack reads its own junit and cobertura paths" "$repo" sh "$CI/check-gate-metrics.sh" service
+rm -f "$mod/junit.xml"
+printf '<testsuite tests="2" failures="0" errors="0" skipped="0"/>\n' > "$mod/pytest-report.xml"
+expect_fail "gate metrics: a rust pack does not read the python report path" "$repo" sh "$CI/check-gate-metrics.sh" service
+
+d="$tmp/roots-go"
+mkdir -p "$d/app/backend"
+printf 'module example.com/orders\n\ngo 1.26\n' > "$d/app/backend/go.mod"
+expect_pass "layout roots: a go.mod backend is a backend root" "$d" sh "$CI/check-layout-roots.sh"
+if (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "BACKEND_ROOT='app/backend'"; then
+  pass "resolve-layout: app/backend/go.mod resolves as the backend root"
+else
+  fail "resolve-layout: app/backend/go.mod resolves as the backend root"
+fi
+
 # activate-stack-pack.sh
 act="$KIT/templates/.agents-v0/scripts/activate-stack-pack.sh"
 d="$tmp/activate-java"
@@ -886,6 +936,7 @@ cat > "$rust/pack.json" <<'EOF'
   "verifyFast": "cargo test",
   "coverage": {"path": "coverage.xml", "format": "cobertura"},
   "testsReport": {"path": "junit.xml", "format": "junit"},
+  "cve": {"path": "cve-report.json"},
   "authMarker": "auth",
   "publicMarker": "public",
   "migrationTool": "sqlx",

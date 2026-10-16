@@ -1,10 +1,10 @@
 ---
-description: React (default) and SvelteKit (existing repos) — structure, data loading, forms, auth client, a11y, XSS-safe content
+description: React UI pack — structure, data loading, forms, auth client, a11y, XSS-safe content. Another ui id follows its own pack.json.
 globs: "**/*.svelte,**/*.tsx,**/routes/**/+page.svelte,**/routes/**/+layout.svelte,**/routes/**/+error.svelte,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+page.ts,**/routes/**/+layout.ts,**/routes/**/+server.ts"
 alwaysApply: false
 ---
 
-# Frontend web (React default)
+# Frontend web (React pack)
 
 Testing: **`quality-and-testing.mdc`**. Security headers/XSS policy: **`security-baseline.mdc`**.
 

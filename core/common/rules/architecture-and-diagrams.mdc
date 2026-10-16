@@ -48,36 +48,24 @@ Service-specific ADRs override this file. Implementation: `backend.mdc`, `fronte
 
 ---
 
-## Backend (Java Spring Boot)
+## Backend
 
-This table is the `java` example. Any other `Pack` follows that pack's `pack.json` and rule.
-
-| Area | Mandatory |
-|------|-----------|
-| Stack | Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI 3.0, JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test |
-| Layers | Controllers (`@Valid`, DTOs) → Service → Repository → Domain |
-| Domain | Value objects; aggregates; domain events; repository ports in domain |
-| Security | JWT, SecurityContext, MDC correlation; permit `/health`, `/actuator`, `/v3/api-docs`, `/swagger-ui`; protect `/api/v1/**` |
-| Resilience | Resilience4j on outbound calls |
+The bound pack's `backend.mdc` and `pack.json` name the stack, layers, auth marker, and migration tool. Pack `java` is Java 21, Spring Boot, Spring Security, Flyway, and ArchUnit. Do not copy that stack into another pack.
 
 ## BFF (Backend-for-Frontend)
 
+The BFF uses the same pack as the backend. Its implement skill is `implement-bff`.
+
 | Area | Mandatory |
 |------|-----------|
-| Stack | Spring Boot 4.1.1, Spring MVC, Spring Security, Redis, Resilience4j, OpenAPI 3.0 |
 | Role | Aggregation, UI DTOs, auth/session edge, GET cache, rate limit, unified errors |
-| Clients | WebClient/RestClient: ~10s timeout, retry, breaker; `X-Correlation-ID`; service auth |
-| Pipeline | Auth → rate limit → cache (GET) / invalidation (writes) → validation → controller |
-| Rules | Thin BFF; domain logic in backend services; version BFF API independently |
+| Clients | Timeout, retry, and breaker on outbound calls; `X-Correlation-ID`; service auth |
+| Pipeline | Auth → rate limit → cache (GET) / invalidation (writes) → validation → handler |
+| Rules | Thin BFF; domain logic in backend services; version the BFF API independently |
 
-## Frontend stacks (summary)
+## Frontend
 
-| Default (React) | Existing (SvelteKit) |
-|-----------------|----------------------|
-| React 19, TypeScript 5.9, Vite 7, Vitest 3, Redux/Zustand, React Query, Router v6, RHF + Zod | Only when the repo already uses it: TS, Vite, stores, load + fetch |
-| Vitest + Testing Library | Vitest + Playwright for critical paths |
-
-Detail: `frontend-web.mdc`.
+The UI is the bound pack's `ui` id. Read that UI pack's `layout`, `verify`, and `coverage`. The React example is `core/ui/react` and `frontend-web.mdc`.
 
 ## Integration and composition
 

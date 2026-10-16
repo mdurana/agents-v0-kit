@@ -99,21 +99,28 @@ def errors_of(data, kind):
     """Return a list of reasons the manifest is not complete."""
     missing = []
     if kind == "ui":
-        for key in ("id", "stack", "verify", "verifyFast"):
+        for key in ("id", "stack", "verify", "verifyFast", "layout"):
             if not str(data.get(key) or "").strip():
                 missing.append(key)
+        coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+        if not coverage.get("path") or not coverage.get("format"):
+            missing.append("coverage.path")
+            missing.append("coverage.format")
         return missing
     for key in REQUIRED:
         if key not in data or data.get(key) in ("", None, [], {}):
             missing.append(key)
     coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
     report = data.get("testsReport") if isinstance(data.get("testsReport"), dict) else {}
+    cve = data.get("cve") if isinstance(data.get("cve"), dict) else {}
     if not coverage.get("path") or not coverage.get("format"):
         missing.append("coverage.path")
         missing.append("coverage.format")
     if not report.get("path") or not report.get("format"):
         missing.append("testsReport.path")
         missing.append("testsReport.format")
+    if not cve.get("path"):
+        missing.append("cve.path")
     endpoints = data.get("endpoints") if isinstance(data.get("endpoints"), list) else []
     if not endpoints:
         missing.append("endpoints")
@@ -197,6 +204,60 @@ def _basename_match(name, pattern):
     if pattern.startswith("*."):
         return name.endswith(pattern[1:])
     return name == pattern
+
+
+def marker_roots(root=".", max_depth=4):
+    """Relative directories that contain a backend pack detect marker.
+
+    A React package.json is not a marker. node_modules, build output, and
+    .agents-v0 are skipped. max_depth counts separators under root.
+    """
+    skip = {
+        ".git", "node_modules", "target", "dist", "build", ".next", "bin", "obj",
+        ".venv", "venv", "__pycache__", "kit",
+    }
+    manifests = []
+    for pack_id in all_ids():
+        data = load(pack_id)
+        if data and data.get("detect"):
+            manifests.append(data)
+    if not manifests or not os.path.isdir(root):
+        return []
+    found = []
+    root_abs = os.path.abspath(root)
+    for dirpath, dirnames, filenames in os.walk(root_abs):
+        dirnames[:] = [name for name in dirnames if name not in skip and not name.startswith(".agents")]
+        rel = os.path.relpath(dirpath, root_abs)
+        depth = 0 if rel == "." else rel.count(os.sep) + 1
+        if depth > max_depth:
+            dirnames[:] = []
+            continue
+        hit = False
+        for name in filenames:
+            for data in manifests:
+                patterns = data.get("detect") or []
+                if not any(_basename_match(name, pattern) for pattern in patterns):
+                    continue
+                deps = data.get("detectDeps") or []
+                if deps:
+                    if name != "package.json":
+                        continue
+                    try:
+                        payload = json.load(open(os.path.join(dirpath, name), encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        continue
+                    have = {}
+                    for key in ("dependencies", "devDependencies"):
+                        have.update(payload.get(key) or {})
+                    if not any(dep in have for dep in deps):
+                        continue
+                hit = True
+                break
+            if hit:
+                break
+        if hit:
+            found.append("." if rel == "." else rel.replace(os.sep, "/"))
+    return found
 
 
 def detect(root="."):
