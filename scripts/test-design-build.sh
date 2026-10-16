@@ -472,6 +472,14 @@ public class OrderController {
 EOF
 (cd "$e" && git init -q && git add -A && git_c commit -q -m base)
 ebase="$(cd "$e" && git rev-parse HEAD)"
+mkdir -p "$e/docs/agents-v0"
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | java |
+EOF
 run pass "endpoint auth: an existing unannotated endpoint is not a new one" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 cat > "$e/src/main/java/com/acme/OrderController.java" <<'EOF'
 package com.acme;

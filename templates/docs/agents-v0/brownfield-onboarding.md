@@ -7,6 +7,8 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 
 ```bash
 ./scripts/install.sh /path/to/existing-repo
+# Pin the kit commit instead of copying kit files:
+# ./scripts/install.sh --link --commit <sha> --url <kit-git-url> /path/to/existing-repo
 # Optional Maven/docker/OpenAPI starters (copies templates/ except templates/app/):
 # ./scripts/install.sh --with-starters /path/to/existing-repo
 ```
@@ -30,12 +32,12 @@ codebase as it is today, with every statement cited to code or marked `UNVERIFIE
 | Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `ci/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
 | As-is architecture, network, context map, inherited decisions, flows you name | `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/adr/0000-inherited-decisions.md`, `docs/agents-v0/diagrams/sequences/` |
 
-When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. A `Pack` cell that already names `java`, `dotnet`, `node`, `python`, or `go` stays. Two backend markers stop so a person can choose. A later roadmap or architecture does not replace that pack.
+When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. No marker asks the person to name the pack id and to write its `pack.json`. Two markers stop so a person can choose. A `Pack` cell that already names an id stays, including an id that is not a kit example. A later roadmap or architecture does not replace that pack. Set `CI_PACK_IMAGE` to that pack's `ciImage`.
 
 Checks you can run yourself: `sh .agents-v0/scripts/discover-codebase.sh` (refresh the inventories) and `sh .agents-v0/scripts/check-onboarding-docs.sh` (every citation resolves; no template line left; every document names its commit). Lists are capped (`DISCOVER_MAX`, default 500) and say so when they are cut. No secret value is ever written; configuration appears by key name.
 Record the directory layout in the profile **This repo** table (Profile `service`, `ui`, or `app`, or the discovered roots when the tree matches none of those). Do not move source onto a greenfield default.
 
-Org rules are installed to `.cursor/rules/org/` and refreshed on `install.sh --update`.
+A copy install puts org rules in `.cursor/rules/org/` and refreshes them on `install.sh --update`. A `--link` install symlinks those rules to the pinned kit commit; a kit change reaches the project when the pin moves.
 
 The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch and the `delivery-approval` environment. Scope `GITLAB_TOKEN` (`read_api`, masked) to that environment only, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Optional: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"` (git runs only `hooks/pre-push`) runs the local delivery gate when the branch name matches `docs/agents-v0/requirements/<feature>.md`. See [greenfield-onboarding.md](greenfield-onboarding.md).
 

@@ -1,0 +1,39 @@
+{
+  "id": "go",
+  "backend": "Go 1.26, Gin",
+  "http": "Gin handlers",
+  "security": "Gin auth middleware",
+  "database": "PostgreSQL 15, golang-migrate",
+  "tests": "go test",
+  "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
+  "verify": "go test ./... -coverprofile=coverage.out -json > go-test.json",
+  "verifyFast": "go test ./...",
+  "coverage": {"path": "coverage.out", "format": "go-cover"},
+  "testsReport": {"path": "go-test.json", "format": "go-json"},
+  "cve": {"path": "cve-report.json"},
+  "diffCoverage": {"glob": "*.go", "sourceRoot": ""},
+  "testFile": "_test\\.go$",
+  "migrationTool": "golang-migrate",
+  "authMarker": "Auth",
+  "publicMarker": "public",
+  "ciImage": "golang:1.26",
+  "dockerfile": "docker/Dockerfile.go",
+  "detect": ["go.mod"],
+  "ui": "react",
+  "endpoints": [
+    {
+      "suffix": ".go",
+      "marker": "gin\\.|chi\\.NewRouter",
+      "mapping": "\\.(GET|POST|PUT|PATCH|DELETE)\\(\\s*\"([^\"]+)\"",
+      "security": "Auth|middleware",
+      "name": "go"
+    },
+    {
+      "suffix": ".go",
+      "marker": "http\\.HandleFunc",
+      "mapping": "http\\.HandleFunc\\(\\s*\"([^\"]+)\"",
+      "security": "Auth|middleware",
+      "name": "go-stdlib"
+    }
+  ]
+}

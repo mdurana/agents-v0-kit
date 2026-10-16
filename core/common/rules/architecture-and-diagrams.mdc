@@ -50,7 +50,7 @@ Service-specific ADRs override this file. Implementation: `backend.mdc`, `fronte
 
 ## Backend (Java Spring Boot)
 
-This table is the `java` pack. When `Pack` is `dotnet`, `node`, `python`, or `go`, follow that pack's `PACK.md` and rule instead.
+This table is the `java` example. Any other `Pack` follows that pack's `pack.json` and rule.
 
 | Area | Mandatory |
 |------|-----------|

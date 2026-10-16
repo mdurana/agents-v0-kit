@@ -17,8 +17,8 @@ alwaysApply: false
 ## Workflow
 
 1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`).
-2. Before merge: the profile Backend verify command (for Pack `java`, **`./mvnw -B clean verify`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `PACK.md`. The fast loop does not replace this gate. The coverage table below applies to every pack.
-3. Coverage gaps: the report named in the pack `PACK.md`. Pack `java` is `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
+2. Before merge: the profile Backend verify command (the `java` example is **`./mvnw -B clean verify`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `pack.json`. The fast loop does not replace this gate. The coverage table below applies to every pack.
+3. Coverage gaps: the report named in the pack `pack.json`. The `java` example is `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without documented exception (Pack `java`: OWASP Dependency-Check; other packs: `cve-report.json`).
 5. Lockfiles are committed. GitLab secret detection runs on the merge request; a committed secret fails the pipeline. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
 

@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Stack (active pack)
 
-The `Pack` row in `docs/agents-v0/project-profile.md` is the backend: `java`, `dotnet`, `node`, `python`, or `go`. Versions, layers, auth, migrations, and verify commands are in `.agents-v0/packs/<pack>/PACK.md`. `/v0-architecture` records `Pack:` on the pattern ADR and runs `sh .agents-v0/scripts/activate-stack-pack.sh`. Any other stack stops before `/v0-plan`. `/v0-onboard` records the pack already on disk and does not replace it. P0-A uses `java`. The UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it. OpenAPI 3.0 uses `/api/v1/`. Events and cache only when the ADR justifies them. The directory table below is the java layout; another pack uses the layout in its `PACK.md`.
+The `Pack` row in `docs/agents-v0/project-profile.md` is the backend pack id. Any id is valid when `.agents-v0/packs/<id>/pack.json` is complete (verify command, auth marker, report formats, endpoint scanner, and service skill). Kit examples are not a closed list. `/v0-architecture` records `Pack:` on the pattern ADR and runs `sh .agents-v0/scripts/activate-stack-pack.sh`. An empty Pack stops the program. `/v0-onboard` does not replace a Pack that is already set. The UI is that pack's `ui` id. A kit pin in `docs/agents-v0/kit-pin` is the kit commit; kit files are not copied into the project. OpenAPI 3.0 uses `/api/v1/`. Events and cache only when the ADR justifies them. The directory table below is one example layout; the pack manifest names its own.
 
 ## Directory profiles
 
@@ -15,15 +15,15 @@ Greenfield repos use one profile. Record it under **Layout** in `docs/agents-v0/
 
 | Profile | When | Code roots |
 |---------|------|------------|
-| `service` | Pack `java` | `app/backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. A BFF-only repo uses `app/bff/` instead of `app/backend/`. Other packs use the layout in their PACK.md |
-| `ui` | React default; SvelteKit only if already used | `app/frontend/`. React: `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices`. Existing SvelteKit: `src/routes/`, `src/lib/` |
+| `service` | The bound pack | The layout that pack's `pack.json` and rules name. The `java` example uses `app/backend/`: `src/main/java`, `src/main/resources/db/migration`, `src/test/java`. A BFF-only repo uses `app/bff/` instead of `app/backend/` |
+| `ui` | The pack's `ui` id | `app/frontend/`. The React example uses `src/pages/`, `src/features/`, `src/components/{layout,common}`, `src/services/api`, `src/store/slices` |
 | `app` | Service and UI in one repo | `app/backend/` and `app/frontend/` (same trees as `service` and `ui`). Add `app/bff/` only when a BFF is in scope |
 
 The repo root holds `docs/`, `ci/`, and `openapi/`. No root `src/`, `pom.xml`, or `package.json`. `/v0-onboard` may record `.` when a legacy repo already has source at the root.
 
 **Several services in one repo.** List them in `Service roots` (comma-separated, relative: `app/services/order, app/services/inventory`) instead of one `Backend root`; `app/services/*/` JVM modules are also auto-detected. Each root is its own Maven module with its own database, built and scanned by CI (`ci/resolve-layout.sh` prints `SERVICE_ROOTS`) and owns one catalog, `openapi/<service>-v1.yaml` (`<service>` = last segment of the root). The requirements artifact records `Service root:`. A story that touches two services is two stories plus an integration story (`program-planning`). Maven config paths: `maven/quality-plugins.xml`. CI does not cross git repositories; list other repos in `docs/agents-v0/workspace.manifest.json`.
 
-Pack `java` uses packages `api`, `service`, `repository`, and `domain`. Other packs use the layout in their PACK.md. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands are the profile rows, run inside the code root. CI reads the Layout table via `ci/resolve-layout.sh`.
+The `java` example uses packages `api`, `service`, `repository`, and `domain`. Any other pack uses the layout in its `pack.json` and rules. New OpenAPI contracts default to `openapi/api-v1.yaml`. That file is the org catalog. Design drafts the feature fragment at `docs/agents-v0/design/<feature>/openapi.yaml`. Build merges the approved fragment into the catalog before implementation (`workflow-orchestration.mdc`). Verify commands are the profile rows, run inside the code root. CI reads the Layout table via `ci/resolve-layout.sh`.
 
 ## Cross-cutting (all services)
 

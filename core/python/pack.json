@@ -1,0 +1,39 @@
+{
+  "id": "python",
+  "backend": "Python 3.13, FastAPI, Pydantic v2",
+  "http": "FastAPI APIRouter",
+  "security": "FastAPI security dependencies",
+  "database": "PostgreSQL 15, SQLAlchemy 2, Alembic",
+  "tests": "pytest",
+  "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
+  "verify": "python -m pytest --junitxml=pytest-report.xml --cov --cov-report=xml:coverage.xml",
+  "verifyFast": "python -m pytest -q",
+  "coverage": {"path": "coverage.xml", "format": "cobertura"},
+  "testsReport": {"path": "pytest-report.xml", "format": "junit"},
+  "cve": {"path": "cve-report.json"},
+  "diffCoverage": {"glob": "*.py", "sourceRoot": ""},
+  "testFile": "(^|/)test_[^/]+\\.py$",
+  "migrationTool": "Alembic",
+  "authMarker": "Depends(",
+  "publicMarker": "public",
+  "ciImage": "python:3.13-slim",
+  "dockerfile": "docker/Dockerfile.python",
+  "detect": ["pyproject.toml"],
+  "ui": "react",
+  "endpoints": [
+    {
+      "suffix": ".py",
+      "marker": "APIRouter|FastAPI\\(",
+      "mapping": "@(?:router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "security": "Depends\\(|require_role",
+      "name": "fastapi"
+    },
+    {
+      "suffix": ".py",
+      "marker": "urlpatterns",
+      "mapping": "\\bpath\\(\\s*[\"']([^\"']+)",
+      "security": "login_required|permission_classes|IsAuthenticated",
+      "name": "django"
+    }
+  ]
+}

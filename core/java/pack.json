@@ -1,0 +1,26 @@
+{
+  "id": "java",
+  "backend": "Java 21, Spring Boot 4.1.1, Maven wrapper",
+  "http": "Spring MVC, embedded Tomcat 11.0.26",
+  "security": "Spring Security",
+  "database": "PostgreSQL 15, Flyway",
+  "tests": "JUnit (spring-boot-starter-test), ArchUnit 1.4.2, H2 test profile",
+  "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
+  "verify": "cd app/backend && ./mvnw -B clean verify",
+  "verifyFast": "cd app/backend && ./mvnw -B clean verify -P!ci-security",
+  "coverage": {"path": "target/site/jacoco/jacoco.xml", "format": "jacoco"},
+  "testsReport": {"path": "target/surefire-reports/TEST-*.xml", "format": "junit"},
+  "cve": {"path": "target/dependency-check-report.json"},
+  "diffCoverage": {"glob": "*.java", "sourceRoot": "src/main/java"},
+  "testFile": "(Test|Tests|IT)\\.java$",
+  "migrationTool": "Flyway",
+  "authMarker": "@PreAuthorize",
+  "publicMarker": "@PreAuthorize(\"permitAll()\")",
+  "ciImage": "eclipse-temurin:21-jdk",
+  "dockerfile": "docker/Dockerfile.spring-boot",
+  "detect": ["pom.xml"],
+  "ui": "react",
+  "endpoints": [
+    {"suffix": ".java", "parser": "spring", "name": "java"}
+  ]
+}

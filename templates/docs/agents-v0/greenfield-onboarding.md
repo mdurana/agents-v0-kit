@@ -7,16 +7,16 @@ delivery kit and **incremental** milestone delivery (P0 → P5).
 
 **Preferred:** create an empty git repo (no application source yet). The kit bundles a
 P0 codebase archive (`templates/app/p0-platform-skeleton.tar.gz`) that matches the
-`java` pack — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
+`java` example — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
 PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only.
-A program that is not this skeleton chooses `java`, `dotnet`, `node`, `python`, or `go` in `/v0-architecture`.
+A program names its stack on the discovery `Stack preference:` line. `/v0-architecture` writes `.agents-v0/packs/<id>/pack.json` for that id. The id does not have to be one of the example packs.
 
 **Fallback** when you must use an external generator:
 
 | Profile | Typical bootstrap |
 |---------|-------------------|
 | `service` | [start.spring.io](https://start.spring.io) or internal archetype with `baseDir=app/backend` |
-| `ui` | React + Vite under `app/frontend/` (SvelteKit only when continuing an existing SvelteKit codebase) |
+| `ui` | The pack's UI under `app/frontend/`. The React example is Vite. |
 | `app` | Backend under `app/backend/` and UI under `app/frontend/` |
 
 Do not put `src/`, `pom.xml`, or `package.json` at the repo root. `docs/`, `ci/`, and `openapi/` stay there.
@@ -43,7 +43,15 @@ Repack the archive after editing `templates/app/{backend,frontend}`:
 ./scripts/pack-app-template.sh
 ```
 
-During P0 build stories, follow **`scaffold-service`**. Pack `java` or an empty Pack proves the bundled template and does not reinvent the health shell when the archive was used. Another pack copies the Dockerfile and quality snippet named in its `PACK.md` and does not extract the Java archive.
+During P0 build stories, follow that pack's **`scaffold-service`**. The `java` example proves the bundled template and does not reinvent the health shell when the archive was used. Any other pack follows its own scaffold and does not extract the Java archive. An empty Pack stops until `/v0-architecture` writes the manifest.
+
+To keep kit commits out of the project, pin the kit instead of copying it:
+
+```bash
+./scripts/install.sh --link --commit <sha> --url <kit-git-url> /path/to/your-new-repo
+```
+
+`--path` points at a local kit checkout. The pin is `docs/agents-v0/kit-pin`. Set `CI_PACK_IMAGE` to the pack's `ciImage`.
 **Major** cross-cutting changes use **`system-design`** in `/v0-design`.
 
 Manual equivalent:

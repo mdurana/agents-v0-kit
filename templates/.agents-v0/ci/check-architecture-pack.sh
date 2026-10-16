@@ -34,10 +34,14 @@ done
 [ -f "$arch" ] || { printf 'FAIL: architecture file not found: %s\n' "$arch" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
-ARCH="$arch" APPROVED="$approved" python3 - <<'PY'
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ARCH="$arch" APPROVED="$approved" PACKLIB_DIR="$DIR" python3 - <<'PY'
 import os
 import re
 import sys
+
+sys.path.insert(0, os.environ["PACKLIB_DIR"])
+import packlib
 
 arch = os.environ["ARCH"]
 approved = os.environ["APPROVED"] == "1"
@@ -169,7 +173,6 @@ TECH = re.compile(
     r"dotnet|asp\.net|csharp|entity framework|ef core|nodejs|node\.js|node|nestjs|express|typescript|"
     r"python|fastapi|django|pydantic|alembic|golang|gin|chi|go)\b", re.I)
 PACK_LINE = re.compile(r"^Pack:\s*(\S+)\s*$", re.M)
-PACKS = {"java", "dotnet", "node", "python", "go"}
 
 text = read(arch)
 h2 = split_sections(text, 2)
@@ -291,10 +294,20 @@ if body is not None:
             fail(f"{adr}: Status is '{value or '?'}'; the pattern ADR must be Accepted once the architecture row is Approved")
         packs = PACK_LINE.findall(adr_text)
         if not packs:
-            fail(f"{adr}: pattern ADR must record Pack: java, dotnet, node, python, or go")
+            fail(f"{adr}: pattern ADR must record Pack: <id>")
         for pack in packs:
-            if pack not in PACKS:
-                fail(f"{adr}: Pack '{pack}' has no pack; stop before Plan")
+            data = packlib.load(pack)
+            problems = [] if data is None else packlib.errors_of(data, "backend")
+            if data is None or problems:
+                fail(f"{adr}: Pack '{pack}' has no complete manifest; write .agents-v0/packs/{pack}/pack.json before Plan")
+            else:
+                directory = data["dir"]
+                rules = os.path.join(directory, "rules")
+                if not os.path.isdir(rules) or not any(name.endswith(".mdc") for name in os.listdir(rules)):
+                    fail(f"{adr}: Pack '{pack}' has no rules")
+                for skill in ("implement-service", "implement-bff"):
+                    if not os.path.isfile(os.path.join(directory, "skills", skill, "SKILL.md")):
+                        fail(f"{adr}: Pack '{pack}' has no {skill} skill")
     if not adr_paths:
         fail(f"{path}: Options must name the pattern ADR under docs/agents-v0/adr/")
     fitness = split_sections(body, 2).get("fitness functions", "")

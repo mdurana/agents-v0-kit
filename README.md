@@ -1,8 +1,8 @@
 # Agentic Delivery Workflow Kit (agents-v0)
 
-An agentic delivery kit for **Cursor**. One core (`core/`) installs into `.cursor/` via `scripts/install.sh`, with shared gates, approvals, evidence contracts, and CI checks.
+An agentic delivery kit for **Cursor**. `scripts/install.sh` copies the core into a target repo. `scripts/install.sh --link` pins a kit commit in `docs/agents-v0/kit-pin` and symlinks `.cursor` and `.agents-v0/ci` instead of copying them.
 
-The kit helps agents build and maintain enterprise-grade systems — one backend pack (`java`, `dotnet`, `node`, `python`, or `go`) and a React frontend — through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The map of every command, record, and check is [templates/docs/agents-v0/agents-v0-kit.md](templates/docs/agents-v0/agents-v0-kit.md) (installed as `docs/agents-v0/agents-v0-kit.md`). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. Prefer `bootstrap-greenfield.sh --scaffold-app` when Pack is `java` or empty, so the bundled app archive seeds `app/`. Another pack's P0-A follows that pack's scaffold skill and does not extract the archive. Build copies the milestone story, writes the N/A design, and proves that shell. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`).
+The kit helps agents build and maintain enterprise-grade systems through a gated lifecycle: **Roadmap → Architecture → Plan** for a new program, then **Intake → Design → Build → Verify → Release**, with optional `/v0-local-release` after Verify, and **Maintain** feeding back into Verify. The stack is the id in the discovery `Stack preference:` line. The roadmap copies that line and does not install a pack. `/v0-architecture` writes `.agents-v0/packs/<id>/pack.json` and binds it. Any id is valid once that manifest is complete. Example packs under `core/` are not a closed list. The UI is the manifest's `ui` id (`core/ui/react` is the React example). The map of every command, record, and check is [templates/docs/agents-v0/agents-v0-kit.md](templates/docs/agents-v0/agents-v0-kit.md) (installed as `docs/agents-v0/agents-v0-kit.md`). A story with a contract, a UI, or a public route stops at every gate for explicit user approval. P0-A skips Intake and Design and stops once, at Release, unless optional `/v0-local-release` already wrote Intake, Design, Build, and Verify. `bootstrap-greenfield.sh --scaffold-app` extracts the `java` example archive into `app/` only for that example. Another pack's P0-A follows that pack's scaffold skill. An empty `Pack` does not select Java. Build copies the milestone story, writes the N/A design, and proves that shell. A story with no `/api/v1` operation, no UX spec, and no public route pins and continues, unless it is `Material: yes` (a new service, datastore, security boundary, or breaking API); that story still stops at Design. Its Design row is written with the Build approval when the shortcut applies. Approval is never inferred. Evidence is persisted and checked by CI at merge. Delivery uses on-prem GitLab (`.gitlab-ci.yml`, `glab mr create`). Set `CI_PACK_IMAGE` to the pack's `ciImage`.
 
 A feature’s progress is `docs/agents-v0/requirements/<feature>.state.json` (`scripts/sync-feature-state.sh`). `lastApprovedPhase` comes only from an `Approved` row. `activePhase` plus `activeStatus` (`in_progress`, `awaiting_approval`, or `blocked`) is the phase in flight. `/v0-status <feature>` reads that file: `in_progress` or `blocked` runs the same phase again from files already on disk; `awaiting_approval` waits and does not start the next phase. The user names the feature. The newest state file is not assumed to be the one they mean.
 
@@ -15,13 +15,13 @@ Different features may proceed in one checkout only while each writes its own `d
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `AGENTS.md`            | Kit lifecycle summary (reference; Cursor loads rules from `.cursor/rules/`)                                        |
 | `core/common/`         | Lifecycle shared by every pack: commands, agents, rules, skills, hooks, Cursor adapter                            |
-| `core/java/` `core/dotnet/` `core/node/` `core/python/` `core/go/` | Pack agents, rules, skills, auth hook, and starters. Install copies one pack plus `common/` |
+| `core/<id>/` and `core/ui/<id>/` | Example pack manifests, agents, rules, skills, hooks, and starters. A project pack lives in the target at `.agents-v0/packs/<id>/` |
 | `core/common/commands/v0-*.md` | 16 entry points (`/v0-roadmap` … `/v0-deck`) |
 | `core/common/agents/`  | Shared subagents. `backend-engineer` and `bff-engineer` live in the pack. 19 subagents in all |
 | `core/common/skills/` plus each pack's `skills/` | 40 playbooks |
 | `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |
 | `templates/docs/agents-v0/` | Kit reference docs (map, user guide, compliance, model routing); installed to `docs/agents-v0/` in target repos |
-| `scripts/`             | `install.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `scaffold-app-template.sh`, `pack-app-template.sh`, `audit-brownfield-baseline.sh` |
+| `scripts/`             | `install.sh`, `link-project.sh`, `validate-kit.sh`, `bootstrap-greenfield.sh`, `scaffold-app-template.sh`, `pack-app-template.sh`, `audit-brownfield-baseline.sh` |
 
 
 
@@ -58,9 +58,11 @@ Different features may proceed in one checkout only while each writes its own `d
 ## Install
 
 ```bash
-# install into a target repo (minimal templates; default pack java)
+# install into a target repo (minimal templates; seeds the java example into .cursor)
 ./scripts/install.sh /path/to/target-repo
 # or: ./scripts/install.sh --pack dotnet /path/to/target-repo
+# pin the kit instead of copying it (project commits do not include kit files):
+./scripts/install.sh --link --path /path/to/this-kit --commit "$(git rev-parse HEAD)" /path/to/target-repo
 # greenfield / full starters (maven, docker, openapi, …):
 ./scripts/install.sh --with-starters /path/to/target-repo
 # preferred greenfield (kit + P0 app archive under app/):
@@ -76,7 +78,7 @@ Different features may proceed in one checkout only while each writes its own `d
 
 On an Intel Mac, a missing JDK 21, Node, or npm is installed with MacPorts. PyYAML uses the same script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts): `sh .agents-v0/scripts/host-tools-macports.sh` (see `docs/agents-v0/gold-standards.md` after install).
 
-Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`, `ci/endpoint_scan.py`, and `.agents-v0/packs/`. `--update` keeps the profile `Pack` row.
+Seeded only when missing (never clobbered): `README.md` and project templates. Always refreshed on `--update`: `.cursor/` rules, agents, commands, skills, hooks, reference docs, `ci/*.sh`, `ci/endpoint_scan.py`, `ci/packlib.py`, and example packs under `.agents-v0/packs/`. A project pack whose id is not an example is left in place. `--update` keeps the profile `Pack` row. `--link` writes `docs/agents-v0/kit-pin` and symlinks the kit checkout. The profile `Pack` is whatever id has a complete `.agents-v0/packs/<id>/pack.json`. Example manifests under `core/` are not a closed list.
 
 ## Model routing
 

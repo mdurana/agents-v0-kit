@@ -4,7 +4,7 @@ Delivery kit for **Cursor**. Always-on instructions live in `.cursor/rules/` aft
 
 ## Mission
 
-Build and maintain enterprise-grade systems — one backend pack (`java`, `dotnet`, `node`, `python`, or `go`; the bundled skeleton is `java`) and a React frontend — through a gated delivery lifecycle with recorded human approvals.
+Build and maintain enterprise-grade systems — one backend pack the program names, plus the UI pack that manifest records — through a gated delivery lifecycle with recorded human approvals. Example packs live under `core/` (`java`, `dotnet`, `node`, `python`, `go`, and `ui/react`). The bundled skeleton is the `java` example. A project pack is any id with a complete `.agents-v0/packs/<id>/pack.json`.
 
 ## Lifecycle and gates
 

@@ -1,0 +1,47 @@
+{
+  "id": "node",
+  "backend": "Node.js, NestJS, TypeScript 5.9, npm",
+  "http": "NestJS controllers",
+  "security": "Nest guards, Passport JWT",
+  "database": "PostgreSQL 15, TypeORM migrations",
+  "tests": "Jest",
+  "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
+  "verify": "npm test -- --ci --coverage --coverageReporters=json-summary --reporters=default --reporters=jest-junit",
+  "verifyFast": "npm test",
+  "coverage": {"path": "coverage/coverage-summary.json", "format": "jest-summary"},
+  "testsReport": {"path": "junit.xml", "format": "junit"},
+  "cve": {"path": "cve-report.json"},
+  "diffCoverage": {"glob": "*.ts", "sourceRoot": "src"},
+  "testFile": "\\.(test|spec)\\.[A-Za-z]+$",
+  "migrationTool": "TypeORM",
+  "authMarker": "@UseGuards",
+  "publicMarker": "@Public",
+  "ciImage": "node:22-bookworm",
+  "dockerfile": "docker/Dockerfile.nestjs",
+  "detect": ["package.json"],
+  "detectDeps": ["@nestjs/core", "express"],
+  "ui": "react",
+  "endpoints": [
+    {
+      "suffix": ".ts",
+      "marker": "@(Get|Post|Put|Patch|Delete)\\(",
+      "mapping": "@(Get|Post|Put|Patch|Delete)\\(\\s*[\"']?([^\"')]*)",
+      "security": "@UseGuards|@Public",
+      "name": "nest"
+    },
+    {
+      "suffix": ".ts",
+      "marker": "express\\(|Router\\(",
+      "mapping": "\\b(?:app|router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "security": "requireAuth|authenticate|authorize|publicRoute",
+      "name": "express"
+    },
+    {
+      "suffix": ".js",
+      "marker": "express\\(|Router\\(",
+      "mapping": "\\b(?:app|router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "security": "requireAuth|authenticate|authorize|publicRoute",
+      "name": "express-js"
+    }
+  ]
+}

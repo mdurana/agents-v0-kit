@@ -2,7 +2,7 @@
 
 > One-page summary. (`quality-and-testing.mdc`)
 
-- **Before merge:** the profile Backend verify command, or `npm test` for the frontend. Pack `java` is `./mvnw -B clean verify` from the backend root. See `docs/agents-v0/gold-standards.md`.
+- **Before merge:** the profile Backend verify command from the bound `pack.json`, or the UI verify command. The `java` example is `./mvnw -B clean verify` from the backend root. See `docs/agents-v0/gold-standards.md`.
 - **Coverage:** 80% backend / 70% frontend.
 - **Method:** ≤ 30 lines; cognitive complexity ≤ 15.
 - **Class:** < 300 lines.

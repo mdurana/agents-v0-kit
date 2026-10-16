@@ -585,6 +585,15 @@ else
   pass "activate-stack-pack --detect rejects two backend markers"
 fi
 
+link="$tmp/link-project"
+mkdir -p "$link"
+git -C "$link" init -q
+pin_commit="$(git -C "$KIT" rev-parse HEAD)"
+expect_pass "link-project pins a kit checkout" "$link" sh "$KIT/scripts/link-project.sh" --path "$KIT" --commit "$pin_commit" "$link"
+expect_pass "resolve-kit-root prints the pinned kit" "$link" sh .agents-v0/scripts/resolve-kit-root.sh
+[ -L "$link/.agents-v0/ci/packlib.py" ] && pass "link-project symlinks kit CI" || fail "link-project symlinks kit CI"
+[ ! -f "$link/.agents-v0/packs/java/pack.json" ] && pass "link-project does not copy example packs" || fail "link-project does not copy example packs"
+
 # --- check-layout-roots.sh ---------------------------------------------------
 d="$tmp/roots-unknown"
 mkdir -p "$d/app"
@@ -839,6 +848,26 @@ d="$tmp/pack-rust"
 write_pack "$d"
 sedi 's/^Pack: java$/Pack: rust/' "$d/docs/agents-v0/adr/01-pattern.md"
 expect_fail "check-architecture-pack rejects a stack with no pack" "$d" sh "$CI/check-architecture-pack.sh"
+rust="$d/.agents-v0/packs/rust"
+mkdir -p "$rust/rules" "$rust/skills/implement-service" "$rust/skills/implement-bff"
+printf '%s\n' '---' 'description: rust backend' '---' '# backend' > "$rust/rules/backend.mdc"
+printf '%s\n' '# implement-service' > "$rust/skills/implement-service/SKILL.md"
+printf '%s\n' '# implement-bff' > "$rust/skills/implement-bff/SKILL.md"
+cat > "$rust/pack.json" <<'EOF'
+{
+  "id": "rust",
+  "verify": "cargo test",
+  "verifyFast": "cargo test",
+  "coverage": {"path": "coverage.xml", "format": "cobertura"},
+  "testsReport": {"path": "junit.xml", "format": "junit"},
+  "authMarker": "auth",
+  "publicMarker": "public",
+  "migrationTool": "sqlx",
+  "ciImage": "rust:1",
+  "endpoints": [{"suffix": ".rs", "mapping": "#\\[(get|post)\\]\\(\"([^\"]+)\"\\)", "security": "auth|public", "name": "rust"}]
+}
+EOF
+expect_pass "check-architecture-pack accepts a complete custom pack" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-topology"
 write_pack "$d"

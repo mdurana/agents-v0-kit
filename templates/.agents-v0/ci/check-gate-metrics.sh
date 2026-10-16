@@ -41,7 +41,8 @@ fi
 [ -d "$root" ] || { printf 'FAIL: module root not found: %s\n' "$root" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
-GATE_ROOT="$root" python3 - <<'PY'
+DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE_ROOT="$root" PACKLIB_DIR="$DIR" python3 - <<'PY'
 import glob
 import json
 import os
@@ -297,8 +298,38 @@ def finish():
     raise SystemExit(0)
 
 
-kind = module_kind(root)
+def kind_from_pack():
+    """A bound Pack selects the report format. An empty Pack leaves detection alone."""
+    sys.path.insert(0, os.environ["PACKLIB_DIR"])
+    import packlib
+    pack_id = packlib.profile_pack()
+    if not pack_id:
+        return ""
+    data = packlib.load(pack_id)
+    if data is None or packlib.errors_of(data, "backend"):
+        failures.append(f"Pack {pack_id} has no complete manifest")
+        return "missing"
+    report = (data.get("testsReport") or {}).get("format")
+    coverage = (data.get("coverage") or {}).get("format")
+    summary["pack"] = pack_id
+    if coverage == "jacoco":
+        return "java"
+    if coverage == "go-cover" or report == "go-json":
+        return "go"
+    if coverage == "jest-summary":
+        return "node"
+    if report == "trx":
+        return "dotnet"
+    if coverage == "cobertura" or report in ("junit", "pytest"):
+        return "python"
+    failures.append(f"Pack {pack_id} coverage format {coverage} is not measured")
+    return "missing"
+
+
+kind = kind_from_pack() or module_kind(root)
 summary["kind"] = kind
+if kind == "missing":
+    finish()
 if kind != "java":
     measure_alt(kind)
     finish()

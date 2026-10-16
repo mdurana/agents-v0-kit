@@ -10,7 +10,7 @@ Roadmap playbook for the `program-planner` agent (`workflow-orchestration.mdc` R
 ## Steps
 1. Take the discovery path from the user. Refuse to guess a file. Refuse a path that is absolute, contains `..`, or points outside the repository.
 2. Read that file and nothing else about the problem. Required headings: Problem, Success metric, Options, Chosen option, In scope, Out of scope. Stop and name the first heading whose body is missing, empty, or still a placeholder.
-3. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave. Copy Problem, Success metric, Chosen option, and Out of scope as facts. When the discovery file has a line `Stack preference:` whose value is `java`, `dotnet`, `node`, `python`, or `go`, copy that line onto the roadmap. Do not activate a pack from it.
+3. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave. Copy Problem, Success metric, Chosen option, and Out of scope as facts. When the discovery file has a line `Stack preference:`, copy that line onto the roadmap as written. Do not activate a pack from it.
 4. Place each In scope item in exactly one of Now, Next, or Later. The item text is copied. Do not invent a theme. Do not move an Out of scope item into a horizon.
 5. Present the sequence and wait for explicit approval. Then append the `roadmap` row:
 

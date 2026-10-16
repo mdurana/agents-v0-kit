@@ -21,7 +21,7 @@ This command writes shared files: `docs/agents-v0/architecture.md`, `docs/agents
 1. Launch the `solution-architect` subagent. It follows `program-architecture`. Phase agents do not launch other agents, so this command launches the reviewer in step 3.
 2. Write the pack in this order. A narrower request may stop after the named step. C4 stays technology-agnostic. The pattern ADR chooses the technology, with at least two options.
    - C4 Context and Container in `docs/agents-v0/architecture.md`.
-   - Pattern ADR under `docs/agents-v0/adr/`, with a filled `Patterns considered` table and a `Pack:` line (`java`, `dotnet`, `node`, `python`, or `go`). A discovery `Stack preference:` is an input, not the binding. A stack outside those five stops before `/v0-plan`.
+   - Pattern ADR under `docs/agents-v0/adr/`, with a filled `Patterns considered` table and a `Pack:` line. The id is the stack the user named. A discovery `Stack preference:` is an input, not the binding. Write `.agents-v0/packs/<id>/pack.json` and bind it with `activate-stack-pack.sh`. An incomplete manifest stops before `/v0-plan`.
    - Platform topology in `docs/agents-v0/network.md`, including a `Target topology` diagram.
    - Services: `docs/agents-v0/design/system/context-map.md` (also the service map), then in `architecture.md` the data flow, the conceptual, logical, and physical data models, the state machine, failure domains and degradation, and MVP and future state. Sequence diagrams. A component plan per context under `docs/agents-v0/design/system/components/`, or `N/A: <reason>`.
    - Contracts: catalog shape and the deprecation rule. No feature `openapi.yaml`.

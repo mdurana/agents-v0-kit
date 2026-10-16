@@ -30,11 +30,11 @@ Phases: **Intake → Design → Build → Verify → Release**, with **Maintain*
 Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` set to the path. It does not copy the file. A missing path or a placeholder heading stops. The `roadmap` row (`ci/check-approvals.sh <roadmap> roadmap`) covers the sequence. The discovery file has no kit approval row.
 
 ### Roadmap gate
-Now, Next, and Later are in-scope items copied from the discovery file. A discovery line `Stack preference:` (`java`, `dotnet`, `node`, `python`, or `go`) is copied onto the roadmap and does not select the pack. Stop for explicit user approval before Architecture.
+Now, Next, and Later are in-scope items copied from the discovery file. A discovery line `Stack preference:` is copied onto the roadmap as written and does not select the pack. Stop for explicit user approval before Architecture.
 
 ## Architecture
 
-`/v0-architecture` (`program-architecture`) runs after the `roadmap` row and before any backlog. Skip list: P0-A, a named ticket, and Maintain or Trivial. It writes the C4-through-operations pack and `docs/agents-v0/design/system/arc-record.md`. It does not write stories. One approval records the `architecture` row and names that ARC file. An `arc` row is a later amendment that supersedes the accepted ADR. Plan waits for the `architecture` row and a `Pack` cell of `java`, `dotnet`, `node`, `python`, or `go`.
+`/v0-architecture` (`program-architecture`) runs after the `roadmap` row and before any backlog. Skip list: P0-A, a named ticket, and Maintain or Trivial. It writes the C4-through-operations pack and `docs/agents-v0/design/system/arc-record.md`. It does not write stories. One approval records the `architecture` row and names that ARC file. An `arc` row is a later amendment that supersedes the accepted ADR. Plan waits for the `architecture` row and a complete manifest for the profile `Pack` cell.
 
 ## Program planning
 

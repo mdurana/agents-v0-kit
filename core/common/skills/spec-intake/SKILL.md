@@ -31,7 +31,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
      | Intake | docs/agents-v0/requirements/&lt;feature&gt;.md | &lt;name&gt; | Approved | &lt;date&gt; |
 
      Append one row per approved phase; record evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`.
-4. The default UI is React 19, TypeScript 5.9, and Vite 7. Record SvelteKit only when the repo already uses it.
+4. The UI is the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, and Vite 7.
 5. Apply the **story-size budget** before the gate (`workflow-orchestration.mdc`):
    - Record `Surfaces:` as `backend`, `bff`, or `frontend`. When `docs/agents-v0/project-profile.md` lists `Service roots`, also record `Service root: <root>` for a backend or BFF story. A story that needs two service roots is two stories.
    - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
@@ -60,7 +60,7 @@ Then HTTP 404 and no order row is written
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report.
 - [ ] `project-delivery-core.mdc`: stack identified; async/messaging/cache justified or omitted.
-- [ ] `frontend-web.mdc`: default UI is React 19, TypeScript 5.9, Vite 7; SvelteKit only when the repo already uses it.
+- [ ] The UI matches the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, Vite 7.
 - [ ] UX requirements recorded for UI-affecting changes (WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria).
 - [ ] `security-baseline.mdc` §11: applicable regulations and security-review triggers identified. A sensitive action is named so Design can require step-up.
 - [ ] User story is one sentence: `As a [role], I want [goal], so that [benefit].`

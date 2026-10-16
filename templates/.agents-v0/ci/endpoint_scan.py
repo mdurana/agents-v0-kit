@@ -1,8 +1,7 @@
 """Shared endpoint scanners for check-endpoint-auth.sh and discover-codebase.sh.
 
-One table defines every non-Java pack. Discovery proposes profile rows from this
-table, and the auth check scans with the same marker, mapping, and security
-regexes. Do not copy the table into either script.
+Scanners come from the active pack's pack.json. Discovery proposes profile rows
+from every pack manifest it can see. Do not copy those regexes into either script.
 """
 
 import os
@@ -10,52 +9,42 @@ import re
 import subprocess
 import sys
 
+import packlib
+
 MAPPING = re.compile(r"@(Get|Post|Put|Patch|Delete|Request)Mapping\b(.*)")
 QUOTED = re.compile(r'"([^"]*)"')
 SECURITY = re.compile(r"@(PreAuthorize|PostAuthorize|Secured|RolesAllowed|PermitAll|DenyAll)\b")
 CLASS_DECL = re.compile(r"\b(class|interface)\s+\w+")
-PACKS = {"java", "dotnet", "node", "python", "go"}
 SKIP = {
     "node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next",
     "docs", ".cursor", ".claude", ".kilo",
 }
 
-# suffix, marker, mapping, security, name.
-# Mapping group 1 is the verb and group 2 the path, unless the regex has a single group (the path).
-BUILTINS = {
-    "dotnet": [
-        (".cs", r"\[Http(Get|Post|Put|Patch|Delete)",
-         r"\[Http(Get|Post|Put|Patch|Delete)(?:\(\s*\"([^\"]*)\"\))?",
-         r"\[Authorize|\[AllowAnonymous\]", "dotnet"),
-    ],
-    "node": [
-        (".ts", r"@(Get|Post|Put|Patch|Delete)\(",
-         r"@(Get|Post|Put|Patch|Delete)\(\s*[\"']?([^\"')]*)",
-         r"@UseGuards|@Public", "nest"),
-        (".ts", r"express\(|Router\(",
-         r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-         r"requireAuth|authenticate|authorize|publicRoute", "express"),
-        (".js", r"express\(|Router\(",
-         r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-         r"requireAuth|authenticate|authorize|publicRoute", "express"),
-    ],
-    "python": [
-        (".py", r"APIRouter|FastAPI\(",
-         r"@(?:router)\.(get|post|put|patch|delete)\(\s*[\"']([^\"']+)",
-         r"Depends\(|require_role", "fastapi"),
-        (".py", r"urlpatterns",
-         r"\bpath\(\s*[\"']([^\"']+)",
-         r"login_required|permission_classes|IsAuthenticated", "django"),
-    ],
-    "go": [
-        (".go", r"gin\.|chi\.NewRouter",
-         r"\.(GET|POST|PUT|PATCH|DELETE)\(\s*\"([^\"]+)\"",
-         r"Auth|middleware", "go"),
-        (".go", r"http\.HandleFunc",
-         r"http\.HandleFunc\(\s*\"([^\"]+)\"",
-         r"Auth|middleware", "go-stdlib"),
-    ],
-}
+def _spec_tuple(spec, pack_id):
+    """(suffix, marker, mapping, security, name) for the generic scanner."""
+    return (
+        spec.get("suffix") or "",
+        spec.get("marker") or "",
+        spec.get("mapping") or "",
+        spec.get("security") or "",
+        spec.get("name") or pack_id,
+    )
+
+
+def pack_endpoints(pack_id):
+    data = packlib.load(pack_id) if pack_id else None
+    if not data:
+        return []
+    return [spec for spec in data.get("endpoints") or [] if isinstance(spec, dict)]
+
+
+def all_endpoint_specs():
+    specs = []
+    for data in packlib.all_manifests():
+        for spec in data.get("endpoints") or []:
+            if isinstance(spec, dict) and spec.get("parser") != "spring":
+                specs.append(_spec_tuple(spec, data["id"]))
+    return specs
 
 
 def java_endpoints(lines):
@@ -93,25 +82,15 @@ def java_endpoints(lines):
 
 
 def profile_pack(profile="docs/agents-v0/project-profile.md"):
-    """Pack row under ## Stack. Missing or blank stays java so existing repos keep that scanner."""
-    if not os.path.isfile(profile):
-        return "java"
-    text = open(profile, encoding="utf-8", errors="replace").read()
-    if "## Stack" not in text:
-        return "java"
-    body = text.split("## Stack", 1)[1].split("\n## ", 1)[0]
-    for line in body.splitlines():
-        if not line.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if cells and cells[0] == "Pack" and len(cells) > 1 and cells[1] in PACKS:
-            return cells[1]
-    return "java"
+    """Pack row under ## Stack. A placeholder or a blank cell is empty."""
+    return packlib.profile_pack(profile)
 
 
 def _builtin_covers(pack, suffix, mapping):
-    for spec in BUILTINS.get(pack, []):
-        if spec[0] == suffix and spec[2] == mapping:
+    for spec in pack_endpoints(pack):
+        if spec.get("parser") == "spring":
+            continue
+        if spec.get("suffix") == suffix and spec.get("mapping") == mapping:
             return True
     return False
 
@@ -185,14 +164,21 @@ def extra_endpoints(lines, spec):
         yield i + 1, verb, route.strip(" '\"")[:120], ok
 
 
+def _scan_pack(path, lines, pack):
+    for spec in pack_endpoints(pack):
+        suffix = spec.get("suffix") or ""
+        if not suffix or not path.endswith(suffix):
+            continue
+        if spec.get("parser") == "spring":
+            yield from java_endpoints(lines)
+        else:
+            yield from extra_endpoints(lines, _spec_tuple(spec, pack))
+
+
 def scan_lines(path, lines, pack=None, stacks=None):
     pack = profile_pack() if pack is None else pack
     stacks = profile_stacks() if stacks is None else stacks
-    if pack == "java" and path.endswith(".java"):
-        yield from java_endpoints(lines)
-    for spec in BUILTINS.get(pack, []):
-        if path.endswith(spec[0]):
-            yield from extra_endpoints(lines, spec)
+    yield from _scan_pack(path, lines, pack)
     for spec in stacks:
         if path.endswith(spec[0]):
             yield from extra_endpoints(lines, spec)
@@ -201,10 +187,10 @@ def scan_lines(path, lines, pack=None, stacks=None):
 def watched(path, pack=None, stacks=None):
     pack = profile_pack() if pack is None else pack
     stacks = profile_stacks() if stacks is None else stacks
-    if pack == "java" and path.endswith(".java"):
-        return True
-    if any(path.endswith(spec[0]) for spec in BUILTINS.get(pack, [])):
-        return True
+    for spec in pack_endpoints(pack):
+        suffix = spec.get("suffix") or ""
+        if suffix and path.endswith(suffix):
+            return True
     return any(path.endswith(spec[0]) for spec in stacks)
 
 
@@ -216,12 +202,11 @@ def proposal_hits(files, read_text):
             blob = read_text(path)[:8000]
         except OSError:
             continue
-        for specs in BUILTINS.values():
-            for suffix, marker, mapping, security, name in specs:
-                if name in seen or not path.endswith(suffix):
-                    continue
-                if re.search(marker, blob):
-                    seen[name] = (suffix, marker, mapping, security, path.replace(os.sep, "/"))
+        for suffix, marker, mapping, security, name in all_endpoint_specs():
+            if name in seen or not path.endswith(suffix):
+                continue
+            if marker and re.search(marker, blob):
+                seen[name] = (suffix, marker, mapping, security, path.replace(os.sep, "/"))
     return seen
 
 
@@ -244,6 +229,12 @@ def main(args):
         return 1
     pack = profile_pack()
     stacks = profile_stacks()
+    if pack and not packlib.load(pack):
+        print(f"FAIL: Pack {pack} has no complete manifest", file=sys.stderr)
+        return 1
+    if not pack and not stacks:
+        print("FAIL: Pack is empty", file=sys.stderr)
+        return 1
     if args[0] == "--list":
         roots = args[1:] or ["."]
         for root in roots:
@@ -272,10 +263,9 @@ def main(args):
             text = "\n".join(_read_lines(path))
         code_old, old = _git("show", f"{base}:{path}")
         before = {(v, p) for _n, v, p, _ok in scan_lines(path, old.splitlines(), pack, stacks)} if code_old == 0 else set()
-        if path.endswith(".java"):
-            hint = "(@PreAuthorize/@Secured/@RolesAllowed, or @PermitAll when it is public on purpose)"
-        else:
-            hint = "(the active pack scanner, or an Endpoint authorization row)"
+        data = packlib.load(pack) if pack else None
+        marker = (data or {}).get("publicMarker") or "the pack public marker"
+        hint = f"(the {pack or 'profile'} scanner, or {marker})"
         for line_no, verb, full, ok in scan_lines(path, text.splitlines(), pack, stacks):
             checked += 1
             if not ok and (verb, full) not in before:

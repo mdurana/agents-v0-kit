@@ -2,11 +2,16 @@
 # install.sh — install the agents-v0 delivery kit into a target repo (Cursor).
 #
 # Usage:
-#   install.sh [--pack java|dotnet|node|python|go] [--with-starters] <target-repo>
+#   install.sh [--pack <id>] [--with-starters] <target-repo>
 #       First install: seeds .cursor/ adapter tree and project templates only where missing.
-#       --pack chooses which stack rules and skills land in .cursor (default: the
-#       profile Pack row, or java). Every pack is still copied to .agents-v0/packs
-#       so /v0-architecture can activate another one.
+#       --pack chooses which example pack's rules and skills land in .cursor (default
+#       java, the example cursor seed only). This does not set the profile Pack row.
+#       Every example pack.json under core/ is copied to .agents-v0/packs. A project
+#       pack whose id is not an example is left in place.
+#
+#   install.sh --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>
+#       Pin the kit commit in docs/agents-v0/kit-pin and symlink .cursor and
+#       .agents-v0/ci into that checkout. Kit files are not copied into the project.
 #
 #   install.sh --update [--quick] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
@@ -21,11 +26,17 @@ KIT="$(cd "$(dirname "$0")/.." && pwd)"
 UPDATE=0
 QUICK=0
 WITH_STARTERS=0
+LINK=0
+LINK_FORCE=0
+LINK_URL=""
+LINK_PATH=""
+LINK_COMMIT=""
 PACK=""
 TARGET=""
 
 usage() {
-  printf 'usage: %s [--pack java|dotnet|node|python|go] [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack <id>] [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
+  printf '       %s --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
 
@@ -63,10 +74,21 @@ emit_command() {
 
 install_pack_library() {
   t="$1"
-  rm -rf "$t/.agents-v0/packs"
-  for id in java dotnet node python go; do
+  mkdir -p "$t/.agents-v0/packs" "$t/.agents-v0/ui"
+  for manifest in "$KIT"/core/*/pack.json; do
+    [ -f "$manifest" ] || continue
+    id="$(basename "$(dirname "$manifest")")"
+    [ "$id" = "ui" ] && continue
+    rm -rf "$t/.agents-v0/packs/$id"
     mkdir -p "$t/.agents-v0/packs/$id"
     cp -R "$KIT/core/$id/." "$t/.agents-v0/packs/$id/"
+  done
+  for manifest in "$KIT"/core/ui/*/pack.json; do
+    [ -f "$manifest" ] || continue
+    id="$(basename "$(dirname "$manifest")")"
+    rm -rf "$t/.agents-v0/ui/$id"
+    mkdir -p "$t/.agents-v0/ui/$id"
+    cp -R "$KIT/core/ui/$id/." "$t/.agents-v0/ui/$id/"
   done
 }
 
@@ -82,14 +104,18 @@ install_rules() {
   dstdir="$1"
   mkdir -p "$dstdir"
   install_tree "$KIT/core/common/rules" "$dstdir"
-  install_tree "$KIT/core/$PACK/rules" "$dstdir"
+  if [ -n "$PACK" ]; then
+    install_tree "$KIT/core/$PACK/rules" "$dstdir"
+  fi
 }
 
 install_skills() {
   dstdir="$1"
   mkdir -p "$dstdir"
   install_tree "$KIT/core/common/skills" "$dstdir"
-  install_tree "$KIT/core/$PACK/skills" "$dstdir"
+  if [ -n "$PACK" ]; then
+    install_tree "$KIT/core/$PACK/skills" "$dstdir"
+  fi
 }
 
 install_starters() {
@@ -116,16 +142,22 @@ install_cursor() {
   seed_agent_ignore "$t" .cursorignore
   mkdir -p "$t/.cursor/rules/org" "$t/.cursor/agents" "$t/.cursor/commands" "$t/.cursor/skills" "$t/.cursor/hooks"
   install_rules "$t/.cursor/rules/org"
-  for f in "$KIT"/core/common/agents/*.md "$KIT"/core/"$PACK"/agents/*.md; do
+  for f in "$KIT"/core/common/agents/*.md; do
     [ -f "$f" ] || continue
     emit_agent "$f" "$t/.cursor/agents/$(basename "$f")"
   done
+  if [ -n "$PACK" ]; then
+    for f in "$KIT"/core/"$PACK"/agents/*.md; do
+      [ -f "$f" ] || continue
+      emit_agent "$f" "$t/.cursor/agents/$(basename "$f")"
+    done
+  fi
   for f in "$KIT"/core/common/commands/*.md; do
     emit_command "$f" "$t/.cursor/commands/$(basename "$f")"
   done
   install_skills "$t/.cursor/skills"
   cp "$KIT"/core/common/hooks/*.sh "$KIT"/core/common/hooks/hook-policy.py "$t/.cursor/hooks/"
-  if [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
+  if [ -n "$PACK" ] && [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
     cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.cursor/hooks/pack-scan.sh"
   fi
   rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json"
@@ -164,6 +196,8 @@ install_templates() {
 .agents-v0/ci/check-build-plan.sh
 .agents-v0/ci/check-endpoint-auth.sh
 .agents-v0/ci/endpoint_scan.py
+.agents-v0/ci/packlib.py
+.agents-v0/ci/run-backend-verify.sh
 .agents-v0/ci/check-frontend-calls.sh
 .agents-v0/ci/check-asyncapi.sh
 .agents-v0/ci/check-arc.sh
@@ -189,6 +223,7 @@ install_templates() {
 .agents-v0/scripts/update-agents-model.sh
 .agents-v0/scripts/host-tools-macports.sh
 .agents-v0/scripts/activate-stack-pack.sh
+.agents-v0/scripts/resolve-kit-root.sh
 .agents-v0/hooks/pre-push
 docs/agents-v0/compliance-matrix.md
 docs/agents-v0/model-routing-matrix.md
@@ -257,13 +292,13 @@ docs/agents-v0/benchmark/reference-project.md
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md .agents-v0/ci/classify-change.sh .agents-v0/ci/check-openapi.sh .agents-v0/ci/check-design.sh \
         .agents-v0/ci/check-design-contracts.sh .agents-v0/ci/check-ux-spec.sh .agents-v0/ci/check-build-plan.sh .agents-v0/ci/check-endpoint-auth.sh \
-        .agents-v0/ci/endpoint_scan.py \
+        .agents-v0/ci/endpoint_scan.py .agents-v0/ci/packlib.py .agents-v0/ci/run-backend-verify.sh \
         .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh .agents-v0/ci/check-arc.sh .agents-v0/ci/check-adr.sh .agents-v0/ci/check-architecture-pack.sh .agents-v0/ci/check-intake.sh docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
-        .agents-v0/scripts/activate-stack-pack.sh \
+        .agents-v0/scripts/activate-stack-pack.sh .agents-v0/scripts/resolve-kit-root.sh \
         .agents-v0/scripts/run-local-container.sh; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
@@ -314,6 +349,29 @@ while [ $# -gt 0 ]; do
       WITH_STARTERS=1
       shift
       ;;
+    --link)
+      LINK=1
+      shift
+      ;;
+    --force)
+      LINK_FORCE=1
+      shift
+      ;;
+    --url)
+      [ $# -ge 2 ] || usage
+      LINK_URL="$2"
+      shift 2
+      ;;
+    --path)
+      [ $# -ge 2 ] || usage
+      LINK_PATH="$2"
+      shift 2
+      ;;
+    --commit)
+      [ $# -ge 2 ] || usage
+      LINK_COMMIT="$2"
+      shift 2
+      ;;
     --pack)
       [ $# -ge 2 ] || usage
       PACK="$2"
@@ -330,10 +388,10 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$TARGET" ] || usage
-case "$PACK" in
-  ""|java|dotnet|node|python|go) ;;
-  *) printf 'error: --pack must be java, dotnet, node, python, or go\n' >&2; exit 1 ;;
-esac
+if [ -n "$PACK" ] && [ ! -f "$KIT/core/$PACK/pack.json" ]; then
+  printf 'error: --pack %s has no core/%s/pack.json\n' "$PACK" "$PACK" >&2
+  exit 1
+fi
 [ "$QUICK" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --quick applies to --update only\n' >&2; usage; }
 [ -d "$TARGET" ] || { printf 'error: target not found: %s\n' "$TARGET" >&2; exit 1; }
 TARGET_ABS="$(cd "$TARGET" && pwd)"
@@ -363,26 +421,45 @@ if [ "$TARGET_ABS" = "$KIT" ]; then
   exit 1
 fi
 
+if [ "$LINK" = 1 ]; then
+  [ -n "$LINK_COMMIT" ] || { printf 'error: --link requires --commit\n' >&2; exit 1; }
+  [ -n "$LINK_URL" ] || [ -n "$LINK_PATH" ] || { printf 'error: --link requires --url or --path\n' >&2; exit 1; }
+  set -- --commit "$LINK_COMMIT"
+  [ -z "$LINK_URL" ] || set -- "$@" --url "$LINK_URL"
+  [ -z "$LINK_PATH" ] || set -- "$@" --path "$LINK_PATH"
+  [ "$LINK_FORCE" = 0 ] || set -- "$@" --force
+  sh "$KIT/scripts/link-project.sh" "$@" "$TARGET_ABS"
+  exit 0
+fi
+
 require_pyyaml
 if [ -z "$PACK" ] && [ -f "$TARGET_ABS/docs/agents-v0/project-profile.md" ]; then
   PACK="$(python3 - "$TARGET_ABS/docs/agents-v0/project-profile.md" <<'PY'
+import re
 import sys
 text = open(sys.argv[1], encoding="utf-8").read()
 if "## Stack" not in text:
     raise SystemExit(0)
 body = text.split("## Stack", 1)[1].split("\n## ", 1)[0]
-allowed = {"java", "dotnet", "node", "python", "go"}
 for line in body.splitlines():
     if not line.startswith("|"):
         continue
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-    if cells and cells[0] == "Pack" and len(cells) > 1 and cells[1] in allowed:
+    if cells and cells[0] == "Pack" and len(cells) > 1 and re.match(r"^[a-z][a-z0-9_-]*$", cells[1]):
         print(cells[1])
         break
 PY
 )"
 fi
-PACK="${PACK:-java}"
+# An empty profile Pack seeds the java example into .cursor. A project pack that
+# is not an example in core/ keeps the rules activate-stack-pack already installed.
+if [ -n "$PACK" ] && [ ! -f "$KIT/core/$PACK/pack.json" ]; then
+  PACK=""
+  SKIP_PACK_CURSOR=1
+else
+  SKIP_PACK_CURSOR=0
+  PACK="${PACK:-java}"
+fi
 
 install_templates "$TARGET_ABS"
 install_pack_library "$TARGET_ABS"

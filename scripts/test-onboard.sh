@@ -23,7 +23,13 @@ expect_fail() { desc="$1"; dir="$2"; shift 2; if (cd "$dir" && "$@") >/dev/null 
 r="$tmp/repo"
 mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/docs/agents-v0"
 cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh \
-   "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$r/.agents-v0/ci/"
+   "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$KIT"/templates/.agents-v0/ci/packlib.py "$r/.agents-v0/ci/"
+mkdir -p "$r/.agents-v0/ui/react"
+cp "$KIT/core/ui/react/pack.json" "$r/.agents-v0/ui/react/pack.json"
+for id in java dotnet node python go; do
+  mkdir -p "$r/.agents-v0/packs/$id"
+  cp "$KIT/core/$id/pack.json" "$r/.agents-v0/packs/$id/pack.json"
+done
 cp "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
    "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
    "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$r/.agents-v0/scripts/"

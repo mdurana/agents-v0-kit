@@ -22,10 +22,14 @@ mode="${2:-}"
 case "$mode" in '' | --complete) ;; *) printf 'FAIL: unknown option %s\n' "$mode" >&2; exit 1 ;; esac
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
-FEATURE="$feature" MODE="$mode" python3 - <<'PY'
+DIR="$(cd "$(dirname "$0")" && pwd)"
+FEATURE="$feature" MODE="$mode" PACKLIB_DIR="$DIR" python3 - <<'PY'
 import os
 import re
 import sys
+
+sys.path.insert(0, os.environ["PACKLIB_DIR"])
+import packlib
 
 feature, complete = os.environ["FEATURE"], os.environ["MODE"] == "--complete"
 require_red = os.environ.get("REQUIRE_RED", "1") != "0"
@@ -92,6 +96,10 @@ for r in rows:
 # Test sources, read once.
 SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", "docs", ".cursor", ".claude", ".kilo"}
 TEST_FILE = re.compile(r"(Test|Tests|IT)\.java$|\.(test|spec)\.[A-Za-z]+$|_test\.[A-Za-z]+$|(^|/)test_[^/]+\.py$")
+_pack = packlib.load(packlib.profile_pack())
+_test_file = (_pack or {}).get("testFile")
+if _test_file:
+    TEST_FILE = re.compile(TEST_FILE.pattern + "|" + _test_file)
 blob = ""
 for dirpath, dirs, names in os.walk("."):
     dirs[:] = [d for d in dirs if d not in SKIP]

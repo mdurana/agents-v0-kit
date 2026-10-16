@@ -8,7 +8,7 @@ alwaysApply: false
 
 Testing: **`quality-and-testing.mdc`**. Security headers/XSS policy: **`security-baseline.mdc`**.
 
-Default stack: **React 19, TypeScript 5.9, Vite 7, Vitest 3**. Use SvelteKit only when the repo already uses it.
+Default stack for the React example: **React 19, TypeScript 5.9, Vite 7, Vitest 3**. Another UI follows the bound pack's `ui` id.
 
 ## Shared client concerns
 

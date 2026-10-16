@@ -6,10 +6,9 @@
 #   sh .agents-v0/ci/check-endpoint-auth.sh --list [<root>...]  print every mapping: file:line  VERB /path  annotated|NO-ANNOTATION
 #
 # Scanners live in endpoint_scan.py, which discover-codebase.sh imports too.
-# The Pack row selects the built-in scanner. java (and a missing Pack) scans *.java.
-# dotnet, node, python, and go use the BUILTINS table in that module. Extra rows under
-# "## Endpoint authorization" add file types. A row whose mapping the active pack
-# already scans is skipped, so discovery does not double-count a built-in stack.
+# The Pack row selects that pack's endpoint scanners in pack.json. An empty Pack
+# does not scan a default language. Extra rows under "## Endpoint authorization"
+# add file types. A row whose mapping the active pack already scans is skipped.
 # <head> omitted compares <base> with the working tree.
 
 set -eu

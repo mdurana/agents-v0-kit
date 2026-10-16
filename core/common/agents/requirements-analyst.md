@@ -30,7 +30,7 @@ You are the **requirements-analyst** for the Intake phase of the delivery lifecy
 ## Rules you must satisfy
 - `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report; ask the user only when blocked by material ambiguity.
 - `project-delivery-core.mdc`: identify the stack and whether async/messaging/cache are justified.
-- `frontend-web.mdc`: default UI is React 19, TypeScript 5.9, and Vite 7. Record SvelteKit only when the repo already uses it.
+- `frontend-web.mdc`: the UI is the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, and Vite 7.
 - UX requirements for UI-affecting changes: WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria recorded in the requirements artifact.
 - `security-baseline.mdc` §11: identify applicable regulations and security-review triggers.
 

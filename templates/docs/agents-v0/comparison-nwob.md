@@ -124,7 +124,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 | Topic | agents-v0 | NWOB |
 |-------|-----------|------|
-| **Backend default** | Pack chosen in `/v0-architecture`: `java` (Java 21, Spring Boot 4.1.1, Maven, the bundled skeleton), `dotnet`, `node`, `python`, or `go` | Java (modern); neutral in `constitution-custom.mdc` |
+| **Backend default** | The discovery `Stack preference:` is copied onto the roadmap. `/v0-architecture` binds any id that has a complete `pack.json`. Example packs include `java` (the bundled skeleton), `dotnet`, `node`, `python`, and `go` | Java (modern); neutral in `constitution-custom.mdc` |
 | **Tests** | JUnit via `spring-boot-starter-test`, ArchUnit 1.4.2, H2 in test profile, Vitest 3 | Project-specific |
 | **Local run** | Compose API `:8080`, UI `:8081`, `postgres:15-alpine` | Project-specific |
 | **Database** | PostgreSQL 15, Flyway | PostgreSQL, Liquibase |
@@ -134,7 +134,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 | **Errors** | RFC 7807 **or** custom envelope (one per surface) | RFC 7807 mandatory (`trace_id`, `error_code`) |
 | **Data lifecycle** | Not prescribed in kit core | Soft-delete mandate, audit timestamps, async purge |
 | **Stateless workloads** | Implicit | Mandatory (K8s/EKS defaults) |
-| **Frontend** | React 19, TypeScript 5.9, Vite 7, Vitest 3. SvelteKit only when the repo already uses it | No dedicated frontend rules |
+| **Frontend** | The pack's `ui` id. The React example is React 19, TypeScript 5.9, Vite 7, Vitest 3 | No dedicated frontend rules |
 | **Security** | `security-baseline`, VAPT rules; an always-on miss (F4, F8, F9, F10) is Critical | Short DoD security bullets; no VAPT pack |
 | **Complexity** | Cognitive ≤15, method ≤30 lines, class <300 | `implementation-quality-standards.md` |
 | **Test naming** | `methodName_scenario_expectedOutcome` | `tc<NNN>_method_given_should` + AAA comments |
@@ -146,7 +146,7 @@ Engineering comparison of the **agents-v0** delivery kit and **NWOB Agent Skills
 
 | Concern | agents-v0 | NWOB |
 |---------|-----------|------|
-| **Install** | `install.sh`, `--with-starters`, `--update` | External clone or submodule; `--force`, `--no-scaffold-docs` |
+| **Install** | `install.sh` copies into the project; `install.sh --link` pins `docs/agents-v0/kit-pin` and symlinks the kit | External clone or submodule; `--force`, `--no-scaffold-docs` |
 | **Greenfield** | `bootstrap-greenfield.sh --scaffold-app` extracts `templates/app/p0-platform-skeleton.tar.gz` (`java` pack health/shell) | `nwob init` + `nwob-docs/` scaffold |
 | **Brownfield** | `audit-brownfield-baseline.sh`, `/v0-onboard` | Map external SDD in place; no forced copy |
 | **Multi-service** | Service roots, per-service OpenAPI, `workspace.manifest.json` | `repositories/` + `service-map.md` |

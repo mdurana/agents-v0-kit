@@ -1,0 +1,6 @@
+{
+  "id": "react",
+  "stack": "React 19, TypeScript 5.9, Vite 7",
+  "verify": "npm run verify",
+  "verifyFast": "npm test"
+}

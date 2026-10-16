@@ -12,7 +12,7 @@
 
 ## Decision
 
-<!-- What we decided. A pattern ADR also has its own line: Pack: java | dotnet | node | python | go -->
+<!-- What we decided. A pattern ADR also has its own line: Pack: <id> -->
 
 ## Alternatives considered
 

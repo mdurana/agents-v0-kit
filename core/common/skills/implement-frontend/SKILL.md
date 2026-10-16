@@ -1,6 +1,6 @@
 ---
 name: implement-frontend
-description: Build phase playbook. Implement React (default) or existing SvelteKit UI — routes, loads, forms, a11y, XSS-safe content — with red–green tests.
+description: Build phase playbook. Implement the UI named by the pack's ui id — routes, loads, forms, a11y, XSS-safe content — with red–green tests. The React example is frontend-web.mdc.
 ---
 
 # implement-frontend
@@ -11,7 +11,7 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 1. Read the Design artifacts — including the approved UX spec (`docs/agents-v0/design/<feature>/ux-spec.md`) and the HTML mockups it links under `docs/agents-v0/design/<feature>/mockups/` — and the existing frontend. If a UI change has no approved spec or a linked mockup is missing, stop.
 2. **Baseline:** run the full Frontend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop and report the pre-existing failure; never build on a broken baseline. Put UI code under that frontend root.
 3. **Wire the frontend quality gate** if missing (ESLint, coverage provider with the ≥ 70% threshold, lockfile audit) — unwired tooling makes the build script compile-only.
-4. Default UI is React 19, TypeScript 5.9, Vite 7 (`frontend-web.mdc`). Use SvelteKit only when the repo already uses it.
+4. The UI is the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, Vite 7 (`frontend-web.mdc`).
 5. Before the first implementation edit, write or continue `docs/agents-v0/build/<feature>/plan.md`: one row per approved `AC-*`. Mark a row `done` only after that unit's fast command is green, and name the test; then run `sh .agents-v0/ci/check-build-plan.sh <feature>` (it fails when the test does not exist or was never red; `(no-red: <reason>)` waives one row). Do not add, delete, or rewrite AC rows. Before the gate also run `sh .agents-v0/ci/check-frontend-calls.sh`: every `/api/` call must be a catalog operation.
 6. Work **red–green (TDD where practical)** per plan row: failing test first, then implement until green (`quality-and-testing.mdc`). Each loop run **must** use `Frontend verify (fast)` from the profile (a real command such as `npm test`, not a `<!--` placeholder). If that cell is empty or still a placeholder, stop and fill the profile rather than running the full Frontend verify in the loop. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent (`workflow-orchestration.mdc`): record `blocked` and stop. The second red result for the same test writes `docs/agents-v0/build/<feature>/failure-brief.md` and returns for `debug-investigator`. Before attempt three run `sh .agents-v0/scripts/check-failure-brief.sh <feature>` (must exit 0). Attempt three applies that note. A third red result stops.
 7. Implement routes/loads/components per `frontend-web.mdc`:

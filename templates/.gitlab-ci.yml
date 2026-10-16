@@ -46,7 +46,8 @@ workflow:
 # A project with no Testcontainers tests can delete the Docker block too.
 build:
   stage: test
-  image: ${CI_IMAGE_PREFIX}eclipse-temurin:21-jdk
+  # CI_PACK_IMAGE is the pack.json ciImage. GitLab selects the image before the job reads the manifest.
+  image: ${CI_PACK_IMAGE:-${CI_IMAGE_PREFIX}eclipse-temurin:21-jdk}
   services:
     - name: ${CI_IMAGE_PREFIX}docker:27-dind
       alias: docker
@@ -118,9 +119,14 @@ build:
         fi
         cd "$repo"
       }
-      verify_maven "${BACKEND_ROOT:-}"
-      verify_maven "${BFF_ROOT:-}"
-      for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
+      pack_cmd="$(sh .agents-v0/ci/run-backend-verify.sh || true)"
+      if [ -n "$pack_cmd" ]; then
+        run_verify sh -c "$pack_cmd"
+      else
+        verify_maven "${BACKEND_ROOT:-}"
+        verify_maven "${BFF_ROOT:-}"
+        for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
+      fi
   artifacts:
     when: always
     paths:
@@ -219,7 +225,10 @@ event-schema-compat:
 .trusted-ci: &trusted_ci |
   git fetch origin "$CI_DEFAULT_BRANCH"
   CI_DIR=.agents-v0/ci
-  if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
+  if [ -f docs/agents-v0/kit-pin ]; then
+    KIT_ROOT="$(sh .agents-v0/scripts/resolve-kit-root.sh)"
+    CI_DIR="$KIT_ROOT/templates/.agents-v0/ci"
+  elif git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
     rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci
     git archive FETCH_HEAD .agents-v0/ci | tar -x -C /tmp/trusted-ci
     CI_DIR=/tmp/trusted-ci/.agents-v0/ci
@@ -253,6 +262,11 @@ endpoint-auth:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
         - "**/*.java"
+        - "**/*.cs"
+        - "**/*.py"
+        - "**/*.go"
+        - "**/*.ts"
+        - "**/.agents-v0/packs/*/pack.json"
   before_script:
     - apk add --no-cache git python3
   script:

@@ -1,0 +1,32 @@
+{
+  "id": "dotnet",
+  "backend": ".NET 10, ASP.NET Core, EF Core",
+  "http": "ASP.NET Core MVC / minimal APIs on Kestrel",
+  "security": "ASP.NET Core authentication, [Authorize] policies",
+  "database": "PostgreSQL 15, EF Core migrations. SQL Server when the ADR names it",
+  "tests": "xUnit, coverlet",
+  "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
+  "verify": "dotnet test --logger \"trx;LogFileName=test-results.trx\" --results-directory TestResults --collect:\"XPlat Code Coverage\"",
+  "verifyFast": "dotnet test",
+  "coverage": {"path": "coverage.cobertura.xml", "format": "cobertura"},
+  "testsReport": {"path": "TestResults/**/*.trx", "format": "trx"},
+  "cve": {"path": "cve-report.json"},
+  "diffCoverage": {"glob": "*.cs", "sourceRoot": ""},
+  "testFile": "Tests\\.cs$",
+  "migrationTool": "EF Core",
+  "authMarker": "[Authorize]",
+  "publicMarker": "[AllowAnonymous]",
+  "ciImage": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "dockerfile": "docker/Dockerfile.dotnet",
+  "detect": ["*.csproj", "*.sln"],
+  "ui": "react",
+  "endpoints": [
+    {
+      "suffix": ".cs",
+      "marker": "\\[Http(Get|Post|Put|Patch|Delete)",
+      "mapping": "\\[Http(Get|Post|Put|Patch|Delete)(?:\\(\\s*\"([^\"]*)\"\\))?",
+      "security": "\\[Authorize|\\[AllowAnonymous\\]",
+      "name": "dotnet"
+    }
+  ]
+}

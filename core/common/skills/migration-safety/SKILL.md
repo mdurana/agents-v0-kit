@@ -5,7 +5,7 @@ description: Database migration playbook. Expand/contract, backfill verification
 
 # migration-safety
 
-Schema changes on brownfield or production-bound services. Used by `/v0-build` (the pack implement skill's migration step, including `implement-service` step 10) for every new migration and by `/v0-maintain` for schema fixes. The design's data-model section (`design.md`) states the migration shape; Build follows it. The tool is the one named in the pack `PACK.md`: Flyway (`java`), EF Core (`dotnet`), TypeORM (`node`), Alembic (`python`, or Django migrations when that app already exists), golang-migrate (`go`). Do not introduce a second migration tool.
+Schema changes on brownfield or production-bound services. Used by `/v0-build` (the pack implement skill's migration step, including `implement-service` step 10) for every new migration and by `/v0-maintain` for schema fixes. The design's data-model section (`design.md`) states the migration shape; Build follows it. The tool is the `migrationTool` in the bound pack's `pack.json`. Do not introduce a second migration tool.
 
 ## Steps
 1. Prefer **expand/contract**: additive migration first; deploy; backfill; then contract in a later release.

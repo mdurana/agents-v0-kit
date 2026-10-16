@@ -15,7 +15,7 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; status=1; }
 
 r="$tmp/repo"
 mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/src/main/java/com/acme" "$r/src/main/resources" "$r/docs/agents-v0/requirements" "$r/docs/agents-v0/build/old"
-cp "$KIT"/templates/.agents-v0/ci/*.sh "$r/.agents-v0/ci/"
+cp "$KIT"/templates/.agents-v0/ci/*.sh "$KIT"/templates/.agents-v0/ci/packlib.py "$r/.agents-v0/ci/"
 cp "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$KIT"/templates/.agents-v0/scripts/delivery-metrics.sh "$r/.agents-v0/scripts/"
 
 git_c() { git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
