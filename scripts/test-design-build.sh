@@ -106,6 +106,32 @@ sedi '/x-event-type/d' "$o/async-no-event.yaml"
 sedi '/eventType/d' "$o/async-no-event.yaml"
 yaml_run fail "asyncapi lint: a message without event type fails" "$o" sh "$CI/check-asyncapi.sh" lint async-no-event.yaml
 
+cat > "$o/async3-ok.yaml" <<'EOF'
+asyncapi: 3.0.0
+info: {title: Orders events, version: "1.0.0"}
+channels:
+  orders.created:
+    address: orders.created
+    messages:
+      orderCreated:
+        x-event-type: ORDER_CREATED
+        payload:
+          type: object
+          properties:
+            eventType: {type: string}
+operations:
+  publishOrderCreated:
+    action: send
+    channel:
+      $ref: '#/channels/orders.created'
+    messages:
+      - $ref: '#/channels/orders.created/messages/orderCreated'
+EOF
+yaml_run pass "asyncapi lint: a valid 3.x draft passes" "$o" sh "$CI/check-asyncapi.sh" lint async3-ok.yaml
+cp "$o/async3-ok.yaml" "$o/async3-no-op.yaml"
+sedi '/^operations:/,$d' "$o/async3-no-op.yaml"
+yaml_run fail "asyncapi lint: 3.x without an operation fails" "$o" sh "$CI/check-asyncapi.sh" lint async3-no-op.yaml
+
 cat > "$o/catalog-ok.yaml" <<'EOF'
 openapi: 3.0.3
 info: {title: Orders, version: "1"}

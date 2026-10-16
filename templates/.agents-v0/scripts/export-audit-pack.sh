@@ -92,7 +92,7 @@ def approval_paths(path):
         cols = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cols) < 3:
             continue
-        for token in re.findall(r"docs/[^\s`,|]+", cols[2]):
+        for token in re.findall(r"docs/[^\s`,|]+", cols[1]):
             token = token.rstrip(").,;")
             if ">" in token or "<" in token:
                 continue
