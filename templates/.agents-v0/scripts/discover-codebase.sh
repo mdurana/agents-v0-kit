@@ -50,6 +50,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.environ["GATE_SCRIPT"]))
 import endpoint_scan
+import packlib
 
 ROOTS = os.environ["DISCOVER_ROOTS"].split()
 COMMIT = os.environ["DISCOVER_COMMIT"]
@@ -113,33 +114,62 @@ def lines_of(path):
     return text_of[path]
 
 
-# ---- Endpoints (same Java scanner as ci/check-endpoint-auth.sh) ------------
+# ---- Endpoints (shared scanners from ci/endpoint_scan.py) ------------------
 endpoints, unannotated = [], []
-for path in java:
-    for line_no, verb, full, secured in endpoint_scan.java_endpoints(lines_of(path)):
+active_pack = endpoint_scan.profile_pack()
+active_stacks = endpoint_scan.profile_stacks()
+all_specs = endpoint_scan.all_endpoint_specs()
+for path in files:
+    rows_for_file = []
+    if active_pack or active_stacks:
+        rows_for_file = list(endpoint_scan.scan_lines(path, lines_of(path), active_pack, active_stacks))
+    else:
+        if path.endswith(".java"):
+            rows_for_file = list(endpoint_scan.java_endpoints(lines_of(path)))
+        else:
+            for spec in all_specs:
+                if path.endswith(spec[0]):
+                    rows_for_file.extend(endpoint_scan.extra_endpoints(lines_of(path), spec))
+    for line_no, verb, full, secured in rows_for_file:
         row = f"{path}:{line_no}  {verb} {full}  {'annotated' if secured else 'NO-ANNOTATION'}"
         endpoints.append(row)
         if not secured:
             unannotated.append(row)
-write("endpoints.txt", "HTTP endpoints (Spring)", endpoints,
-      "NO-ANNOTATION means no @PreAuthorize/@Secured/@RolesAllowed near the mapping; authorization may still be enforced in configuration.")
+write("endpoints.txt", "HTTP endpoints", endpoints,
+      "NO-ANNOTATION means no pack auth/public marker was found near the mapping; authorization may still be enforced in configuration or middleware.")
 
 # ---- Entities, migrations --------------------------------------------------
 entities = []
-for path in java:
-    lines = lines_of(path)
-    for i, ln in enumerate(lines):
-        if re.search(r"@Entity\b", ln):
-            nearby = lines[i: i + 12]
-            cls = next((m.group(1) for l2 in nearby for m in [re.search(r"\bclass\s+(\w+)", l2)] if m), "?")
-            tbl = next((m.group(1) for l2 in lines[max(0, i - 4): i + 5] for m in [re.search(r'@Table\([^)]*name\s*=\s*"([^"]+)"', l2)] if m), "")
-            entities.append(f"{path}:{i + 1}  Entity {cls}" + (f"  table {tbl}" if tbl else ""))
-write("entities.txt", "JPA entities", entities)
+for path in files:
+    if path.endswith(".java"):
+        lines = lines_of(path)
+        for i, ln in enumerate(lines):
+            if re.search(r"@Entity\b", ln):
+                nearby = lines[i: i + 12]
+                cls = next((m.group(1) for l2 in nearby for m in [re.search(r"\bclass\s+(\w+)", l2)] if m), "?")
+                tbl = next((m.group(1) for l2 in lines[max(0, i - 4): i + 5] for m in [re.search(r'@Table\([^)]*name\s*=\s*"([^"]+)"', l2)] if m), "")
+                entities.append(f"{path}:{i + 1}  Entity {cls}" + (f"  table {tbl}" if tbl else ""))
+    elif path.endswith(".cs"):
+        for i, ln in enumerate(lines_of(path)):
+            for m in re.finditer(r"DbSet<\s*(\w+)\s*>", ln):
+                entities.append(f"{path}:{i + 1}  Entity {m.group(1)}")
+    elif path.endswith(".py"):
+        lines = lines_of(path)
+        for i, ln in enumerate(lines):
+            m = re.search(r"__tablename__\s*=\s*[\"']([^\"']+)[\"']", ln)
+            if m:
+                prev = lines[max(0, i - 8): i + 1]
+                cls = next((c.group(1) for l2 in reversed(prev) for c in [re.search(r"\bclass\s+(\w+)", l2)] if c), "?")
+                entities.append(f"{path}:{i + 1}  Entity {cls}  table {m.group(1)}")
+write("entities.txt", "Persistent entities / models", entities)
 
 migrations = [f for f in files if (("db/migration" in f.replace(os.sep, "/") and f.endswith(".sql"))
+                                   or ("db/migrations" in f.replace(os.sep, "/") and f.endswith(".sql"))
                                    or "db/changelog" in f.replace(os.sep, "/")
+                                   or "/alembic/versions/" in ("/" + f.replace(os.sep, "/"))
+                                   or ("/migrations/" in ("/" + f.replace(os.sep, "/")).lower() and f.endswith((".sql", ".py", ".cs", ".ts", ".js")))
                                    or (re.search(r"changelog", os.path.basename(f), re.I) and f.endswith((".xml", ".yaml", ".yml", ".json"))))]
-write("migrations.txt", "Database migrations (Flyway / Liquibase)", sorted(migrations),
+write("migrations.txt", "Database migrations", sorted(migrations),
       "Latest file by name is the last row of the sorted list.")
 
 
@@ -236,13 +266,24 @@ write("ci-deploy.txt", "CI, container, and deploy files", ci_rows)
 
 # ---- Tests -----------------------------------------------------------------
 test_rows = []
+pack_test_re = None
+if active_pack:
+    pdata = packlib.load(active_pack)
+    if pdata and pdata.get("testFile"):
+        try:
+            pack_test_re = re.compile(pdata["testFile"])
+        except re.error:
+            pack_test_re = None
 for base in ROOTS:
     prefix = "" if base == "." else base.rstrip("/") + os.sep
     inside = [f for f in files if f.startswith(prefix)]
     jtests = [f for f in inside if f.endswith(".java") and "/src/test/java/" in f.replace(os.sep, "/")]
+    btests = [f for f in inside if re.search(r"(Test|Tests|IT)\.java$|Tests\.cs$|_test\.go$|(^|/)test_[^/]+\.py$", f.replace(os.sep, "/"))
+              or (pack_test_re.search(f.replace(os.sep, "/")) if pack_test_re else False)]
     ftests = [f for f in inside if re.search(r"\.(test|spec)\.(js|ts|tsx|jsx|svelte)$", f)]
     e2e = [f for f in inside if re.match(r"^(playwright|cypress)\.config\.", os.path.basename(f))]
-    test_rows.append(f"{base}  java test files {len(jtests)}  frontend test files {len(ftests)}  e2e config {len(e2e)}")
+    extra = f"  backend test files {len(btests)}" if len(btests) != len(jtests) else ""
+    test_rows.append(f"{base}  java test files {len(jtests)}{extra}  frontend test files {len(ftests)}  e2e config {len(e2e)}")
 write("tests.txt", "Test files per root", test_rows)
 
 
@@ -251,23 +292,40 @@ def jvm(path):
     return any(os.path.isfile(os.path.join(path, f)) for f in ("pom.xml", "build.gradle", "build.gradle.kts"))
 
 
+marker_set = set(packlib.marker_roots(".", 4))
+
+
+def backend_root(path):
+    norm = "." if path in ("", ".") else path.rstrip("/").replace(os.sep, "/")
+    return jvm(path) or norm in marker_set or any(
+        os.path.isfile(os.path.join(path, f)) for f in ("go.mod", "pyproject.toml", "Cargo.toml")
+    )
+
+
 base_rows, ratchet, failing = [], [], []
 for base in ROOTS:
-    if not jvm(base):
+    if not backend_root(base):
         continue
     target = os.path.join(base, "target")
-    if not os.path.isdir(target):
+    if jvm(base) and not os.path.isdir(target):
         base_rows.append(f"| {base} | not measured: no target/ (run the baseline audit; Gradle builds are not read) | | | |")
         continue
     if GATE and os.path.isfile(GATE):
         env = dict(os.environ, GATE_REPORT_ONLY="1", ALLOW_NO_TESTS="1")
         subprocess.run(["sh", GATE, base], env=env, capture_output=True, text=True)
-    summary_path = os.path.join(target, "gate-metrics.json")
+    summary_path = os.path.join(target, "gate-metrics.json") if os.path.isdir(target) else os.path.join(base, "gate-metrics.json")
+    if not os.path.isfile(summary_path):
+        alt = os.path.join(base, "gate-metrics.json")
+        if os.path.isfile(alt):
+            summary_path = alt
     if not os.path.isfile(summary_path):
         base_rows.append(f"| {base} | not measured: no gate-metrics summary | | | |")
         continue
     with open(summary_path, encoding="utf-8") as handle:
         data = json.load(handle)
+    if not jvm(base) and data.get("failures") and (data.get("tests") or {}).get("run", 0) == 0 and data.get("lineCoveragePct") is None:
+        base_rows.append(f"| {base} | not measured: no test/coverage reports (run the baseline audit) | | | |")
+        continue
     tests = data.get("tests", {})
     pct = data.get("lineCoveragePct")
     cves = data.get("highCriticalCves")

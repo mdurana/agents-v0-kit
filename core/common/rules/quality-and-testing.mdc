@@ -34,7 +34,7 @@ Wire the coverage, test, and CVE reports named in the bound pack's `pack.json` b
 | Backend branches | the pack coverage report (Pack `java`: JaCoCo / Sonar) | |
 | Frontend | **70%** | raise if CI gate exists |
 
-**Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
+**Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
 
 ## Complexity and size
 

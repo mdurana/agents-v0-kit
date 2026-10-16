@@ -159,22 +159,66 @@ audit_root() {
   if [ -f package.json ]; then
     run_node
   fi
+  if [ -f go.mod ]; then
+    if command -v go >/dev/null 2>&1; then
+      ran=1
+      printf '--- go test ./... ---\n'
+      go test ./... || status=1
+    else
+      printf 'SKIP: go.mod present but go not on PATH\n'
+    fi
+  fi
+  if [ -f pyproject.toml ] || [ -f pytest.ini ]; then
+    if command -v python3 >/dev/null 2>&1 && python3 -m pytest --version >/dev/null 2>&1; then
+      ran=1
+      printf '--- python3 -m pytest ---\n'
+      python3 -m pytest || status=1
+    else
+      printf 'SKIP: pyproject.toml present but pytest not available\n'
+    fi
+  fi
+  if find . -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) -print -quit 2>/dev/null | grep -q .; then
+    if command -v dotnet >/dev/null 2>&1; then
+      ran=1
+      printf '--- dotnet test ---\n'
+      dotnet test || status=1
+    else
+      printf 'SKIP: .NET project present but dotnet not on PATH\n'
+    fi
+  fi
   cd "$TARGET_ABS"
 }
 
-if [ -f .agents-v0/ci/resolve-layout.sh ]; then
-  eval "$(sh .agents-v0/ci/resolve-layout.sh)"
-  printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
-  audit_root "${BACKEND_ROOT:-}"
-  audit_root "${BFF_ROOT:-}"
-  for svc in ${SERVICE_ROOTS:-}; do audit_root "$svc"; done
-  audit_root "${FRONTEND_ROOT:-}"
-else
-  audit_root "."
+if [ -f .agents-v0/ci/run-backend-verify.sh ]; then
+  be_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Backend verify" || true)"
+  fe_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
+  if [ -n "$be_cmd" ]; then
+    ran=1
+    printf '--- Backend verify: %s ---\n' "$be_cmd"
+    sh -c "$be_cmd" || status=1
+  fi
+  if [ -n "$fe_cmd" ]; then
+    ran=1
+    printf '--- Frontend verify: %s ---\n' "$fe_cmd"
+    sh -c "$fe_cmd" || status=1
+  fi
 fi
 
 if [ "$ran" = 0 ]; then
-  printf 'WARN: no pom.xml, Gradle build, or package.json — run your project verify command manually\n'
+  if [ -f .agents-v0/ci/resolve-layout.sh ]; then
+    eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+    printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
+    audit_root "${BACKEND_ROOT:-}"
+    audit_root "${BFF_ROOT:-}"
+    for svc in ${SERVICE_ROOTS:-}; do audit_root "$svc"; done
+    audit_root "${FRONTEND_ROOT:-}"
+  else
+    audit_root "."
+  fi
+fi
+
+if [ "$ran" = 0 ]; then
+  printf 'WARN: no profile verify command or recognized build file — run your project verify command manually\n'
   printf 'See docs/agents-v0/brownfield-onboarding.md\n'
   exit 2
 fi

@@ -333,11 +333,16 @@ endpoint-auth:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
         - "**/*.java"
+        - "**/*.kt"
         - "**/*.cs"
         - "**/*.py"
         - "**/*.go"
         - "**/*.ts"
+        - "**/*.js"
+        - "**/*.rs"
+        - "**/*.rb"
         - "**/.agents-v0/packs/*/pack.json"
+        - docs/agents-v0/project-profile.md
   before_script:
     - apk add --no-cache git python3
   script:

@@ -47,6 +47,12 @@ cap() {
     [ -f "$r/build.gradle.kts" ] && printf -- '- Gradle: `%s/build.gradle.kts`\n' "$r"
     [ -f "$r/package.json" ] && printf -- '- Node: `%s/package.json`\n' "$r"
     [ -f "$r/pnpm-workspace.yaml" ] && printf -- '- pnpm workspace: `%s/pnpm-workspace.yaml`\n' "$r"
+    [ -f "$r/go.mod" ] && printf -- '- Go: `%s/go.mod`\n' "$r"
+    [ -f "$r/pyproject.toml" ] && printf -- '- Python: `%s/pyproject.toml`\n' "$r"
+    [ -f "$r/Cargo.toml" ] && printf -- '- Rust: `%s/Cargo.toml`\n' "$r"
+    for cs in "$r"/*.sln "$r"/*.csproj; do
+      [ -f "$cs" ] && printf -- '- .NET: `%s`\n' "$cs"
+    done
   done
   [ -x ./mvnw ] && printf -- '- Maven wrapper at the repo root: `./mvnw`\n'
 
@@ -76,8 +82,8 @@ cap() {
 
   printf '\n## HTTP entry points\n\n'
   # shellcheck disable=SC2086
-  find . \( $PRUNE \) -prune -o -name '*.java' -print 2>/dev/null \
-    | xargs grep -l -E '@(RestController|Controller)\b' 2>/dev/null | sort \
+  find . \( $PRUNE \) -prune -o \( -name '*.java' -o -name '*.cs' -o -name '*.py' -o -name '*.go' -o -name '*.ts' \) -print 2>/dev/null \
+    | xargs grep -l -E '@(RestController|Controller)\b|\[ApiController\]|\bAPIRouter\b|\bgin\.Default\b|\bchi\.NewRouter\b' 2>/dev/null | sort \
     | sed 's:^\./:- Controller `:; s:$:`:' | cap 200
   # shellcheck disable=SC2086
   find . \( $PRUNE \) -prune -o -type f \( -name '+page.svelte' -o -name '+server.ts' -o -name '+page.server.ts' \) -print 2>/dev/null \

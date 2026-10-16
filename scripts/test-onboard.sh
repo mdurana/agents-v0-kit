@@ -145,7 +145,7 @@ has "baseline: unmeasured root is said so" "$d/baseline.md" "not measured"
 has "every inventory carries the commit" "$d/endpoints.txt" "commit:"
 
 (cd "$r" && DISCOVER_MAX=1 sh .agents-v0/scripts/discover-codebase.sh >/dev/null 2>&1)
-has "a capped list says it was cut" "$d/endpoints.txt" "TRUNCATED: showing 1 of 4"
+has "a capped list says it was cut" "$d/endpoints.txt" "TRUNCATED: showing 1 of 5"
 
 # baseline numbers from target/ reports
 mkdir -p "$o/target/surefire-reports" "$o/target/site/jacoco"

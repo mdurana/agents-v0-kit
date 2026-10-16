@@ -495,7 +495,7 @@ cat > "$kf/docs/agents-v0/project-profile.md" <<'EOF'
 
 | Scope | Interim minimum | Approver (Security + architecture) | Remove by |
 |-------|-----------------|------------------------------------|-----------|
-| 70 | x | @ada | 2027-01-01 |
+| services/order | 70 | @ada | 2027-01-01 |
 EOF
 expect_pass "gate metrics: one failure within a known_failures budget of 1 passes" "$kf" sh "$CI/check-gate-metrics.sh" "$m"
 printf '<testsuite tests="2" failures="1" errors="0" skipped="0"/>\n' > "$m/target/surefire-reports/TEST-c.xml"
@@ -506,7 +506,17 @@ rm -f "$m/target/surefire-reports/TEST-b.xml" "$m/target/surefire-reports/TEST-c
 printf '[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\n' > "$kf/one-failure.log"
 printf '[ERROR] Tests run: 3, Failures: 2, Errors: 0, Skipped: 0\n' > "$kf/two-failures.log"
 printf '[ERROR] COMPILATION ERROR : cannot find symbol\n' > "$kf/compile-error.log"
+printf 'Failed!  - Failed: 1, Passed: 4, Skipped: 0, Total: 5\n' > "$kf/dotnet-one.log"
+printf '=== 1 failed, 3 passed in 0.12s ===\n' > "$kf/pytest-one.log"
+printf 'Tests: 1 failed, 2 passed, 3 total\n' > "$kf/jest-one.log"
+printf -- '--- FAIL: TestOrder (0.01s)\n' > "$kf/go-one.log"
 expect_pass "known failures: one failure within the budget passes with --require-failures" "$kf" sh "$CI/check-known-failures.sh" --require-failures one-failure.log
+expect_pass "known failures: dotnet test failure within budget passes" "$kf" sh "$CI/check-known-failures.sh" --require-failures dotnet-one.log
+expect_pass "known failures: pytest failure within budget passes" "$kf" sh "$CI/check-known-failures.sh" --require-failures pytest-one.log
+expect_pass "known failures: jest/vitest failure within budget passes" "$kf" sh "$CI/check-known-failures.sh" --require-failures jest-one.log
+expect_pass "known failures: go test failure within budget passes" "$kf" sh "$CI/check-known-failures.sh" --require-failures go-one.log
+expect_pass "coverage ratchet: LINE_COVERAGE_PCT meets interim minimum" "$kf" env LINE_COVERAGE_PCT=75 COVERAGE_SCOPE=services/order sh "$CI/check-coverage-ratchet.sh"
+expect_fail "coverage ratchet: LINE_COVERAGE_PCT below interim minimum fails" "$kf" env LINE_COVERAGE_PCT=60 COVERAGE_SCOPE=services/order sh "$CI/check-coverage-ratchet.sh"
 expect_fail "known failures: two failures exceed the budget" "$kf" sh "$CI/check-known-failures.sh" --require-failures two-failures.log
 expect_fail "known failures: a compile error is not a known failure with --require-failures" "$kf" sh "$CI/check-known-failures.sh" --require-failures compile-error.log
 expect_pass "known failures: a log with no test failures still passes without the flag" "$kf" sh "$CI/check-known-failures.sh" compile-error.log

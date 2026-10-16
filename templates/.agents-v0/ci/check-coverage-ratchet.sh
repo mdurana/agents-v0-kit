@@ -2,9 +2,9 @@
 # check-coverage-ratchet.sh — fail expired or unapproved coverage_ratchet rows.
 #
 # Usage: sh .agents-v0/ci/check-coverage-ratchet.sh [docs/agents-v0/project-profile.md]
-# Optional: JACOCO_LINE_PCT and COVERAGE_SCOPE compare a measured line % to the
-# interim minimum of the matching active row. JaCoCo gates in Maven stay authoritative
-# for the org minimum; this script only enforces the recorded brownfield exception.
+# Optional: LINE_COVERAGE_PCT (or legacy JACOCO_LINE_PCT) and COVERAGE_SCOPE compare a measured
+# line % to the interim minimum of the matching active row. The pack's coverage gate stays
+# authoritative for the org minimum; this script only enforces the recorded brownfield exception.
 
 set -eu
 
@@ -28,7 +28,7 @@ if not section:
     raise SystemExit(0)
 
 today = datetime.date.today()
-pct = os.environ.get("JACOCO_LINE_PCT", "").strip()
+pct = (os.environ.get("LINE_COVERAGE_PCT") or os.environ.get("JACOCO_LINE_PCT") or "").strip()
 want_scope = os.environ.get("COVERAGE_SCOPE", "").strip()
 fail = False
 seen = False
@@ -70,7 +70,7 @@ for line in section.group(0).splitlines():
                 fail = True
                 continue
         except ValueError:
-            print("FAIL: JACOCO_LINE_PCT or interim minimum is not numeric", file=sys.stderr)
+            print("FAIL: LINE_COVERAGE_PCT / JACOCO_LINE_PCT or interim minimum is not numeric", file=sys.stderr)
             fail = True
             continue
     print(f"OK: coverage_ratchet {scope} interim {interim} until {remove}")

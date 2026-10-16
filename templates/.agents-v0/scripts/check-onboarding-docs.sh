@@ -44,7 +44,7 @@ import os
 import re
 import sys
 
-EXT = ("java|kt|ts|tsx|js|jsx|svelte|py|go|xml|yml|yaml|json|properties|sql|gradle|kts|md|sh|html|css|toml|tf|conf")
+EXT = ("java|kt|cs|rs|rb|php|swift|scala|c|cpp|h|hpp|ts|tsx|js|jsx|svelte|vue|py|go|xml|csproj|sln|yml|yaml|json|properties|sql|gradle|kts|md|sh|html|css|toml|tf|conf")
 CITE = re.compile(r"`([A-Za-z0-9_./@+\-]+\.(?:%s)):(\d+)(?:-(\d+))?`" % EXT)
 failures, unverified, checked, cites = [], 0, 0, 0
 line_counts = {}

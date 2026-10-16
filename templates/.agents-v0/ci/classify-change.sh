@@ -23,6 +23,7 @@
 # configuration. When in doubt it says yes.
 
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
 
 base="${1:-}"
 if [ -z "$base" ]; then
@@ -43,7 +44,8 @@ while [ $# -gt 0 ]; do
 done
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
-BASE="$base" HEAD="$head" REQUIRE_TRIVIAL="$require_trivial" MAX_LINES="$max_lines" python3 - <<'PY'
+DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE="$base" HEAD="$head" REQUIRE_TRIVIAL="$require_trivial" MAX_LINES="$max_lines" PACKLIB_DIR="$DIR" python3 - <<'PY'
 import os
 import re
 import subprocess
@@ -72,21 +74,54 @@ if not head:
 EVIDENCE = re.compile(r"^docs/agents-v0/(maintain|verify|build)/")
 DELIVERY = re.compile(r"^(docs/agents-v0/(requirements|milestones)/|docs/agents-v0/onboarding/report\.md$)")
 DOC = re.compile(r"(^docs/)|(\.(md|mdc|txt|adoc)$)|(^|/)(README|CHANGELOG|LICENSE)(\.[a-z]+)?$", re.I)
-LOCK = re.compile(r"(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|gradle\.lockfile|poetry\.lock)$")
-BUILD = re.compile(r"(^|/)(pom\.xml|build\.gradle(\.kts)?|gradle\.properties|package\.json|libs\.versions\.toml)$")
+LOCK = re.compile(
+    r"(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|gradle\.lockfile|poetry\.lock|"
+    r"uv\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|packages\.lock\.json|composer\.lock|Gemfile\.lock)$"
+)
+BUILD = re.compile(
+    r"(^|/)(pom\.xml|build\.gradle(\.kts)?|gradle\.properties|package\.json|libs\.versions\.toml|"
+    r"go\.mod|pyproject\.toml|requirements([\w.-]*)\.txt|Pipfile|Cargo\.toml|"
+    r"Directory\.Build\.props|Directory\.Packages\.props|[^/]+\.csproj)$"
+)
+
+pack_detect = []
+packlib_dir = os.environ.get("PACKLIB_DIR") or ""
+if packlib_dir and os.path.isfile(os.path.join(packlib_dir, "packlib.py")):
+    sys.path.insert(0, packlib_dir)
+    import packlib
+    for m in packlib.all_manifests():
+        pack_detect.extend(m.get("detect") or [])
+
+
+def is_build_file(path):
+    if BUILD.search(path):
+        return True
+    bname = os.path.basename(path)
+    for pat in pack_detect:
+        if pat.startswith("*.") and bname.endswith(pat[1:]):
+            return True
+        if bname == pat:
+            return True
+    return False
+
+
 SEC_PATH = re.compile(r"(secur|auth|login|logout|session|jwt|oauth|saml|upload|cors|csrf|permission|rbac|acl|"
                       r"hooks\.server|\+server\.|\+page\.server|\+layout\.server|nginx.*\.conf|^Dockerfile|/Dockerfile|"
-                      r"\.gitlab-ci|\.github/workflows|application[\w.-]*\.(ya?ml|properties)$)", re.I)
+                      r"\.gitlab-ci|\.github/workflows|application[\w.-]*\.(ya?ml|properties)$|appsettings[\w.-]*\.json$)", re.I)
 SEC_LINE = re.compile(r"@(PreAuthorize|PostAuthorize|Secured|RolesAllowed|RestController|Controller|RequestMapping|"
-                      r"GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping|CrossOrigin|EnableWebSecurity|EnableMethodSecurity)\b|"
+                      r"GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping|CrossOrigin|EnableWebSecurity|EnableMethodSecurity|UseGuards|Public)\b|"
+                      r"\[(Authorize|AllowAnonymous|HttpGet|HttpPost|HttpPut|HttpPatch|HttpDelete)\b|"
                       r"permitAll|permit-all|csrf|HttpSecurity|SecurityFilterChain|JwtDecoder|MultipartFile|"
                       r"localStorage|sessionStorage|document\.cookie|Authorization|setAllowedOrigins", re.I)
-SCHEMA_PATH = re.compile(r"(db/migration|db/changelog|\.sql$)", re.I)
-SCHEMA_LINE = re.compile(r"@Entity\b|@Table\b|createTable|alter table|drop table", re.I)
+SCHEMA_PATH = re.compile(r"(db/migrations?|db/changelog|alembic/versions|/migrations/|\.sql$)", re.I)
+SCHEMA_LINE = re.compile(r"@Entity\b|@Table\b|DbSet<|__tablename__|createTable|alter table|drop table", re.I)
 VERSION_LINE = re.compile(
     r"^\s*(<([\w.-]*version[\w.-]*)>[^<]*</\2>|<version>[^<]*</version>|[\w.-]*[vV]ersion\s*[=:]\s*['\"]?[\w.\-+]+['\"]?,?"
+    r"|<(PackageReference|PackageVersion)\s+Include=\"[^\"]+\"\s+Version=\"[\w.\-+]+\"\s*/>"
     r"|\"[@\w/.\-]+\":\s*\"[\^~<>=]*\s*\d[\w.\-+|<>=^~ *]*\",?"
     r"|\s*(api|implementation|compileOnly|runtimeOnly|testImplementation|classpath)\s*\(?['\"][\w.\-]+:[\w.\-]+:[\w.\-+]+['\"]\)?"
+    r"|(?:require\s+)?[A-Za-z0-9_.\-/]+\s+v\d+\.\d+\.\d+[\w.\-+]*(\s+//\s*indirect)?"
+    r"|[A-Za-z0-9_.\-]+(\[[A-Za-z0-9_,.\-]+\])?\s*(==|~=|>=|<=|\^)\s*\d+\.\d+[\w.\-+]*"
     r"|[\w.\-]+\s*=\s*\"[\w.\-+]+\"|\s*id\s+['\"][\w.\-]+['\"]\s+version\s+['\"][\w.\-+]+['\"])\s*$")
 NUMBER = re.compile(r"\d+\.\d+(?:\.\d+)?")
 
@@ -126,7 +161,7 @@ for name in names:
         reasons.append(f"schema: {name}")
     src_lines += len(changed)
     # A bump replaces lines one for one; an added or removed line is a new or dropped dependency.
-    if (BUILD.search(name) and changed and len(added) == len(removed)
+    if (is_build_file(name) and changed and len(added) == len(removed)
             and all(VERSION_LINE.match(ln) or not ln.strip() for ln in changed)):
         dep_files.append(name)
         old = [v for ln in removed for v in NUMBER.findall(ln)]

@@ -35,6 +35,8 @@ printf '@RestController\npublic class BarController {\n  @GetMapping("/x") Strin
 printf '# Readme\n' > "$r/README.md"
 printf '{\n  "scripts": {\n    "test": "jest"\n  },\n  "dependencies": {\n    "express": "^4.18.2"\n  }\n}\n' > "$r/package.json"
 printf 'dependencies {\n  implementation '"'"'org.a:b:1.0.0'"'"'\n}\n' > "$r/build.gradle"
+printf '<Project>\n  <ItemGroup>\n    <PackageReference Include="Serilog" Version="3.1.0" />\n  </ItemGroup>\n</Project>\n' > "$r/Orders.csproj"
+printf 'module example.com/app\n\nrequire github.com/gin-gonic/gin v1.9.1\n' > "$r/go.mod"
 cat > "$r/docs/agents-v0/requirements/old.md" <<'EOF'
 # Old feature
 
@@ -108,6 +110,13 @@ classified "classify: a package.json script change is code" "class=code"
 
 branch c-gradle; sedi "s|^}|  implementation 'org.c:d:2.0.0'\n}|" "$r/build.gradle"; commit gradle
 classified "classify: an added gradle dependency line is code" "class=code"
+
+branch c-csproj; sedi 's/3.1.0/3.1.1/' "$r/Orders.csproj"; commit csproj
+classified "classify: a csproj PackageReference bump is dependency-version" "class=dependency-version"
+classified "classify: a csproj patch bump is trivial-eligible" "trivial-eligible=yes"
+
+branch c-gomod; sedi 's/v1.9.1/v1.9.2/' "$r/go.mod"; commit gomod
+classified "classify: a go.mod require bump is dependency-version" "class=dependency-version"
 
 branch c-wt; sedi 's/3.2.5/3.2.7/' "$r/pom.xml"
 if (cd "$r" && sh .agents-v0/ci/classify-change.sh "$base_sha" 2>/dev/null) | grep -Fxq "class=dependency-version"; then pass "classify: the working tree is read when no head is given"; else fail "classify: the working tree is read when no head is given"; fi
