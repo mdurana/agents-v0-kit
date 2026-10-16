@@ -11,7 +11,7 @@ Verify phase playbook for the `code-reviewer` agent (`workflow-orchestration.mdc
 1. Read the changed files (diff or branch changes).
 2. Apply the `code-review.mdc` checklist:
    - Correctness: happy path, edge cases, failure modes.
-   - Security: parameterized SQL and sort/filter allowlists; XSS-safe rendering; log injection mitigated (`Encode.forJava`); no secrets; safe path handling; CSRF/CORS/BOLA; JWT claim checks; audit events when the diff touches those actions.
+   - Security: parameterized SQL and sort/filter allowlists; XSS-safe rendering; log injection mitigated the way the pack `backend.mdc` says; no secrets; safe path handling; CSRF/CORS/BOLA; JWT claim checks; audit events when the diff touches those actions.
    - API/events: boundary validation; DTOs not entities; idempotent event handling; HTTP semantics.
    - Observability: useful logs at state transitions; trace context propagated; no PII/secrets.
    - Complexity/coverage: methods ≤ 30 lines; cognitive complexity ≤ 15.

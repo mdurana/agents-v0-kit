@@ -20,7 +20,7 @@ Build phase playbook for the `backend-engineer` agent, used together with `imple
    - the outbox row exists when the domain write commits, and does not exist when it rolls back;
    - each compensation runs when its step fails;
    - a consumer accepts an older `eventVersion` that the schema still allows.
-8. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` as `implement-service` step 17 says.
+8. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` and `build-output.txt` as `implement-service` step 19 says. Do not read `build-output.txt` on the next attempt.
 
 ## Rule-compliance checklist
 - [ ] `api-and-events.mdc`: idempotent consumers, bounded retries, DLQ, outbox, envelope, additive `eventVersion`.

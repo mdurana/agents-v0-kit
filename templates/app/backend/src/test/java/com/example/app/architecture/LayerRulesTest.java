@@ -15,14 +15,14 @@ class LayerRulesTest {
     static final ArchRule domainIsIndependentOfWeb =
             noClasses()
                     .that().resideInAPackage("..domain..")
-                    .should().dependOnClassesThat().resideInAnyPackage("..web..", "..controller..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..web..", "..api..", "..controller..")
                     .because("domain must not depend on web layers")
                     .allowEmptyShould(true);
 
     @ArchTest
     static final ArchRule controllersDoNotUseEntities =
             noClasses()
-                    .that().resideInAPackage("..controller..")
+                    .that().resideInAnyPackage("..api..", "..controller..")
                     .should().dependOnClassesThat().resideInAPackage("..entity..")
                     .because("DTOs only at the edge")
                     .allowEmptyShould(true);

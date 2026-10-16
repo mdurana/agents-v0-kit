@@ -17,13 +17,13 @@ Documentation playbook for `/v0-deck`. It does not record a delivery approval. I
 3. **Product** sources, each of which must already carry an `Approved` row except the discovery file:
    - the roadmap (`roadmap`). Read the discovery file only at its `Discovery:` path.
    - `docs/agents-v0/design/system/context-map.md`, cited by an `Approved` `plan` row.
-   - `docs/agents-v0/design/system/arc-record.md` when it exists, with an `Approved` `arc` row.
+   - `docs/agents-v0/design/system/arc-record.md` when it exists. An `Approved` `arc` row on that file admits it. So does an `Approved` `architecture` row in `docs/agents-v0/architecture.md` whose Artifacts cell names that file.
    - every `docs/agents-v0/requirements/*.md` that has an `Approved` `intake` row. Skip a requirements file that does not. Do not fail the deck because some stories are not through Intake yet.
 4. **Delivery** sources are the product sources plus the milestone manifests and the release evidence named on `Approved` `release` rows. Skip a release report that has no `Approved` row.
-5. Refuse a source that lacks its `Approved` row. The discovery file is the exception: the roadmap row is the approval that admits it.
+5. Refuse a source that lacks its `Approved` row. The discovery file is one exception: the roadmap row is the approval that admits it. The ARC record is the other: an `Approved` `architecture` row that names the file admits it.
 6. Write the deck as markdown. Every figure, date, and metric is copied from a source. When a number is not in the sources, omit it. Scenario text is copied from the requirements artifact. Do not invent a problem statement.
 7. Use the outline for the kind. For `Non-technical`, an in-scope line is the scenario name only (`### AC-n — <name>`). For `Technical` and `Mixed`, also copy `Kind:` and the `Then` line.
-8. Write the params file with Audience, Decision, and one source line per file (`path`, approval date). The discovery line uses the roadmap approval date. A requirements line uses the date on its `Approved` `intake` row.
+8. Write the params file with Audience, Decision, and one source line per file (`path`, approval date). The discovery line uses the roadmap approval date. A requirements line uses the date on its `Approved` `intake` row. The ARC line uses the `arc` approval date, or the `architecture` approval date when that row names the file.
 9. Do not edit those sources. Do not add an `Approved` row.
 
 ### Intake outline
@@ -46,7 +46,7 @@ File: `docs/agents-v0/presentations/<roadmap-stem>.md` for product, and `docs/ag
 
 ## Rule-compliance checklist
 - [ ] Audience and decision were supplied by the user. Intake also names the feature.
-- [ ] Every source except the discovery file has an `Approved` row.
+- [ ] Every source except the discovery file has an `Approved` row. The ARC record may instead be named by an `Approved` `architecture` row.
 - [ ] The deck contains no number that the sources do not contain.
 - [ ] Non-technical in-scope lines are scenario names. Technical and Mixed lines also copy `Kind` and `Then`.
 - [ ] Requirements, design, and `Delivery approvals` were not edited.
