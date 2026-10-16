@@ -36,7 +36,7 @@ A plan passes when `docs/agents-v0/milestones/plan.md` has the milestone table a
 ## Run protocol
 
 1. Fix the inputs and record them in the result file: kit version (`VERSION`), model per role (`docs/agents-v0/model-routing-matrix.md`), CI host (GitLab).
-2. Run `/v0-roadmap`, approve it, then `/v0-architecture`, approve it, then `/v0-plan`. Run every story in dependency order with `/v0-deliver`. P0-A starts at `/v0-build`. One feature per git worktree (`scripts/feature-worktree.sh`). Approve each gate; count a gate as a re-approval when you sent work back. A story that adds a service is `Material: yes` and stops for the ARC record.
+2. Run `/v0-roadmap`, approve it, then `/v0-architecture`, approve it, then `/v0-plan`. Run every story in dependency order with `/v0-deliver`. P0-A starts at `/v0-build`. One feature per git worktree (`sh .agents-v0/scripts/feature-worktree.sh <feature>`). Approve each gate; count a gate as a re-approval when you sent work back. A story that adds a service is `Material: yes` and stops for the ARC record.
 3. Batch the Intake and Design approvals of the P2 stories once (`workflow-orchestration.mdc` Batch approval) and record that you did.
 4. Stop a story when its phase is `blocked` and record the blocked reason. Do not hand-edit code to unblock it; the point is what the kit does without help.
 5. After the last story, run `sh .agents-v0/scripts/delivery-metrics.sh . > docs/agents-v0/benchmark/results/<YYYY-MM-DD>-<kit-version>.md` in the project and add the manual rows below.
@@ -66,7 +66,7 @@ Copy this block into `docs/agents-v0/benchmark/results/<YYYY-MM-DD>-<kit-version
 Kit version: <VERSION>
 Models: <plan/build/review/debug model IDs from model-routing-matrix>
 CI host: GitLab
-Stories finished: <n>/12   Blocked: <n> (<story: reason>, ...)
+Stories finished: <n>/10   Blocked: <n> (<story: reason>, ...)
 Approved gates per story: <avg>   Re-approvals per story: <avg>
 Failed attempts per story: <avg>  Max in one story: <n>
 Critical findings at first Verify: <total>

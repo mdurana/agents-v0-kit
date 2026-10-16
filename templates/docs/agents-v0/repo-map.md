@@ -1,6 +1,6 @@
 # Repository map
 
-> Run `scripts/generate-repo-map.sh` during `/v0-onboard` to refresh this file.
+> Run `sh .agents-v0/scripts/generate-repo-map.sh` during `/v0-onboard` to refresh this file.
 
 ## Top-level layout
 

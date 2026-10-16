@@ -8,4 +8,4 @@ Copy these into a feature Design tree and replace `<placeholders>`. Prefer them 
 | `adr-sync-vs-async.md` → `docs/agents-v0/adr/<NN>-sync-vs-async.md` | Choosing sync HTTP vs async messaging between services |
 | `ux-spec-one-screen.md` → `docs/agents-v0/design/<feature>/ux-spec.md` | UI story with a single primary screen (still add mockups per state) |
 
-Still run `ci/check-design.sh`, `ci/check-openapi.sh`, and `ci/check-ux-spec.sh`. Snippets do not waive gates.
+Still run `sh .agents-v0/ci/check-design.sh`, `sh .agents-v0/ci/check-openapi.sh`, and `sh .agents-v0/ci/check-ux-spec.sh`. Snippets do not waive gates.
