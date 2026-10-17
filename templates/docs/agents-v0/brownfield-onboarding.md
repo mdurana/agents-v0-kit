@@ -88,5 +88,5 @@ A new program of more than one story, after the `onboard` row is approved, start
 ## References
 
 - [greenfield-onboarding.md](greenfield-onboarding.md) — new repos and P0 milestone
-- [compliance-matrix.md](compliance-matrix.md) — which gate enforces each rule
+- [agents-v0-kit.md](agents-v0-kit.md) — commands, records, and the checks CI runs
 - [user-guide.md](user-guide.md) — approver-facing workflow

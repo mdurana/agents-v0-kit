@@ -14,7 +14,7 @@ from pathlib import Path
 
 matrix_path = Path(sys.argv[1])
 matrix = matrix_path.read_text(encoding="utf-8")
-head = matrix.split("## Task execution", 1)[0]
+head = matrix.split("## Critical units", 1)[0]
 role_key = {
     "plan": "plan",
     "build": "build",

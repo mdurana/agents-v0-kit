@@ -25,4 +25,4 @@ Use for PRs, diffs, or explicit review requests.
 
 ## References
 
-`docs/agents-v0/security-standards.md`, `docs/agents-v0/gold-standards.md`, `docs/agents-v0/quality-quick-reference.md`
+`security-baseline.mdc`, `docs/agents-v0/gold-standards.md`, `docs/agents-v0/quality-gates.md`

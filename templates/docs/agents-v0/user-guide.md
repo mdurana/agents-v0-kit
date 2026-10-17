@@ -343,4 +343,4 @@ Make the portal better.
 6. After go-live: /v0-maintain + describe the issue.
 ```
 
-For technical setup, model routing, and compliance mapping, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--pack java --scaffold-app` for the Java archive), [brownfield-onboarding.md](brownfield-onboarding.md), [snippets/README.md](snippets/README.md).
+For technical setup and model routing, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--pack java --scaffold-app` for the Java archive), [brownfield-onboarding.md](brownfield-onboarding.md), [snippets/README.md](snippets/README.md).

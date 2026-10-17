@@ -1,8 +1,7 @@
 # Quality gate engineering principles
 
 > Toolchain wiring guidance. Referenced by `quality-and-testing.mdc` §Tooling —
-> "wire before heavy coding." Thresholds: `docs/agents-v0/quality-gates.md`. One-page
-> summary: `docs/agents-v0/quality-quick-reference.md`.
+> "wire before heavy coding." Thresholds: `docs/agents-v0/quality-gates.md`.
 
 ## Principle
 

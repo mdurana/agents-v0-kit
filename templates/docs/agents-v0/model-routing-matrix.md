@@ -22,37 +22,6 @@ Role IDs and defaults match `templates/.cursor/model-config.json` (installed to 
 
 
 
-## Task execution architecture
-
-```mermaid
-flowchart TD
-    plan["Plan role — program planning, requirements, architecture"]
-    build["Build role — multi-file diffs, terminal loops"]
-    critical["Build (critical) — security-trigger and saga units"]
-    review["Review role — code and security review"]
-    schemas["Schemas sub-tasks — contracts and unit tests"]
-    explore["Explore sub-tasks — repo mapping"]
-    debug["Debug sub-tasks — stack isolation"]
-    docs["Docs sub-tasks — doc drafting"]
-    documenter["Documenter — onboard as-is"]
-    orchestrator["Orchestrator — phase routing"]
-    plan --> build
-    plan --> critical
-    plan --> schemas
-    plan --> docs
-    build --> debug
-    build --> explore
-    review --> build
-    review --> critical
-    orchestrator --> plan
-    orchestrator --> build
-    documenter --> explore
-```
-
-
-
-
-
 ## Critical units
 
 The Build role is a fast, inexpensive model. Some units are where a wrong answer is costly: authentication and authorization, uploads, public routes, sagas, and event consumers. A unit is **critical** when the requirements artifact lists a security-review trigger for it, or when the story implements a saga or a consumer (`implement-messaging`). `/v0-build` launches the build agent for a critical unit, and `/v0-maintain` the maintenance agent for a fix that touches one, with the **Build (critical)** row: pass the **Plan** model ID as the launch override. The agent file is unchanged. Other units stay on the Build role.

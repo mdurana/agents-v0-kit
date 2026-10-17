@@ -65,7 +65,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | Triage | Docs-only or version-only, and only when `.agents-v0/ci/classify-change.sh` says so and a person confirms. |
 | Deploy | Optional, after the merge, one environment at a time. Records go in a later docs-only merge request. |
 
-`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, and `plan` rows, and the `arc` row when a story is `Material: yes` or `docs/agents-v0/design/system/arc-record.md` exists. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
+`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, and `plan` rows, and the `arc` row when a story is `Material: yes`. `docs/agents-v0/design/system/arc-record.md` is written by architecture and is not that approval. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
 
 ## Commands
 
@@ -250,7 +250,7 @@ On GitLab the gate scripts are read from the default branch, so a merge request 
 
 ## Hooks
 
-Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, hard reset, recursive delete, reading secret files (`.env`, SSH and GPG keys, cloud and cluster credentials, `*.pem` and `*.key`, `/proc/*/environ`), and commands that dump environment variables (`env`, `printenv`, `export -p`, `declare -x`, `compgen -e`). They block edits to every `.agents-v0/ci/*.sh` and `.agents-v0/scripts/*.sh`, `.agents-v0/hooks/pre-push`, and the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, `git rebase`, `git merge`, `git cherry-pick`, `git revert`, `git restore` (unless it only unstages), `git stash pop`/`drop`/`clear`, creating, deleting, or renaming a branch, a new worktree, `glab mr create`, `git tag`, a mutating `glab api` call, `sudo`, and piping a download into a shell or interpreter. Optional `.agents-v0/hooks/pre-push` skips branch-delete pushes (zero SHA). `after-edit.sh` warns on common VAPT mistakes and on new approval rows in delivery artifacts. CI and `CODEOWNERS` enforce the merge contract.
+Cursor runs the hook scripts via `.cursor/hooks.json`. `pre-shell.sh` blocks force-push, hard reset, recursive delete, reading secret files (`.env`, SSH and GPG keys, cloud and cluster credentials, `*.pem` and `*.key`, `/proc/*/environ`), and commands that dump environment variables (`env`, `printenv`, `export -p`, `declare -x`, `compgen -e`). They block edits to every `.agents-v0/ci/*.sh` and `.agents-v0/scripts/*.sh`, `.agents-v0/hooks/pre-push`, and the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, `git rebase`, `git merge`, `git cherry-pick`, `git revert`, `git restore` (unless it only unstages), `git stash pop`/`drop`/`clear`, creating, deleting, or renaming a branch, a new worktree, `glab mr create`, `git tag`, a mutating `glab api` call, `sudo`, and piping a download into a shell or interpreter. Optional `.agents-v0/hooks/pre-push` skips branch-delete pushes (zero SHA). `after-edit.sh` warns on common VAPT mistakes and on new approval rows in delivery artifacts. CI and `CODEOWNERS` enforce the merge contract.
 
 ## Rules and skills
 
@@ -291,8 +291,5 @@ A new Java repo starts with `bootstrap-greenfield.sh --pack java --scaffold-app`
 | How do I start a new repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
 | Intel Mac host tools? | [gold-standards.md](gold-standards.md) |
 | Design fill-in snippets (less invent) | [snippets/README.md](snippets/README.md) |
-| Should we thin always-on rules? | [token-optimization-assessment.md](token-optimization-assessment.md) |
-| Which check enforces which rule? | [compliance-matrix.md](compliance-matrix.md) |
 | Which model runs which role? | [model-routing-matrix.md](model-routing-matrix.md) |
-| How do we measure a first run? | [benchmark/reference-project.md](benchmark/reference-project.md) |
 | What command do I run? | `core/common/commands/<phase>.md` |

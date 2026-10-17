@@ -69,7 +69,6 @@ validate_target() {
   [ -x "$t/.agents-v0/ci/check-evidence.sh" ] || err "target ci/check-evidence.sh not executable"
   [ -f "$t/.gitlab/merge_request_templates/default.md" ] || err "target GitLab MR template missing"
   grep -Fq 'check-evidence' "$t/.gitlab/merge_request_templates/default.md" || err "target MR template lacks the evidence-check reference"
-  [ -f "$t/docs/agents-v0/compliance-matrix.md" ] || err "target docs/agents-v0/compliance-matrix.md missing"
   [ -f "$t/docs/agents-v0/model-routing-matrix.md" ] || err "target docs/agents-v0/model-routing-matrix.md missing"
   [ -f "$t/docs/agents-v0/user-guide.md" ] || err "target docs/agents-v0/user-guide.md missing"
   if [ -f "$t/.gitignore" ]; then
@@ -162,7 +161,7 @@ def cols(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 ids = {}
-for line in matrix.split("## Task execution", 1)[0].splitlines():
+for line in matrix.split("## Critical units", 1)[0].splitlines():
     if not line.startswith("|"):
         continue
     c = cols(line)
@@ -341,25 +340,26 @@ grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.
 for artifact in templates/.gitlab-ci.yml templates/.gitlab/merge_request_templates/default.md templates/docs/agents-v0/architecture.md templates/docs/agents-v0/network.md templates/docs/agents-v0/project-profile.md templates/docs/agents-v0/requirements/_state.template.json templates/.gitlab/CODEOWNERS templates/.agents-v0/ci/check-approvals.sh templates/.agents-v0/ci/check-evidence.sh templates/.agents-v0/ci/check-milestone.sh templates/.agents-v0/ci/check-delivery-linkage.sh templates/.agents-v0/ci/check-approver-gitlab.sh templates/.agents-v0/ci/check-coverage-ratchet.sh templates/.agents-v0/ci/check-known-failures.sh templates/.agents-v0/ci/resolve-layout.sh templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh templates/.agents-v0/scripts/check-delivery-gate-local.sh templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh templates/.agents-v0/scripts/export-audit-pack.sh templates/.agents-v0/hooks/pre-push templates/.cursor/model-config.json templates/docs/agents-v0/milestones/_template.md templates/docs/agents-v0/milestones/p0-platform-skeleton.md templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md templates/docs/agents-v0/milestones/p2-mvp-core-features.md templates/docs/agents-v0/milestones/p3-feature-expansion.md templates/docs/agents-v0/milestones/p4-hardening.md templates/docs/agents-v0/milestones/p5-release-readiness.md templates/docs/agents-v0/repo-map.md templates/docs/agents-v0/workspace.manifest.json templates/.agents-v0/scripts/generate-repo-map.sh templates/.agents-v0/scripts/collect-dependency-graphs.sh templates/.agents-v0/scripts/sync-feature-state.sh templates/.agents-v0/scripts/delivery-metrics.sh templates/.agents-v0/ci/check-feature-state.sh templates/docs/agents-v0/greenfield-onboarding.md templates/docs/agents-v0/brownfield-onboarding.md templates/.agents-v0/scripts/run-local-container.sh templates/docker-compose.yml templates/docker/README.md core/java/starters/docker/Dockerfile.spring-boot templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/docker/nginx-spa.conf templates/docker/docker-compose.postgres.yml core/java/starters/maven/checkstyle.xml core/java/starters/maven/dependency-check-suppressions.xml core/java/starters/maven/quality-plugins-ci-security.xml core/java/starters/maven/contract-conformance.xml core/java/starters/maven/archunit/LayerRulesTest.java templates/docs/agents-v0/design/ux-spec.md templates/docs/agents-v0/design/system/context-map.md templates/docs/agents-v0/design/system/nfr-slo.md templates/docs/agents-v0/design/system/threat-model.md templates/docs/agents-v0/design/system/slo-evidence.md templates/.agents-v0/ci/check-gate-metrics.sh templates/.agents-v0/ci/check-event-schemas.sh templates/.agents-v0/ci/check-asyncapi.sh templates/.agents-v0/scripts/feature-worktree.sh templates/.agents-v0/scripts/check-attempt-budget.sh; do
   [ -f "$artifact" ] || err "required artifact template missing: $artifact"
 done
-for doc in compliance-matrix.md model-routing-matrix.md user-guide.md agents-v0-kit.md greenfield-onboarding.md brownfield-onboarding.md benchmark/reference-project.md; do
+for doc in model-routing-matrix.md user-guide.md agents-v0-kit.md greenfield-onboarding.md brownfield-onboarding.md; do
   tpl="templates/docs/agents-v0/$doc"
   [ -f "$tpl" ] || err "$tpl missing (install.sh will not seed docs/agents-v0/$doc)"
 done
 # Rules cite these paths. Seed them on install. Refresh the kit-owned copies on --update.
 # quality-gates.md and gold-standards.md stay if the target already filled them.
-for doc in security-standards.md security/vapt-prevention-guardrails.md security/vapt-pr-checklist.md quality-gates.md quality-quick-reference.md quality-gates-engineering-principles.md gold-standards.md; do
+for doc in quality-gates.md quality-gates-engineering-principles.md gold-standards.md; do
   grep -Fq "docs/agents-v0/$doc" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$doc"
 done
-for doc in security-standards.md security/vapt-prevention-guardrails.md security/vapt-pr-checklist.md quality-quick-reference.md quality-gates-engineering-principles.md; do
+for doc in quality-gates-engineering-principles.md; do
   awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq "docs/agents-v0/$doc" || err "install.sh --update does not refresh docs/agents-v0/$doc"
 done
 if grep -Fq 'docs/security-standards.md' core/common/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/security-standards.md"; fi
 if grep -Fq 'docs/quality-quick-reference.md' core/common/rules/*.mdc templates/docs/agents-v0/*.md; then err "a rule or doc still cites docs/quality-quick-reference.md"; fi
+if grep -Fq 'compliance-matrix.md' core/common/rules/*.mdc templates/docs/agents-v0/*.md README.md AGENTS.md; then err "a rule or doc still cites compliance-matrix.md"; fi
 grep -Fq 'F4, F8, F9, F10' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit.md must describe the always-on VAPT gate"
 if grep -Fq 'Any applicable VAPT item left unchecked is Critical' templates/docs/agents-v0/agents-v0-kit.md; then err "agents-v0-kit.md still treats every unchecked VAPT item as Critical"; fi
 grep -Fq '## Applicable VAPT findings' templates/docs/agents-v0/design/system/threat-model.md || err "threat-model template must name the always-on VAPT findings"
-grep -Fq '("docs/security-standards.md", "docs/agents-v0/security-standards.md")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/security-standards.md"
-grep -Fq '("docs/quality-quick-reference.md", "docs/agents-v0/quality-quick-reference.md")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/quality-quick-reference.md"
+grep -Fq '("docs/security-standards.md", "security-baseline.mdc")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/security-standards.md"
+grep -Fq '("docs/quality-quick-reference.md", "docs/agents-v0/quality-gates.md")' scripts/migrate-agents-v0-paths.py || err "path migrator must rewrite docs/quality-quick-reference.md"
 grep -Fq '## Applicable VAPT findings' scripts/install.sh || err "install.sh must add the VAPT section to an existing threat model"
 if awk '/always_on_update="/,/^"/' scripts/install.sh | grep -Fq 'threat-model.md'; then err "install.sh --update must not overwrite threat-model.md"; fi
 
@@ -400,7 +400,7 @@ grep -Fq 'check-failure-brief.sh' scripts/install.sh || err "install.sh does not
 grep -Fq 'snippets/openapi-resource-crud.yaml' core/common/skills/contract-first-design/SKILL.md || err "contract-first-design must prefer the OpenAPI snippet"
 grep -Fq 'Frontend verify (fast)' scripts/bootstrap-greenfield.sh || err "bootstrap must fill Frontend verify (fast)"
 grep -Fq 'must** use `Frontend verify (fast)' core/common/skills/implement-frontend/SKILL.md || err "implement-frontend must require a real fast verify cell"
-grep -Fq 'token-optimization-assessment.md' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must link the always-on trim assessment"
+if grep -Fq 'token-optimization-assessment.md' templates/docs/agents-v0/*.md; then err "a doc still cites token-optimization-assessment.md"; fi
 grep -Fq 'phase-result.md' core/common/agents/orchestrator.md || err "orchestrator does not write the phase result"
 grep -Fq 'together' core/common/commands/v0-verify.md || err "/v0-verify does not run the read-only reviewers together"
 grep -Fq 'build-output.txt' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not keep raw verify logs out of the next attempt"
@@ -419,8 +419,8 @@ grep -Fq 'docs/agents-v0/milestones/plan.md' core/common/commands/v0-plan.md || 
 grep -Fq 'so that' templates/docs/agents-v0/user-guide.md || err "user guide intake example lacks so that"
 grep -Fq 'milestone' core/common/commands/v0-intake.md || err "/v0-intake does not mention milestone programs"
 grep -Fq 'Milestone programs' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not describe milestone programs"
-grep -Fq 'H-B pre-shell.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks pre-shell blocking classification"
-grep -Fq 'H-W after-edit.sh' templates/docs/agents-v0/compliance-matrix.md || err "compliance matrix lacks after-edit warning classification"
+grep -Fq 'pre-shell.sh' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must describe the pre-shell hook"
+grep -Fq 'after-edit.sh' templates/docs/agents-v0/agents-v0-kit.md || err "agents-v0-kit must describe the after-edit hook"
 
 # 15. Agent context ignore file.
 ignore="templates/.cursorignore"

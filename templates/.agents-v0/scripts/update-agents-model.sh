@@ -159,7 +159,7 @@ section_name = "intro"
 matrix_updated = 0
 for line in text.splitlines(keepends=True):
     bare = line.rstrip("\r\n")
-    if bare.startswith("## Task execution"):
+    if bare.startswith("## Critical units"):
         section_name = "after_roles"
     elif bare.startswith("## Kit agent mapping"):
         section_name = "agents"

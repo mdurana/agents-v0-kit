@@ -8,11 +8,9 @@ alwaysApply: false
 
 Baseline org standard for all services and frontends in this repository.
 
-**VAPT addendum:** `docs/agents-v0/security/vapt-prevention-guardrails.md` · Team rules: `vapt.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc`
+**VAPT rules:** `vapt.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc`. The PR checklist and its retest criteria are `vapt-pr-review.mdc`.
 
 **Verify gate.** Always-on findings are F4, F8, F9, and F10. An applicable miss is Critical. F1–F3 and F5–F7 are regression checks for the surface the diff touches. HIGH and MEDIUM block merge on that surface. LOW blocks only when the diff makes the issue exploitable.
-
-Traceability to OWASP ASVS 5.0.0 lives in `docs/agents-v0/compliance-matrix.md`.
 
 ---
 
@@ -167,8 +165,6 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 
 | Document | Purpose |
 |----------|---------|
-| `docs/agents-v0/security/vapt-prevention-guardrails.md` | VAPT retest matrix and prevention guardrails |
-| `docs/agents-v0/security/vapt-pr-checklist.md` | PR review checklist |
 | Team rules | `vapt.mdc`, `vapt-webapp.mdc`, `vapt-pr-review.mdc` |
 
 ---
@@ -178,7 +174,7 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 - Identify applicable regulations (GDPR, BSP, Data Privacy Act, internal GXI policies) per system
 - When the system stores regulated personal data, apply §3 (at rest), §7 (TLS), and §12 (audit events)
 - Security review required for: auth changes, new upload endpoints, RBAC changes, new public routes, and any `{id}` path
-- VAPT retest criteria: see `docs/agents-v0/security/vapt-prevention-guardrails.md` (Retest Matrix)
+- VAPT retest criteria: `vapt-pr-review.mdc`
 
 ---
 

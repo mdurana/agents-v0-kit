@@ -28,7 +28,7 @@ Default stack for the React example: **React 19, TypeScript 5.9, Vite 7, Vitest 
 ## XSS and untrusted HTML
 
 - Treat server and URL input as untrusted; **sanitize** or **avoid** `innerHTML` / `{@html}` / `dangerouslySetInnerHTML` unless allow-listed or passed through maintained sanitizer policy.
-- CSP per `security-baseline.mdc` and `docs/agents-v0/security-standards.md`.
+- CSP per `security-baseline.mdc`.
 
 ## React (default)
 

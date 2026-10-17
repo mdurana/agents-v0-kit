@@ -56,7 +56,7 @@ For **RFC 7807** (`application/problem+json`) vs custom envelope, see `api-and-e
 - `README.md` and `docs/agents-v0/diagrams/sequences/<service>.md` in the feature change
 - `docs/agents-v0/architecture.md` and `docs/agents-v0/network.md`: `/v0-onboard` or the P0 build. Later, a docs-only follow-up
 
-Authoritative refs (repo paths win if they differ): `docs/agents-v0/security-standards.md` + `security-baseline.mdc`; `docs/agents-v0/gold-standards.md`; `docs/agents-v0/quality-gates.md` / `docs/agents-v0/quality-quick-reference.md` + `quality-and-testing.mdc`.
+Authoritative refs (repo paths win if they differ): `security-baseline.mdc`; `docs/agents-v0/gold-standards.md`; `docs/agents-v0/quality-gates.md` + `quality-and-testing.mdc`.
 
 ## BFF and frontends
 
