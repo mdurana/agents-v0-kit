@@ -189,15 +189,31 @@ audit_root() {
   cd "$TARGET_ABS"
 }
 
+have_layout=0
+if [ -f .agents-v0/ci/resolve-layout.sh ]; then
+  eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+  have_layout=1
+fi
+
 if [ -f .agents-v0/ci/run-backend-verify.sh ]; then
   be_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Backend verify" || true)"
+  svc_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Service verify" || true)"
   fe_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
-  if [ -n "$be_cmd" ]; then
+  if [ -n "$be_cmd" ] && { [ "$have_layout" = 0 ] || [ -n "${BACKEND_ROOT:-}" ] || { [ -z "${BFF_ROOT:-}" ] && [ -z "${SERVICE_ROOTS:-}" ]; }; }; then
     ran=1
     printf '--- Backend verify: %s ---\n' "$be_cmd"
     sh -c "$be_cmd" || status=1
   fi
-  if [ -n "$fe_cmd" ]; then
+  if [ -n "$svc_cmd" ]; then
+    for r in ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
+      [ -n "$r" ] && [ -d "$r" ] || continue
+      ran=1
+      rcmd="$(printf '%s' "$svc_cmd" | sed "s|{root}|$r|g")"
+      printf '--- Service verify (%s): %s ---\n' "$r" "$rcmd"
+      sh -c "$rcmd" || status=1
+    done
+  fi
+  if [ -n "$fe_cmd" ] && { [ "$have_layout" = 0 ] || [ -n "${FRONTEND_ROOT:-}" ]; }; then
     ran=1
     printf '--- Frontend verify: %s ---\n' "$fe_cmd"
     sh -c "$fe_cmd" || status=1
@@ -205,8 +221,7 @@ if [ -f .agents-v0/ci/run-backend-verify.sh ]; then
 fi
 
 if [ "$ran" = 0 ]; then
-  if [ -f .agents-v0/ci/resolve-layout.sh ]; then
-    eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+  if [ "$have_layout" = 1 ]; then
     printf 'Layout profile: %s\n' "${LAYOUT_PROFILE:-unset}"
     audit_root "${BACKEND_ROOT:-}"
     audit_root "${BFF_ROOT:-}"

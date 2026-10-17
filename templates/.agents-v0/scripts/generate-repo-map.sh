@@ -91,8 +91,8 @@ cap() {
 
   printf '\n## HTTP entry points\n\n'
   # shellcheck disable=SC2086
-  find . \( $PRUNE \) -prune -o \( -name '*.java' -o -name '*.cs' -o -name '*.py' -o -name '*.go' -o -name '*.ts' \) -print 2>/dev/null \
-    | xargs grep -l -E '@(RestController|Controller)\b|\[ApiController\]|\.Map(Get|Post|Put|Patch|Delete)\b|\b(APIRouter|FastAPI)\b|\bgin\.(Default|New)\b|\bchi\.NewRouter\b' 2>/dev/null | sort \
+  find . \( $PRUNE \) -prune -o \( -name '*.java' -o -name '*.cs' -o -name '*.py' -o -name '*.go' -o -name '*.ts' -o -name '*.js' \) -print 2>/dev/null \
+    | xargs grep -l -E '@(RestController|Controller)\b|\[ApiController\]|\.Map(Get|Post|Put|Patch|Delete)\b|\b(APIRouter|FastAPI)\b|\burlpatterns\b|\b(express|Router)\(|\bgin\.(Default|New)\b|\bchi\.NewRouter\b|\bhttp\.HandleFunc\b' 2>/dev/null | sort \
     | sed 's:^\./:- Controller `:; s:$:`:' | cap 200
   # shellcheck disable=SC2086
   find . \( $PRUNE \) -prune -o -type f \( -name '+page.svelte' -o -name '+server.ts' -o -name '+page.server.ts' \) -print 2>/dev/null \

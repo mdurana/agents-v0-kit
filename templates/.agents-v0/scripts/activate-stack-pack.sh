@@ -232,6 +232,25 @@ def with_backend_root(text, command):
     return f"cd {root} && {body}"
 
 
+def with_frontend_root(text, command):
+    """Run the UI pack command in the profile Frontend root when that cell is filled."""
+    root = row_value(text, "Layout", "Frontend root")
+    if not root or "<!--" in root or root.strip().lower() in ("n/a", "na"):
+        return command
+    root = root.strip().strip("`").rstrip("/")
+    body = re.sub(r"^cd\s+\S+\s+&&\s+", "", command)
+    return f"cd {root} && {body}"
+
+
+def has_frontend_surface(text):
+    """Return False when Layout Profile is service or Frontend root is explicitly n/a."""
+    prof = row_value(text, "Layout", "Profile").strip().strip("`").lower()
+    froot = row_value(text, "Layout", "Frontend root").strip().strip("`").lower()
+    if prof == "service" or froot in ("n/a", "na"):
+        return False
+    return True
+
+
 text = read_profile()
 existing = packlib.profile_pack(profile_path)
 if detect:
@@ -260,12 +279,13 @@ mapping = [
     ("Commands", "Backend verify (fast, no OWASP)", info.get("verifyFast", "")),
 ]
 ui = info.get("uiPack") or {}
-if ui.get("stack"):
-    mapping.append(("Stack", "Frontend", ui["stack"]))
-if ui.get("verify"):
-    mapping.append(("Commands", "Frontend verify", ui["verify"]))
-if ui.get("verifyFast"):
-    mapping.append(("Commands", "Frontend verify (fast)", ui["verifyFast"]))
+if has_frontend_surface(text):
+    if ui.get("stack"):
+        mapping.append(("Stack", "Frontend", ui["stack"]))
+    if ui.get("verify"):
+        mapping.append(("Commands", "Frontend verify", ui["verify"]))
+    if ui.get("verifyFast"):
+        mapping.append(("Commands", "Frontend verify (fast)", ui["verifyFast"]))
 if info.get("serviceVerify"):
     mapping.append(("Commands", "Service verify", info["serviceVerify"]))
 if info.get("serviceVerifyFast"):
@@ -285,10 +305,13 @@ for heading, row, value in mapping:
         if (heading, row) in optional:
             continue
         fail(f"{requested} pack.json has no {row}", 1)
-    owned = heading == "Commands" and row.startswith("Backend verify")
-    if owned:
+    owned_be = heading == "Commands" and row.startswith("Backend verify")
+    owned_fe = heading == "Commands" and row.startswith("Frontend verify")
+    if owned_be:
         value = with_backend_root(text, value)
-    text = set_row(text, heading, row, value, force or owned)
+    elif owned_fe:
+        value = with_frontend_root(text, value)
+    text = set_row(text, heading, row, value, force or owned_be or owned_fe)
 os.makedirs(os.path.dirname(profile_path), exist_ok=True)
 with open(profile_path, "w", encoding="utf-8") as handle:
     handle.write(text)

@@ -14,7 +14,7 @@ command -v python3 >/dev/null 2>&1 || { err "python3 not found"; exit 1; }
 command -v dash >/dev/null 2>&1 && DASH=dash || DASH=sh
 
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+trap 'rc=$?; rm -rf "$scratch"; exit $rc' EXIT INT TERM
 cd "$scratch"
 
 json_str() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }

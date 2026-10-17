@@ -5,7 +5,7 @@ set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'rc=$?; rm -rf "$tmp"; exit $rc' EXIT INT TERM
 status=0
 
 pass() { printf 'ok: %s\n' "$1"; }

@@ -9,7 +9,7 @@ KIT="$(cd "$(dirname "$0")/.." && pwd)"
 CI="$KIT/templates/.agents-v0/ci"
 SC="$KIT/templates/.agents-v0/scripts"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'rc=$?; rm -rf "$tmp"; exit $rc' EXIT INT TERM
 status=0
 
 pass() { printf 'ok: %s\n' "$1"; }
@@ -707,6 +707,27 @@ if (cd "$d" && sh "$act" --detect) >/dev/null 2>&1; then
 else
   pass "activate-stack-pack --detect rejects two backend markers"
 fi
+d="$tmp/activate-service-only"
+mkdir -p "$d/docs/agents-v0" "$d/app/backend"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Profile | <!-- service, ui, or app --> |/| Profile | service |/' "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Backend root | <!-- `app\/backend\/` or n\/a --> |/| Backend root | `app\/backend\/` |/' "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Frontend root | <!-- `app\/frontend\/` or n\/a --> |/| Frontend root | n\/a |/' "$d/docs/agents-v0/project-profile.md"
+expect_pass "activate-stack-pack binds dotnet on a service-only profile" "$d" sh "$act" dotnet
+if grep -Fq '| Frontend verify | npm run verify |' "$d/docs/agents-v0/project-profile.md"; then
+  fail "activate-stack-pack must not populate Frontend verify when Profile is service"
+else
+  pass "activate-stack-pack skips Frontend verify when Profile is service"
+fi
+d="$tmp/activate-app-fe"
+mkdir -p "$d/docs/agents-v0" "$d/app/backend" "$d/app/frontend"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Profile | <!-- service, ui, or app --> |/| Profile | app |/' "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Backend root | <!-- `app\/backend\/` or n\/a --> |/| Backend root | `app\/backend\/` |/' "$d/docs/agents-v0/project-profile.md"
+sedi 's/| Frontend root | <!-- `app\/frontend\/` or n\/a --> |/| Frontend root | `app\/frontend\/` |/' "$d/docs/agents-v0/project-profile.md"
+expect_pass "activate-stack-pack binds dotnet on an app profile" "$d" sh "$act" dotnet
+grep -Fq '| Frontend verify | cd app/frontend && npm run verify |' "$d/docs/agents-v0/project-profile.md" \
+  && pass "activate-stack-pack prefixes Frontend root on Frontend verify" || fail "activate-stack-pack prefixes Frontend root on Frontend verify"
 
 link="$tmp/link-project"
 mkdir -p "$link"
@@ -1091,7 +1112,7 @@ expect_fail "check-milestone fails when the approved pack is incomplete" "$d" sh
 # --- collect-gate-reports.sh fail-closed CVE & pip-audit format --------------
 d="$tmp/cve-fail-closed"
 mkdir -p "$d/.agents-v0/packs/python" "$d/docs/agents-v0"
-cp "$ROOT/core/python/pack.json" "$d/.agents-v0/packs/python/pack.json"
+cp "$KIT/core/python/pack.json" "$d/.agents-v0/packs/python/pack.json"
 cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
 ## Stack
 
@@ -1102,7 +1123,7 @@ EOF
 cat > "$d/coverage.xml" <<'EOF'
 <coverage line-rate="0.90"><packages><package><classes><class filename="app.py"><lines><line number="1" hits="1"/></lines></class></classes></package></packages></coverage>
 EOF
-cat > "$d/junit.xml" <<'EOF'
+cat > "$d/pytest-report.xml" <<'EOF'
 <testsuite tests="1" failures="0" errors="0"><testcase classname="t" name="ok"/></testsuite>
 EOF
 # Run collect-gate-reports with PATH stripped of pip-audit so no scanner runs
@@ -1123,8 +1144,8 @@ expect_fail "check-gate-metrics fails closed on pip-audit dependencies[].vulns[]
 # --- .gitlab-ci.yml build script multi-service execution ---------------------
 d="$tmp/gitlab-build-sim"
 mkdir -p "$d/.agents-v0/ci" "$d/.agents-v0/packs/node" "$d/docs/agents-v0" "$d/services/orders"
-cp "$CI/"*.sh "$d/.agents-v0/ci/"
-cp "$ROOT/core/node/pack.json" "$d/.agents-v0/packs/node/pack.json"
+cp "$CI/"*.sh "$CI/"*.py "$d/.agents-v0/ci/"
+cp "$KIT/core/node/pack.json" "$d/.agents-v0/packs/node/pack.json"
 cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
 ## Stack
 
@@ -1132,22 +1153,22 @@ cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
 |-------|--------|
 | Pack | node |
 
-## Layout & commands
+## Commands
 
-| Field | Value |
-|-------|--------|
-| Service verify | cd <root> && echo "ran-service-verify" > verified.txt && mkdir -p coverage && printf "SF:src/index.ts\nDA:1,1\nLF:1\nLH:1\nend_of_record\n" > coverage/lcov.info && printf "<testsuite tests=\"1\" failures=\"0\"/>\n" > junit.xml |
+| Purpose | Command |
+|---------|---------|
+| Service verify | cd {root} && echo "ran-service-verify" > verified.txt && mkdir -p coverage && printf '{"total":{"lines":{"pct":90}}}\n' > coverage/coverage-summary.json && printf '<testsuite tests="1" failures="0" errors="0"><testcase classname="t" name="ok"/></testsuite>\n' > junit.xml |
 EOF
-printf '{"name":"orders"}\n' > "$d/services/orders/package.json"
-python3 - "$ROOT/templates/.gitlab-ci.yml" "$d/run-build.sh" <<'PY'
+printf '{"name":"orders","dependencies":{"@nestjs/core":"10.0.0"}}\n' > "$d/services/orders/package.json"
+python3 - "$KIT/templates/.gitlab-ci.yml" "$d/run-build.sh" <<'PY'
 import sys, yaml
 ci = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 script = "\n".join(ci["build"]["script"])
 open(sys.argv[2], "w", encoding="utf-8").write(script + "\n")
 PY
-expect_pass ".gitlab-ci.yml build script executes Service verify across SERVICE_ROOTS and collects gate reports" "$d" sh run-build.sh
-if [ -f "$d/ci-artifacts/gate/services/orders/coverage/lcov.info" ] && [ -f "$d/services/orders/verified.txt" ]; then
-  pass ".gitlab-ci.yml build script staged coverage/lcov.info under ci-artifacts/gate/services/orders/"
+expect_pass ".gitlab-ci.yml build script executes Service verify across SERVICE_ROOTS and collects gate reports" "$d" env CI_PACK_IMAGE="node:22-bookworm" sh run-build.sh
+if [ -f "$d/ci-artifacts/gate/services/orders/coverage/coverage-summary.json" ] && [ -f "$d/services/orders/verified.txt" ]; then
+  pass ".gitlab-ci.yml build script staged coverage/coverage-summary.json under ci-artifacts/gate/services/orders/"
 else
   fail ".gitlab-ci.yml build script did not stage per-service gate artifacts"
 fi

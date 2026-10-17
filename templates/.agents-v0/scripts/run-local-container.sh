@@ -115,21 +115,27 @@ configure_docker_host_for_podman() {
 
 compose_cmd() {
   if [ "$ENGINE" = "podman" ] && podman compose version >/dev/null 2>&1; then
-    COMPOSE_FRONT=(podman compose)
+    COMPOSE_BIN="podman"
+    COMPOSE_SUB="compose"
+    COMPOSE_DISPLAY="podman compose"
     return 0
   fi
   if docker compose version >/dev/null 2>&1; then
     if [ "$ENGINE" = "podman" ]; then
       configure_docker_host_for_podman
     fi
-    COMPOSE_FRONT=(docker compose)
+    COMPOSE_BIN="docker"
+    COMPOSE_SUB="compose"
+    COMPOSE_DISPLAY="docker compose"
     return 0
   fi
   if command -v docker-compose >/dev/null 2>&1; then
     if [ "$ENGINE" = "podman" ]; then
       configure_docker_host_for_podman
     fi
-    COMPOSE_FRONT=(docker-compose)
+    COMPOSE_BIN="docker-compose"
+    COMPOSE_SUB=""
+    COMPOSE_DISPLAY="docker-compose"
     return 0
   fi
   return 1
@@ -178,7 +184,11 @@ if find_compose_file; then
     printf 'error: %s found but podman compose / docker compose is not available\n' "$COMPOSE_FILE" >&2
     exit 1
   fi
-  set -- "${COMPOSE_FRONT[@]}" -f "$COMPOSE_FILE"
+  if [ -n "$COMPOSE_SUB" ]; then
+    set -- "$COMPOSE_BIN" "$COMPOSE_SUB" -f "$COMPOSE_FILE"
+  else
+    set -- "$COMPOSE_BIN" -f "$COMPOSE_FILE"
+  fi
   if [ "$DO_DOWN" -eq 1 ]; then
     printf 'Stopping compose stack (%s)...\n' "$COMPOSE_FILE"
     "$@" down
@@ -192,7 +202,7 @@ if find_compose_file; then
   "$@"
   host_port="${APP_PORT:-8080}"
   printf '\nStack running (compose).\n'
-  printf '  Logs : %s -f %s logs -f\n' "${COMPOSE_FRONT[*]}" "$COMPOSE_FILE"
+  printf '  Logs : %s -f %s logs -f\n' "$COMPOSE_DISPLAY" "$COMPOSE_FILE"
   printf '  Down : sh .agents-v0/scripts/run-local-container.sh --down\n'
   printf '  URL  : http://localhost:%s (set APP_PORT / APP_CONTAINER_PORT in compose if needed)\n' "$host_port"
   exit 0

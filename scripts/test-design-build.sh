@@ -8,7 +8,7 @@ set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 CI="$KIT/templates/.agents-v0/ci"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'rc=$?; rm -rf "$tmp"; exit $rc' EXIT INT TERM
 status=0
 HAVE_YAML=0
 python3 -c 'import yaml' >/dev/null 2>&1 && HAVE_YAML=1
