@@ -13,3 +13,6 @@ target/
 build/
 out/
 dist/
+__pycache__/
+*.py[cod]
+*.bak

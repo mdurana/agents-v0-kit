@@ -25,7 +25,7 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 8. Add Alembic migrations, or Django migrations when the repo is already Django (`migration-safety`).
 9. Wire correlation ID and `traceparent`.
 10. Run the full Backend verify command once, with **bounded fix attempts (≤ 3 per failure)**.
-11. Persist the build report and `build-output.txt`.
+11. Persist `docs/agents-v0/build/<feature>/build-report.md` and `build-output.txt`.
 
 ## Rules you must satisfy
 - `backend.mdc` and `vapt.mdc` F1, F3, F4, F8, F9, F10.

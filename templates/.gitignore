@@ -89,6 +89,23 @@ dependency-check-report.html
 *.tfstate
 *.tfstate.*
 
+# --- Python / .NET / Go ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+bin/
+obj/
+TestResults/
+coverage.cobertura.xml
+coverage.xml
+pytest-report.xml
+coverage.out
+go-test.json
+cve-report.json
+
 # --- Misc ---
 *.orig
 *.rej
+*.bak

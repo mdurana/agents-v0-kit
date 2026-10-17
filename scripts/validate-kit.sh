@@ -12,6 +12,7 @@
 # CI scripts, seeded docs, ignore negations, exec bits. Model availability in
 # each tool is not verified.
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
 
 usage() {
   printf 'usage: %s                validate the kit itself (no arguments)\n' "$(basename "$0")" >&2
@@ -477,9 +478,12 @@ grep -Fq '.agents-v0/scripts/' scripts/install.sh || err "install.sh must chmod 
 grep -Fq 'Dockerfile and Compose' templates/docs/agents-v0/milestones/p0-platform-skeleton.md || err "P0 milestone must include the local container in the skeleton story"
 
 # 14. Build-hardening contracts survive in core.
-grep -Fq 'TDD' core/java/skills/implement-service/SKILL.md || err "implement-service lacks the red–green (TDD) requirement"
-grep -Fq 'bounded' core/java/skills/implement-service/SKILL.md || err "implement-service lacks bounded fix attempts"
-grep -Fq 'docs/agents-v0/build/' core/java/agents/backend-engineer.md || err "backend-engineer does not persist build evidence"
+for p in java dotnet node python go; do
+  grep -Fq 'TDD' "core/$p/skills/implement-service/SKILL.md" || err "$p implement-service lacks the red–green (TDD) requirement"
+  grep -Fq 'bounded' "core/$p/skills/implement-service/SKILL.md" || err "$p implement-service lacks bounded fix attempts"
+  grep -Fq 'migration-safety' "core/$p/skills/implement-service/SKILL.md" || err "$p implement-service must follow migration-safety for migrations"
+  grep -Fq 'docs/agents-v0/build/' "core/$p/agents/backend-engineer.md" || err "$p backend-engineer does not persist build evidence"
+done
 
 # 17. Consistency between prose and the files it describes (catches drift).
 agent_count="$(find core -path '*/agents/*.md' -exec basename {} \; | sort -u | wc -l | tr -d ' ')"
@@ -498,12 +502,15 @@ for ref in $(grep -rhoE '\(skills?: [^)]*\)' core/common/commands core/*/agents 
   find core -path "*/skills/$ref/SKILL.md" | grep -q . || err "a command or agent names skill $ref, which does not exist"
 done
 # Every engineer agent defers to the loop in its implement-* skill instead of restating it.
-grep -Fq 'implement-service` step 6' core/java/agents/backend-engineer.md || err "backend-engineer must defer to implement-service step 6"
-grep -Fq 'implement-bff` step 6' core/java/agents/bff-engineer.md || err "bff-engineer must defer to implement-bff step 6"
-grep -Fq 'implement-frontend` step 6' core/common/agents/frontend-engineer.md || err "frontend-engineer must defer to implement-frontend step 6"
-for f in core/java/skills/implement-service/SKILL.md core/java/skills/implement-bff/SKILL.md core/common/skills/implement-frontend/SKILL.md; do
-  grep -Fq 'check-attempt-budget.sh' "$f" || err "$f must run the phase attempt budget check"
+for p in java dotnet node python go; do
+  grep -Fq 'implement-service` step 6' "core/$p/agents/backend-engineer.md" || err "$p backend-engineer must defer to implement-service step 6"
+  grep -Fq 'implement-bff` step 6' "core/$p/agents/bff-engineer.md" || err "$p bff-engineer must defer to implement-bff step 6"
+  for f in "core/$p/skills/implement-service/SKILL.md" "core/$p/skills/implement-bff/SKILL.md"; do
+    grep -Fq 'check-attempt-budget.sh' "$f" || err "$f must run the phase attempt budget check"
+  done
 done
+grep -Fq 'implement-frontend` step 6' core/common/agents/frontend-engineer.md || err "frontend-engineer must defer to implement-frontend step 6"
+grep -Fq 'check-attempt-budget.sh' core/common/skills/implement-frontend/SKILL.md || err "implement-frontend must run the phase attempt budget check"
 # GitLab-only kit: conduct rule names glab; must not document GitHub/gh as a supported host.
 grep -Fq 'glab' core/common/rules/ai-agent-conduct.mdc || err "ai-agent-conduct.mdc must name glab (GitLab is the default host)"
 grep -Fq 'gh ' core/common/rules/ai-agent-conduct.mdc && err "ai-agent-conduct.mdc must not reference gh (GitLab-only kit)"

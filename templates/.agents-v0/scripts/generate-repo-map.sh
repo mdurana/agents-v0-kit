@@ -20,7 +20,7 @@ fi
 ROOTS="$(printf '%s' "$ROOTS" | tr -s ' ' | sed 's/^ //;s/ $//')"
 [ -n "$ROOTS" ] || ROOTS="."
 
-PRUNE='-name node_modules -o -name target -o -name .git -o -name dist -o -name build -o -name .svelte-kit -o -name .next'
+PRUNE='-name node_modules -o -name target -o -name .git -o -name dist -o -name build -o -name .svelte-kit -o -name .next -o -name bin -o -name obj -o -name .venv -o -name venv -o -name __pycache__'
 
 # cap <limit>: print the first <limit> lines of stdin, then say how many were cut.
 cap() {
@@ -71,11 +71,20 @@ cap() {
     if [ -f "$r/package.json" ] && grep -q '"workspaces"' "$r/package.json"; then
       printf -- '- npm workspaces declared in `%s/package.json`\n' "$r"
     fi
+    for sln in "$r"/*.sln; do
+      [ -f "$sln" ] || continue
+      grep -E '^Project\(' "$sln" 2>/dev/null | sed -E 's/.*=[[:space:]]*"[^"]+",[[:space:]]*"([^"]+)".*/\1/' | tr '\\' '/' | while IFS= read -r m; do
+        printf -- '- .NET project `%s/%s`\n' "$r" "$m"
+      done
+    done
+    if [ -f "$r/go.work" ]; then
+      printf -- '- Go workspace declared in `%s/go.work`\n' "$r"
+    fi
   done
 
   printf '\n## Source roots (heuristic)\n\n'
   for r in $ROOTS; do
-    for d in src/main/java src/test/java src/main/resources src app lib packages; do
+    for d in src/main/java src/test/java src/main/resources src app lib packages cmd internal pkg; do
       [ -d "$r/$d" ] && printf -- '- `%s/%s`\n' "$r" "$d"
     done
   done
@@ -83,7 +92,7 @@ cap() {
   printf '\n## HTTP entry points\n\n'
   # shellcheck disable=SC2086
   find . \( $PRUNE \) -prune -o \( -name '*.java' -o -name '*.cs' -o -name '*.py' -o -name '*.go' -o -name '*.ts' \) -print 2>/dev/null \
-    | xargs grep -l -E '@(RestController|Controller)\b|\[ApiController\]|\bAPIRouter\b|\bgin\.Default\b|\bchi\.NewRouter\b' 2>/dev/null | sort \
+    | xargs grep -l -E '@(RestController|Controller)\b|\[ApiController\]|\.Map(Get|Post|Put|Patch|Delete)\b|\b(APIRouter|FastAPI)\b|\bgin\.(Default|New)\b|\bchi\.NewRouter\b' 2>/dev/null | sort \
     | sed 's:^\./:- Controller `:; s:$:`:' | cap 200
   # shellcheck disable=SC2086
   find . \( $PRUNE \) -prune -o -type f \( -name '+page.svelte' -o -name '+server.ts' -o -name '+page.server.ts' \) -print 2>/dev/null \

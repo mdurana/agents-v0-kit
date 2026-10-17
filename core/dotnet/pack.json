@@ -29,8 +29,15 @@
       "suffix": ".cs",
       "marker": "\\[Http(Get|Post|Put|Patch|Delete)",
       "mapping": "\\[Http(Get|Post|Put|Patch|Delete)(?:\\(\\s*\"([^\"]*)\"\\))?",
-      "security": "\\[Authorize|\\[AllowAnonymous\\]",
+      "security": "\\[Authorize|\\[AllowAnonymous\\]|RequireAuthorization|AllowAnonymous",
       "name": "dotnet"
+    },
+    {
+      "suffix": ".cs",
+      "marker": "\\.Map(Get|Post|Put|Patch|Delete)\\s*\\(",
+      "mapping": "\\.Map(Get|Post|Put|Patch|Delete)\\s*\\(\\s*\"([^\"]*)\"",
+      "security": "RequireAuthorization|AllowAnonymous|\\[Authorize|\\[AllowAnonymous\\]",
+      "name": "dotnet-minimal"
     }
   ]
 }

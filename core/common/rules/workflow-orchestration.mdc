@@ -62,17 +62,17 @@ Once `docs/agents-v0/requirements/<feature>.md` exists, the phase command runs `
 
 Each feature has its own `docs/agents-v0/requirements/<feature>.md`, `docs/agents-v0/requirements/<feature>.state.json`, `docs/agents-v0/design/<feature>/`, `docs/agents-v0/build/<feature>/`, and `docs/agents-v0/verify/<feature>/`. Phases of different features may proceed in one checkout only when they do not write the same shared file.
 
-**Worktree per feature (preferred).** Run each in-flight feature in its own worktree and branch: `sh .agents-v0/scripts/feature-worktree.sh <feature>`. It needs one explicit user authorization per feature, and the hooks ask. `git status` is then per feature, and two features that change the same catalog meet in the merge request. With `Service roots`, the catalog is the owning service's `openapi/<service>-v1.yaml`. The stop conditions below apply in a shared checkout.
+**Worktree per feature (preferred).** Run each in-flight feature in its own worktree and branch: `sh .agents-v0/scripts/feature-worktree.sh <feature>` (one explicit user authorization per feature; hooks ask). `git status` is then per feature, and catalog edits meet in the merge request (`openapi/<service>-v1.yaml` with `Service roots`). The stop conditions below apply in a shared checkout.
 
-Shared files: `docs/agents-v0/project-profile.md`, the OpenAPI catalog (`openapi/api-v1.yaml` unless the profile names another file), `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/milestones/plan.md`, `README.md`, and build or CI files (`pom.xml`, `package.json`, `maven/`, `.gitlab-ci.yml`, `.gitlab/`). Ordinary feature work does not rewrite `docs/agents-v0/project-profile.md`. A layout, verify-command, or ratchet change is its own change. A feature contract draft under `docs/agents-v0/design/<feature>/` is not a shared file. Design writes that draft. Build merges the approved draft into the catalog.
+Shared files: `docs/agents-v0/project-profile.md`, the OpenAPI catalog (`openapi/api-v1.yaml` unless the profile names another file), `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/milestones/plan.md`, `README.md`, and build or CI files (`pom.xml`, `*.csproj`, `go.mod`, `pyproject.toml`, `package.json`, `.gitlab-ci.yml`, `.gitlab/`). Ordinary feature work does not rewrite `docs/agents-v0/project-profile.md`. A feature contract draft under `docs/agents-v0/design/<feature>/` is not shared: Design writes the draft; Build merges the approved draft into the catalog.
 
 Intake and Design for a second feature may write only that feature's requirements, state, and `docs/agents-v0/design/<feature>/` paths. Stop before editing a shared file when `git status` shows it is already modified, or when another feature's state file has `activeStatus` `in_progress`, `awaiting_approval`, or `blocked` for a phase that writes that file.
 
-Before `/v0-build`, `/v0-verify`, `/v0-release`, or `/v0-maintain`, stop if `git status` shows another feature's code or a shared-file edit that is not this feature's approved diff. Report the paths. Do not start the phase on that tree. Creating a branch needs explicit user authorization.
+Before `/v0-build`, `/v0-verify`, `/v0-release`, or `/v0-maintain`, stop if `git status` shows another feature's code or a shared-file edit that is not this feature's approved diff. Report the paths and do not start the phase on that tree. Creating a branch needs explicit user authorization.
 
-`/v0-status` and phase commands use the feature name the user gives. When the user does not name one, list the state files and ask. Do not assume the newest `*.state.json` is the feature they mean.
+`/v0-status` and phase commands use the feature name the user gives. When none is named, list the state files and ask; do not assume the newest `*.state.json`.
 
-**Milestone programs:** `docs/agents-v0/milestones/<milestone>.md` manifests group user stories. Each story runs the gated chain with approvals in its own feature artifact; story artifacts record `Milestone:` / `Story:` traceability. Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `.agents-v0/ci/check-approvals.sh` + `.agents-v0/ci/check-milestone.sh`. A P4 manifest that names `docs/agents-v0/design/system/slo-evidence.md` also needs that file at `verify` and `release`. Record each story as passed or blocked from its own state file. Do not merge those checkouts.
+**Milestone programs:** `docs/agents-v0/milestones/<milestone>.md` manifests group user stories. Each story runs the gated chain with approvals in its own feature artifact (`Milestone:` / `Story:` traceability). Milestone go/no-go is the `milestone` row in the manifest's `Delivery approvals` table, verified by `.agents-v0/ci/check-approvals.sh` + `.agents-v0/ci/check-milestone.sh`. A P4 manifest naming `docs/agents-v0/design/system/slo-evidence.md` also requires that file at `verify` and `release`. Record each story from its own state file; do not merge those checkouts.
 
 ## Change tiers
 
@@ -84,13 +84,13 @@ Pick the lightest tier that fits; record the tier in the handoff artifact.
 | **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Release |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design that name the applicable VAPT findings (always-on F4, F8, F9, F10, plus any regression finding the change touches); milestone manifest row |
 
-A fix, CVE patch, upgrade, or hotfix is recorded in `docs/agents-v0/maintain/<id>/note.md` (`Maintain-Note:` in the MR) with `Tier: trivial | standard | emergency`; trivial and emergency need a person's confirmation. Emergency may merge before Verify and owes it by its `Follow-up verify due` date. A maintenance change never borrows a feature artifact.
+A fix, CVE patch, upgrade, or hotfix is recorded in `docs/agents-v0/maintain/<id>/note.md` (`Maintain-Note:` in the MR) with `Tier: trivial | standard | emergency`; trivial and emergency need a person's confirmation. Emergency may merge before Verify and owes it by `Follow-up verify due`. A maintenance change never borrows a feature artifact.
 
 ## Helper agents
 
-Phase agents do not launch helper agents. Helpers are `explore-researcher`, `schema-author`, `debug-investigator`, and `docs-author`. A known `/api/v1` contract launches `schema-author` in the same turn, with no brief. Any other helper is a brief the phase agent writes and returns; the main session launches it and passes its `return:` back. Launch each brief once. The same `ask` again is a loop: stop. Delete the brief once the result is back.
+Phase agents do not launch helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`). A known `/api/v1` contract launches `schema-author` in the same turn with no brief. Any other helper is a brief the phase agent writes and returns; the main session launches it once and passes `return:` back. Repeating the same `ask` is a loop: stop. Delete the brief once the result is back.
 
-A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fields to return), and `ask:` (one paragraph naming the files and the rules to follow).
+A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fields to return), and `ask:` (one paragraph naming the files and rules).
 
 | Phase | Brief |
 |-------|--------|
@@ -103,15 +103,15 @@ A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fi
 
 ## Phase result
 
-When a phase reaches `awaiting_approval` or `blocked`, write `docs/agents-v0/requirements/<feature>.phase-result.md` before stopping, with `phase`, `status` (`awaiting_approval` or `blocked`), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes. It is per feature and is not a shared file.
+When a phase reaches `awaiting_approval` or `blocked`, write `docs/agents-v0/requirements/<feature>.phase-result.md` before stopping, with `phase`, `status` (`awaiting_approval` or `blocked`), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes (per-feature, not shared).
 
 ## Command results
 
-Each verify attempt appends a card to `docs/agents-v0/build/<feature>/build-report.md`. The card columns are Command, Exit, Attempt, Failing test, and Location (`file:line`). The raw log may stay in CI or in `build-output.txt`. The next attempt must not read `build-output.txt`.
+Each verify attempt appends a card (Command, Exit, Attempt, Failing test, Location `file:line`) to `docs/agents-v0/build/<feature>/build-report.md`. Raw logs stay in CI or `build-output.txt`; the next attempt must not read `build-output.txt`.
 
 ## Phase attempt budget
 
-The per-test limit does not bound a cascade of different failures. A phase also has a total budget of failed cards (Exit not 0): the `Phase attempt budget` row in `docs/agents-v0/project-profile.md`, default 8. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`. On exit 1, record `blocked` with reason `attempt budget exhausted`, write the phase result, and stop. Only the user raises the budget, by editing the profile row.
+A phase has a total budget of failed cards (Exit not 0): the `Phase attempt budget` row in `docs/agents-v0/project-profile.md` (default 8). Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`. On exit 1, record `blocked` with reason `attempt budget exhausted`, write the phase result, and stop. Only the user raises the budget in the profile row.
 
 ## Conduct model (from `ai-agent-conduct.mdc`)
 
@@ -139,7 +139,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 **Approval recording:** record gate decision, approver, date, evidence paths, and N/A reasons in the phase handoff artifact's `Delivery approvals` table (`| Phase | Artifacts | Approver | Decision | Date |`). Never infer approval. Decision must be an explicit positive token (`Approved`; CI accepts `approved` / `yes` / `pass`). Include `commit: <sha>` in Build/Verify artifact columns when evidence is produced.
 
-**Batch approval.** Only the Intake and Design gates may be approved for several stories in one message, and only when the user names every story (`Approved: Design for P2-A, P2-B`). Each named story must be Standard tier with no security-review trigger, no open question, and no `Vertical slice: yes`; any other story is approved alone. Each story's artifact still gets its own row (the `orchestrator` holds the steps). Build, Verify, and Release are always per story.
+**Batch approval.** Only Intake and Design gates may be approved for several stories in one message when the user names every story (`Approved: Design for P2-A, P2-B`). Each named story must be Standard tier with no security-review trigger, no open question, and no `Vertical slice: yes`; any other story is approved alone. Each story's artifact still gets its own row (`orchestrator` holds the steps). Build, Verify, and Release are always per story.
 
 **Brownfield baseline:** if `docs/agents-v0/project-profile.md` documents `known_failures` or a ratchet plan, Build may proceed only when the profile allows it and new failures are not introduced.
 
@@ -150,16 +150,16 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment. A changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design. Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it. Any other such design, with no UX spec and no public route, pins and continues; the Design row is written with the Build approval. `Material: yes` does not use that shortcut.
-- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design. `.agents-v0/ci/check-arc.sh` checks it. P4 measures or waives the SLO rows in `slo-evidence.md`. The structural table is not an SLO list.
-- Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks) that name the applicable VAPT findings in `security-baseline.mdc` (always-on F4, F8, F9, F10).
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. `design-reviewer` when there is a draft, a UX spec, or a public route; otherwise pin without `review.md`. Pin (`design.lock`) includes the cited ADR. A later change is an amendment; a changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design (Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it). Any other such design with no UX spec and no public route pins and continues (Design row written with Build approval; `Material: yes` does not use that shortcut).
+- `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design (`.agents-v0/ci/check-arc.sh`). P4 measures or waives SLO rows in `slo-evidence.md`.
+- Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks) naming applicable VAPT findings in `security-baseline.mdc` (always-on F4, F8, F9, F10).
 
 ### Build gate
 - **Baseline green** before first edit, unless `/v0-build` skips a checkout that is already the default branch tip; otherwise the profile verify command. Stop on a pre-existing failure unless the profile allows it.
 - **Build plan** at `docs/agents-v0/build/<feature>/plan.md` before the first implementation edit: one row per approved `AC-*` (AC, Status `pending`/`done`/`blocked`, Test). A green unit sets its row to `done` and names the test. Do not add, delete, or rewrite AC rows.
 - **Red–green loop** on the profile's **fast** verify cell (real command, not a placeholder). Gate: full verify once (coverage/static/CVE). Second red for the same test → `failure-brief.md` + `check-failure-brief.sh` before attempt three; third red stops. Do not read `build-output.txt` again. ≤ 3 fixes per failure.
 - When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before other implementation edits. Stop when the catalog is already modified by another feature. A story with no draft records N/A in the build report.
-- Quality tooling wired from the pack (`maven/quality-plugins.xml` for Java). Red–green tests for new behavior; VAPT-required tests in the same diff when applicable.
+- Quality tooling wired from the pack. Red–green tests for new behavior; VAPT-required tests in the same diff when applicable.
 - Contract conformance and the pack layer check where wired; methods ≤ 30 lines; auth+authz; correlation/tracing; DTOs only; pack migrations; no secrets.
 - UX spec implemented for UI changes: component defaults, layout matching the approved mockups, API client only for operations named on those rows.
 - **Build evidence** under `docs/agents-v0/build/<feature>/` (`build-report.md` with `commit:` line; optional `build-output.txt` — prefer CI artifacts for raw logs).

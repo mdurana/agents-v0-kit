@@ -2,7 +2,7 @@
      dotnet test then writes TestResults/*.trx and coverage.cobertura.xml. -->
 <Project>
   <PropertyGroup>
-    <CollectCoverage>true</CollectCoverage>
+    <CollectCoverage Condition="'$(CollectCoverage)' == ''">true</CollectCoverage>
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <CoverletOutput>../coverage.cobertura.xml</CoverletOutput>
   </PropertyGroup>

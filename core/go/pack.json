@@ -6,12 +6,12 @@
   "database": "PostgreSQL 15, golang-migrate",
   "tests": "go test",
   "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
-  "verify": "cd app/backend && go test ./... -coverprofile=coverage.out -json > go-test.json",
+  "verify": "cd app/backend && if [ -f Makefile ]; then make verify; else go test ./... -coverprofile=coverage.out -json > go-test.json; fi",
   "verifyFast": "cd app/backend && go test ./...",
   "coverage": {"path": "coverage.out", "format": "go-cover"},
   "testsReport": {"path": "go-test.json", "format": "go-json"},
   "cve": {"path": "cve-report.json"},
-  "serviceVerify": "cd {root} && go test ./... -coverprofile=coverage.out -json > go-test.json",
+  "serviceVerify": "cd {root} && if [ -f Makefile ]; then make verify; else go test ./... -coverprofile=coverage.out -json > go-test.json; fi",
   "serviceVerifyFast": "cd {root} && go test ./...",
   "hostChecks": ["go"],
   "hostPorts": ["go"],
@@ -28,7 +28,7 @@
     {
       "suffix": ".go",
       "marker": "gin\\.|chi\\.NewRouter",
-      "mapping": "\\.(GET|POST|PUT|PATCH|DELETE)\\(\\s*\"([^\"]+)\"",
+      "mapping": "\\.(GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\\(\\s*\"([^\"]+)\"",
       "security": "Auth|middleware",
       "name": "go"
     },

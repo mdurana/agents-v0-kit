@@ -1,9 +1,9 @@
 #!/bin/sh
 # lib.sh — shared helpers for Cursor hook scripts (source from hooks/*.sh).
 #
-# Java VAPT-WARN scans in this file are fast heuristics only. Authoritative F4
-# access-control evidence is SonarQube / ArchUnit (when wired) and the Verify
-# phase (security-reviewer + vapt-review), not after-edit hook warnings.
+# Pack-specific static analysis lives in `.agents-v0/packs/<id>/hooks/pack-scan.sh`
+# (shipped from `core/<pack>/hooks/pack-scan.sh`). Authoritative F4 access-control
+# evidence is the Verify phase (security-reviewer + vapt-review), not after-edit hook warnings.
 
 # Read hook JSON from stdin; print a string field (supports nested keys with dots).
 # Tries common Cursor payload shapes when the top-level key is missing.
@@ -153,58 +153,5 @@ out = {"permission": "allow"}
 if agent.strip():
     out["agent_message"] = agent
 print(json.dumps(out))
-' || true
-}
-
-# Warn on Java controllers: mutating mappings without nearby or class-level @PreAuthorize.
-# Skips tests and non-controller sources; heuristic only (Verify/Sonar own F4).
-hook_java_warn_missing_preauthorize() {
-  file="$1"
-  [ -f "$file" ] || return 0
-  case "$file" in
-    *Test.java|*Tests.java|*/test/*|*/it/*) return 0 ;;
-  esac
-  HOOK_JAVA_FILE="$file" python3 -c '
-import os, re, sys
-
-path = os.environ.get("HOOK_JAVA_FILE", "")
-try:
-    text = open(path, encoding="utf-8", errors="replace").read()
-except OSError:
-    sys.exit(0)
-
-if not re.search(r"@(?:RestController|Controller)\b", text):
-    sys.exit(0)
-
-mapping_re = re.compile(r"@(Post|Put|Patch|Delete)Mapping\b")
-preauth_re = re.compile(
-    r"@(?:PreAuthorize|Secured|RolesAllowed|"
-    r"jakarta\.annotation\.security\.RolesAllowed)\b"
-)
-
-controller_m = re.search(r"@(RestController|Controller)\b", text)
-
-first_mapping = mapping_re.search(text)
-class_preauth = False
-if first_mapping and controller_m.start() < first_mapping.start():
-    header = text[controller_m.start() : first_mapping.start()]
-    class_preauth = bool(preauth_re.search(header))
-
-lines = text.splitlines()
-for i, line in enumerate(lines):
-    if not mapping_re.search(line):
-        continue
-    # Annotations may sit above or below the mapping line before the method signature.
-    window = "\n".join(lines[max(0, i - 25) : min(len(lines), i + 16)])
-    if preauth_re.search(window):
-        continue
-    if class_preauth:
-        continue
-    lineno = i + 1
-    print(
-        f"VAPT-WARN: {path}:{lineno}: mutating endpoint without method/class "
-        f"security annotation (vapt.mdc F4; heuristic only — confirm in Verify/Sonar).",
-        file=sys.stderr,
-    )
 ' || true
 }

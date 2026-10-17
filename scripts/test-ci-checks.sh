@@ -618,6 +618,11 @@ printf '<coverage line-rate="0.88"/>\n' > "$m/coverage.cobertura.xml"
 expect_pass "gate metrics: trx and cobertura pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
 printf '%s\n' '{"dependencies":[{"vulnerabilities":[{"name":"CVE-2","severity":"HIGH"}]}]}' > "$m/cve-report.json"
 expect_fail "gate metrics: a pack cve-report.json HIGH fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+printf '%s\n' '{"projects":[{"frameworks":[{"topLevelPackages":[{"id":"Newtonsoft.Json","vulnerabilities":[{"severity":"High","advisoryUrl":"https://github.com/advisories/GHSA-1"}]}]}]}]}' > "$m/cve-report.json"
+expect_fail "gate metrics: a dotnet list package --vulnerable High CVE fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+printf '%s\n' '{"vulnerabilities":{"lodash":{"name":"lodash","severity":"critical"}}}' > "$m/cve-report.json"
+expect_fail "gate metrics: an npm audit dict critical CVE fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+rm -f "$m/cve-report.json"
 
 m="$tmp/gate-empty"
 mkdir -p "$m"
@@ -1082,6 +1087,70 @@ EOF
 expect_pass "check-milestone runs the pack check for an approved architecture row" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 rm "$d/docs/agents-v0/design/system/ops-readiness.md"
 expect_fail "check-milestone fails when the approved pack is incomplete" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+
+# --- collect-gate-reports.sh fail-closed CVE & pip-audit format --------------
+d="$tmp/cve-fail-closed"
+mkdir -p "$d/.agents-v0/packs/python" "$d/docs/agents-v0"
+cp "$ROOT/core/python/pack.json" "$d/.agents-v0/packs/python/pack.json"
+cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | python |
+EOF
+cat > "$d/coverage.xml" <<'EOF'
+<coverage line-rate="0.90"><packages><package><classes><class filename="app.py"><lines><line number="1" hits="1"/></lines></class></classes></package></packages></coverage>
+EOF
+cat > "$d/junit.xml" <<'EOF'
+<testsuite tests="1" failures="0" errors="0"><testcase classname="t" name="ok"/></testsuite>
+EOF
+# Run collect-gate-reports with PATH stripped of pip-audit so no scanner runs
+expect_pass "collect-gate-reports succeeds when coverage and junit exist" "$d" env PATH="/usr/bin:/bin" sh "$CI/collect-gate-reports.sh" .
+if [ -f "$d/ci-artifacts/gate/cve-report.json" ]; then
+  fail "collect-gate-reports must not fabricate cve-report.json when no scanner ran"
+else
+  pass "collect-gate-reports does not fabricate cve-report.json when scanner is absent"
+fi
+expect_fail "check-gate-metrics with REQUIRE_CVE_REPORT=1 fails closed when no CVE report was produced" "$d" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh"
+
+cat > "$d/cve-report.json" <<'EOF'
+{"dependencies": [{"name": "urllib3", "version": "1.26.0", "vulns": [{"id": "PYSEC-2023-1", "fix_versions": ["1.26.18"]}]}]}
+EOF
+expect_pass "collect-gate-reports copies real pip-audit cve-report.json" "$d" sh "$CI/collect-gate-reports.sh" .
+expect_fail "check-gate-metrics fails closed on pip-audit dependencies[].vulns[] entry" "$d" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh"
+
+# --- .gitlab-ci.yml build script multi-service execution ---------------------
+d="$tmp/gitlab-build-sim"
+mkdir -p "$d/.agents-v0/ci" "$d/.agents-v0/packs/node" "$d/docs/agents-v0" "$d/services/orders"
+cp "$CI/"*.sh "$d/.agents-v0/ci/"
+cp "$ROOT/core/node/pack.json" "$d/.agents-v0/packs/node/pack.json"
+cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | node |
+
+## Layout & commands
+
+| Field | Value |
+|-------|--------|
+| Service verify | cd <root> && echo "ran-service-verify" > verified.txt && mkdir -p coverage && printf "SF:src/index.ts\nDA:1,1\nLF:1\nLH:1\nend_of_record\n" > coverage/lcov.info && printf "<testsuite tests=\"1\" failures=\"0\"/>\n" > junit.xml |
+EOF
+printf '{"name":"orders"}\n' > "$d/services/orders/package.json"
+python3 - "$ROOT/templates/.gitlab-ci.yml" "$d/run-build.sh" <<'PY'
+import sys, yaml
+ci = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+script = "\n".join(ci["build"]["script"])
+open(sys.argv[2], "w", encoding="utf-8").write(script + "\n")
+PY
+expect_pass ".gitlab-ci.yml build script executes Service verify across SERVICE_ROOTS and collects gate reports" "$d" sh run-build.sh
+if [ -f "$d/ci-artifacts/gate/services/orders/coverage/lcov.info" ] && [ -f "$d/services/orders/verified.txt" ]; then
+  pass ".gitlab-ci.yml build script staged coverage/lcov.info under ci-artifacts/gate/services/orders/"
+else
+  fail ".gitlab-ci.yml build script did not stage per-service gate artifacts"
+fi
 
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2

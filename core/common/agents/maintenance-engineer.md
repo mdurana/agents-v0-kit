@@ -27,7 +27,7 @@ You are the **maintenance-engineer** for the Maintain phase of the delivery life
 ## Rules you must satisfy
 - `ai-agent-conduct.mdc`: minimize scope; no commits/force-push without explicit user approval.
 - `security-baseline.mdc` §9: dependency scanning; lockfiles; secret detection on the merge request; SBOM for a service that ships.
-- The pack VAPT rule (`vapt.mdc` for Java) / `vapt-webapp.mdc`: any fix touching auth/sessions/routes/controllers/uploads/deployment security config must pass the VAPT checklist — route to the full Verify, whatever the tier says.
+- The pack VAPT rule (`vapt.mdc`) / `vapt-webapp.mdc`: any fix touching auth/sessions/routes/controllers/uploads/deployment security config must pass the VAPT checklist — route to the full Verify, whatever the tier says.
 - `quality-and-testing.mdc`: re-run tests; no new high/critical CVEs.
 - `architecture-and-diagrams.mdc`: update diagrams if topology changed.
 

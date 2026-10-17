@@ -439,15 +439,41 @@ def measure_alt(kind):
 
 
 def cve_names(data):
-    """HIGH/CRITICAL names. OWASP uses dependencies[].vulnerabilities[]. A pack may use a top-level vulnerabilities list."""
+    """HIGH/CRITICAL names from OWASP, top-level vulnerabilities list/dict (npm audit), or .NET vulnerable package JSON."""
     found = []
-    entries = list(data.get("vulnerabilities") or [])
+    raw_vulns = data.get("vulnerabilities")
+    if isinstance(raw_vulns, dict):
+        entries = [v for v in raw_vulns.values() if isinstance(v, dict)]
+    elif isinstance(raw_vulns, list):
+        entries = list(raw_vulns)
+    else:
+        entries = []
     for dep in data.get("dependencies") or []:
         if isinstance(dep, dict):
             entries.extend(dep.get("vulnerabilities") or [])
+            for v in dep.get("vulns") or []:
+                if isinstance(v, dict):
+                    entries.append({
+                        "name": v.get("id") or v.get("name") or dep.get("name") or "?",
+                        "severity": v.get("severity") or "HIGH",
+                    })
+    for proj in data.get("projects") or []:
+        for fw in (proj.get("frameworks") if isinstance(proj, dict) else None) or []:
+            if not isinstance(fw, dict):
+                continue
+            for key in ("topLevelPackages", "transitivePackages"):
+                for pkg in fw.get(key) or []:
+                    if not isinstance(pkg, dict):
+                        continue
+                    for v in pkg.get("vulnerabilities") or []:
+                        if isinstance(v, dict):
+                            entries.append({
+                                "name": v.get("name") or v.get("id") or pkg.get("id") or v.get("advisoryUrl") or "?",
+                                "severity": v.get("severity", ""),
+                            })
     for vuln in entries:
         if isinstance(vuln, dict) and str(vuln.get("severity", "")).upper() in ("HIGH", "CRITICAL"):
-            found.append(str(vuln.get("name", "?")))
+            found.append(str(vuln.get("name") or vuln.get("id") or vuln.get("advisoryUrl") or "?"))
     return found
 
 

@@ -161,6 +161,20 @@ for path in files:
                 prev = lines[max(0, i - 8): i + 1]
                 cls = next((c.group(1) for l2 in reversed(prev) for c in [re.search(r"\bclass\s+(\w+)", l2)] if c), "?")
                 entities.append(f"{path}:{i + 1}  Entity {cls}  table {m.group(1)}")
+    elif path.endswith(".ts"):
+        lines = lines_of(path)
+        for i, ln in enumerate(lines):
+            if re.search(r"@Entity\b", ln):
+                nearby = lines[i: i + 8]
+                cls = next((m.group(1) for l2 in nearby for m in [re.search(r"\bclass\s+(\w+)", l2)] if m), "?")
+                tbl = next((m.group(1) for m in [re.search(r"@Entity\(\s*[\"']([^\"']+)[\"']", ln)] if m), "")
+                entities.append(f"{path}:{i + 1}  Entity {cls}" + (f"  table {tbl}" if tbl else ""))
+    elif path.endswith(".go"):
+        lines = lines_of(path)
+        for i, ln in enumerate(lines):
+            m = re.search(r"\btype\s+(\w+)\s+struct\b", ln)
+            if m and any(re.search(r'`[^`]*\b(gorm|db):"[^"]+"', l2) for l2 in lines[i + 1: i + 20]):
+                entities.append(f"{path}:{i + 1}  Entity {m.group(1)}")
 write("entities.txt", "Persistent entities / models", entities)
 
 migrations = [f for f in files if (("db/migration" in f.replace(os.sep, "/") and f.endswith(".sql"))
@@ -173,26 +187,37 @@ write("migrations.txt", "Database migrations", sorted(migrations),
       "Latest file by name is the last row of the sorted list.")
 
 
-# ---- Pattern scans over Java ----------------------------------------------
+# ---- Pattern scans over backend code ---------------------------------------
+code_files = [f for f in files if f.endswith((".java", ".cs", ".py", ".go", ".ts", ".js"))]
+
+
 def scan(patterns, pool):
     regex = re.compile(patterns)
     rows = []
     for path in pool:
         for i, ln in enumerate(lines_of(path)):
-            if regex.search(ln) and not ln.lstrip().startswith(("import ", "*", "//")):
+            if regex.search(ln) and not ln.lstrip().startswith(("import ", "from ", "using ", "*", "//", "#")):
                 rows.append(f"{path}:{i + 1}  {clip(ln)}")
     return rows
 
 
 write("messaging.txt", "Messaging (listeners and producers)",
-      scan(r"@(KafkaListener|RabbitListener|JmsListener|StreamListener|SqsListener|EnableKafka|EnableRabbit)\b|\b(KafkaTemplate|RabbitTemplate|StreamBridge|JmsTemplate)\b", java))
+      scan(r"@(KafkaListener|RabbitListener|JmsListener|StreamListener|SqsListener|EnableKafka|EnableRabbit|MessagePattern|EventPattern)\b|"
+           r"\b(KafkaTemplate|RabbitTemplate|StreamBridge|JmsTemplate|IBus|MassTransit|Confluent\.Kafka|"
+           r"AIOKafkaConsumer|AIOKafkaProducer|kombu|bullmq|sarama|kafka\.NewReader|amqp\.Dial)\b|\bIConsumer<|\bCelery\(|\bsarama\.",
+           code_files))
 write("scheduled.txt", "Scheduled and async work",
-      scan(r"@(Scheduled|Async|EnableScheduling|EnableAsync|SchedulerLock)\b", java))
+      scan(r"@(Scheduled|Async|EnableScheduling|EnableAsync|SchedulerLock|Cron)\b|"
+           r"\b(BackgroundService|IHostedService|Hangfire|RecurringJob|APScheduler|gocron|cron\.New)\b",
+           code_files))
 write("outbound.txt", "Outbound HTTP clients",
-      scan(r"\b(RestTemplate|WebClient|RestClient|OkHttpClient|HttpClient)\b|@FeignClient\b|@HttpExchange\b", java))
+      scan(r"\b(RestTemplate|WebClient|RestClient|OkHttpClient|HttpClient|IHttpClientFactory|Refit|"
+           r"httpx\.(?:AsyncClient|Client|get|post|put|delete)|requests\.(?:Session|get|post|put|delete)|"
+           r"aiohttp\.ClientSession|axios\.(?:create|get|post|put|delete)|http\.NewRequest)\b|@FeignClient\b|@HttpExchange\b",
+           code_files))
 
 # ---- Configuration: key names only -----------------------------------------
-CONFIG_FILE = re.compile(r"^(application|bootstrap)[\w.-]*\.(ya?ml|properties)$|^\.env\.(example|sample|template)$")
+CONFIG_FILE = re.compile(r"^(application|bootstrap)[\w.-]*\.(ya?ml|properties)$|^appsettings[\w.-]*\.json$|^\.env\.(example|sample|template)$")
 SECRET_KEY = re.compile(r"(password|passwd|secret|token|api[-_.]?key|private[-_.]?key|credential)", re.I)
 keys, env_refs, secret_keys = [], [], []
 for path in files:
@@ -200,18 +225,21 @@ for path in files:
         continue
     lines = read(path)
     is_yaml = path.endswith((".yml", ".yaml"))
+    is_json = path.endswith(".json")
     stack = []
     for i, ln in enumerate(lines, 1):
         stripped = ln.strip()
-        if not stripped or stripped.startswith(("#", "!", "- ")):
+        if not stripped or stripped.startswith(("#", "!", "- ", "{", "}", "[")) or stripped in ("},", "],"):
             continue
         for ref in re.findall(r"\$\{([A-Za-z0-9_.\-]+)", ln):
             env_refs.append(f"{path}:{i}  {ref}")
-        if is_yaml:
-            m = re.match(r"(\s*)([A-Za-z0-9_.\-\"']+)\s*:(.*)$", ln)
+        if is_yaml or is_json:
+            m = re.match(r'(\s*)["\']?([A-Za-z0-9_.\-]+)["\']?\s*:(.*)$', ln)
             if not m:
                 continue
-            indent, key, value = len(m.group(1)), m.group(2).strip("\"'"), m.group(3).strip()
+            indent, key, value = len(m.group(1)), m.group(2).strip("\"'"), m.group(3).strip().rstrip(",")
+            if is_json and value in ("{", "["):
+                value = ""
             while stack and stack[-1][0] >= indent:
                 stack.pop()
             stack.append((indent, key))
@@ -223,7 +251,8 @@ for path in files:
             full, value = m.group(1), m.group(2).strip()
         keys.append(f"{path}:{i}  {full}")
         if SECRET_KEY.search(full):
-            kind = "empty-or-nested" if not value else ("env-ref" if "${" in value else "LITERAL-IN-FILE")
+            clean_val = value.strip("\"'")
+            kind = "empty-or-nested" if not clean_val else ("env-ref" if "${" in clean_val else "LITERAL-IN-FILE")
             secret_keys.append(f"{path}:{i}  {full}  ({kind})")
 write("config.txt", "Configuration (key names only; values are never printed)",
       ["## keys"] + keys + ["", "## environment references"] + sorted(set(env_refs)) + ["", "## secret-like keys"] + secret_keys)
@@ -340,7 +369,7 @@ lines = ["# Baseline numbers", f"commit: {COMMIT}",
          "generated by scripts/discover-codebase.sh from target/ reports (read-only; nothing here is a gate)", "",
          "| Root | Tests run | Failures + errors | Bundle line coverage | Unsuppressed HIGH/CRITICAL CVEs |",
          "|------|-----------|-------------------|----------------------|----------------------------------|"]
-lines += base_rows or ["| (no JVM root) | | | | |"]
+lines += base_rows or ["| (no backend root) | | | | |"]
 lines += ["", "## Proposed known_failures rows (for docs/agents-v0/project-profile.md; a person approves them)", "",
           "| Allowed failure count | Scope / test IDs | Owner | Remove by |",
           "|----------------------|------------------|-------|-----------|"] + (failing or ["| 0 | | | |"])
@@ -355,14 +384,15 @@ summary.append(("baseline.md", len(base_rows), False))
 sec_patterns = re.compile(
     r"permitAll\(\)|permit-all|csrf\(\)\.disable|csrf\.disable|\.csrf\(.*disable|@EnableMethodSecurity|@EnableWebSecurity|"
     r"MethodSecurityBypass|authorizeHttpRequests|antMatchers|requestMatchers|@CrossOrigin|allowedOrigins\(\s*\"\*\"|"
-    r"setAllowedOrigins|frameOptions\(\)\.(disable|sameOrigin)")
+    r"setAllowedOrigins|frameOptions\(\)\.(disable|sameOrigin)|"
+    r"AllowAnonymous|DisableAntiforgery|AllowAnyOrigin|CORSMiddleware|enableCors|InsecureSkipVerify")
 config_files = [f for f in files if CONFIG_FILE.match(os.path.basename(f))]
 sec_rows = []
-for path in java + config_files:
+for path in list(dict.fromkeys(code_files + config_files)):
     for i, ln in enumerate(lines_of(path), 1):
-        if sec_patterns.search(ln) and not ln.lstrip().startswith(("import ", "*", "//", "#")):
+        if sec_patterns.search(ln) and not ln.lstrip().startswith(("import ", "from ", "using ", "*", "//", "#")):
             key = ln.split(":", 1)[0].split("=", 1)[0]
-            shown = clip(ln) if path.endswith(".java") or not SECRET_KEY.search(key) else clip(key)
+            shown = clip(ln) if path in code_files or not SECRET_KEY.search(key) else clip(key)
             sec_rows.append(f"{path}:{i}  {shown}")
 literal = [r for r in secret_keys if "LITERAL-IN-FILE" in r]
 doc = ["# Security baseline snapshot", f"commit: {COMMIT}",

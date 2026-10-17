@@ -14,15 +14,18 @@ try:
     lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
 except OSError:
     raise SystemExit(0)
-mapping_re = re.compile(r"\[Http(Post|Put|Patch|Delete)\b")
-auth_re = re.compile(r"\[Authorize|\[AllowAnonymous\]")
+mapping_re = re.compile(r"\[Http(Post|Put|Patch|Delete)\b|\.Map(Post|Put|Patch|Delete)\s*\(")
+auth_re = re.compile(r"\[Authorize|\[AllowAnonymous\]|RequireAuthorization|AllowAnonymous")
 for i, line in enumerate(lines):
     if not mapping_re.search(line):
         continue
     window = "\n".join(lines[max(0, i - 12): min(len(lines), i + 9)])
     if auth_re.search(window):
         continue
-    print(f"{path}:{i + 1}: mutating action without [Authorize] or [AllowAnonymous] (vapt.mdc F4; heuristic only).")
+    print(f"{path}:{i + 1}: mutating action without [Authorize]/RequireAuthorization or [AllowAnonymous]/AllowAnonymous (vapt.mdc F4; heuristic only).")
+full = "\n".join(lines)
+if "AllowAnyOrigin" in full and "AllowCredentials" in full:
+    print(f"{path}: AllowAnyOrigin combined with AllowCredentials — insecure CORS configuration (vapt.mdc; heuristic only).")
 ' 2>/dev/null >"$pack_warns" || true
   while IFS= read -r line; do
     [ -n "$line" ] && warn "$line"

@@ -12,8 +12,8 @@ Default envelopes: **`project-delivery-core.mdc`**. Implementation: `backend.mdc
 
 - Resource URLs: `/api/v1/orders/{id}`; **201** create, **204** no-body success.
 - **DTOs only** at the edge — never persistence entities from handlers.
-- Bean Validation: `@Valid` on bodies; constraints on DTO fields; typed path/query params (`@Positive`, `@NotBlank`) — no unsafe parsing.
-- OpenAPI: `@Operation`, `@ApiResponse` where the project uses them.
+- **Boundary validation:** validate request bodies, path params, and query params with the pack's schema/validator (`@Valid` / Bean Validation in Java, `[ApiController]` + DataAnnotations / FluentValidation in .NET, Pydantic v2 in Python, `binding` tags in Go, `ValidationPipe` / `class-validator` in Node) — no unsafe parsing.
+- **OpenAPI:** keep code and the approved OpenAPI contract in sync (`@Operation`/`@ApiResponse` or pack equivalent where used).
 
 ## Error responses — pick one per API surface
 
@@ -55,6 +55,7 @@ Include **correlation** and **request** IDs in error payloads when the stack sup
 
 `eventId`, `eventType`, `eventVersion`, `timestamp`, `source`, `correlationId`, `data`, metadata (`idempotency_key`).
 
+Example idempotent consumer deduplication (Java/Spring; apply the equivalent check in the bound pack):
 ```java
 @KafkaListener(topics = "orders")
 public void process(OrderEvent event) {

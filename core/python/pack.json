@@ -28,7 +28,7 @@
     {
       "suffix": ".py",
       "marker": "APIRouter|FastAPI\\(",
-      "mapping": "@(?:router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "mapping": "@(?:\\w*router|app)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
       "security": "Depends\\(|require_role",
       "name": "fastapi"
     },

@@ -14,7 +14,7 @@ try:
     lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
 except OSError:
     raise SystemExit(0)
-mapping_re = re.compile(r"\.(POST|PUT|PATCH|DELETE)\(|http\.HandleFunc\(")
+mapping_re = re.compile(r"\.(POST|PUT|PATCH|DELETE|Post|Put|Patch|Delete)\(|http\.HandleFunc\(")
 auth_re = re.compile(r"Auth|middleware")
 for i, line in enumerate(lines):
     if not mapping_re.search(line):

@@ -14,7 +14,7 @@ try:
     lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
 except OSError:
     raise SystemExit(0)
-mapping_re = re.compile(r"@(Post|Put|Patch|Delete)\(|\b(?:app|router)\.(post|put|patch|delete)\(")
+mapping_re = re.compile(r"@(Post|Put|Patch|Delete)\(|\b(?:\w*[Rr]outer|app)\.(post|put|patch|delete)\(")
 auth_re = re.compile(r"@UseGuards|@Public|requireAuth|authenticate|authorize|publicRoute")
 for i, line in enumerate(lines):
     if not mapping_re.search(line):

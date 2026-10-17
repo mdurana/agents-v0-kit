@@ -557,6 +557,100 @@ def health():
 EOF
 run pass "endpoint auth: a profile stack accepts a secured route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
 
+# Pack-native endpoint scanners: dotnet Minimal API, python custom router, go Chi router
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | dotnet |
+EOF
+cat > "$e/Program.cs" <<'EOF'
+app.MapPost("/api/v1/orders", () => Results.Ok());
+EOF
+(cd "$e" && git add docs/agents-v0/project-profile.md Program.cs)
+run fail "endpoint auth: dotnet pack flags an unannotated Minimal API MapPost" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+cat > "$e/Program.cs" <<'EOF'
+app.MapPost("/api/v1/orders", () => Results.Ok()).RequireAuthorization();
+EOF
+run pass "endpoint auth: dotnet pack accepts a Minimal API MapPost with RequireAuthorization" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+rm -f "$e/Program.cs"
+
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | python |
+EOF
+cat > "$e/api/routes.py" <<'EOF'
+from fastapi import APIRouter
+orders_router = APIRouter()
+
+@orders_router.post("/api/v1/orders")
+def create_order():
+    return {}
+EOF
+run fail "endpoint auth: python pack flags an unannotated @orders_router.post route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+cat > "$e/api/routes.py" <<'EOF'
+from fastapi import APIRouter, Depends
+orders_router = APIRouter()
+
+@orders_router.post("/api/v1/orders")
+def create_order(user=Depends(auth)):
+    return {}
+EOF
+run pass "endpoint auth: python pack accepts @orders_router.post with Depends" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | go |
+EOF
+cat > "$e/routes.go" <<'EOF'
+package main
+import "github.com/go-chi/chi/v5"
+func routes() {
+	r := chi.NewRouter()
+	r.Post("/api/v1/orders", createOrder)
+}
+EOF
+(cd "$e" && git add routes.go)
+run fail "endpoint auth: go pack flags an unannotated Chi r.Post route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+cat > "$e/routes.go" <<'EOF'
+package main
+import "github.com/go-chi/chi/v5"
+func routes() {
+	r := chi.NewRouter()
+	r.With(AuthMiddleware).Post("/api/v1/orders", createOrder)
+}
+EOF
+run pass "endpoint auth: go pack accepts a Chi r.Post route with AuthMiddleware" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+rm -f "$e/routes.go"
+
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | node |
+EOF
+cat > "$e/orders.routes.ts" <<'EOF'
+import { Router } from 'express';
+const ordersRouter = Router();
+ordersRouter.post('/api/v1/orders', (req, res) => res.json({}));
+EOF
+(cd "$e" && git add docs/agents-v0/project-profile.md orders.routes.ts)
+run fail "endpoint auth: node pack flags an unannotated Express ordersRouter.post route" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+cat > "$e/orders.routes.ts" <<'EOF'
+import { Router } from 'express';
+const ordersRouter = Router();
+ordersRouter.post('/api/v1/orders', requireAuth, (req, res) => res.json({}));
+EOF
+run pass "endpoint auth: node pack accepts Express ordersRouter.post with requireAuth" "$e" sh "$CI/check-endpoint-auth.sh" "$ebase"
+
 # --- ci/check-frontend-calls.sh ----------------------------------------------
 f="$tmp/frontend"
 mkdir -p "$f/.agents-v0/ci" "$f/openapi" "$f/frontend/src/lib" "$f/frontend/src/lib/__tests__"

@@ -23,7 +23,7 @@ Verify phase playbook for the `test-engineer` agent (`workflow-orchestration.mdc
 
 ## Rule-compliance checklist
 - [ ] `quality-and-testing.mdc`: AAA; naming; coverage ≥ 80%/70%; methods ≤ 30 lines; cognitive complexity ≤ 15; no new high/critical CVEs.
-- [ ] Pack VAPT rule (`vapt.mdc` for Java) / `vapt-webapp.mdc`: required tests per finding included.
+- [ ] Pack VAPT rule (`vapt.mdc`) / `vapt-webapp.mdc`: required tests per finding included.
 - [ ] `api-and-events.mdc`: idempotent consumer tests.
 - [ ] UX spec: for UI-affecting changes, a11y check green (no serious/critical violations), UX acceptance criteria covered; UX report persisted to `docs/agents-v0/verify/<feature>/ux-report.md`.
 - [ ] Mocks: external I/O only; domain tests deterministic.

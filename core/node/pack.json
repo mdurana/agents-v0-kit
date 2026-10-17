@@ -36,14 +36,14 @@
     {
       "suffix": ".ts",
       "marker": "express\\(|Router\\(",
-      "mapping": "\\b(?:app|router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "mapping": "\\b(?:\\w*[Rr]outer|app)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
       "security": "requireAuth|authenticate|authorize|publicRoute",
       "name": "express"
     },
     {
       "suffix": ".js",
       "marker": "express\\(|Router\\(",
-      "mapping": "\\b(?:app|router)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
+      "mapping": "\\b(?:\\w*[Rr]outer|app)\\.(get|post|put|patch|delete)\\(\\s*[\"']([^\"']+)",
       "security": "requireAuth|authenticate|authorize|publicRoute",
       "name": "express-js"
     }

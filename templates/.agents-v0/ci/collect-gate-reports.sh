@@ -21,8 +21,10 @@ fi
 
 COLLECT_DIR="$DIR" COLLECT_ROOTS="$*" python3 - <<'PY'
 import glob
+import json
 import os
 import shutil
+import subprocess
 import sys
 
 sys.path.insert(0, os.environ["COLLECT_DIR"])
@@ -32,6 +34,7 @@ roots = [item for item in os.environ.get("COLLECT_ROOTS", "").split() if item]
 pack_id = packlib.profile_pack()
 data = packlib.load(pack_id) if pack_id else None
 patterns = []
+cve = None
 if data and not packlib.errors_of(data, "backend"):
     for key in ("coverage", "testsReport"):
         spec = data.get(key) or {}
@@ -48,6 +51,72 @@ else:
         "target/dependency-check-report.json",
     ]
 
+
+def ensure_cve_artifact(root_dir, cve_rel, pid):
+    if not cve_rel or "*" in cve_rel or pid == "java":
+        return 0
+    if glob.glob(os.path.join(root_dir, cve_rel), recursive=True):
+        return 0
+    payload = None
+    try:
+        if pid == "dotnet" and shutil.which("dotnet"):
+            proc = subprocess.run(
+                ["dotnet", "list", "package", "--vulnerable", "--include-transitive", "--format", "json"],
+                cwd=root_dir, capture_output=True, text=True, timeout=60,
+            )
+            if proc.returncode == 0 and proc.stdout.strip().startswith("{"):
+                parsed = json.loads(proc.stdout)
+                if "projects" in parsed:
+                    payload = parsed
+        elif pid == "node" and shutil.which("npm") and os.path.isfile(os.path.join(root_dir, "package-lock.json")):
+            proc = subprocess.run(
+                ["npm", "audit", "--omit=dev", "--json"],
+                cwd=root_dir, capture_output=True, text=True, timeout=60,
+            )
+            if proc.stdout.strip().startswith("{"):
+                parsed = json.loads(proc.stdout)
+                if "vulnerabilities" in parsed:
+                    payload = parsed
+        elif pid == "python" and shutil.which("pip-audit"):
+            proc = subprocess.run(
+                ["pip-audit", "-f", "json"],
+                cwd=root_dir, capture_output=True, text=True, timeout=60,
+            )
+            if proc.stdout.strip().startswith("{"):
+                parsed = json.loads(proc.stdout)
+                if "dependencies" in parsed:
+                    payload = parsed
+        elif pid == "go" and shutil.which("govulncheck"):
+            proc = subprocess.run(
+                ["govulncheck", "-json", "./..."],
+                cwd=root_dir, capture_output=True, text=True, timeout=60,
+            )
+            if proc.returncode in (0, 3):
+                deps = {}
+                for line in proc.stdout.splitlines():
+                    line = line.strip()
+                    if not line.startswith("{"):
+                        continue
+                    msg = json.loads(line)
+                    finding = msg.get("finding")
+                    if not isinstance(finding, dict):
+                        continue
+                    trace = finding.get("trace") or []
+                    mod = str(trace[0].get("module") or "?") if trace and isinstance(trace[0], dict) else "?"
+                    deps.setdefault(mod, []).append({"name": str(finding.get("osv") or "?"), "severity": "HIGH"})
+                payload = {"dependencies": [{"fileName": k, "vulnerabilities": v} for k, v in sorted(deps.items())]}
+    except Exception:
+        payload = None
+    if payload is None:
+        return 0
+    dest = os.path.join("ci-artifacts", "gate", root_dir, cve_rel)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+        handle.write("\n")
+    return 1
+
+
 copied = 0
 for root in roots:
     if not os.path.isdir(root):
@@ -61,5 +130,7 @@ for root in roots:
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copy2(match, dest)
             copied += 1
+    if cve and data:
+        copied += ensure_cve_artifact(root, cve, data.get("id") or "")
 print(f"gate reports: copied {copied} file(s) into ci-artifacts/gate/")
 PY
