@@ -14,7 +14,9 @@
 # Structure checks: design.md has the sections Traceability, Data model, Authorization, Failure
 # modes, Observability, and Rollout, each with content or "N/A: <reason>"; no TEMPLATE: line is
 # left; every AC-n of the requirements artifact appears in Traceability; every operationId of the
-# draft appears in Authorization; the "ADR:" line names an existing ADR with at least two
+# draft appears in Authorization. With no asyncapi.yaml and no events/ files, the Events section
+# records "N/A: no event contract" (/v0-design). That phrase fails when an event contract is present.
+# The "ADR:" line names an existing ADR with at least two
 # alternatives (or says "N/A: <reason>"). That ADR has Status Proposed or Accepted. A pin requires
 # Accepted. Citing a superseded ADR fails: point at the successor. Every AC whose requirements block
 # says Kind: negative or Kind: edge is named in Failure modes.
@@ -180,6 +182,33 @@ def review_not_required(body):
     return True
 
 
+NO_EVENT = "N/A: no event contract"
+
+
+def event_contract_files():
+    """asyncapi.yaml or any file under events/ means the story has an event contract."""
+    found = []
+    for name in ("asyncapi.yaml", "asyncapi.yml", "asyncapi.json"):
+        if os.path.isfile(os.path.join(base, name)):
+            found.append(name)
+    events = os.path.join(base, "events")
+    if os.path.isdir(events):
+        for dirpath, _dirs, names in os.walk(events):
+            for name in names:
+                found.append(os.path.relpath(os.path.join(dirpath, name), base))
+    return found
+
+
+def check_events(path, body, secs):
+    """Follow /v0-design: no messages records the N/A phrase; a contract must not."""
+    events_body = section(secs, "events") or ""
+    if event_contract_files():
+        if NO_EVENT in body:
+            fail(f"{path}: \"{NO_EVENT}\" is recorded while an event contract is present")
+    elif NO_EVENT not in events_body:
+        fail(f"{path}: no event contract, so the Events section must record \"{NO_EVENT}\"")
+
+
 def has_content(body):
     text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
     text = "\n".join(l for l in text.splitlines() if l.strip() and not re.match(r"^\s*\|[-:| ]+\|\s*$", l))
@@ -204,6 +233,7 @@ def check():
             fail(f"{path}: section '{label}' is missing")
         elif not has_content(part):
             fail(f"{path}: section '{label}' is empty (write it, or \"N/A: <reason>\")")
+    check_events(path, body, secs)
     requirements = read(os.path.join("docs", "agents-v0", "requirements", f"{feature}.md"))
     trace = section(secs, "traceability") or ""
     if requirements is None:

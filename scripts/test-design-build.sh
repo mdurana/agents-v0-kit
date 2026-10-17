@@ -192,6 +192,9 @@ Table orders(id uuid primary key, sku text not null), index on sku, about 2M row
 | createOrder | ROLE_CUSTOMER | caller becomes the owner |
 | getOrder | ROLE_CUSTOMER | order.ownerId equals the caller |
 
+## Events
+N/A: no event contract
+
 ## Failure modes
 Inventory timeout after 2s: reject with 503 and a retry hint; nothing is written.
 
@@ -202,6 +205,18 @@ RED metrics per operation, a log field orderId, an alert on 5xx above 1 percent.
 Behind flag orders.enabled, default off; expand migration first; rollback by disabling the flag.
 EOF
 run pass "design: a complete design passes" "$d" sh "$CI/check-design.sh" orders
+cp "$d/docs/agents-v0/design/orders/design.md" "$tmp/design.events"
+sedi '/N\/A: no event contract/d' "$d/docs/agents-v0/design/orders/design.md"
+run fail "design: no event contract without the N/A phrase fails" "$d" sh "$CI/check-design.sh" orders
+cp "$tmp/design.events" "$d/docs/agents-v0/design/orders/design.md"
+cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
+run fail "design: the N/A phrase fails while asyncapi.yaml exists" "$d" sh "$CI/check-design.sh" orders
+rm -f "$d/docs/agents-v0/design/orders/asyncapi.yaml"
+mkdir -p "$d/docs/agents-v0/design/orders/events"
+printf '{}\n' > "$d/docs/agents-v0/design/orders/events/order-created.json"
+run fail "design: the N/A phrase fails while events/ has a file" "$d" sh "$CI/check-design.sh" orders
+rm -rf "$d/docs/agents-v0/design/orders/events"
+cp "$tmp/design.events" "$d/docs/agents-v0/design/orders/design.md"
 cp "$d/docs/agents-v0/requirements/orders.md" "$tmp/req.keep"
 cp "$d/docs/agents-v0/design/orders/design.md" "$tmp/design-neg.keep"
 cat >> "$d/docs/agents-v0/requirements/orders.md" <<'EOF'
@@ -265,6 +280,9 @@ N/A: no persistence in the skeleton.
 ## Authorization
 N/A: no /api/v1 operation
 
+## Events
+N/A: no event contract
+
 ## Failure modes
 The verify command fails closed and prints the module that failed.
 
@@ -295,6 +313,7 @@ run pass "design: a Proposed ADR still passes the structure check" "$d" sh "$CI/
 run fail "design: a Proposed ADR cannot be pinned" "$d" sh "$CI/check-design.sh" orders --pin approved
 sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-orders.md"
 cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
+sedi 's/N\/A: no event contract/Channel orders.order-created in asyncapi.yaml./' "$d/docs/agents-v0/design/orders/design.md"
 ha="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$ha" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run pass "design: a resolved review lets the pin through" "$d" sh "$CI/check-design.sh" orders --pin approved

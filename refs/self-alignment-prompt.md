@@ -16,7 +16,7 @@ Classify each finding:
 
 Already settled, keep these unless a script has changed:
 - coverage_ratchet is a dated waiver record. It does not change JaCoCo 0.80 in core/java/starters/maven/quality-plugins.xml. The GitLab coverage-ratchet job does not pass LINE_COVERAGE_PCT, so check-coverage-ratchet.sh checks the approver and the removal date, and compares a measured number only when LINE_COVERAGE_PCT or JACOCO_LINE_PCT is set. Changed lines stay at 80% when DIFF_BASE is set.
-- No messages means the Events section of design.md is `N/A: no event contract`. check-design.sh does not look for that phrase.
+- No messages means the Events section of design.md is `N/A: no event contract`. check-design.sh requires that phrase when no event contract is present, and rejects it when `asyncapi.yaml` or `events/` exists.
 
 Do not add a phase, a contract type, an MCP server, core.hooksPath, or a CI gate. Keep the three always-on rules at or under 32,000 bytes. Stay inside the file the finding names.
 
