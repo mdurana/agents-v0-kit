@@ -298,8 +298,10 @@ if body is not None:
         for pack in packs:
             data = packlib.load(pack)
             problems = [] if data is None else packlib.errors_of(data, "backend")
-            if data is None or problems:
-                fail(f"{adr}: Pack '{pack}' has no complete manifest; write .agents-v0/packs/{pack}/pack.json before Plan")
+            if data is None:
+                fail(f"{adr}: Pack '{pack}' has no manifest; write .agents-v0/packs/{pack}/pack.json before Plan")
+            elif problems:
+                fail(f"{adr}: Pack '{pack}' manifest is incomplete: {', '.join(problems)}")
             else:
                 directory = data["dir"]
                 rules = os.path.join(directory, "rules")
@@ -308,6 +310,14 @@ if body is not None:
                 for skill in ("implement-service", "implement-bff"):
                     if not os.path.isfile(os.path.join(directory, "skills", skill, "SKILL.md")):
                         fail(f"{adr}: Pack '{pack}' has no {skill} skill")
+                ui = data.get("uiPack")
+                if isinstance(data.get("ui"), str):
+                    if not ui:
+                        fail(f"{adr}: Pack '{pack}' has no UI manifest for '{data['ui']}'; write .agents-v0/ui/{data['ui']}/pack.json before Plan")
+                    else:
+                        ui_problems = packlib.errors_of(ui, "ui")
+                        if ui_problems:
+                            fail(f"{adr}: Pack '{pack}' UI manifest '{data['ui']}' is incomplete: {', '.join(ui_problems)}")
     if not adr_paths:
         fail(f"{path}: Options must name the pattern ADR under docs/agents-v0/adr/")
     fitness = split_sections(body, 2).get("fitness functions", "")

@@ -1029,6 +1029,21 @@ EOF
 expect_pass "check-architecture-pack accepts a complete custom pack" "$d" sh "$CI/check-architecture-pack.sh"
 sedi 's/"cobertura"/"llvm"/' "$rust/pack.json"
 expect_fail "check-architecture-pack rejects an unmeasured coverage format" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/"llvm"/"cobertura"/' "$rust/pack.json"
+python3 - "$rust/pack.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+data["ui"] = "nonexistent"
+json.dump(data, open(sys.argv[1], "w"), indent=2)
+PY
+expect_fail "check-architecture-pack rejects a pack with missing UI manifest" "$d" sh "$CI/check-architecture-pack.sh"
+python3 - "$rust/pack.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+data["ui"] = "react"
+json.dump(data, open(sys.argv[1], "w"), indent=2)
+PY
+expect_pass "check-architecture-pack accepts a pack with valid UI manifest" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-topology"
 write_pack "$d"
