@@ -10,13 +10,13 @@ alwaysApply: false
 
 ## Integration and contract testing
 
-- **Testcontainers:** API + DB + messaging integration tests when the repo already depends on it; reusable containers per project docs.
+- **Testcontainers:** API + DB + messaging integration tests against the target engine; when a diff adds or changes migrations or SQL (`db/migration`, `migrations`, `alembic`, `*.sql`), `.agents-v0/ci/check-gate-metrics.sh` fails if tests rely only on H2/in-memory substitutes without target-DB verification.
 - **Consumer–provider contracts:** **Pact** (or org-standard tool) for BFF ↔ service HTTP contracts; publish/verify in CI.
 - **Architecture tests (optional):** the pack's layer check (Pack `java`: **ArchUnit**) when drift is recurring.
 
 ## Workflow
 
-1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`).
+1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`). Capture the failing red test report before green overwrites it (`sh .agents-v0/ci/check-build-plan.sh <feature> --record-red`).
 2. Before merge: the profile Backend verify command (the `java` example is **`./mvnw -B clean verify`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `pack.json`. The fast loop does not replace this gate. The coverage table below applies to every pack.
 3. Coverage gaps: the report named in the pack `pack.json`. The `java` example is `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without a documented exception. The report is the pack `cve.path` (Pack `java`: OWASP Dependency-Check).
@@ -34,7 +34,7 @@ Wire the coverage, test, and CVE reports named in the bound pack's `pack.json` b
 | Backend branches | the pack coverage report (Pack `java`: JaCoCo / Sonar) | |
 | Frontend | **70%** | raise if CI gate exists |
 
-**Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements.
+**Brownfield ratchet:** if `docs/agents-v0/project-profile.md` records an approved `coverage_ratchet` row (interim minimum, Security + architecture approver, removal date), use that interim minimum for the listed scope until the removal date; new or changed code still meets the org minimum above. An expired or unapproved row does not apply. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired, unapproved, or (when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set) below its interim minimum. The ratchet never relaxes VAPT, auth, or CVE requirements. When `mutation_ratchet` (or `MIN_MUTATION_PCT`) is configured, `.agents-v0/ci/check-gate-metrics.sh` also checks Pitest/Stryker/mutmut mutation reports against the configured floor.
 
 ## Complexity and size
 

@@ -276,6 +276,9 @@ The skeleton merges to the default branch before feature stories branch.
 EOF
 run pass "design: a non-API design pins without a review" "$d" sh "$CI/check-design.sh" skel --pin approved
 rm -f "$d/docs/agents-v0/design/skel/design.lock"
+cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/skel/asyncapi.yaml"
+run fail "design: an asyncapi contract needs a review before pinning" "$d" sh "$CI/check-design.sh" skel --pin approved
+rm -f "$d/docs/agents-v0/design/skel/asyncapi.yaml"
 printf 'GET /health uses @PreAuthorize("permitAll()").\n' >> "$d/docs/agents-v0/design/skel/design.md"
 run pass "design: a health permitAll still pins without a review" "$d" sh "$CI/check-design.sh" skel --pin approved
 rm -f "$d/docs/agents-v0/design/skel/design.lock"
@@ -291,10 +294,15 @@ printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evide
 run pass "design: a Proposed ADR still passes the structure check" "$d" sh "$CI/check-design.sh" orders
 run fail "design: a Proposed ADR cannot be pinned" "$d" sh "$CI/check-design.sh" orders --pin approved
 sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-orders.md"
+cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
 ha="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$ha" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run pass "design: a resolved review lets the pin through" "$d" sh "$CI/check-design.sh" orders --pin approved
 run pass "design: the lock matches the pinned design" "$d" sh "$CI/check-design.sh" orders --verify-lock
+sedi 's/ORDER_CREATED/ORDER_PLACED/' "$d/docs/agents-v0/design/orders/asyncapi.yaml"
+run fail "design: modifying asyncapi.yaml after the pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
+run pass "design: restoring asyncapi.yaml matches the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 cp "$d/docs/agents-v0/adr/01-orders.md" "$tmp/adr.pinned"
 sedi 's/Synchronous REST./Synchronous REST plus a queue./' "$d/docs/agents-v0/adr/01-orders.md"
 run fail "design: rewriting an accepted ADR fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
@@ -477,6 +485,38 @@ run fail "build plan: a row that is not a requirement fails" "$b" sh "$CI/check-
 cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
 sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/agents-v0/build/orders/plan.md"
 run pass "build plan: REQUIRE_RED=0 turns the red-first check off" "$b" env REQUIRE_RED=0 sh "$CI/check-build-plan.sh" orders
+cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+run fail "build plan: REQUIRE_RED_REPORT=1 fails when only a markdown card exists without a machine report" "$b" env REQUIRE_RED_REPORT=1 sh "$CI/check-build-plan.sh" orders
+mkdir -p "$b/target/surefire-reports"
+cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
+<testsuite tests="1" failures="1">
+  <testcase classname="com.acme.OrderServiceTest" name="create_valid_returnsId">
+    <failure message="expected 201"/>
+  </testcase>
+</testsuite>
+EOF
+run pass "build plan: --record-red snapshots failing test IDs from JUnit XML into red-tests.json" "$b" sh "$CI/check-build-plan.sh" orders --record-red
+cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
+<testsuite tests="1" failures="0">
+  <testcase classname="com.acme.OrderServiceTest" name="create_valid_returnsId"/>
+</testsuite>
+EOF
+run pass "build plan: REQUIRE_RED_REPORT=1 passes after --record-red even when green overwrote the XML" "$b" env REQUIRE_RED_REPORT=1 sh "$CI/check-build-plan.sh" orders
+sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/agents-v0/build/orders/plan.md"
+printf '| mvn verify | 1 | 2 | OrderServiceTest#get_unknown_returns404 | OrderService.java:20 |\n' >> "$b/docs/agents-v0/build/orders/build-report.md"
+run fail "build plan: a markdown red card not backed by red-tests.json fails when red-tests.json is present" "$b" sh "$CI/check-build-plan.sh" orders
+rm -f "$b/docs/agents-v0/build/orders/red-tests.json"
+cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+sedi 's|OrderService.java:10|target/surefire-reports/TEST-OrderServiceTest.xml|' "$b/docs/agents-v0/build/orders/build-report.md"
+run fail "build plan: a card Location naming a green XML report fails machine verification" "$b" sh "$CI/check-build-plan.sh" orders
+cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
+<testsuite tests="1" failures="1">
+  <testcase classname="com.acme.OrderServiceTest" name="create_valid_returnsId">
+    <failure message="expected 201"/>
+  </testcase>
+</testsuite>
+EOF
+run pass "build plan: a card Location naming a failing XML report passes machine verification" "$b" sh "$CI/check-build-plan.sh" orders
 
 # --- ci/check-endpoint-auth.sh -----------------------------------------------
 e="$tmp/endpoints"

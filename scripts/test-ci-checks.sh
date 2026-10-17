@@ -550,6 +550,36 @@ printf 'package com.acme;\nclass A {\nint x;\nint y;\n}\n' > "$m/src/main/java/c
 expect_fail "gate metrics: diff coverage 50% fails the default 80%" "$tmp" env DIFF_BASE="$diff_base" sh "$CI/check-gate-metrics.sh" "$m"
 expect_pass "gate metrics: diff coverage 50% passes MIN_DIFF_LINE_PCT=40" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=40 sh "$CI/check-gate-metrics.sh" "$m"
 
+mkdir -p "$m/src/main/resources/db/migration" "$m/src/test/resources" "$m/src/test/java/com/acme"
+printf 'CREATE TABLE orders (id UUID PRIMARY KEY);\n' > "$m/src/main/resources/db/migration/V1__init.sql"
+printf 'spring:\n  datasource:\n    url: jdbc:h2:mem:testdb\n' > "$m/src/test/resources/application-test.yml"
+(
+  cd "$m"
+  git add -A && git_commit schema_h2_only
+)
+expect_fail "gate metrics: schema migration diff with H2-only test config fails" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=0 sh "$CI/check-gate-metrics.sh" "$m"
+cat > "$m/src/test/java/com/acme/MigrationIntegrationTest.java" <<'EOF'
+package com.acme;
+import org.testcontainers.containers.PostgreSQLContainer;
+class MigrationIntegrationTest {}
+EOF
+(
+  cd "$m"
+  git add -A && git_commit schema_with_tc
+)
+expect_pass "gate metrics: schema migration diff with Testcontainers test passes" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=0 sh "$CI/check-gate-metrics.sh" "$m"
+
+mkdir -p "$m/target/pit-reports"
+cat > "$m/target/pit-reports/mutations.xml" <<'EOF'
+<mutations>
+  <mutation detected="true" status="KILLED"/>
+  <mutation detected="false" status="SURVIVED"/>
+</mutations>
+EOF
+expect_fail "gate metrics: pitest mutation score 50% below MIN_MUTATION_PCT=75 fails" "$tmp" env MIN_MUTATION_PCT=75 sh "$CI/check-gate-metrics.sh" "$m"
+expect_pass "gate metrics: pitest mutation score 50% meeting MIN_MUTATION_PCT=50 passes" "$tmp" env MIN_MUTATION_PCT=50 sh "$CI/check-gate-metrics.sh" "$m"
+rm -rf "$m/target/pit-reports"
+
 m="$tmp/gate-python"
 mkdir -p "$m"
 printf '[project]\nname = "orders"\n' > "$m/pyproject.toml"

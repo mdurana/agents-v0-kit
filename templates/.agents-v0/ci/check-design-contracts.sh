@@ -58,7 +58,7 @@ for req in docs/agents-v0/requirements/*.md; do
   fi
 done
 
-for async in docs/agents-v0/design/*/asyncapi.yaml; do
+for async in docs/agents-v0/design/*/asyncapi.yaml docs/agents-v0/design/*/asyncapi.yml docs/agents-v0/design/*/asyncapi.json; do
   [ -f "$async" ] || continue
   sh "$here/check-asyncapi.sh" lint "$async" || failed=1
 done

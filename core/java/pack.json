@@ -4,7 +4,7 @@
   "http": "Spring MVC, embedded Tomcat 11.0.26",
   "security": "Spring Security",
   "database": "PostgreSQL 15, Flyway",
-  "tests": "JUnit (spring-boot-starter-test), ArchUnit 1.4.2, H2 test profile",
+  "tests": "JUnit (spring-boot-starter-test), ArchUnit 1.4.2, Testcontainers (H2 unit profile only; schema changes require target DB)",
   "localRun": "Compose API :8080, UI :8081, postgres:15-alpine",
   "verify": "cd app/backend && ./mvnw -B clean verify",
   "verifyFast": "cd app/backend && ./mvnw -B clean verify -P!ci-security",

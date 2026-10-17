@@ -336,6 +336,11 @@ design-contract:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
         - docs/agents-v0/design/*/openapi.yaml
+        - docs/agents-v0/design/*/openapi.yml
+        - docs/agents-v0/design/*/openapi.json
+        - docs/agents-v0/design/*/asyncapi.yaml
+        - docs/agents-v0/design/*/asyncapi.yml
+        - docs/agents-v0/design/*/asyncapi.json
         - docs/agents-v0/design/*/design.lock
         - docs/agents-v0/design/*/ux-spec.md
   before_script:

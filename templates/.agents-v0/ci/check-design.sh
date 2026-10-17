@@ -97,7 +97,7 @@ def status_kind(status):
 
 def design_files():
     out = []
-    for name in ("design.md", "openapi.yaml", "openapi.yml", "openapi.json", "ux-spec.md"):
+    for name in ("design.md", "openapi.yaml", "openapi.yml", "openapi.json", "asyncapi.yaml", "asyncapi.yml", "asyncapi.json", "ux-spec.md"):
         if os.path.isfile(os.path.join(base, name)):
             out.append(os.path.join(base, name))
     for sub in ("events", "mockups"):
@@ -158,13 +158,16 @@ def section(secs, key):
 
 
 def review_not_required(body):
-    """A design with no API, no UI, and no public route can be pinned without design-reviewer."""
+    """A design with no API, no AsyncAPI/events, no UI, and no public route can be pinned without design-reviewer."""
     if not body or "N/A: no /api/v1 operation" not in body:
         return False
     if os.path.isfile(os.path.join(base, "ux-spec.md")):
         return False
-    for name in ("openapi.yaml", "openapi.yml", "openapi.json"):
+    for name in ("openapi.yaml", "openapi.yml", "openapi.json", "asyncapi.yaml", "asyncapi.yml", "asyncapi.json"):
         if os.path.isfile(os.path.join(base, name)):
+            return False
+    for _dirpath, _dirs, names in os.walk(os.path.join(base, "events")):
+        if names:
             return False
     # A health, readiness, or liveness route is the skeleton's proof, not a product API.
     kept = re.sub(

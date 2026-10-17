@@ -494,7 +494,180 @@ def record_cve(path):
         failures.append("unsuppressed HIGH/CRITICAL CVEs: " + ", ".join(sorted(set(found))))
 
 
+SCHEMA_PATH_RE = re.compile(
+    r"(^|/)(db/migrations?|db/changelog|alembic/versions|migrations)/|schema\.prisma$|\.sql$",
+    re.I,
+)
+TARGET_DB_TEST_RE = re.compile(
+    r"(testcontainers|@Testcontainers|PostgreSQLContainer|SqlServerContainer|MySQLContainer|"
+    r"MariaDBContainer|OracleContainer|JdbcDatabaseContainer|DockerComposeContainer|ComposeContainer|"
+    r"@ServiceConnection|tc:postgresql|jdbc:postgresql:|jdbc:sqlserver:|UseNpgsql|NpgsqlConnection|"
+    r"UseSqlServer|SqlConnection|psycopg|asyncpg|pgx|postgres://|postgresql://|sqlserver://)",
+    re.I,
+)
+TEST_SOURCE_RE = re.compile(
+    r"(Test|Tests|IT)\.java$|(Test|Tests)\.cs$|\.(test|spec)\.[A-Za-z]+$|_test\.[A-Za-z]+$|(^|/)test_[^/]+\.py$",
+    re.I,
+)
+
+
+def check_schema_target_db():
+    """If the diff touches a migration or SQL file, tests must run against the target DB (not H2/in-memory only)."""
+    base = env("DIFF_BASE")
+    if not base or env("ALLOW_INMEMORY_MIGRATION_TEST") == "1":
+        return
+    try:
+        merge_base = subprocess.run(
+            ["git", "-C", root, "merge-base", base, "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        changed = subprocess.run(
+            ["git", "-C", root, "diff", "--name-only", "--relative", merge_base, "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+    except (subprocess.CalledProcessError, OSError):
+        return
+    schema_files = [p.strip() for p in changed if p.strip() and SCHEMA_PATH_RE.search(p.replace("\\", "/"))]
+    if not schema_files:
+        return
+    skip = {".git", "node_modules", "target", "dist", "build", "bin", "obj", ".venv", "venv", "__pycache__"}
+    has_target_db = False
+    for dirpath, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in skip]
+        for name in names:
+            full = os.path.join(dirpath, name)
+            norm = full.replace(os.sep, "/")
+            if (
+                TEST_SOURCE_RE.search(norm)
+                or "/src/test/" in norm
+                or "/tests/" in norm
+                or "/__tests__/" in norm
+                or re.search(r"(^|/)(docker-)?compose[^/]*\.ya?ml$", norm, re.I)
+            ):
+                try:
+                    with open(full, encoding="utf-8", errors="replace") as handle:
+                        text = handle.read()
+                except OSError:
+                    continue
+                if TARGET_DB_TEST_RE.search(text):
+                    has_target_db = True
+                    break
+        if has_target_db:
+            break
+    summary["schemaChangedFiles"] = schema_files
+    summary["schemaTargetDbVerified"] = has_target_db
+    if not has_target_db:
+        failures.append(
+            f"schema/migration files changed ({', '.join(schema_files[:3])}) "
+            "but no target-database test (Testcontainers or Compose) was found; "
+            "H2 or in-memory substitutes do not satisfy schema verification"
+        )
+    else:
+        print(f"schema: target database test verified for {len(schema_files)} migration/SQL file(s)")
+
+
+def mutation_ratchet_minimum():
+    """Optional mutation minimum from MIN_MUTATION_PCT or the mutation_ratchet table in project-profile.md."""
+    explicit = number("MIN_MUTATION_PCT")
+    if explicit is not None:
+        return explicit
+    path = env("KNOWN_FAILURES_PROFILE") or os.path.join("docs", "agents-v0", "project-profile.md")
+    if not os.path.isfile(path):
+        return None
+    in_section = False
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                in_section = "mutation_ratchet" in stripped
+                continue
+            if in_section and stripped.startswith("|"):
+                cells = [cell.strip().rstrip("%") for cell in stripped.strip("|").split("|")]
+                if len(cells) >= 2 and re.fullmatch(r"\d+(?:\.\d+)?", cells[1]):
+                    return float(cells[1])
+    return None
+
+
+def parse_mutation_pct(path):
+    if not path or not os.path.isfile(path):
+        return None
+    low = path.lower()
+    if low.endswith(".xml"):
+        try:
+            top = ET.parse(path).getroot()
+        except ET.ParseError:
+            return None
+        killed = total = 0
+        for mut in top.iter():
+            if mut.tag == "mutation" or mut.tag.endswith("}mutation"):
+                status = (mut.get("status") or "").upper()
+                if status in ("MEMORY_ERROR", "RUN_ERROR", "NON_VIABLE"):
+                    continue
+                total += 1
+                if (mut.get("detected") or "").lower() == "true" or status in ("KILLED", "TIMED_OUT"):
+                    killed += 1
+        return None if total == 0 else 100.0 * killed / total
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if isinstance(data.get("mutationScore"), (int, float)):
+        return float(data["mutationScore"])
+    if isinstance(data.get("killed"), (int, float)) and isinstance(data.get("total"), (int, float)) and data["total"] > 0:
+        return 100.0 * float(data["killed"]) / float(data["total"])
+    files = data.get("files")
+    if isinstance(files, dict):
+        killed = total = 0
+        for fobj in files.values():
+            if not isinstance(fobj, dict):
+                continue
+            for mut in fobj.get("mutants") or []:
+                if not isinstance(mut, dict):
+                    continue
+                st = (mut.get("status") or "").lower()
+                if st in ("ignored", "compileerror", "runtimeerror"):
+                    continue
+                total += 1
+                if st in ("killed", "timeout"):
+                    killed += 1
+        return None if total == 0 else 100.0 * killed / total
+    return None
+
+
+def check_mutation():
+    """Optional mutation score check when MUTATION_REPORT, pack mutation.path, or mutation_ratchet is configured."""
+    mut_spec = (bound_pack or {}).get("mutation") if isinstance((bound_pack or {}).get("mutation"), dict) else {}
+    rel = env("MUTATION_REPORT") or mut_spec.get("path") or ""
+    candidates = files_for(rel) if rel else []
+    report_file = candidates[0] if candidates else (rel if rel and os.path.isfile(rel) else "")
+    if not report_file:
+        for default_rel in (
+            os.path.join("target", "pit-reports", "mutations.xml"),
+            os.path.join("reports", "mutation", "mutation.json"),
+            "mutation.json",
+        ):
+            found = files_for(default_rel)
+            if found:
+                report_file = found[0]
+                break
+    minimum = mutation_ratchet_minimum()
+    pct = parse_mutation_pct(report_file) if report_file else None
+    if pct is not None:
+        summary["mutationPct"] = round(pct, 2)
+        print(f"mutation: score {pct:.2f}%")
+        if minimum is not None and pct < minimum:
+            failures.append(f"mutation score {pct:.2f}% < {minimum:g}%")
+    elif minimum is not None:
+        failures.append(f"mutation minimum {minimum:g}% is set but no mutation report was found")
+
+
 def finish():
+    if summary.get("kind") not in (None, "", "missing"):
+        check_schema_target_db()
+        check_mutation()
     out = env("GATE_METRICS_OUT") or os.path.join(root, "target", "gate-metrics.json")
     if not os.path.isdir(os.path.join(root, "target")):
         out = env("GATE_METRICS_OUT") or os.path.join(root, "gate-metrics.json")
