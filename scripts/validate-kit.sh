@@ -111,6 +111,10 @@ done
 for command in roadmap architecture plan intake design build verify maintain release deliver status onboard triage export deck; do
   [ -f "core/common/commands/v0-$command.md" ] || err "missing /v0-$command command"
 done
+for f in core/common/commands/v0-*.md; do
+  c="$(basename "$f" .md)"
+  grep -Fq "\`/$c\`" AGENTS.md || err "AGENTS.md lifecycle table does not list /$c"
+done
 grep -Fq '`/v0-plan`' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-plan"
 grep -Fq 'docs/agents-v0/requirements/<feature>.md' core/common/commands/v0-intake.md || err "/v0-intake does not name its requirements artifact"
 grep -Fq 'docs/agents-v0/build/' core/common/commands/v0-build.md || err "/v0-build does not name persisted build evidence paths"

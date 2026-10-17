@@ -22,6 +22,9 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Release | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` (own approvals, tier); routes to Verify |
 | Trivial fixes | `/v0-triage` | maintenance-engineer | bugfix-triage | Classifier-qualified, person-confirmed; abbreviated Verify |
+| Deliver (one story) | `/v0-deliver` | orchestrator | — | Runs Intake → Design → Build → Verify → Release in order, stopping at every gate; the feature's state file |
+| Export (on request) | `/v0-export` | — | jira-export | `docs/agents-v0/backlog/tickets.csv` (documentation only, approves nothing) |
+| Briefing (on request) | `/v0-deck` | — | leadership-deck | `docs/agents-v0/presentations/<name>.md` (documentation only, approves nothing) |
 | Resume | `/v0-status` | orchestrator | — | Next phase from approvals + on-disk evidence |
 
 ## Non-negotiable conduct
