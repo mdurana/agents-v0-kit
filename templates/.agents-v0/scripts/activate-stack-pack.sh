@@ -158,12 +158,15 @@ def require_complete(pack_id):
     for skill in ("implement-service", "implement-bff"):
         if not os.path.isfile(os.path.join(directory, "skills", skill, "SKILL.md")):
             problems.append(skill)
+    ui_value = data.get("ui")
     ui = data.get("uiPack")
-    if isinstance(data.get("ui"), str):
+    if isinstance(ui_value, str):
         if not ui:
             problems.append("ui")
         else:
             problems.extend("ui." + item for item in packlib.errors_of(ui, "ui"))
+    elif isinstance(ui_value, dict):
+        problems.extend("ui." + item for item in packlib.errors_of(ui_value, "ui"))
     if problems:
         fail(f"{pack_id} pack is incomplete: " + ", ".join(problems), 1)
     return data

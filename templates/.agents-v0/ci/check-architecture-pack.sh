@@ -310,14 +310,19 @@ if body is not None:
                 for skill in ("implement-service", "implement-bff"):
                     if not os.path.isfile(os.path.join(directory, "skills", skill, "SKILL.md")):
                         fail(f"{adr}: Pack '{pack}' has no {skill} skill")
+                ui_value = data.get("ui")
                 ui = data.get("uiPack")
-                if isinstance(data.get("ui"), str):
+                if isinstance(ui_value, str):
                     if not ui:
-                        fail(f"{adr}: Pack '{pack}' has no UI manifest for '{data['ui']}'; write .agents-v0/ui/{data['ui']}/pack.json before Plan")
+                        fail(f"{adr}: Pack '{pack}' has no UI manifest for '{ui_value}'; write .agents-v0/ui/{ui_value}/pack.json before Plan")
                     else:
                         ui_problems = packlib.errors_of(ui, "ui")
                         if ui_problems:
-                            fail(f"{adr}: Pack '{pack}' UI manifest '{data['ui']}' is incomplete: {', '.join(ui_problems)}")
+                            fail(f"{adr}: Pack '{pack}' UI manifest '{ui_value}' is incomplete: {', '.join(ui_problems)}")
+                elif isinstance(ui_value, dict):
+                    ui_problems = packlib.errors_of(ui_value, "ui")
+                    if ui_problems:
+                        fail(f"{adr}: Pack '{pack}' inlined UI manifest is incomplete: {', '.join(ui_problems)}")
     if not adr_paths:
         fail(f"{path}: Options must name the pattern ADR under docs/agents-v0/adr/")
     fitness = split_sections(body, 2).get("fitness functions", "")

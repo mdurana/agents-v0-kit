@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Stack (active pack)
 
-The `Pack` row in `docs/agents-v0/project-profile.md` is the backend pack id. Any id is valid when that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). Kit examples are not a closed list. `/v0-architecture` records `Pack:` on the pattern ADR and runs `sh .agents-v0/scripts/activate-stack-pack.sh`. An empty Pack stops the program. `/v0-onboard` does not replace a Pack that is already set. The UI is that pack's `ui` id. A kit pin in `docs/agents-v0/kit-pin` is the kit commit; kit files are not copied into the project. OpenAPI 3.0 uses `/api/v1/`. Events and cache only when the ADR justifies them. The directory table below is one example layout; the pack manifest names its own.
+The `Pack` row in `docs/agents-v0/project-profile.md` is the backend pack id. Any id is valid when that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). Kit examples are not a closed list. `/v0-architecture` records `Pack:` on the pattern ADR and runs `sh .agents-v0/scripts/activate-stack-pack.sh`. An empty Pack stops the program. `/v0-onboard` does not replace a Pack that is already set. The UI is that pack's `ui` id when `ui` names an id (omitted for a backend-only pack). A kit pin in `docs/agents-v0/kit-pin` is the kit commit; kit files are not copied into the project. OpenAPI 3.0 uses `/api/v1/`. Events and cache only when the ADR justifies them. The directory table below is one example layout; the pack manifest names its own.
 
 ## Directory profiles
 

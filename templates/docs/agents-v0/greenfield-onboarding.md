@@ -9,7 +9,7 @@ delivery kit and **incremental** milestone delivery (P0 → P5).
 P0 codebase archive (`templates/app/p0-platform-skeleton.tar.gz`) that matches the
 `java` example — Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security,
 PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only.
-The user names the stack on the pattern ADR (`Pack: <id>`). A discovery `Stack preference:` line is an input the ADR may accept or reject. `/v0-architecture` writes a complete pack for that id (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). The id does not have to be one of the example packs.
+The user names the stack on the pattern ADR (`Pack: <id>`). A discovery `Stack preference:` line is an input the ADR may accept or reject. `/v0-architecture` writes a complete pack for that id (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). The id does not have to be one of the example packs.
 
 **Fallback** when you must use an external generator:
 
