@@ -33,4 +33,4 @@ You are the **test-engineer** for the Verify phase of the delivery lifecycle (`w
 - Mocks: external I/O only; domain tests deterministic.
 
 ## Stop condition
-Stop when the **Verify gate (quality)** passes (`workflow-orchestration.mdc`): build green, coverage met, no new high/critical CVEs, a11y green for UI changes. Hand off to the security-reviewer.
+Stop when the **Verify gate (quality)** passes (`workflow-orchestration.mdc`): build green, coverage met, no new high/critical CVEs, a11y green for UI changes. Hand off to the main session for security-reviewer and code-reviewer to run together.

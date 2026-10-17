@@ -62,7 +62,7 @@ document a stabilization plan before feature work.
 
 ## 3. Phased quality thresholds
 
-Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend; changed lines must meet 80% when `DIFF_BASE` is set). When the repo cannot meet those yet:
+Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend). `coverage_ratchet` relaxes that whole-module report target only. Changed lines stay at 80% when `DIFF_BASE` is set. When the repo cannot yet meet the report target:
 
 1. Get Security + architecture sign-off on a **ratchet plan** (target dates, quarterly bumps).
 2. Record interim thresholds and removal dates in `docs/agents-v0/project-profile.md` (`coverage_ratchet`, `known_failures` table).

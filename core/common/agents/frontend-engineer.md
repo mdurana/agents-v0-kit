@@ -26,7 +26,7 @@ You are the **frontend-engineer** for the Build phase of the delivery lifecycle 
 
 ## Rules you must satisfy
 - `frontend-web.mdc`: structure, `load`/server loads, `browser` guard, stores, Zod forms, user-visible errors on failed fetch.
-- `quality-and-testing.mdc`: red–green for non-trivial logic; frontend coverage ≥ 70% on changed code.
+- `quality-and-testing.mdc`: red–green for non-trivial logic; report coverage ≥ 70% (CI fails changed lines under 80% when `DIFF_BASE` is set).
 - `vapt-webapp.mdc` F1: access token in memory; refresh token in an HttpOnly cookie; clear leftover client state on logout; call backend logout + IdP sign-out for SSO.
 - `vapt-webapp.mdc` F2: no backend URLs/RBAC roles/permission keys in client bundles; no `PUBLIC_*`/`VITE_*` leaking internal config; `sourcemap: false` in prod.
 - `vapt-webapp.mdc` F4: enforce route/module access in `+layout.server.ts`, hooks, or BFF — not UI hide-only.

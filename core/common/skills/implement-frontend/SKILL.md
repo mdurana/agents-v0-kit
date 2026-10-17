@@ -28,7 +28,7 @@ Build phase playbook for the `frontend-engineer` agent (`workflow-orchestration.
 
 ## Rule-compliance checklist
 - [ ] `frontend-web.mdc`: structure; `load`; `browser` guard; stores; Zod forms; user-visible fetch errors.
-- [ ] `quality-and-testing.mdc`: red–green per behavior unit; frontend coverage ≥ 70% on changed code.
+- [ ] `quality-and-testing.mdc`: red–green per behavior unit; report coverage ≥ 70% (CI fails changed lines under 80% when `DIFF_BASE` is set).
 - [ ] Baseline green before the first edit; red–green loop uses a real `Frontend verify (fast)` cell; full Frontend verify once at the gate; `check-failure-brief.sh` before attempt three.
 - [ ] `vapt-webapp.mdc` F1: access token in memory; refresh token in an HttpOnly cookie; clear leftover client state on logout; backend + IdP sign-out.
 - [ ] `vapt-webapp.mdc` F2: no config/RBAC/internal URLs in client bundle; `sourcemap: false`.
