@@ -1,6 +1,6 @@
 # Roadmap: <program>
 
-Discovery: <repo-relative path the user passed to /v0-roadmap>
+Discovery: <repo-relative path the user passed to /v0-roadmap> (sha256: <sha256-hash>)
 
 <!-- Stack preference: copy a discovery line `Stack preference: <id>` here when that file has one. Otherwise delete this comment. It does not activate a pack. -->
 
@@ -40,4 +40,4 @@ Discovery: <repo-relative path the user passed to /v0-roadmap>
 
 > The `roadmap` row covers the sequence. The discovery file has no kit approval row.
 > `/v0-architecture` runs next and does not write stories. `/v0-plan` then reads this file and does not add a theme it does not name.
-> `.agents-v0/ci/check-approvals.sh <this file> roadmap` checks the row.
+> `.agents-v0/ci/check-approvals.sh <this file> roadmap` and `.agents-v0/ci/check-roadmap.sh <this file>` check the roadmap.

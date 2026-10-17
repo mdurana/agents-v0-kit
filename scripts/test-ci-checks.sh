@@ -882,6 +882,126 @@ Material: no
 EOF
 expect_pass "check-approvals accepts the roadmap row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/roadmap/claims.md roadmap
 expect_pass "check-milestone accepts a manifest that names an approved roadmap" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
+
+# --- check-roadmap.sh tests ------------------------------------------------
+mkdir -p "$d/docs/product"
+cat > "$d/docs/product/claims-discovery.md" <<'EOF'
+# Claims Discovery
+## Problem
+Slow batch claim adjudication.
+## **Success Metrics**
+Adjudication time under 15 minutes.
+## Options
+Option A: in-memory queue. Option B: event stream.
+## Chosen option
+Option A.
+## In scope
+- Batch file ingestion
+- Adjudication rules engine
+## Out of scope
+- Real-time mobile push notifications
+EOF
+expect_pass "check-roadmap preflight accepts normalized ## **Success Metrics**" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery.md
+
+cat > "$d/docs/product/claims-discovery-placeholder.md" <<'EOF'
+# Claims Discovery
+## Problem
+Slow batch claim adjudication.
+## Success metric
+Target is a couple of XX MB latency.
+## Options
+Option A.
+## Chosen option
+Option A.
+## In scope
+- Item 1
+## Out of scope
+- Item 2
+EOF
+expect_fail "check-roadmap preflight rejects XX placeholder" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery-placeholder.md
+
+disc_hash="$(python3 -c 'import hashlib, sys; sys.stdout.write(hashlib.sha256(open("'$d'/docs/product/claims-discovery.md", "rb").read()).hexdigest())')"
+cat > "$d/docs/agents-v0/roadmap/claims-valid.md" <<EOF
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: $disc_hash)
+
+## Problem
+Slow batch claim adjudication.
+
+## Success metric
+Adjudication time under 15 minutes.
+
+## Chosen option
+Option A.
+
+## Now
+- Batch file ingestion
+
+## Next
+- Adjudication rules engine
+
+## Later
+
+## Out of scope
+- Real-time mobile push notifications
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims-valid.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_pass "check-roadmap validates partitioned roadmap with matching sha256" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-valid.md
+
+cat > "$d/docs/agents-v0/roadmap/claims-invented.md" <<EOF
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: $disc_hash)
+
+## Now
+- Batch file ingestion
+
+## Next
+- Adjudication rules engine (follow-on theme)
+
+## Later
+
+## Out of scope
+- Real-time mobile push notifications
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims-invented.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_fail "check-roadmap rejects invented item in horizon" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-invented.md
+
+cat > "$d/docs/agents-v0/roadmap/claims-hash-mismatch.md" <<'EOF'
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: 0000000000000000000000000000000000000000000000000000000000000000)
+
+## Now
+- Batch file ingestion
+
+## Next
+- Adjudication rules engine
+
+## Later
+
+## Out of scope
+- Real-time mobile push notifications
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims-hash-mismatch.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_fail "check-roadmap rejects hash mismatch when discovery document changed" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-hash-mismatch.md
+
 expect_pass "check-arc ignores a story that is not material" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
 printf 'Material: yes\nARC: docs/agents-v0/design/system/arc-record.md\n' > "$d/docs/agents-v0/requirements/a.md"
 expect_fail "check-arc fails a material story with no ARC record" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md

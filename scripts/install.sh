@@ -178,6 +178,7 @@ install_templates() {
 .gitlab/merge_request_templates/default.md
 .gitlab/CODEOWNERS
 .agents-v0/ci/check-approvals.sh
+.agents-v0/ci/check-roadmap.sh
 .agents-v0/ci/check-evidence.sh
 .agents-v0/ci/check-milestone.sh
 .agents-v0/ci/check-delivery-linkage.sh
@@ -273,7 +274,7 @@ docs/agents-v0/brownfield-onboarding.md
     overwrite=0
     if [ "$UPDATE" = 1 ]; then
       for always in $always_on_update \
-        .agents-v0/ci/check-approvals.sh .agents-v0/ci/check-evidence.sh .agents-v0/ci/check-milestone.sh \
+        .agents-v0/ci/check-approvals.sh .agents-v0/ci/check-roadmap.sh .agents-v0/ci/check-evidence.sh .agents-v0/ci/check-milestone.sh \
         .agents-v0/ci/check-delivery-linkage.sh .agents-v0/ci/check-approver-gitlab.sh .agents-v0/ci/check-coverage-ratchet.sh \
         .agents-v0/ci/check-known-failures.sh .agents-v0/ci/resolve-layout.sh .agents-v0/ci/check-feature-state.sh \
         .agents-v0/ci/check-gate-metrics.sh .agents-v0/ci/check-event-schemas.sh .agents-v0/ci/check-layout-roots.sh \

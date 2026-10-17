@@ -27,10 +27,10 @@ Phases: **Intake → Design → Build → Verify → Release**, with **Maintain*
 
 ## Roadmap
 
-Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` set to the path. It does not copy the file. A missing path or a placeholder heading stops. The `roadmap` row (`.agents-v0/ci/check-approvals.sh <roadmap> roadmap`) covers the sequence. The discovery file has no kit approval row.
+Discovery stays outside the kit, in any file under the repo root. `/v0-roadmap <path>` (`program-roadmap`) reads only that file and writes `docs/agents-v0/roadmap/<program>.md` with `Discovery:` (and sha256 checksum). Gate and preflight are verified by `.agents-v0/ci/check-roadmap.sh`. Re-run with `--refresh` when facts change. The `roadmap` row covers the sequence.
 
 ### Roadmap gate
-Now, Next, and Later are in-scope items copied from the discovery file. A discovery line `Stack preference:` is copied onto the roadmap as written and does not select the pack. Stop for explicit user approval before Architecture.
+Now, Next, and Later are in-scope items copied from discovery, each in one horizon with no invented themes. A `Stack preference:` line is copied as written. Stop for explicit user approval before Architecture.
 
 ## Architecture
 

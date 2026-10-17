@@ -41,7 +41,6 @@ coverage/
 **/site/jacoco/
 
 # VCS and package caches
-.git/
 .npm/
 .yarn/
 .pnpm-store/

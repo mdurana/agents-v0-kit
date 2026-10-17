@@ -45,7 +45,10 @@ BANNED = ("works as expected", "handles errors gracefully", "successfully proces
 REFUSAL = re.compile(
     r"(?i)(\b(400|401|403|422)\b|unauthorized|forbidden|rejected|denied|invalid|validation)"
 )
-PLACEHOLDER = re.compile(r"(<[^>\n]+>|\[\.\.\.\]|\bTBD\b|TEMPLATE:)")
+PLACEHOLDER = re.compile(
+    r"(<[^>\n]+>|\[\.\.\.\]|\b(TBD|TODO|FIXME|XXX?)\b|__+|[?]{2,}|TEMPLATE:)",
+    re.IGNORECASE,
+)
 TRIGGER = re.compile(r"(?i)\b(auth|authentication|authorization|upload|rbac|public route)\b")
 SURFACES = {"backend", "bff", "frontend"}
 
