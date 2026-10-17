@@ -1,6 +1,6 @@
 # Design: <feature>
 
-> Copy to `docs/agents-v0/design/<feature>/design.md`. `sh .agents-v0/ci/check-design.sh <feature>` checks it: every section below must say something, or say `N/A: <reason>`; every `AC-n` of the requirements artifact appears in Traceability; every `operationId` of `openapi.yaml` appears in Authorization; the ADR line names a real ADR with at least two alternatives and Status `Proposed` or `Accepted`. A pin requires `Accepted`. A later decision supersedes that file. Delete each `TEMPLATE:` line when you replace it.
+> Copy to `docs/agents-v0/design/<feature>/design.md`. `sh .agents-v0/ci/check-design.sh <feature>` checks Traceability, Data model, Authorization, Failure modes, Observability, and Rollout: each must say something, or say `N/A: <reason>`. It also checks that every `AC-n` of the requirements artifact appears in Traceability, every `operationId` of `openapi.yaml` appears in Authorization, and the ADR line names a real ADR with at least two alternatives and Status `Proposed` or `Accepted`. A pin requires `Accepted`. A later decision supersedes that file. The Events section is still `N/A: no event contract` when the story has no messages; the script does not look for that phrase. Delete each `TEMPLATE:` line when you replace it.
 
 ADR: <!-- TEMPLATE: docs/agents-v0/adr/NN-slug.md, or "N/A: <reason>" -->
 

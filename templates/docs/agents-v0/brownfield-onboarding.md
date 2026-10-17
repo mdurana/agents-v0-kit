@@ -62,7 +62,7 @@ document a stabilization plan before feature work.
 
 ## 3. Phased quality thresholds
 
-Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend). `coverage_ratchet` relaxes that whole-module report target only. Changed lines stay at 80% when `DIFF_BASE` is set. When the repo cannot yet meet the report target:
+Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend). A `coverage_ratchet` row is a dated waiver record. It does not relax Pack `java` verify: JaCoCo stays at 0.80 in `core/java/starters/maven/quality-plugins.xml`. The GitLab `coverage-ratchet` job does not pass `LINE_COVERAGE_PCT`, so `.agents-v0/ci/check-coverage-ratchet.sh` checks the approver and the removal date, and compares a measured number only when that variable or `JACOCO_LINE_PCT` is set. Changed lines stay at 80% when `DIFF_BASE` is set. When the repo cannot yet meet the report target:
 
 1. Get Security + architecture sign-off on a **ratchet plan** (target dates, quarterly bumps).
 2. Record interim thresholds and removal dates in `docs/agents-v0/project-profile.md` (`coverage_ratchet`, `known_failures` table).

@@ -14,8 +14,10 @@
 #
 # Environment:
 #   ALLOW_NO_TESTS=1       do not fail when no test report exists (module with no tests)
-#   MIN_LINE_PCT=<n>       fail when bundle line coverage is below n (unset: report only;
-#                          the JaCoCo check goal and docs/agents-v0/project-profile.md coverage_ratchet own it)
+#   MIN_LINE_PCT=<n>       fail when bundle line coverage is below n (unset: report only).
+#                          Pack java's JaCoCo check goal is a fixed 0.80. coverage_ratchet does not
+#                          change it; check-coverage-ratchet.sh compares a number only when
+#                          LINE_COVERAGE_PCT or JACOCO_LINE_PCT is set.
 #   DIFF_BASE=<git-rev>    also measure coverage of Java lines added since merge-base(DIFF_BASE, HEAD)
 #   MIN_DIFF_LINE_PCT=<n>  diff coverage minimum (default 80)
 #   REQUIRE_CVE_REPORT=1   fail when dependency-check-report.json is missing

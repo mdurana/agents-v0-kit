@@ -82,7 +82,7 @@ A person approves each row, and CODEOWNERS makes this file a code-owner change, 
 |----------------------|------------------|-------|-----------|
 | 0 | | | |
 
-### coverage_ratchet (optional; read by quality-and-testing.mdc)
+### coverage_ratchet (optional; read by .agents-v0/ci/check-coverage-ratchet.sh)
 
 | Scope | Interim minimum | Approver (Security + architecture) | Remove by |
 |-------|-----------------|------------------------------------|-----------|
