@@ -10,7 +10,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 
 | Clause | Enforcer |
 |--------|----------|
-| Active pack is the id in the profile `Pack` cell. Any id is valid once `.agents-v0/packs/<id>/pack.json` is complete. The `java` example pins Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; its `ui` example is React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine` | A backend-engineer, frontend-engineer; S the pack's implement-* skill, implement-frontend; C /v0-architecture; CI check-architecture-pack.sh, activate-stack-pack.sh; G Architecture and Build gates |
+| Active pack is the id in the profile `Pack` cell. Any id is valid once that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). The `java` example pins Java 21, Spring Boot 4.1.1, Maven wrapper, Spring MVC, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, OpenAPI; its `ui` example is React 19 / TS 5.9 / Vite 7; JUnit / ArchUnit 1.4.2 / H2 test profile / Vitest 3; Compose API 8080, UI 8081, `postgres:15-alpine` | A backend-engineer, frontend-engineer; S the pack's implement-* skill, implement-frontend; C /v0-architecture; CI check-architecture-pack.sh, activate-stack-pack.sh; G Architecture and Build gates |
 | P0 app template archive (`templates/app/p0-platform-skeleton.tar.gz`) is the `java` example, extracted by `--scaffold-app` for that example. Any other pack uses its scaffold skill and does not extract it. An empty Pack does not extract it | scripts/pack-app-template.sh, scaffold-app-template.sh, bootstrap-greenfield.sh; S scaffold-service; G validate-kit + test-app-template |
 | UI is the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, Vite 7, Vitest 3 | A requirements-analyst, frontend-engineer; S spec-intake, implement-frontend; G Intake gate |
 | Directory profiles (service, ui, app); `Service roots` for several services in one repo (one catalog per service) | R project-delivery-core; `docs/agents-v0/project-profile.md`; C /v0-onboard; CI .agents-v0/ci/resolve-layout.sh |
@@ -25,9 +25,8 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Mandated docs: README and sequence diagrams in the feature release. `architecture.md` and `network.md` are written by `/v0-onboard` or the P0 build, then a docs-only follow-up | A maintenance-engineer, release-manager; S doc-sync, release-pr; C /v0-onboard, /v0-build, /v0-release |
 | BFF thin; domain logic in services | A bff-engineer; S implement-bff; R architecture-and-diagrams |
 | Health (`/health`, `/ready`, `/live` when the project uses them) | A backend-engineer; S implement-service; G Build gate |
-| Cache and YugabyteDB only when requirements justify them | A solution-architect; S contract-first-design; G Design gate |
+| Events and cache only when the ADR justifies them | A solution-architect; S contract-first-design; G Design gate |
 | DDD defaults (aggregates, value objects, repository ports) | A solution-architect, backend-engineer; S contract-first-design, implement-service; G Design/Build gate |
-| Do not switch MVC and WebFlux without an ADR | A backend-engineer, bff-engineer; S implement-service, implement-bff; G Design gate |
 | OMS / order domain only when the task touches that domain | A solution-architect; S contract-first-design; R architecture-and-diagrams |
 
 ## ai-agent-conduct.mdc
@@ -114,6 +113,7 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Controllers delegate; no business rules in the REST layer | A backend-engineer; S implement-service; G Build gate |
 | Lombok: no `@AllArgsConstructor`, `@ToString`, or `@EqualsAndHashCode` on entities with lazy collections | A backend-engineer, code-reviewer; S implement-service, pr-review |
 | Records and MapStruct only when the repo already uses them | A backend-engineer; S implement-service |
+| Do not switch MVC and WebFlux without an ADR (Pack `java`) | A backend-engineer, bff-engineer; S implement-bff; R backend.mdc (Pack `java`); G Design gate |
 | Intel Mac host JDK: a missing Java 21 is MacPorts `openjdk21` via `sh .agents-v0/scripts/host-tools-macports.sh`; kit builds set `JAVA_HOME` from `/usr/libexec/java_home -v 21`; Maven is `./mvnw` | C /v0-build, /v0-maintain; R backend.mdc; `docs/agents-v0/gold-standards.md` |
 
 ## frontend-web.mdc
@@ -228,9 +228,9 @@ Tool note: hook rows (H-B/H-W) run on Cursor via `.cursor/hooks.json` (sessionSt
 | Architecture owners review `docs/agents-v0/design/`, `docs/agents-v0/adr/`, and the `openapi/` catalog | CODEOWNERS |
 | The catalog merge is proven: the catalog contains every operation and component of the approved draft | C /v0-build; S implement-*; CI .agents-v0/ci/check-openapi.sh merged |
 | Build plan is real: one row per AC, each done row names an existing test with a red card first | C /v0-build; S implement-*; CI .agents-v0/ci/check-build-plan.sh (via .agents-v0/ci/check-delivery-linkage.sh) |
-| No new endpoint without the pack's auth marker (Pack `java`: a security annotation; `@PermitAll` marks a public one) | C /v0-build; S implement-service; CI .agents-v0/ci/check-endpoint-auth.sh |
+| No new endpoint without the pack's auth marker (Pack `java`: a security annotation; `@PreAuthorize("permitAll()")` marks a public one) | C /v0-build; S implement-service; CI .agents-v0/ci/check-endpoint-auth.sh |
 | The frontend calls only operations the catalog lists | C /v0-build; S implement-frontend; CI .agents-v0/ci/check-frontend-calls.sh |
-| Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /v0-build; `maven/contract-conformance.xml` |
+| Runtime OpenAPI matches the catalog in both directions (a missing or an undocumented endpoint fails) | C /v0-build; `core/java/starters/maven/contract-conformance.xml` |
 | `/v0-deliver` runs the phase commands in order and holds no phase detail of its own; resumes from the state file; a reopened phase is marked `Re-opened` until re-approved. P0-A skips `/v0-intake` and `/v0-design` and stops once at Release. Build copies the milestone story. A no-contract story does not stop at Design | C /v0-deliver; A orchestrator; R workflow-orchestration |
 | Merge and approval of a merge request are human acts on the default host: `glab mr merge`, `glab mr approve`, and merge/approve through `glab api` are blocked; `glab mr create`, `glab ci trigger`, state-changing `glab api`, and `git tag` ask | H-B / H-ask pre-shell.sh; hook-policy.py shell |
 | Optional local release after Verify: Decision `Local` (not Approved). `/v0-release` does not require it. After the checkpoint the next story may start | C /v0-local-release, /v0-release, /v0-status; S local-release; `.agents-v0/scripts/resolve-integration-branch.sh`; `.agents-v0/scripts/sync-feature-state.sh --clear-active` |

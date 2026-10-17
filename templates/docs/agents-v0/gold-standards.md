@@ -4,16 +4,16 @@
 
 ## Host tools (Intel Mac)
 
-On Intel macOS (`uname -m` is `x86_64`), missing host tools are installed with MacPorts. Apple Silicon, Linux, and CI images keep their existing toolchain.
+On Intel macOS (`uname -m` is `x86_64`), missing host tools are installed with MacPorts when a port exists. The .NET SDK is not a MacPorts port. Apple Silicon, Linux, and CI images keep their existing toolchain.
 
-The machine that runs the profile verify command needs the toolchain that command names. Pack `java` needs JDK 21 and the wrapper `./mvnw`. The React example needs Node 22 (22.12+; CI and the Dockerfile starters use 22, and 20.19+ still builds Vite 7 but is end-of-life) and npm. PyYAML is `python3 -c 'import yaml'`. Docker and Podman are applications, not MacPorts ports.
+The machine that runs the profile verify command needs the toolchain that command names, determined by the bound pack's `hostChecks`. Pack `java` needs JDK 21 and the wrapper `./mvnw`. Pack `node` needs Node 22 (22.12+; CI and Dockerfile starters use 22) and npm. Pack `python` needs Python 3.13. Pack `go` needs Go. Pack `dotnet` needs the .NET 10 SDK (installed from Microsoft or the pack CI image). The React example needs Node 22 and npm. PyYAML is `python3 -c 'import yaml'`. Docker and Podman are applications, not MacPorts ports.
 
 ```bash
 sh .agents-v0/scripts/host-tools-macports.sh
 sh .agents-v0/scripts/host-tools-macports.sh --install
 ```
 
-`--install` needs approval. It runs `sudo port -N install` only for what is missing: `openjdk21`, `nodejs22`, `npm11`, and PyYAML (`python3 -m pip install pyyaml`, or `pyXY-yaml` when Python itself is from MacPorts). Put `/opt/local/bin` before other package managers on `PATH`. For kit builds, set `JAVA_HOME` from `/usr/libexec/java_home -v 21`. A later performance story that needs k6 uses `sudo port install k6`.
+`--install` needs approval. It runs `sudo port -N install` only for what is missing among the pack's host checks: `openjdk21`, `nodejs22`, `npm11`, `go`, `python313`, and PyYAML (`python3 -m pip install pyyaml`, or `pyXY-yaml` when Python itself is from MacPorts). Put `/opt/local/bin` before other package managers on `PATH`. For kit Java builds, set `JAVA_HOME` from `/usr/libexec/java_home -v 21`. A later performance story that needs k6 uses `sudo port install k6`.
 
 ## Build
 
@@ -30,6 +30,10 @@ Profile `service` runs the Backend verify row from the backend or BFF root. Prof
 
 ```bash
 ./mvnw spring-boot:run  # Pack java, from the backend root, or per service
+dotnet run              # Pack dotnet
+npm run start:dev       # Pack node (NestJS)
+python -m uvicorn ...   # Pack python (FastAPI)
+go run .                # Pack go
 npm run dev             # React example
 ```
 

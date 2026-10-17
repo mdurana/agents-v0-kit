@@ -39,7 +39,7 @@ Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orche
 
 ## Rule-compliance checklist
 - [ ] C4 sections name no product technology.
-- [ ] The pattern ADR has two real options, a filled `Patterns considered` table, and `Pack:` set to the pack id. That id has a complete `.agents-v0/packs/<id>/pack.json`. An Accepted ADR was superseded, not rewritten, when the decision changed. `.agents-v0/ci/check-adr.sh` passes. `sh .agents-v0/scripts/activate-stack-pack.sh` has bound that pack.
+- [ ] The pattern ADR has two real options, a filled `Patterns considered` table, and `Pack:` set to the pack id. That id has a complete pack (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). An Accepted ADR was superseded, not rewritten, when the decision changed. `.agents-v0/ci/check-adr.sh` passes. `sh .agents-v0/scripts/activate-stack-pack.sh` has bound that pack after the `architecture` row was approved.
 - [ ] Data flow reuses the C4 Container nodes. Data models, state machine, failure domains, and MVP and future state are written or `N/A: <reason>`.
 - [ ] `network.md` has a target topology diagram. As-is onboard text was kept.
 - [ ] The context map is the service map, and each context has a component plan or `N/A: <reason>`.

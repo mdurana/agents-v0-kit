@@ -54,7 +54,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 |------|----------------|
 | Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
 | Roadmap | A new program of more than one story. The person points `/v0-roadmap` at a discovery file anywhere in the repo. The kit sequences it and does not rediscover the problem. A named ticket, a milestone that already has a `plan` row, Maintain, and Trivial skip this. |
-| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `.agents-v0/ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. The pattern ADR records `Pack: <id>` for the stack the discovery named. Any id is valid once `.agents-v0/packs/<id>/pack.json` is complete. Approval runs `.agents-v0/scripts/activate-stack-pack.sh`, which fills the profile and installs that pack's rules and skills. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
+| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `.agents-v0/ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. The pattern ADR records `Pack: <id>` for the stack the user names; a discovery `Stack preference:` is an input that the ADR may accept or reject. Any id is valid once that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). Approval of the `architecture` row runs `.agents-v0/scripts/activate-stack-pack.sh`, which fills the profile and installs that pack's rules and skills. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
 | Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
 | Design review and pin | `design-reviewer` writes `review.md` when the story has a contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design, including the cited ADR, is hashed into `design.lock` after the Design approval. The pin requires the ADR's Status to be `Accepted`. A design with none of those is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation, and that change supersedes the pattern ADR. |
 | P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive into `app/backend` and `app/frontend` for that example. Any other pack follows its scaffold and does not extract that archive. An empty Pack does not select the archive. The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the five rows. Optional `/v0-local-release` may write the first four. |
@@ -65,7 +65,7 @@ A standard story is the solid path: Intake, Design, Build, Verify, Release, then
 | Triage | Docs-only or version-only, and only when `.agents-v0/ci/classify-change.sh` says so and a person confirms. |
 | Deploy | Optional, after the merge, one environment at a time. Records go in a later docs-only merge request. |
 
-`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, `plan`, and `arc` rows. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
+`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, and `plan` rows, and the `arc` row when a story is `Material: yes` or `docs/agents-v0/design/system/arc-record.md` exists. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
 
 ## Commands
 
@@ -242,7 +242,7 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 | `check-event-schemas.sh` | Event schemas stay additive |
 | `check-gate-metrics.sh` | Tests, diff coverage, CVEs, from the build output. Test failures up to the `known_failures` budget are reported, not failed |
 | `classify-change.sh` | Whether a trivial note is still trivial |
-| `check-layout-roots.sh` | A build with a `pom.xml` resolved a module to build |
+| `check-layout-roots.sh` | A repo with a pack detect marker resolved a backend root |
 | `check-coverage-ratchet.sh` | A coverage exception is approved and not expired |
 | `check-known-failures.sh` | After a verify that exited non-zero, only test failures inside the documented `known_failures` budget are excused. A compile or plugin error is never excused (`--require-failures`) |
 
@@ -254,7 +254,7 @@ Cursor runs the hook scripts via `.cursor/hooks.json`. They block force-push, ha
 
 ## Rules and skills
 
-Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB (`scripts/validate-kit.sh`). `AGENTS.md` is the kit repository's own summary and is not installed. The other rules load with the files they apply to: Java, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
+Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB (`scripts/validate-kit.sh`). `AGENTS.md` is the kit repository's own summary and is not installed. The other rules load with the files they apply to: the bound pack's backend rules, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
 
 Skills are the phase playbooks (`core/common/skills/*/SKILL.md` and `core/<pack>/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
 
@@ -267,21 +267,21 @@ Skills are the phase playbooks (`core/common/skills/*/SKILL.md` and `core/<pack>
 ./scripts/install.sh --link --path /path/to/agents-v0 --commit <sha> /path/to/repo
 ```
 
-`--link` records `docs/agents-v0/kit-pin` and symlinks `.cursor` and `.agents-v0/ci` into that kit commit. Kit commits stay in the kit repository. The project keeps its delivery records and `.agents-v0/packs/<id>/`. Any pack id is valid once that manifest is complete. An empty Pack does not select an example. A copy install still writes the kit files into the project; `--update` refreshes that copy. Set `CI_PACK_IMAGE` to the pack `ciImage` so the GitLab build job uses that image.
+`--link` records `docs/agents-v0/kit-pin` and symlinks `.cursor` and `.agents-v0/ci` into that kit commit. Kit commits stay in the kit repository. The project keeps its delivery records and `.agents-v0/packs/<id>/`. Any pack id is valid once that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest). An empty Pack does not select an example. A copy install still writes the kit files into the project; `--update` refreshes that copy. Set `CI_PACK_IMAGE` to the pack `ciImage` so the GitLab build job uses that image.
 
 ```bash
 ./scripts/install.sh --update /path/to/repo
 ./scripts/install.sh --update --quick /path/to/repo   # offline: skips the app-template build test
-./scripts/bootstrap-greenfield.sh --profile app --scaffold-app /path/to/new-repo
+./scripts/bootstrap-greenfield.sh --profile app --pack java --scaffold-app /path/to/new-repo
 ./scripts/pack-app-template.sh   # after editing templates/app/{backend,frontend}
 ./scripts/validate-kit.sh
 ```
 
-On an Intel Mac, a missing JDK 21, Node, or npm comes from MacPorts. The same script installs PyYAML with `python3 -m pip install pyyaml`, or with a `pyXY-yaml` port when Python itself is from MacPorts: `sh .agents-v0/scripts/host-tools-macports.sh` ([gold-standards.md](gold-standards.md)). Apple Silicon, Linux, and CI images are unchanged. Maven stays `./mvnw`.
+On an Intel Mac, missing host tools named by the bound pack's `hostChecks` are installed with MacPorts when a port exists (JDK 21, Node, npm, Python, Go). The .NET SDK comes from the pack image, not MacPorts. The same script installs PyYAML with `python3 -m pip install pyyaml`, or with a `pyXY-yaml` port when Python itself is from MacPorts: `sh .agents-v0/scripts/host-tools-macports.sh` ([gold-standards.md](gold-standards.md)). Apple Silicon, Linux, and CI images are unchanged. Maven stays `./mvnw`.
 
-`--pack` copies that example's rules and skills into `.cursor/` and stores every example `pack.json` under `.agents-v0/packs/`. A project pack with its own id stays. `--update` without `--pack` keeps the `Pack` row already in the profile. `--with-starters` adds Maven quality snippets, Dockerfiles, and an OpenAPI starter. It does **not** copy `templates/app/` (the P0 codebase). Without `--with-starters`, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
+`--pack` copies that example's rules and skills into `.cursor/` and stores every example `pack.json` under `.agents-v0/packs/`. A project pack with its own id stays. `--update` without `--pack` keeps the `Pack` row already in the profile. `--with-starters` copies kit templates (Dockerfiles, OpenAPI starter) and the active pack's starters from `core/<pack>/starters/` (for pack `java`: Maven quality snippets, ArchUnit, suppressions). It does **not** copy `templates/app/` (the P0 codebase). Without `--with-starters`, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
 
-A new repo starts with `bootstrap-greenfield.sh --scaffold-app` to install the kit and extract `templates/app/p0-platform-skeleton.tar.gz` into `app/backend` and `app/frontend` ([greenfield-onboarding.md](greenfield-onboarding.md)). That archive is the `java` example: Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only. A program names its stack in discovery, and `/v0-architecture` writes `.agents-v0/packs/<id>/pack.json` for that id. An existing repo starts with install (no `--scaffold-app`), then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)). `--link` keeps the kit in its own repository.
+A new Java repo starts with `bootstrap-greenfield.sh --pack java --scaffold-app` to install the kit and extract `templates/app/p0-platform-skeleton.tar.gz` into `app/backend` and `app/frontend` ([greenfield-onboarding.md](greenfield-onboarding.md)). That archive is the `java` example: Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only. Any other pack follows its scaffold skill and does not extract that archive. The user names the stack on the pattern ADR (`Pack: <id>`). A discovery `Stack preference:` is an input the ADR may accept or reject. `/v0-architecture` writes a complete pack for that id (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest) and binds it after the `architecture` row is approved. An existing repo starts with install (no `--scaffold-app`), then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)). `--link` keeps the kit in its own repository.
 
 ## Read next
 

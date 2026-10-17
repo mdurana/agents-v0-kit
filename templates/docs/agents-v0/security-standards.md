@@ -14,7 +14,7 @@
 
 ## Authorization
 
-- RBAC/ABAC, least privilege; `@PreAuthorize` on every mutating or sensitive method (F4, A01:2025).
+- RBAC/ABAC, least privilege; the pack auth marker on every mutating or sensitive method (Pack `java`: `@PreAuthorize`; `[Authorize]`; `Depends()`; Go auth middleware) (F4, A01:2025).
 - Server-side enforcement; never trust client role headers.
 - BOLA: authorized lookup for every `{id}` path. The retest is a same-role peer (F8).
 - Writes bind through a request DTO that rejects unknown properties.

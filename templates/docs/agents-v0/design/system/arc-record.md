@@ -23,7 +23,7 @@ Discovery: <the Discovery path recorded on that roadmap, or N/A>
 
 Latency, availability, and RPO/RTO targets are the filled rows in `docs/agents-v0/design/system/nfr-slo.md`. Do not copy them here. P4 closes that table in `docs/agents-v0/design/system/slo-evidence.md`.
 
-Structural fitness functions say what must stay true about the shape of the system, how a test or CI job proves it, and what happens when it fails. A row names a real check (for example an ArchUnit rule, see `templates/maven/archunit/LayerRulesTest.java`, a contract diff, or a dependency rule) or says `planned: <milestone>`.
+Structural fitness functions say what must stay true about the shape of the system, how a test or CI job proves it, and what happens when it fails. A row names a real check (for example an ArchUnit rule, see `core/java/starters/maven/archunit/LayerRulesTest.java`, a contract diff, or a dependency rule) or says `planned: <milestone>`.
 
 | Principle | Check | Threshold | On failure |
 |-----------|-------|-----------|------------|

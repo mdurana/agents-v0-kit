@@ -18,6 +18,7 @@ Onboarding rewrites shared files (`docs/agents-v0/project-profile.md`, `docs/age
 3. **Helpers.** For each `docs/agents-v0/onboarding/<module>.helper-brief.md`, launch the helper it names (`explore-researcher` unless the brief says otherwise) from this session. Briefs for independent modules may run in parallel. Pass each `return:` into a second launch of `codebase-documenter`. Delete a brief after its result is back. Launch each brief once (`workflow-orchestration.mdc` Helper agents). Do not present the gate while a brief is on disk.
 4. Check the **Onboard gate**:
    - `docs/agents-v0/project-profile.md` records the commands, the Layout (`Service roots` when the repo has several services), and the contracts. The baseline result and its numbers are in the report. Proposed `known_failures` and `coverage_ratchet` rows are listed for a person to approve, not yet in the profile.
+   - When the profile `Pack` cell is empty or still a placeholder, run `sh .agents-v0/scripts/activate-stack-pack.sh --detect` (or prompt for the pack id if ambiguous or no marker). The bound pack's rules and skills are installed, and the profile records `Pack` and the verify commands.
    - `docs/agents-v0/discovery/` was generated at the report's `commit:`. Any `TRUNCATED:` list is re-run or recorded as partial.
    - Each in-scope module has a document under `docs/agents-v0/onboarding/modules/`.
    - `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/context-map.md`, and `docs/agents-v0/adr/0000-inherited-decisions.md` are as-is; the sequence diagrams the user named exist.
@@ -26,7 +27,7 @@ Onboarding rewrites shared files (`docs/agents-v0/project-profile.md`, `docs/age
    - Open questions and every `UNVERIFIED` item are listed in the report.
 5. **Stop** and present the gate result, the open questions, and the triage list to the user. After explicit approval, record the `onboard` row (Decision: `Approved`, approver, date, the report and modules paths) in the report's `Delivery approvals` table, add any approved ratchet or known-failure rows to the profile, and run `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md` with no active-phase flags. `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, and `/v0-plan` need that approval.
 
-Optional starters (`maven/`, `docker/`, `openapi/`): copy from kit `templates/` only when the user requests `--with-starters` install or gives explicit consent. When the program spans repos, the documenter records `docs/agents-v0/workspace.manifest.json`.
+Optional starters (`docker/` and `openapi/` from kit `templates/`, plus pack starters from `core/<pack>/starters/`): copy only when the user requests `--with-starters` install or gives explicit consent. When the program spans repos, the documenter records `docs/agents-v0/workspace.manifest.json`.
 
 ## Rules
 `workflow-orchestration.mdc`, `project-delivery-core.mdc`, `architecture-and-diagrams.mdc`, `security-baseline.mdc`, `ai-agent-conduct.mdc`, `docs/agents-v0/brownfield-onboarding.md`.

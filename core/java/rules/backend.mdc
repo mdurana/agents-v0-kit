@@ -58,6 +58,7 @@ Paths are relative to the Spring root in `docs/agents-v0/project-profile.md` (`a
 - Status codes and DTO mapping consistent with `GlobalExceptionHandler`.
 - URLs: `/api/v1/{resource}`; **201** create, **204** no body where appropriate.
 - **DTOs only** — never expose entities.
+- **Architecture:** Do not switch between Spring MVC and Spring WebFlux without an ADR.
 
 ```java
 @GetMapping("/users/{id}")

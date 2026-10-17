@@ -56,7 +56,7 @@ The state file separates the last approval from the phase in flight. `sh .agents
 
 Once `docs/agents-v0/requirements/<feature>.md` exists, the phase command runs `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase <phase> --status in_progress` and continues from files already on disk; it does not recreate them. A red baseline, a spent attempt budget, or a missing prerequisite re-runs it with `--status blocked --reason "<one line>"` and stops. A phase ready for the user re-runs it with `--status awaiting_approval` and stops. Do not add an `Approved` row until the user approves.
 
-`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`. A roadmap with no `architecture` row names `/v0-architecture`. An architecture row with no `plan` row names `/v0-plan`. Also report `roadmap`, `plan`, and `arc` when `Material: yes`. Do not report `/v0-export` or `/v0-deck`.
+`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`. A roadmap with no `architecture` row names `/v0-architecture`. An architecture row with no `plan` row names `/v0-plan`. Also report `roadmap`, `architecture`, and `plan`. Report `arc` when `Material: yes`. Do not report `/v0-export` or `/v0-deck`.
 
 ## Parallel features
 

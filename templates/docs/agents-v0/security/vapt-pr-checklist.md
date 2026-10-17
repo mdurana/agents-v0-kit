@@ -9,7 +9,7 @@ Always-on findings are F4, F8, F9, and F10. An applicable miss is **Critical**. 
 **Date:** _______________
 
 ## F4 — Function-level access control (HIGH, always-on)
-- [ ] `@PreAuthorize` on every new/changed admin or mutation endpoint
+- [ ] The pack auth marker on every new or changed admin or mutation endpoint (`@PreAuthorize`, `[Authorize]`, a security `Depends()`, or Go auth middleware)
 - [ ] Server-side route/module enforcement
 - [ ] `permit-all` not enabled in lab/SIT/UAT/prod
 - [ ] No authz bypass flags
@@ -52,7 +52,7 @@ Always-on findings are F4, F8, F9, and F10. An applicable miss is **Critical**. 
 - [ ] Server-side: size limit, content sniff, structure parse, generated storage name
 - [ ] Decompression limit; production virus scan
 - [ ] Extension check supplemental
-- [ ] `@PreAuthorize` on upload endpoints
+- [ ] The pack auth marker on upload endpoints (`@PreAuthorize`, `[Authorize]`, a security `Depends()`, or Go auth middleware)
 - [ ] Client `accept` supplemental
 - [ ] Test: renamed wrong-type file → 400
 

@@ -21,7 +21,7 @@
 
 ## Tooling
 
-JaCoCo, SonarQube, Checkstyle, SpotBugs, OWASP Dependency-Check, plus the OpenAPI contract diff (`maven/contract-conformance.xml`) and ArchUnit layer rules (`maven/archunit/LayerRulesTest.java`) where wired.
+The reporting toolchain is determined by the bound pack's `pack.json` (Pack `java`: JaCoCo, Checkstyle, SpotBugs, OWASP Dependency-Check, ArchUnit; Pack `dotnet`: Coverlet, xUnit; Pack `node`: Jest; Pack `python`: pytest-cov; Pack `go`: go test -cover). Thresholds and principles apply across all packs. Java starter wiring includes OpenAPI contract diff (`core/java/starters/maven/contract-conformance.xml`) and ArchUnit layer rules (`core/java/starters/maven/archunit/LayerRulesTest.java`).
 
 ## CVE policy
 

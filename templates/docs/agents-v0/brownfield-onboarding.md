@@ -9,11 +9,11 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 ./scripts/install.sh /path/to/existing-repo
 # Pin the kit commit instead of copying kit files:
 # ./scripts/install.sh --link --commit <sha> --url <kit-git-url> /path/to/existing-repo
-# Optional Maven/docker/OpenAPI starters (copies templates/ except templates/app/):
-# ./scripts/install.sh --with-starters /path/to/existing-repo
+# Optional starters (--with-starters copies templates/ except app/, plus core/<pack>/starters/):
+# ./scripts/install.sh --pack <id> --with-starters /path/to/existing-repo
 ```
 
-On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the first build or maintain verify. A missing JDK 21, Node, or npm is installed with MacPorts after you approve `--install`. PyYAML uses that script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts) ([gold-standards.md](gold-standards.md)).
+On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the first build or maintain verify. Missing host tools named by the pack's `hostChecks` are installed with MacPorts when a port exists (JDK 21, Node, npm, Python, Go). The .NET SDK comes from the pack image, not MacPorts. PyYAML uses that script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts) ([gold-standards.md](gold-standards.md)).
 
 Do **not** run `bootstrap-greenfield.sh --scaffold-app` on an existing codebase. That archive is for empty greenfield repos only; `/v0-onboard` records the tree as it is and does not move source onto `app/backend` / `app/frontend`.
 
@@ -49,7 +49,7 @@ From the agents-v0 kit repo:
 ./scripts/audit-brownfield-baseline.sh /path/to/existing-repo
 ```
 
-The script runs the repo’s standard Java or frontend verify command when detected and
+The script runs the repo’s Backend verify command from `docs/agents-v0/project-profile.md` (or detects Maven, Gradle, npm, pytest, Go, or dotnet test when the profile cell is not yet set) and
 prints pass/fail. **Build and maintain agents stop if the baseline is red** — fix or
 document a stabilization plan before feature work.
 
@@ -73,8 +73,8 @@ Do **not** document weaker VAPT or auth controls — escalate to Security instea
 ## 4. Documented CVE exceptions
 
 1. Prefer upgrading dependencies (`/v0-maintain`, skill `dependency-upgrade`).
-2. If a CVE must be suppressed, add an entry to `maven/dependency-check-suppressions.xml`
-   (starter: kit `templates/maven/dependency-check-suppressions.xml`).
+2. If a CVE must be suppressed in pack `java`, add an entry to `maven/dependency-check-suppressions.xml`
+   (starter: kit `core/java/starters/maven/dependency-check-suppressions.xml`). Other packs record CVE suppressions in the format expected by their CVE scanner (see the pack's `pack.json`).
 3. Record the exception in the Verify test report (`docs/agents-v0/verify/<feature>/test-report.md`)
    per `quality-and-testing.mdc`.
 

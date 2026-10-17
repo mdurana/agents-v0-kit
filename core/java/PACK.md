@@ -15,6 +15,6 @@
 - **Backend verify (fast):** cd app/backend && ./mvnw -B clean verify -P!ci-security
 - **Coverage:** target/site/jacoco/jacoco.xml
 - **Tests report:** target/surefire-reports/TEST-*.xml
-- **Auth:** @PreAuthorize or @PermitAll on every mapping
+- **Auth:** @PreAuthorize on every mapping (@PreAuthorize("permitAll()") for public routes)
 
 Pinned versions stay on this list. The pattern ADR may choose topology, sync versus events, this data store, and a brownfield migration approach. React 19, TypeScript 5.9, and Vite 7 stay the UI.
