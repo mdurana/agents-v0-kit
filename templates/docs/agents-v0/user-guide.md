@@ -14,7 +14,7 @@ This guide matches the workflow in this kit. A new program starts with **Roadmap
 | **Cursor**     | Desktop app with the project open (your team’s service repo, after the kit is installed).            |
 | **Chat**       | Open the AI chat panel in that project.                                                              |
 | **Your input** | A Jira ticket, Confluence page, email spec, or a short description in plain language.                |
-| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no messages between systems, no screens, and no public route does not stop at Design. |
+| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no messages between systems, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. |
 
 
 You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API.
   - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text

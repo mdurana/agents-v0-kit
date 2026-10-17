@@ -50,13 +50,13 @@ The state file separates the last approval from the phase in flight. `sh .agents
 | Field | Meaning |
 |-------|---------|
 | `lastApprovedPhase` | Last `Approved` row. Empty when none are approved. |
-| `activePhase` | Phase whose command was started: `intake`, `design`, `build`, `verify`, `release`, or `maintain`. |
+| `activePhase` | Phase whose command was started: `onboard`, `intake`, `design`, `build`, `verify`, `release`, or `maintain`. |
 | `activeStatus` | `in_progress`, `awaiting_approval`, or `blocked`. |
 | `blockedReason` | One line, only when `activeStatus` is `blocked`. |
 
 Once `docs/agents-v0/requirements/<feature>.md` exists, the phase command runs `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase <phase> --status in_progress` and continues from files already on disk; it does not recreate them. A red baseline, a spent attempt budget, or a missing prerequisite re-runs it with `--status blocked --reason "<one line>"` and stops. A phase ready for the user re-runs it with `--status awaiting_approval` and stops. Do not add an `Approved` row until the user approves.
 
-`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`. A roadmap with no `architecture` row names `/v0-architecture`. An architecture row with no `plan` row names `/v0-plan`. Also report `roadmap`, `architecture`, and `plan`. Report `arc` when `Material: yes`. Do not report `/v0-export` or `/v0-deck`.
+`/v0-status` reads that file. `in_progress` or `blocked`: the next command is the same phase again. `awaiting_approval`: ask for approval and do not start the next phase. No active phase: name the next command from `lastApprovedPhase`. A roadmap with no `architecture` row names `/v0-architecture`. An architecture row with no `plan` row names `/v0-plan`. Also report `roadmap`, `architecture`, and `plan`. Report `arc` if the story added it. Do not report `/v0-export` or `/v0-deck`.
 
 ## Parallel features
 
@@ -150,7 +150,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - UI-affecting: UX requirements per `ux-design.mdc`.
 
 ### Design gate
-- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. Stop at Design for an OpenAPI draft, an AsyncAPI or `events/` contract, a UX spec, a public route other than `/health`, `/ready`, or `/live`, or `Material: yes` (`design-reviewer` writes `review.md`). Otherwise pin without `review.md` and write the Design row with the Build approval. The pin includes `asyncapi.yaml` and the cited ADR. A later change is an amendment; a changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design (Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it).
+- `design.md` at `docs/agents-v0/design/<feature>/`, plus a `/api/v1` draft when the story adds one (otherwise `N/A: no /api/v1 operation`). Failure modes name every negative and edge `AC-*`. Stop at Design for an OpenAPI draft, an AsyncAPI or `events/` contract, a UX spec, a public route other than `/health`, `/ready`, or `/live`, or `Material: yes`. `review.md` covers the first four. Any other story pins without `review.md` and writes the Design row with the Build approval. The pin includes `asyncapi.yaml` and the cited ADR. A later change is an amendment; a changed decision supersedes the ADR. The org catalog stays unchanged. UX spec and mockups when UI-affecting (`ux-design.mdc`). P0-A skips Intake and Design (Build copies the milestone story and AC-1 through AC-4, writes that N/A design, and pins it).
 - `Material: yes` writes or cites `docs/agents-v0/design/system/arc-record.md` (two options, a recommendation, SLO targets in `nfr-slo.md`, and a structural fitness-function table). The `arc` row is separate from Design (`.agents-v0/ci/check-arc.sh`). P4 measures or waives SLO rows in `slo-evidence.md`.
 - Non-trivial security: brief threat-model notes (assets, trust boundaries, top risks) naming applicable VAPT findings in `security-baseline.mdc` (always-on F4, F8, F9, F10).
 
