@@ -35,7 +35,7 @@ same principle and thresholds in `docs/agents-v0/quality-gates.md`.
 3. Confirm the profile Backend verify command runs coverage, style, static checks, the contract diff, and the layer check named in that pack's `pack.json`. The `java` example is `./mvnw -B clean verify` from the backend root.
 4. Add the CVE scan to CI; document any accepted exceptions.
 5. Record the repo's actual thresholds in `docs/agents-v0/quality-gates.md` if they differ
-   from the defaults (the repository wins, per `ai-agent-conduct.mdc`).
+   from the defaults (the repository wins, per `ai-agent-conduct.mdc`). `.agents-v0/ci/check-gate-metrics.sh` reads the Coverage table in `docs/agents-v0/quality-gates.md` directly.
 
 ## Limits
 

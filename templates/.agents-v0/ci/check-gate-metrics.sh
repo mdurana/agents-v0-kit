@@ -14,12 +14,15 @@
 #
 # Environment:
 #   ALLOW_NO_TESTS=1       do not fail when no test report exists (module with no tests)
-#   MIN_LINE_PCT=<n>       fail when bundle line coverage is below n (unset: report only).
+#   MIN_LINE_PCT=<n>       fail when bundle line coverage is below n (default: Whole-module lines from
+#                          docs/agents-v0/quality-gates.md, or unset: report only).
 #                          Pack java's JaCoCo check goal is a fixed 0.80. coverage_ratchet does not
 #                          change it; check-coverage-ratchet.sh compares a number only when
 #                          LINE_COVERAGE_PCT or JACOCO_LINE_PCT is set.
 #   DIFF_BASE=<git-rev>    also measure coverage of Java lines added since merge-base(DIFF_BASE, HEAD)
-#   MIN_DIFF_LINE_PCT=<n>  diff coverage minimum (default 80)
+#   MIN_DIFF_LINE_PCT=<n>  diff coverage minimum (default: Changed lines from
+#                          docs/agents-v0/quality-gates.md, or 80)
+#   QUALITY_GATES_FILE=<f> path to quality-gates.md (default docs/agents-v0/quality-gates.md)
 #   REQUIRE_CVE_REPORT=1   fail when dependency-check-report.json is missing
 #   /v0-verify sets DIFF_BASE and REQUIRE_CVE_REPORT together. It omits both only while a
 #   later story named in Out of scope, whose job is the quality gate, has no Verify
@@ -89,6 +92,37 @@ def known_failures_budget():
     return 0
 
 
+def quality_gates_thresholds():
+    """Thresholds from the Coverage table of docs/agents-v0/quality-gates.md (QUALITY_GATES_FILE)."""
+    path = env("QUALITY_GATES_FILE") or os.path.join("docs", "agents-v0", "quality-gates.md")
+    if not os.path.isfile(path):
+        return {}
+    thresholds = {}
+    in_coverage = False
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                in_coverage = "coverage" in stripped.lower()
+                continue
+            if in_coverage and stripped.startswith("|"):
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                if len(cells) >= 2:
+                    area = cells[0].lower()
+                    val = cells[1].rstrip("%").strip()
+                    if re.fullmatch(r"\d+(?:\.\d+)?", val):
+                        num = float(val)
+                        if "changed line" in area or "diff" in area:
+                            thresholds["diff_line_pct"] = num
+                        elif "whole-module" in area or "bundle line" in area:
+                            thresholds["min_line_pct"] = num
+                        elif "backend line" in area:
+                            thresholds["backend_line_pct"] = num
+                        elif "frontend" in area:
+                            thresholds["frontend_line_pct"] = num
+    return thresholds
+
+
 def module_kind(path):
     """A marker selects a known reader. No marker does not assume Java."""
     if os.path.isdir(os.path.join(path, "target")) or os.path.isfile(os.path.join(path, "pom.xml")):
@@ -149,7 +183,8 @@ def record_coverage(pct, missing_name):
         return
     summary["lineCoveragePct"] = round(pct, 2)
     print(f"coverage: bundle lines {pct:.2f}%")
-    minimum = number("MIN_LINE_PCT")
+    qg = quality_gates_thresholds()
+    minimum = number("MIN_LINE_PCT", qg.get("min_line_pct"))
     if minimum is not None and pct < minimum:
         failures.append(f"bundle line coverage {pct:.2f}% < {minimum:g}%")
 
@@ -277,7 +312,9 @@ def score_diff(tracked, glob_pattern, source_root):
     if tracked is None:
         failures.append("DIFF_BASE is set but the coverage report has no line data")
         return
-    minimum = number("MIN_DIFF_LINE_PCT", 80.0)
+    qg = quality_gates_thresholds()
+    default_diff = qg.get("diff_line_pct", 80.0)
+    minimum = number("MIN_DIFF_LINE_PCT", default_diff)
     added = git_added(glob_pattern, base)
     covered_n = missed_n = 0
     for path, numbers in added.items():
@@ -858,7 +895,8 @@ if os.path.isfile(jacoco):
     summary["lineCoveragePct"] = None if line_pct is None else round(line_pct, 2)
     if line_pct is not None:
         print(f"coverage: bundle lines {line_pct:.2f}%")
-        minimum = number("MIN_LINE_PCT")
+        qg = quality_gates_thresholds()
+        minimum = number("MIN_LINE_PCT", qg.get("min_line_pct"))
         if minimum is not None and line_pct < minimum:
             failures.append(f"bundle line coverage {line_pct:.2f}% < {minimum:g}%")
 else:
@@ -869,7 +907,9 @@ else:
 # Diff coverage: Java lines added since the merge base, the "changed code" minimum.
 base = env("DIFF_BASE")
 if base and os.path.isfile(jacoco):
-    minimum = number("MIN_DIFF_LINE_PCT", 80.0)
+    qg = quality_gates_thresholds()
+    default_diff = qg.get("diff_line_pct", 80.0)
+    minimum = number("MIN_DIFF_LINE_PCT", default_diff)
     try:
         merge_base = subprocess.run(
             ["git", "-C", root, "merge-base", base, "HEAD"],

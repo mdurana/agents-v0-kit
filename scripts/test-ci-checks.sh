@@ -549,6 +549,18 @@ printf 'package com.acme;\nclass A {\nint x;\nint y;\n}\n' > "$m/src/main/java/c
 )
 expect_fail "gate metrics: diff coverage 50% fails the default 80%" "$tmp" env DIFF_BASE="$diff_base" sh "$CI/check-gate-metrics.sh" "$m"
 expect_pass "gate metrics: diff coverage 50% passes MIN_DIFF_LINE_PCT=40" "$tmp" env DIFF_BASE="$diff_base" MIN_DIFF_LINE_PCT=40 sh "$CI/check-gate-metrics.sh" "$m"
+mkdir -p "$tmp/docs/agents-v0"
+cat > "$tmp/docs/agents-v0/quality-gates.md" <<'EOF'
+# Quality gates
+
+## Coverage
+
+| Area | Minimum | CI / stretch |
+|------|---------|--------------|
+| Changed lines | 40% | CI fails when DIFF_BASE is set |
+EOF
+expect_pass "gate metrics: diff coverage 50% passes Changed lines 40% from quality-gates.md" "$tmp" env DIFF_BASE="$diff_base" sh "$CI/check-gate-metrics.sh" "$m"
+rm -rf "$tmp/docs"
 
 mkdir -p "$m/src/main/resources/db/migration" "$m/src/test/resources" "$m/src/test/java/com/acme"
 printf 'CREATE TABLE orders (id UUID PRIMARY KEY);\n' > "$m/src/main/resources/db/migration/V1__init.sql"
