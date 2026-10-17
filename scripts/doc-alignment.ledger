@@ -1,0 +1,206 @@
+# Doc alignment ledger. scripts/check-doc-alignment.sh exits 0 only when every row holds.
+# R id path phrase    the file must contain the phrase
+# F id path phrase    the file must not contain the phrase
+# T id path phrase    a behavior test or the implementing script contains the phrase
+# S script.sh         every templates/.agents-v0/ci/*.sh is listed
+# C v0-name.md        every core/common/commands/v0-*.md is listed
+# H hash script.sh    every non-comment FAIL: line in those scripts is listed
+# Exit 0 means these proved sentences match, and every CI script, phase command, and FAIL: line is listed.
+# A new script, command, or FAIL: line fails this check until its row is added. Pack skills no command names are outside it.
+R	event-na	core/common/commands/v0-design.md	N/A: no event contract
+R	event-na	core/common/skills/contract-first-design/SKILL.md	N/A: no event contract
+R	event-na	core/common/agents/solution-architect.md	N/A: no event contract
+R	event-na	templates/docs/agents-v0/agents-v0-kit.md	N/A: no event contract
+R	event-na	templates/docs/agents-v0/design/_design.template.md	N/A: no event contract
+R	event-na	templates/.agents-v0/ci/check-design.sh	N/A: no event contract
+R	event-na	core/common/commands/v0-build.md	N/A: no event contract
+R	event-na	templates/docs/agents-v0/greenfield-onboarding.md	N/A: no event contract
+R	event-na	templates/docs/agents-v0/milestones/p0-platform-skeleton.md	N/A: no event contract
+R	public-marker	core/common/commands/v0-design.md	pack public marker
+R	public-marker	templates/.agents-v0/ci/check-design.sh	publicMarker
+R	whole-module	core/common/rules/quality-and-testing.mdc	Whole-module lines
+R	whole-module	core/common/commands/v0-verify.md	Whole-module lines
+R	whole-module	core/common/skills/quality-gate/SKILL.md	Whole-module lines
+R	whole-module	templates/docs/agents-v0/quality-gates.md	Whole-module lines
+R	whole-module	templates/docs/agents-v0/agents-v0-kit.md	Whole-module lines
+R	whole-module	README.md	Whole-module lines
+R	whole-module	templates/.agents-v0/ci/check-gate-metrics.sh	whole-module
+R	jacoco-080	core/java/starters/maven/quality-plugins.xml	<minimum>0.80</minimum>
+R	jacoco-080	core/common/rules/quality-and-testing.mdc	does not change that minimum
+R	jacoco-080	templates/docs/agents-v0/quality-gates.md	does not change the JaCoCo 0.80 gate
+R	jacoco-080	templates/docs/agents-v0/brownfield-onboarding.md	does not relax Pack `java` verify
+R	changed-lines	templates/docs/agents-v0/quality-gates.md	Changed lines
+R	changed-lines	core/common/rules/quality-and-testing.mdc	Changed lines threshold
+R	changed-lines	templates/.agents-v0/ci/check-gate-metrics.sh	quality-gates.md
+F	event-na	templates/docs/agents-v0/design/_design.template.md	does not look for that phrase
+F	event-na	core/common/commands/v0-design.md	does not look for that phrase
+F	public-marker	core/common/commands/v0-design.md	any `permitAll` is only
+F	whole-module	README.md	fails only when the pack wires it
+F	whole-module	core/common/rules/quality-and-testing.mdc	fails only when the pack wires it
+F	whole-module	templates/docs/agents-v0/agents-v0-kit.md	fails only when the pack wires it
+T	event-na	scripts/test-design-build.sh	no event contract without the N/A phrase fails
+T	public-marker	scripts/test-design-build.sh	AllowAnonymous on a non-health route needs a review
+T	changed-lines	scripts/test-ci-checks.sh	diff coverage 50% fails the default 80%
+T	jacoco-080	scripts/test-ci-checks.sh	coverage ratchet: LINE_COVERAGE_PCT meets interim minimum
+S	check-adr.sh
+S	check-approvals.sh
+S	check-approver-gitlab.sh
+S	check-arc.sh
+S	check-architecture-pack.sh
+S	check-asyncapi.sh
+S	check-build-plan.sh
+S	check-coverage-ratchet.sh
+S	check-delivery-linkage.sh
+S	check-design-contracts.sh
+S	check-design.sh
+S	check-endpoint-auth.sh
+S	check-event-schemas.sh
+S	check-evidence.sh
+S	check-feature-state.sh
+S	check-frontend-calls.sh
+S	check-gate-metrics.sh
+S	check-intake.sh
+S	check-known-failures.sh
+S	check-layout-roots.sh
+S	check-milestone.sh
+S	check-openapi.sh
+S	check-ux-spec.sh
+S	classify-change.sh
+S	collect-gate-reports.sh
+S	resolve-layout.sh
+S	run-backend-verify.sh
+S	unbound-verify-plan.sh
+C	v0-architecture.md
+C	v0-build.md
+C	v0-deck.md
+C	v0-deliver.md
+C	v0-design.md
+C	v0-export.md
+C	v0-intake.md
+C	v0-local-release.md
+C	v0-maintain.md
+C	v0-onboard.md
+C	v0-plan.md
+C	v0-release.md
+C	v0-roadmap.md
+C	v0-status.md
+C	v0-triage.md
+C	v0-verify.md
+H	6ad4efb49bd9	check-adr.sh
+H	6484ae7d4da2	check-adr.sh
+H	37a5c374ea11	check-approvals.sh
+H	ff2eb94211af	check-approvals.sh
+H	57a6663d0937	check-approvals.sh
+H	78764dd41b52	check-approvals.sh
+H	371dad136720	check-approvals.sh
+H	4827565a76f9	check-approvals.sh
+H	ea3ab0d1cb30	check-approver-gitlab.sh
+H	cc82428099a4	check-approver-gitlab.sh
+H	d2e6c35136e7	check-approver-gitlab.sh
+H	88dcdb1b99dc	check-approver-gitlab.sh
+H	e9928bec193b	check-approver-gitlab.sh
+H	67a4b66563bb	check-approver-gitlab.sh
+H	f8a3b80d70c7	check-approver-gitlab.sh
+H	2ed9fab1c795	check-approver-gitlab.sh
+H	4effc770bb4f	check-approver-gitlab.sh
+H	59fc226fb30a	check-arc.sh
+H	c80fbce06152	check-arc.sh
+H	ac823b35d9c7	check-arc.sh
+H	229e8b6437ce	check-arc.sh
+H	e98e39afa6b2	check-arc.sh
+H	7dac28705701	check-architecture-pack.sh
+H	8794d8af6035	check-architecture-pack.sh
+H	74629c72815d	check-architecture-pack.sh
+H	e6029292f0da	check-asyncapi.sh
+H	e88379e8d80c	check-asyncapi.sh
+H	ac7d80a66973	check-asyncapi.sh
+H	0470a514bf9e	check-asyncapi.sh
+H	54fc988a266d	check-build-plan.sh
+H	4a44222baf32	check-build-plan.sh
+H	d18cb08516fd	check-build-plan.sh
+H	338ddbae6d70	check-build-plan.sh
+H	9ac85488e622	check-build-plan.sh
+H	00125ae16613	check-build-plan.sh
+H	7421ed804996	check-coverage-ratchet.sh
+H	af22380f27ac	check-coverage-ratchet.sh
+H	a1bce6c1df8f	check-coverage-ratchet.sh
+H	eff1b686d101	check-coverage-ratchet.sh
+H	5bc523985722	check-coverage-ratchet.sh
+H	ec631e63a0e6	check-delivery-linkage.sh
+H	64700de82db5	check-delivery-linkage.sh
+H	a45d2f031575	check-delivery-linkage.sh
+H	00156d664620	check-delivery-linkage.sh
+H	ae10cb4dfd35	check-design-contracts.sh
+H	cda1060070c7	check-design.sh
+H	983e56537b90	check-design.sh
+H	fe1de5e8dc94	check-design.sh
+H	0f527ae6f138	check-design.sh
+H	90c3880de196	check-endpoint-auth.sh
+H	e18ea08204c3	check-event-schemas.sh
+H	bca6ed53afd4	check-event-schemas.sh
+H	a464c34c0274	check-evidence.sh
+H	8aa3d00ee5fc	check-evidence.sh
+H	3f7e2800fb1a	check-evidence.sh
+H	56df1ace8829	check-evidence.sh
+H	adf86f3882a3	check-evidence.sh
+H	78a2a6dc50df	check-evidence.sh
+H	1ba4bcdb9a43	check-evidence.sh
+H	b4912e727fd3	check-evidence.sh
+H	eb07fe84a5b3	check-evidence.sh
+H	46e4ad31523c	check-evidence.sh
+H	da2d193a2b84	check-evidence.sh
+H	041c67bcab8e	check-feature-state.sh
+H	f60e0c6c071f	check-feature-state.sh
+H	1d60faab45c3	check-feature-state.sh
+H	b92083c159e9	check-feature-state.sh
+H	d50d73fc5352	check-feature-state.sh
+H	eb98b763f9b0	check-feature-state.sh
+H	4bbb70c71d77	check-feature-state.sh
+H	2c34d67befc5	check-frontend-calls.sh
+H	41c872191d2e	check-frontend-calls.sh
+H	c5a335c519ba	check-frontend-calls.sh
+H	d5b8c66d6c01	check-frontend-calls.sh
+H	378836e6b006	check-gate-metrics.sh
+H	04f2ec49d868	check-gate-metrics.sh
+H	f3a90e39d8ce	check-gate-metrics.sh
+H	461b76308203	check-intake.sh
+H	228a38bea967	check-intake.sh
+H	7c471755f82d	check-intake.sh
+H	85cdbec04452	check-known-failures.sh
+H	5565e7171f77	check-known-failures.sh
+H	964ddbe53545	check-known-failures.sh
+H	29f52d361eb2	check-known-failures.sh
+H	85d32669dd5d	check-known-failures.sh
+H	4330e77502cc	check-layout-roots.sh
+H	cb81fab43b6b	check-milestone.sh
+H	850a81060103	check-milestone.sh
+H	a8becc5387ae	check-milestone.sh
+H	f221718db7b8	check-milestone.sh
+H	de4c155499a5	check-milestone.sh
+H	849b4eb7f02f	check-milestone.sh
+H	62e98243d175	check-milestone.sh
+H	7446dd574aa1	check-milestone.sh
+H	386a03b0f633	check-milestone.sh
+H	077754d50e2e	check-milestone.sh
+H	7b0a6884817e	check-milestone.sh
+H	32b689fed245	check-milestone.sh
+H	a9b7c1cd3f7d	check-milestone.sh
+H	6d0fabae2b4b	check-milestone.sh
+H	12b1c8f40f42	check-milestone.sh
+H	f57fd8ff5b59	check-milestone.sh
+H	5e04475a2a16	check-milestone.sh
+H	ac4e075ce89b	check-openapi.sh
+H	95681316e0d9	check-openapi.sh
+H	4d5990cd8bea	check-openapi.sh
+H	33bef239288a	check-openapi.sh
+H	6734f9ed40dc	check-ux-spec.sh
+H	547352ba935a	check-ux-spec.sh
+H	4e83d90d84d0	classify-change.sh
+H	675e1061f9d0	classify-change.sh
+H	7944458327f8	classify-change.sh
+H	7c99762e9ab5	classify-change.sh
+H	412d5c1053d5	classify-change.sh
+H	34d9ae57fcfa	collect-gate-reports.sh
+H	fb3712dc0653	resolve-layout.sh
+H	8bf9e937b367	resolve-layout.sh
+H	a35bfdd9ae76	unbound-verify-plan.sh

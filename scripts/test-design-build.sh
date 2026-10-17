@@ -302,6 +302,52 @@ run pass "design: a health permitAll still pins without a review" "$d" sh "$CI/c
 rm -f "$d/docs/agents-v0/design/skel/design.lock"
 printf 'POST /api/v1/admin uses permitAll.\n' >> "$d/docs/agents-v0/design/skel/design.md"
 run fail "design: a public route still needs a review" "$d" sh "$CI/check-design.sh" skel --pin approved
+mkdir -p "$d/docs/agents-v0/design/anon"
+printf '# Skel\nAC-1 the build passes\n' > "$d/docs/agents-v0/requirements/anon.md"
+cat > "$d/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | dotnet |
+EOF
+cat > "$d/docs/agents-v0/design/anon/design.md" <<'EOF'
+# Design: skeleton
+
+ADR: N/A: no product decision
+
+N/A: no /api/v1 operation
+
+## Traceability
+| Requirement | Satisfied by |
+|---|---|
+| AC-1 | the module verify command |
+
+## Data model
+N/A: no persistence in the skeleton.
+
+## Authorization
+N/A: no /api/v1 operation
+
+## Events
+N/A: no event contract
+
+## Failure modes
+The verify command fails closed and prints the module that failed.
+
+## Observability
+The build log is the signal for this story.
+
+## Rollout
+The skeleton merges to the default branch before feature stories branch.
+
+GET /health uses [AllowAnonymous].
+EOF
+run pass "design: a health AllowAnonymous pins without a review" "$d" sh "$CI/check-design.sh" anon --pin approved
+rm -f "$d/docs/agents-v0/design/anon/design.lock"
+printf 'POST /admin uses [AllowAnonymous].\n' >> "$d/docs/agents-v0/design/anon/design.md"
+run fail "design: AllowAnonymous on a non-health route needs a review" "$d" sh "$CI/check-design.sh" anon --pin approved
+rm -f "$d/docs/agents-v0/project-profile.md"
 h1="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
 printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Open |\n' "$(printf '%s' "$h1" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run fail "design: an open Critical blocks the pin" "$d" sh "$CI/check-design.sh" orders --pin approved

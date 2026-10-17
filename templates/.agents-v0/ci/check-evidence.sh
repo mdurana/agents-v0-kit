@@ -12,9 +12,9 @@
 #                            is checked.
 #
 # Exit codes: 0 = every checked path exists; 1 = missing artifact, section, row,
-# unrecorded path, dynamic-only path, or missing file.
-# Evidence quality (content) is owned by the phase reviews; this script checks
-# recording and existence only.
+# unrecorded path, dynamic-only path, missing file, a report without commit:,
+# or non-doc files changed since that commit (VERIFY_STALE=0 skips the stale check).
+# Evidence quality (content) is owned by the phase reviews.
 
 set -eu
 

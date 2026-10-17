@@ -41,7 +41,8 @@ case "$action" in
 esac
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
-FEATURE="$feature" ACTION="$action" REASON="$reason" python3 - <<'PY'
+PACKLIB_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+FEATURE="$feature" ACTION="$action" REASON="$reason" PACKLIB_DIR="$PACKLIB_DIR" python3 - <<'PY'
 import datetime
 import glob
 import hashlib
@@ -159,8 +160,36 @@ def section(secs, key):
     return None
 
 
+def bound_public_marker():
+    """The bound pack's publicMarker. Empty when the profile names no pack."""
+    lib = os.environ.get("PACKLIB_DIR") or ""
+    if lib and os.path.isfile(os.path.join(lib, "packlib.py")) and lib not in sys.path:
+        sys.path.insert(0, lib)
+    try:
+        import packlib
+    except ImportError:
+        return ""
+    pack_id = packlib.profile_pack()
+    if not pack_id:
+        return ""
+    data = packlib.load(pack_id)
+    return (data or {}).get("publicMarker") or ""
+
+
+def line_has_marker(line, marker):
+    if not marker:
+        return False
+    if re.search(r"\W", marker):
+        return marker in line
+    return re.search(r"(?<![\w])" + re.escape(marker) + r"(?![\w])", line) is not None
+
+
 def review_not_required(body):
-    """A design with no API, no AsyncAPI/events, no UI, and no public route can be pinned without design-reviewer."""
+    """A design with no API, no AsyncAPI/events, no UI, and no public route can be pinned without design-reviewer.
+
+    A public route is the bound pack's publicMarker (/v0-design). Health, readiness, and liveness
+    may carry that marker. With no Pack, permitAll and the words "public route" keep the Java check.
+    """
     if not body or "N/A: no /api/v1 operation" not in body:
         return False
     if os.path.isfile(os.path.join(base, "ux-spec.md")):
@@ -171,14 +200,19 @@ def review_not_required(body):
     for _dirpath, _dirs, names in os.walk(os.path.join(base, "events")):
         if names:
             return False
-    # A health, readiness, or liveness route is the skeleton's proof, not a product API.
-    kept = re.sub(
-        r"(?i)[^\n]*permitAll[^\n]*(health|ready|live)[^\n]*|[^\n]*(health|ready|live)[^\n]*permitAll[^\n]*",
-        "",
-        body,
-    )
-    if re.search(r"permitAll|public route", kept, re.I):
-        return False
+    marker = bound_public_marker()
+    for line in body.splitlines():
+        health = re.search(r"health|ready|live", line, re.I)
+        if marker:
+            hit = (
+                line_has_marker(line, marker)
+                or ("permitAll" in marker and re.search(r"permitAll", line))
+                or re.search(r"public route", line, re.I)
+            )
+        else:
+            hit = re.search(r"permitAll|public route", line, re.I)
+        if hit and not health:
+            return False
     return True
 
 

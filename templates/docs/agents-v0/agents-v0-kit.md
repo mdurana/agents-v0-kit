@@ -229,10 +229,10 @@ Phase agents do not launch other agents. They write a helper brief and return. T
 | `check-approvals.sh` | The named phase has an explicit approval |
 | `check-evidence.sh` | Recorded evidence exists, has `commit:`, and is not stale |
 | `check-approver-gitlab.sh` | The Approver matches a human who approved the merge request |
-| `check-milestone.sh` | Every story in a manifest has the phase approval, in dependency order |
+| `check-milestone.sh` | Every story in a manifest has the phase approval, in dependency order. On `verify` and `release`, a manifest that names `slo-evidence.md` also requires that file's measured or waiver rows |
 | `check-design.sh` | The design is complete, and still matches its lock |
 | `check-architecture-pack.sh` | The architecture pack is complete: C4 names no product, Data flow matches the Container nodes, data models, state machine, failure domains, target topology, ops readiness, a structural fitness function, component plans, and a clean architecture review. `--approved` also needs an Accepted pattern ADR |
-| `check-design-contracts.sh` | Every feature draft: OpenAPI lint/compat, lock, UX spec, optional AsyncAPI lint |
+| `check-design-contracts.sh` | OpenAPI lint and compat when a draft and catalog exist, the design lock when present, the UX spec when present, AsyncAPI lint when present, `check-adr.sh`, `check-arc.sh` when `Material: yes`, and `check-intake.sh` when Intake is approved |
 | `check-openapi.sh` | The contract lints, is compatible, and was merged |
 | `check-asyncapi.sh` | Optional `asyncapi.yaml` meets channel and message rules |
 | `check-ux-spec.sh` | Spec rows and mockups agree |
