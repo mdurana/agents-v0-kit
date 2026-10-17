@@ -16,7 +16,7 @@ Role IDs and defaults match `templates/.cursor/model-config.json` (installed to 
 | **Schemas**          | schema/unit-test sub-tasks                                       | `composer-2.5[fast=false]`                                 |
 | **Docs**             | doc drafting sub-tasks                                           | `composer-2.5[fast=false]`                  |
 | **Documenter**       | brownfield onboard as-is documentation                           | `composer-2.5[fast=false]`                  |
-| **Orchestrator**     | `/v0-deliver`, `/v0-status`, `/v0-onboard` session routing       | `composer-2.5[fast=false]`                  |
+| **Orchestrator**     | `/v0-deliver` and `/v0-status`. `/v0-onboard` is routed here; `codebase-documenter` writes the report | `composer-2.5[fast=false]`                  |
 | **UX Designer**      | UX design                                                        | `composer-2.5[fast=false]`                  |
 
 

@@ -8,7 +8,7 @@
 #   sh .agents-v0/ci/check-design.sh <feature> --verify-lock    the files still match the last pin
 #
 # Files: docs/agents-v0/design/<feature>/design.md (from docs/agents-v0/design/_design.template.md), the contract draft
-# (openapi.yaml), events/, ux-spec.md, mockups/, amendments.md, design.lock; the requirements
+# (openapi.yaml), asyncapi.yaml, events/, ux-spec.md, mockups/, amendments.md, design.lock; the requirements
 # artifact docs/agents-v0/requirements/<feature>.md; the ADR named on the "ADR:" line of design.md.
 #
 # Structure checks: design.md has the sections Traceability, Data model, Authorization, Failure

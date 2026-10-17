@@ -1,6 +1,6 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, messages between systems, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
 This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
 
@@ -14,7 +14,7 @@ This guide matches the workflow in this kit. A new program starts with **Roadmap
 | **Cursor**     | Desktop app with the project open (your team’s service repo, after the kit is installed).            |
 | **Chat**       | Open the AI chat panel in that project.                                                              |
 | **Your input** | A Jira ticket, Confluence page, email spec, or a short description in plain language.                |
-| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no screens, and no public route does not stop at Design. |
+| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no messages between systems, no screens, and no public route does not stop at Design. |
 
 
 You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design.
   - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -58,7 +58,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-intake`   | Turn one idea or ticket into clear requirements. Each acceptance criterion is a Given / When / Then. One is a failure case, unless the story has no security trigger and no failure behavior. The platform skeleton does not run this. |
 | `/v0-export`   | Optional. Regenerates a Jira spreadsheet from the approved stories. It does not change the plan. |
 | `/v0-deck`     | Optional. Writes a briefing from one approved story (`intake`), or from the approved roadmap and plan (`product` or `delivery`). You say who the audience is and what the meeting must decide. |
-| `/v0-design`   | After intake is approved, when the story has an API, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
+| `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
 | `/v0-local-release` | Optional, after verify. Records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
@@ -106,7 +106,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with no API, no screens, and no public route does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, messages between systems, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 
@@ -138,14 +138,14 @@ The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan ar
 
 **Your question:** *Is the solution shape right before we build?*
 
-This stop applies when the story adds an API, screens, or a public route, and when it adds a service, a datastore, a security boundary, or a breaking API. That last case uses the architecture decision you already approved. You are asked to accept a new recommendation only when this story changes it. A health, readiness, or liveness check does not by itself make it a public route. Otherwise the AI locks the design and continues to Build, and you approve that design together with the build. The platform skeleton does not run this phase.
+This stop applies when the story adds an API, messages between systems, screens, or a public route, and when it adds a service, a datastore, a security boundary, or a breaking API. That last case uses the architecture decision you already approved. You are asked to accept a new recommendation only when this story changes it. A health, readiness, or liveness check does not by itself make it a public route. Otherwise the AI locks the design and continues to Build, and you approve that design together with the build. The platform skeleton does not run this phase.
 
 
 | You should see            | What it means                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | API / contract summary    | What systems talk to each other (not code — interfaces). The draft belongs to this feature. It is merged into the shared API catalog when the feature is built. |
 | Diagrams                  | Flowcharts or sequence diagrams (who calls whom).                                                             |
-| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops, reviews the changed design, and asks you to approve an amendment before it locks the new version. |
+| Design notes and review   | A short design document (every requirement mapped to what satisfies it; who may do what; what happens when a dependency fails). An independent reviewer writes findings when there is an API, messages between systems, screens, or a public route. You approve once that reviewer has no open Critical item, and the design is locked then. A story with none of those is locked without a reviewer. If building shows a locked design is wrong, the AI stops, reviews the changed design, and asks you to approve an amendment before it locks the new version. |
 | ADR (if needed)           | Short decision record for big choices (e.g. sync vs async). Once you accept it, a later change adds a new record and leaves the old one in place. A story with no product decision records that none was needed. |
 | UI stack (if new screens) | The pack's `ui` id. The React example is **React 19, TypeScript 5.9, Vite 7**. |
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
@@ -305,7 +305,7 @@ Make the portal better.
 
 - **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
 - **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
-- **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop. The platform skeleton's one stop is Release. A story with no API, no screens, and no public route has no Design stop. A green build does not approve itself.  
+- **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop. The platform skeleton's one stop is Release. A story with no API, no messages between systems, no screens, and no public route has no Design stop. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  
 - **Overwrite another feature’s files** in the same checkout — it stops and names the files instead.  
 - **Store passwords or API keys** in chat — use your org’s secret vault; never paste production secrets.

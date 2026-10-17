@@ -10,6 +10,8 @@
 | Backend branches | the pack coverage report (Pack java: JaCoCo / Sonar) | |
 | Frontend | 70% | raise if CI gate exists |
 
+On a merge request, changed-line coverage under 80% fails for every pack when `DIFF_BASE` is set (`.agents-v0/ci/check-gate-metrics.sh`). Backend 80% and frontend 70% are the report check. Whole-module line coverage fails in CI only when the pack wires it (Pack `java`: JaCoCo minimum 0.80) or when `MIN_LINE_PCT` or an approved `coverage_ratchet` row is set. When the diff touches a migration or SQL file and `DIFF_BASE` is set, the same script requires a test against the database named in the profile. H2 does not satisfy that row. An expand/contract step with no down script stays legal when the rollback note is recorded. An optional `mutation_ratchet` row in `project-profile.md` checks a mutation report. It is not a default gate.
+
 ## Complexity and size (Java)
 
 | Metric | Limit |
