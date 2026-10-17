@@ -57,12 +57,12 @@ document a stabilization plan before feature work.
 |---------|--------|
 | Build green | Proceed with `/v0-maintain` or feature `/v0-intake` |
 | Tests fail | Stabilization sprint: fix or quarantine flaky tests with team approval |
-| Coverage below 80% / 70% | Phased ratchet — see step 3 |
+| Report coverage below 80% / 70% | Phased ratchet — see step 3 |
 | OWASP high/critical CVEs | Patch via `/v0-maintain` + `dependency-upgrade`, or documented suppressions — see step 4 |
 
 ## 3. Phased quality thresholds
 
-Org defaults are in `quality-and-testing.mdc` (80% backend / 70% frontend). When the repo cannot meet those yet:
+Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend; changed lines must meet 80% when `DIFF_BASE` is set). When the repo cannot meet those yet:
 
 1. Get Security + architecture sign-off on a **ratchet plan** (target dates, quarterly bumps).
 2. Record interim thresholds and removal dates in `docs/agents-v0/project-profile.md` (`coverage_ratchet`, `known_failures` table).

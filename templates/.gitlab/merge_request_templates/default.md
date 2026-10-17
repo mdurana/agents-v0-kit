@@ -103,7 +103,7 @@
 ## Quality gate
 
 - [ ] Profile Backend verify command green (Pack `java`: `./mvnw -B clean verify`) / frontend verify command green
-- [ ] Coverage ≥ 80% backend / 70% frontend for changed code
+- [ ] Changed-line coverage ≥ 80% (report check: ≥ 80% backend / 70% frontend)
 - [ ] No new high/critical CVEs (document any exception)
 - [ ] Docs synced (README, architecture, network, sequence diagrams)
 

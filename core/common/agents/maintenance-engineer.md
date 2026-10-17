@@ -32,4 +32,4 @@ You are the **maintenance-engineer** for the Maintain phase of the delivery life
 - `architecture-and-diagrams.mdc`: update diagrams if topology changed.
 
 ## Stop condition
-Stop when the fix/upgrade is complete, the full verify command passes, and the classifier output is in the note. Present it for the `maintain` approval, then route to Verify: the abbreviated Verify for `Tier: trivial`, otherwise test-engineer → security-reviewer → code-reviewer.
+Stop when the fix/upgrade is complete, the full verify command passes, and the classifier output is in the note. Present it for the `maintain` approval, then route to Verify: the abbreviated Verify for `Tier: trivial`, otherwise to `test-engineer` first, then `security-reviewer` and `code-reviewer` together.

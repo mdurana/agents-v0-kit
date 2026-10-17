@@ -79,5 +79,5 @@ npm test                             # React example (Vitest)
 ## CI
 
 - Build → the profile verify command → the pack coverage report → the pack CVE scan → (deploy). Pack `java` uses JaCoCo, Sonar, and OWASP Dependency-Check. Other packs use the report formats in `pack.json`.
-- Coverage gate: 80% backend, 70% frontend (`quality-and-testing.mdc`).
+- Coverage gate: changed-line coverage under 80% fails when `DIFF_BASE` is set; 80% backend and 70% frontend are the report check (`quality-and-testing.mdc`).
 - No new high/critical CVEs without documented exception.
