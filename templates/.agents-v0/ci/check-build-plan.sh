@@ -94,8 +94,8 @@ for r in rows:
     seen.add(r.get("ac"))
 
 # Test sources, read once.
-SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", "docs", ".cursor", ".claude", ".kilo"}
-TEST_FILE = re.compile(r"(Test|Tests|IT)\.java$|\.(test|spec)\.[A-Za-z]+$|_test\.[A-Za-z]+$|(^|/)test_[^/]+\.py$")
+SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", "docs", ".cursor", ".claude", ".kilo", ".venv", "venv", "__pycache__", "bin", "obj"}
+TEST_FILE = re.compile(r"(Test|Tests|IT)\.java$|(Test|Tests)\.cs$|\.(test|spec)\.[A-Za-z]+$|_test\.[A-Za-z]+$|(^|/)test_[^/]+\.py$")
 _pack = packlib.load(packlib.profile_pack())
 _test_file = (_pack or {}).get("testFile")
 if _test_file:

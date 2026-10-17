@@ -670,6 +670,13 @@ sedi '/refunds/d' "$f/frontend/src/lib/api.ts"
 printf "fetch('/api/v1/secret');\n" > "$f/frontend/src/lib/__tests__/api.test.ts"
 yaml_run pass "frontend calls: test files are not checked" "$f" sh "$CI/check-frontend-calls.sh"
 
+fnode="$tmp/frontend-node-service"
+mkdir -p "$fnode/.agents-v0/ci" "$fnode/src"
+cp "$CI/resolve-layout.sh" "$CI/packlib.py" "$fnode/.agents-v0/ci/"
+printf '{"name":"orders-api","dependencies":{"express":"4.19.0"}}\n' > "$fnode/package.json"
+printf "app.get('/api/v1/unlisted', (req, res) => res.json({}));\n" > "$fnode/src/routes.ts"
+run pass "frontend calls: a root-level backend Node package.json is not scanned as a frontend root" "$fnode" sh "$CI/check-frontend-calls.sh"
+
 if [ "$status" -ne 0 ]; then
   echo "test-design-build: FAILED" >&2
   exit 1

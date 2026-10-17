@@ -781,6 +781,15 @@ mkdir -p "$d/frontend"
 printf '{}\n' > "$d/frontend/package.json"
 expect_pass "layout roots: a repo with no JVM module passes" "$d" sh "$CI/check-layout-roots.sh"
 
+d="$tmp/roots-node-root"
+mkdir -p "$d"
+printf '{"name":"orders","dependencies":{"@nestjs/core":"10.0.0"}}\n' > "$d/package.json"
+if (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "BACKEND_ROOT='\.'" && (cd "$d" && sh "$CI/resolve-layout.sh") | grep -q "FRONTEND_ROOT=''"; then
+  pass "resolve-layout: a root NestJS package.json resolves BACKEND_ROOT=. and FRONTEND_ROOT=''"
+else
+  fail "resolve-layout: a root NestJS package.json resolves BACKEND_ROOT=. and FRONTEND_ROOT=''"
+fi
+
 d="$tmp/roots-ignored"
 mkdir -p "$d/frontend/node_modules/x"
 printf '{}\n' > "$d/frontend/package.json"

@@ -129,6 +129,32 @@ apply_root() {
   printf 'cd %s && %s' "$root" "$body"
 }
 
+CLI_PACK="$PACK"
+
+detect_pack() {
+  if [ -n "$PACK" ]; then
+    return 0
+  fi
+  if [ "$SCAFFOLD_APP" = 1 ]; then
+    PACK="java"
+    return 0
+  fi
+  if [ ! -f "$TARGET_ABS/.agents-v0/ci/packlib.py" ]; then
+    return 0
+  fi
+  PACK="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/ci" python3 - "$TARGET_ABS" <<'PY'
+import os
+import sys
+os.chdir(sys.argv[1])
+sys.path.insert(0, os.environ["PACKLIB_DIR"])
+import packlib
+found = packlib.detect(".")
+if len(found) == 1:
+    print(sorted(found)[0])
+PY
+)"
+}
+
 load_pack_commands() {
   PACK_VERIFY=""
   PACK_VERIFY_FAST=""
@@ -164,7 +190,7 @@ backend_verify_for() {
   if [ -n "${PACK_VERIFY:-}" ]; then
     apply_root "$PACK_VERIFY" "$root"
   else
-    printf 'cd %s && ./mvnw -B clean verify' "${root%/}"
+    printf ''
   fi
 }
 
@@ -173,7 +199,7 @@ backend_fast_for() {
   if [ -n "${PACK_VERIFY_FAST:-}" ]; then
     apply_root "$PACK_VERIFY_FAST" "$root"
   else
-    printf 'cd %s && ./mvnw -B clean verify -P!ci-security' "${root%/}"
+    printf ''
   fi
 }
 
@@ -393,21 +419,25 @@ fill_layout() {
 }
 
 load_markers
+detect_pack
 load_pack_commands
 if [ -z "$PROFILE" ]; then
   PROFILE="$(infer_profile)"
 fi
 fill_layout "$PROFILE"
+if [ -n "$PACK" ] && [ -f "$TARGET_ABS/.agents-v0/scripts/activate-stack-pack.sh" ]; then
+  (cd "$TARGET_ABS" && sh .agents-v0/scripts/activate-stack-pack.sh "$PACK" >/dev/null)
+fi
 
 printf '\nGreenfield bootstrap complete.\n'
-if [ "$SCAFFOLD_APP" = 1 ] && [ -z "$PACK" ]; then
+if [ "$SCAFFOLD_APP" = 1 ] && [ -z "$CLI_PACK" ]; then
   printf 'No --pack was given. Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
   printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
-elif [ "$SCAFFOLD_APP" = 1 ] && [ "$PACK" = "java" ]; then
+elif [ "$SCAFFOLD_APP" = 1 ] && [ "$CLI_PACK" = "java" ]; then
   printf 'Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
   printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
 elif [ "$SCAFFOLD_APP" = 1 ]; then
-  printf 'P0-A: follow the %s scaffold-service skill. The Java archive was not extracted.\n' "$PACK"
+  printf 'P0-A: follow the %s scaffold-service skill. The Java archive was not extracted.\n' "$CLI_PACK"
 else
   printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with scaffold-service.\n'
   printf '      wire the reports named in pack.json; Pack java uses maven/. See docker/README.md\n'

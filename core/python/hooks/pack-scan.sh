@@ -6,6 +6,9 @@ hook_pack_scan() {
     *.py) ;;
     *) return 0 ;;
   esac
+  case "$path" in
+    test_*.py|*_test.py|*/tests/*|*/test/*) return 0 ;;
+  esac
   pack_warns="$(mktemp)"
   HOOK_PACK_FILE="$path" python3 -c '
 import os, re
@@ -15,7 +18,7 @@ try:
 except OSError:
     raise SystemExit(0)
 mapping_re = re.compile(r"@(?:\w*router|app)\.(post|put|patch|delete)\b")
-auth_re = re.compile(r"Depends\(|require_role")
+auth_re = re.compile(r"Depends\(|Security\(|require_role|public_route|login_required|permission_classes|IsAuthenticated|AllowAny")
 for i, line in enumerate(lines):
     if not mapping_re.search(line):
         continue

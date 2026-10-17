@@ -3,6 +3,7 @@
 hook_pack_scan() {
   path="$1"
   case "$path" in
+    *_test.go) return 0 ;;
     *.go) ;;
     *) return 0 ;;
   esac
@@ -15,7 +16,7 @@ try:
 except OSError:
     raise SystemExit(0)
 mapping_re = re.compile(r"\.(POST|PUT|PATCH|DELETE|Post|Put|Patch|Delete)\(|http\.HandleFunc\(")
-auth_re = re.compile(r"Auth|middleware")
+auth_re = re.compile(r"Auth|middleware|Middleware|RequireRole|PublicRoute")
 for i, line in enumerate(lines):
     if not mapping_re.search(line):
         continue

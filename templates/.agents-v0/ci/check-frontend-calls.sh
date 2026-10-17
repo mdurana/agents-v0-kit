@@ -20,8 +20,7 @@ roots=""
 if [ -f "$here/resolve-layout.sh" ]; then
   eval "$(sh "$here/resolve-layout.sh")"
   roots="${FRONTEND_ROOT:-}"
-fi
-if [ -z "$roots" ]; then
+else
   if [ -d frontend ]; then roots="frontend"; elif [ -f package.json ]; then roots="."; fi
 fi
 if [ -z "$roots" ]; then
@@ -41,7 +40,7 @@ catalogs = [c for c in os.environ["CATALOGS"].splitlines() if c]
 if not catalogs:
     catalogs = sorted(glob.glob("openapi/*.yaml") + glob.glob("openapi/*.yml") + glob.glob("openapi/*.json"))
 ignore = os.environ.get("FRONTEND_CALLS_IGNORE")
-SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", "docs", "coverage"}
+SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", "docs", "coverage", ".venv", "venv", "__pycache__", "bin", "obj"}
 TEST = re.compile(r"\.(test|spec)\.[A-Za-z]+$|(^|/)(__tests__|e2e|tests?)/")
 
 

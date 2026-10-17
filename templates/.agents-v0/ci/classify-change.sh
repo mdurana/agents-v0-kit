@@ -111,9 +111,11 @@ SEC_PATH = re.compile(r"(secur|auth|login|logout|session|jwt|oauth|saml|upload|c
 SEC_LINE = re.compile(r"@(PreAuthorize|PostAuthorize|Secured|RolesAllowed|RestController|Controller|RequestMapping|"
                       r"GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping|CrossOrigin|EnableWebSecurity|EnableMethodSecurity|UseGuards|Public)\b|"
                       r"\[(Authorize|AllowAnonymous|HttpGet|HttpPost|HttpPut|HttpPatch|HttpDelete)\b|"
+                      r"\b(RequireAuthorization|AllowAnonymous|AuthMiddleware|RequireRole|permission_classes|login_required)\b|"
+                      r"\b(Depends|Security)\(|"
                       r"permitAll|permit-all|csrf|HttpSecurity|SecurityFilterChain|JwtDecoder|MultipartFile|"
                       r"localStorage|sessionStorage|document\.cookie|Authorization|setAllowedOrigins", re.I)
-SCHEMA_PATH = re.compile(r"(db/migrations?|db/changelog|alembic/versions|/migrations/|\.sql$)", re.I)
+SCHEMA_PATH = re.compile(r"(db/migrations?|db/changelog|alembic/versions|/migrations/|schema\.prisma$|\.sql$)", re.I)
 SCHEMA_LINE = re.compile(r"@Entity\b|@Table\b|DbSet<|__tablename__|createTable|alter table|drop table", re.I)
 VERSION_LINE = re.compile(
     r"^\s*(<([\w.-]*version[\w.-]*)>[^<]*</\2>|<version>[^<]*</version>|[\w.-]*[vV]ersion\s*[=:]\s*['\"]?[\w.\-+]+['\"]?,?"

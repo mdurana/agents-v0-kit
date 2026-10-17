@@ -325,7 +325,9 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if re.search(r"\b(aws|gcloud|az)\s+.*\b(delete|terminate|destroy|remove)\b", low):
         return "ask", "cloud resource deletion requires explicit user approval."
     if re.search(r"\b(docker|podman)\s+push\b", low) or re.search(
-        r"\bnpm\s+publish\b", low
+        r"\b(npm|pnpm|yarn|poetry|uv|cargo)\s+publish\b", low
+    ) or re.search(r"\bdotnet\s+nuget\s+push\b", low) or re.search(
+        r"\btwine\s+upload\b", low
     ):
         return "ask", "registry publish requires explicit user approval."
     if re.search(r"\bmvn\s+.*\bdeploy\b", low) or re.search(

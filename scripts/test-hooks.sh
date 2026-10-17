@@ -53,6 +53,8 @@ shell_case 'rm -rf dir' block
 shell_case 'rm -f build.log' allow
 shell_case 'docker rm -f my-container' allow
 shell_case 'echo x > .cursor/hooks.json' block
+shell_case 'dotnet nuget push pkg.nupkg' ask
+shell_case 'poetry publish' ask
 shell_case 'ls' allow
 
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":".cursor/hooks.json"}}' block "edit .cursor/hooks.json"

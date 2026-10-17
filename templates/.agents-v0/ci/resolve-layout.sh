@@ -284,7 +284,13 @@ elif [ -n "$bff" ]; then
   profile="service"
 elif has_marker . || [ -f package.json ]; then
   if has_marker .; then backend="."; fi
-  if [ -f package.json ]; then frontend="."; fi
+  if [ -f package.json ]; then
+    if [ -z "$backend" ] || grep -Eq '"(react|svelte|@sveltejs/kit|vue|next|vite)"' package.json \
+      || [ -f pom.xml ] || [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f go.mod ] || [ -f pyproject.toml ] \
+      || find . -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) -print -quit 2>/dev/null | grep -q .; then
+      frontend="."
+    fi
+  fi
 fi
 
 # A backend module is the one backend root. Service roots apply only when it is absent.
