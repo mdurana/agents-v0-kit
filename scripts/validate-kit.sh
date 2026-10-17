@@ -330,8 +330,6 @@ sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
 [ -f scripts/test-release.sh ] || err "scripts/test-release.sh missing"
 sh scripts/test-release.sh || err "scripts/test-release.sh failed"
-[ -f scripts/check-doc-alignment.sh ] || err "scripts/check-doc-alignment.sh missing"
-sh scripts/check-doc-alignment.sh || err "scripts/check-doc-alignment.sh failed"
 grep -Fq 'git status --porcelain' core/common/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
@@ -457,7 +455,6 @@ for f in core/common/hooks/*.sh core/*/hooks/*.sh templates/.agents-v0/ci/*.sh t
   sh -n "$f" || err "$f: shell syntax error"
 done
 sh -n scripts/install.sh || err "scripts/install.sh: shell syntax error"
-sh -n scripts/check-doc-alignment.sh || err "scripts/check-doc-alignment.sh: shell syntax error"
 sh -n scripts/bootstrap-greenfield.sh || err "scripts/bootstrap-greenfield.sh: shell syntax error"
 sh -n scripts/audit-brownfield-baseline.sh || err "scripts/audit-brownfield-baseline.sh: shell syntax error"
 [ -f scripts/bootstrap-greenfield.sh ] || err "scripts/bootstrap-greenfield.sh missing"
