@@ -997,16 +997,25 @@ Slow batch claim adjudication.
 ## **Success Metrics**
 Adjudication time under 15 minutes.
 ## Options
-Option A: in-memory queue. Option B: event stream.
+### Option A: In-memory queue
+Single-node queue for batch processing.
+### Option B: Event stream
+Partitioned log for high-throughput streams.
 ## Chosen option
 Option A.
 ## In scope
 - Batch file ingestion
 - Adjudication rules engine
+- **Ticketed Configuration Lifecycle:**
+  - Create and validate configuration tickets
+  - Audit trail for configuration changes
+- **Ingestion Modes:**
+  - Scheduled CSV batch import
+  - Real-time webhook ingestion
 ## Out of scope
 - Real-time mobile push notifications
 EOF
-expect_pass "check-roadmap preflight accepts normalized ## **Success Metrics**" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery.md
+expect_pass "check-roadmap preflight accepts normalized ## **Success Metrics** and ### subheadings" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery.md
 expect_fail "check-roadmap preflight rejects unfilled discovery _template.md" "$d" sh "$CI/check-roadmap.sh" --preflight "$KIT/templates/docs/agents-v0/discovery/_template.md"
 
 cat > "$d/docs/product/claims-discovery-placeholder.md" <<'EOF'
@@ -1027,6 +1036,44 @@ EOF
 expect_fail "check-roadmap preflight rejects XX placeholder" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery-placeholder.md
 
 disc_hash="$(python3 -c 'import hashlib, sys; sys.stdout.write(hashlib.sha256(open("'$d'/docs/product/claims-discovery.md", "rb").read()).hexdigest())')"
+cat > "$d/docs/agents-v0/roadmap/claims-unapproved.md" <<EOF
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: $disc_hash)
+
+## Problem
+Slow batch claim adjudication.
+
+## Success metric
+Adjudication time under 15 minutes.
+
+## Chosen option
+Option A.
+
+## Now
+- Batch file ingestion
+- Scheduled CSV batch import
+
+## Next
+- Adjudication rules engine
+- Real-time webhook ingestion
+
+## Later
+- **Ticketed Configuration Lifecycle:**
+  - Create and validate configuration tickets
+  - Audit trail for configuration changes
+
+## Out of scope
+- Real-time mobile push notifications
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+EOF
+expect_pass "check-roadmap validates pre-approval roadmap content gate without Approved row" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-unapproved.md
+expect_fail "check-roadmap --approved rejects roadmap missing Approved row" "$d" sh "$CI/check-roadmap.sh" --approved docs/agents-v0/roadmap/claims-unapproved.md
+
 cat > "$d/docs/agents-v0/roadmap/claims-valid.md" <<EOF
 # Roadmap: claims
 
@@ -1043,11 +1090,17 @@ Option A.
 
 ## Now
 - Batch file ingestion
+- **Ingestion Modes:**
+  - Scheduled CSV batch import
 
 ## Next
 - Adjudication rules engine
+- **Ingestion Modes:**
+  - Real-time webhook ingestion
 
 ## Later
+- Create and validate configuration tickets
+- Audit trail for configuration changes
 
 ## Out of scope
 - Real-time mobile push notifications
@@ -1058,7 +1111,7 @@ Option A.
 |-------|-----------|----------|----------|------|
 | roadmap | docs/agents-v0/roadmap/claims-valid.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
 EOF
-expect_pass "check-roadmap validates partitioned roadmap with matching sha256" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-valid.md
+expect_pass "check-roadmap validates partitioned roadmap with matching sha256 and nested bullets" "$d" sh "$CI/check-roadmap.sh" --approved docs/agents-v0/roadmap/claims-valid.md
 
 cat > "$d/docs/agents-v0/roadmap/claims-invented.md" <<EOF
 # Roadmap: claims

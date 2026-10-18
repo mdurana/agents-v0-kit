@@ -7,9 +7,9 @@
 #     (Problem, Success metric, Options, Chosen option, In scope, Out of scope)
 #     with non-empty bodies and no placeholder tokens (<...>, [...], TBD, TODO, FIXME, XX, ???, __).
 #
-#   sh .agents-v0/ci/check-roadmap.sh <roadmap-file>
+#   sh .agents-v0/ci/check-roadmap.sh [--approved] <roadmap-file>
 #     Validates the roadmap artifact:
-#       - Delivery approvals table records an explicit Approved roadmap row
+#       - When --approved is passed, Delivery approvals table records an explicit Approved roadmap row
 #       - Discovery: path is recorded and exists
 #       - sha256 checksum matches the discovery document (if recorded)
 #       - Every item in Now, Next, Later is an in-scope item copied from discovery
@@ -23,34 +23,57 @@ set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 
 if [ $# -lt 1 ]; then
-  printf 'usage: %s [--preflight <discovery-file> | <roadmap-file>]\n' "$0" >&2
+  printf 'usage: %s [--preflight <discovery-file> | [--approved] <roadmap-file>]\n' "$0" >&2
   exit 1
 fi
 
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
 MODE="roadmap"
+REQUIRE_APPROVED=0
 TARGET=""
 
-if [ "$1" = "--preflight" ]; then
-  MODE="preflight"
-  if [ $# -lt 2 ]; then
-    printf 'usage: %s --preflight <discovery-file>\n' "$0" >&2
-    exit 1
-  fi
-  TARGET="$2"
-else
-  TARGET="$1"
-fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --preflight)
+      MODE="preflight"
+      shift
+      if [ $# -lt 1 ]; then
+        printf 'usage: %s --preflight <discovery-file>\n' "$0" >&2
+        exit 1
+      fi
+      TARGET="$1"
+      shift
+      ;;
+    --approved)
+      REQUIRE_APPROVED=1
+      shift
+      ;;
+    -*)
+      printf 'usage: %s [--preflight <discovery-file> | [--approved] <roadmap-file>]\n' "$0" >&2
+      exit 1
+      ;;
+    *)
+      TARGET="$1"
+      shift
+      ;;
+  esac
+done
 
+[ -n "$TARGET" ] || { printf 'usage: %s [--preflight <discovery-file> | [--approved] <roadmap-file>]\n' "$0" >&2; exit 1; }
 [ -f "$TARGET" ] || { printf 'FAIL: file not found: %s\n' "$TARGET" >&2; exit 1; }
 
-# For roadmap mode, verify the approval row first
+HAS_APPROVED_ROW=0
 if [ "$MODE" = "roadmap" ]; then
-  sh "$here/check-approvals.sh" "$TARGET" roadmap || exit 1
+  if [ "$REQUIRE_APPROVED" = "1" ]; then
+    sh "$here/check-approvals.sh" "$TARGET" roadmap || exit 1
+    HAS_APPROVED_ROW=1
+  elif sh "$here/check-approvals.sh" "$TARGET" roadmap >/dev/null 2>&1; then
+    HAS_APPROVED_ROW=1
+  fi
 fi
 
-CHECK_MODE="$MODE" CHECK_TARGET="$TARGET" python3 - <<'PY'
+CHECK_MODE="$MODE" CHECK_TARGET="$TARGET" HAS_APPROVED_ROW="$HAS_APPROVED_ROW" python3 - <<'PY'
 import os
 import re
 import sys
@@ -59,6 +82,9 @@ from pathlib import Path
 
 mode = os.environ["CHECK_MODE"]
 target_path = Path(os.environ["CHECK_TARGET"])
+has_approved_row = os.environ.get("HAS_APPROVED_ROW") == "1"
+
+COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 PLACEHOLDER = re.compile(
     r"(<[^>\n]+>|\[\.\.\.\]|\b(TBD|TODO|FIXME|XXX?)\b|__+|[?]{2,})",
@@ -74,20 +100,57 @@ CANONICAL_HEADINGS = [
     ("Out of scope", re.compile(r"^out\s+of\s+scope$")),
 ]
 
+ROADMAP_HEADINGS = [
+    re.compile(r"^now$"),
+    re.compile(r"^next$"),
+    re.compile(r"^later$"),
+    re.compile(r"^delivery\s+approvals?$"),
+]
+
+
+def is_top_section_title(clean_title):
+    for _, pat in CANONICAL_HEADINGS:
+        if pat.match(clean_title):
+            return True
+    for pat in ROADMAP_HEADINGS:
+        if pat.match(clean_title):
+            return True
+    return False
+
+
+def strip_comments(text):
+    return COMMENT.sub("", text)
+
 
 def parse_markdown_sections(text):
     sections = {}
     current_key = None
+    current_level = 0
     buf = []
-    for line in text.splitlines():
-        m = re.match(r"^#{1,6}\s+(.+?)\s*$", line)
+    fenced = False
+    for line in strip_comments(text).splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            fenced = not fenced
+        m = None if fenced else re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
         if m:
-            if current_key is not None:
-                sections[current_key] = "\n".join(buf).strip()
-            raw_title = m.group(1)
+            level = len(m.group(1))
+            raw_title = m.group(2)
             clean_title = re.sub(r"[*_`]", "", raw_title).strip().lower()
-            current_key = clean_title
-            buf = []
+            is_new_section = (
+                current_key is None
+                or current_level == 1
+                or level <= current_level
+                or is_top_section_title(clean_title)
+            )
+            if is_new_section:
+                if current_key is not None:
+                    sections[current_key] = "\n".join(buf).strip()
+                current_key = clean_title
+                current_level = level
+                buf = []
+            else:
+                buf.append(line)
         else:
             if current_key is not None:
                 buf.append(line)
@@ -96,15 +159,57 @@ def parse_markdown_sections(text):
     return sections
 
 
-def extract_bullets(section_text):
-    bullets = []
-    for line in section_text.splitlines():
-        line = line.strip()
-        m = re.match(r"^(?:[-*+]|\d+\.)\s+(.+)$", line)
+def parse_bullet_tree(section_text):
+    roots = []
+    stack = []
+    fenced = False
+    for raw_line in strip_comments(section_text).splitlines():
+        stripped = raw_line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            fenced = not fenced
+            continue
+        if fenced or not stripped:
+            continue
+        if re.match(r"^#{1,6}\s+", stripped):
+            stack = []
+            continue
+        m = re.match(r"^(\s*)(?:[-*+]|\d+\.)\s+(.+)$", raw_line)
         if m:
-            clean = re.sub(r"\s+", " ", m.group(1).strip())
-            bullets.append(clean)
-    return bullets
+            indent = len(m.group(1).expandtabs(2))
+            clean = re.sub(r"\s+", " ", m.group(2).strip())
+            node = {"text": clean, "indent": indent, "children": []}
+            while stack and stack[-1]["indent"] >= indent:
+                stack.pop()
+            if stack:
+                stack[-1]["children"].append(node)
+            else:
+                roots.append(node)
+            stack.append(node)
+        elif stack:
+            indent = len(raw_line) - len(stripped)
+            if indent > stack[-1]["indent"]:
+                stack[-1]["text"] = re.sub(
+                    r"\s+", " ", stack[-1]["text"] + " " + stripped.strip()
+                )
+    return roots
+
+
+def tree_all_texts(nodes):
+    out = []
+    for n in nodes:
+        out.append(n["text"])
+        out.extend(tree_all_texts(n["children"]))
+    return out
+
+
+def tree_leaf_texts(nodes):
+    out = []
+    for n in nodes:
+        if n["children"]:
+            out.extend(tree_leaf_texts(n["children"]))
+        else:
+            out.append(n["text"])
+    return out
 
 
 def is_git_tracked_and_clean(paths):
@@ -207,7 +312,8 @@ if mode == "roadmap":
             )
 
     sealed_legacy = (
-        recorded_hash is None
+        has_approved_row
+        and recorded_hash is None
         and os.environ.get("KIT_STRICT_ROADMAP") != "1"
         and is_git_tracked_and_clean([target_path, disc_path])
     )
@@ -222,32 +328,38 @@ if mode == "roadmap":
     disc_text = disc_bytes.decode("utf-8", errors="replace")
     disc_sections = check_discovery_sections(disc_text, str(disc_path), issues=issues)
 
-    in_scope_bullets = extract_bullets(disc_sections.get("In scope", ""))
-    out_of_scope_bullets = extract_bullets(disc_sections.get("Out of scope", ""))
+    in_scope_tree = parse_bullet_tree(disc_sections.get("In scope", ""))
+    out_of_scope_tree = parse_bullet_tree(disc_sections.get("Out of scope", ""))
+
+    in_scope_all_set = set(tree_all_texts(in_scope_tree))
+    out_of_scope_set = set(tree_all_texts(out_of_scope_tree))
 
     roadmap_sections = parse_markdown_sections(roadmap_text)
 
-    now_bullets = extract_bullets(roadmap_sections.get("now", ""))
-    next_bullets = extract_bullets(roadmap_sections.get("next", ""))
-    later_bullets = extract_bullets(roadmap_sections.get("later", ""))
+    horizon_trees = [
+        ("Now", parse_bullet_tree(roadmap_sections.get("now", ""))),
+        ("Next", parse_bullet_tree(roadmap_sections.get("next", ""))),
+        ("Later", parse_bullet_tree(roadmap_sections.get("later", ""))),
+    ]
 
-    all_roadmap_items = [("Now", b) for b in now_bullets] + \
-                         [("Next", b) for b in next_bullets] + \
-                         [("Later", b) for b in later_bullets]
+    all_roadmap_nodes = []
+    scheduled_leaves = []
+    for horizon, h_tree in horizon_trees:
+        for item in tree_all_texts(h_tree):
+            all_roadmap_nodes.append((horizon, item))
+        for leaf in tree_leaf_texts(h_tree):
+            scheduled_leaves.append((horizon, leaf))
 
-    in_scope_set = set(in_scope_bullets)
-    out_of_scope_set = set(out_of_scope_bullets)
-
-    # 1. No invented themes: every horizon bullet must be in In scope
-    for horizon, item in all_roadmap_items:
-        if item not in in_scope_set:
+    # 1. No invented themes: every horizon bullet (parent or leaf) must exist in discovery In scope
+    for horizon, item in all_roadmap_nodes:
+        if item not in in_scope_all_set:
             report_roadmap(
                 f"roadmap horizon '{horizon}' contains item not found in discovery In scope: '{item}'"
             )
 
-    # 2. Exclusivity: each in-scope item must be in at most one horizon
+    # 2. Exclusivity: each scheduled leaf item must appear in at most one horizon
     seen_items = {}
-    for horizon, item in all_roadmap_items:
+    for horizon, item in scheduled_leaves:
         if item in seen_items:
             report_roadmap(
                 f"in-scope item '{item}' is placed in multiple horizons "
@@ -255,15 +367,35 @@ if mode == "roadmap":
             )
         seen_items[item] = horizon
 
-    # 3. Completeness: every In scope item must appear in at least one horizon
-    for item in in_scope_bullets:
-        if item not in seen_items:
-            report_roadmap(
-                f"in-scope item '{item}' is missing from all roadmap horizons (Now, Next, Later)"
-            )
+    # Also ensure a parent item is not scheduled as a standalone leaf in one horizon while its children are scheduled too
+    for node in in_scope_tree:
+        if node["children"] and node["text"] in seen_items:
+            parent_h = seen_items[node["text"]]
+            for child_leaf in tree_leaf_texts(node["children"]):
+                if child_leaf in seen_items:
+                    report_roadmap(
+                        f"in-scope item '{child_leaf}' is placed in horizon '{seen_items[child_leaf]}' "
+                        f"while its parent '{node['text']}' is also placed as a standalone item in '{parent_h}'."
+                    )
+
+    # 3. Completeness: every top-level In scope item (or all of its leaf sub-items) must be scheduled
+    for node in in_scope_tree:
+        if not node["children"]:
+            if node["text"] not in seen_items:
+                report_roadmap(
+                    f"in-scope item '{node['text']}' is missing from all roadmap horizons (Now, Next, Later)"
+                )
+        else:
+            if node["text"] in seen_items:
+                continue
+            for child_leaf in tree_leaf_texts(node["children"]):
+                if child_leaf not in seen_items:
+                    report_roadmap(
+                        f"in-scope item '{child_leaf}' is missing from all roadmap horizons (Now, Next, Later)"
+                    )
 
     # 4. Out of scope exclusivity: no out of scope item in horizons
-    for horizon, item in all_roadmap_items:
+    for horizon, item in all_roadmap_nodes:
         if item in out_of_scope_set:
             report_roadmap(
                 f"out-of-scope item '{item}' appears in roadmap horizon '{horizon}'"
