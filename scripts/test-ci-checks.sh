@@ -1204,8 +1204,16 @@ expect_fail "check-intake rejects a security trigger without a refusal" "$d" sh 
 sedi 's/Kind: happy/Kind: negative/' "$d/docs/agents-v0/requirements/orders.md"
 sedi 's/Then HTTP 201 and the order row is stored with status PENDING/Then it works as expected/' "$d/docs/agents-v0/requirements/orders.md"
 expect_fail "check-intake rejects a vague Then" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/orders.md
+sedi 's/Then it works as expected/Then HTTP 201 and the order row is stored with status PENDING/' "$d/docs/agents-v0/requirements/orders.md"
 printf 'Story: P0-A\n' > "$d/docs/agents-v0/requirements/p0.md"
 expect_pass "check-intake skips P0-A" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/p0.md
+cp "$d/docs/agents-v0/requirements/orders.md" "$d/docs/agents-v0/requirements/an_role.md"
+sedi 's/As a clerk/As an API consumer/' "$d/docs/agents-v0/requirements/an_role.md"
+expect_pass "check-intake accepts an As an role sentence" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/an_role.md
+cp "$d/docs/agents-v0/requirements/orders.md" "$d/docs/agents-v0/requirements/no_trigger.md"
+sedi 's/- auth: the clerk must be signed in/This story does not change authentication, RBAC, or a public route./' "$d/docs/agents-v0/requirements/no_trigger.md"
+sedi 's/Then HTTP 401 and no order row is written/Then the order is placed on hold instead of failing/' "$d/docs/agents-v0/requirements/no_trigger.md"
+expect_pass "check-intake does not require refusal when trigger words appear in a negative explanation" "$d" sh "$CI/check-intake.sh" docs/agents-v0/requirements/no_trigger.md
 
 # --- check-architecture-pack.sh ----------------------------------------------
 d="$tmp/pack"

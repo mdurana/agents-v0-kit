@@ -87,7 +87,41 @@ def na_reason(body):
 
 def is_none(body):
     words = " ".join(re.sub(r"(?m)^\s*[-*]\s*", "", plain(body)).split())
-    return bool(re.match(r"(?i)^(none|n/a\b)", words))
+    return bool(re.match(r"(?i)^(none\b|n/a\b|not applicable\b|no triggers?\b)", words))
+
+
+def is_trigger_line(line):
+    if not TRIGGER.search(line):
+        return False
+    m = re.match(
+        r"^\s*[-*]?\s*(auth|authentication|authorization|upload|rbac|public route)\s*:\s*(.+)$",
+        line,
+        re.I,
+    )
+    if m:
+        val = m.group(2).strip()
+        if re.match(r"(?i)^(none\b|n/a\b|not applicable\b|no\s*$|false\b)", val):
+            return False
+        return True
+    if re.match(
+        r"^\s*[-*]?\s*(auth|authentication|authorization|upload|rbac|public route)\s*$",
+        line,
+        re.I,
+    ):
+        return True
+    if re.search(r"(?i)\b(none\b|n/a\b|not applicable\b)", line):
+        return False
+    if re.search(
+        r"(?i)\b(does not|doesn't|no|not|without|neither)\b.{0,40}\b(change|touch|modify|add|affect|require|introduce|involve|apply|use|contain|alter)\b",
+        line,
+    ):
+        return False
+    if re.search(
+        r"(?i)\b(no|without)\b\s+(auth|authentication|authorization|upload|rbac|public route)\b",
+        line,
+    ):
+        return False
+    return True
 
 
 def filled(body, allow_na=True, allow_none=False, min_len=20):
@@ -106,7 +140,7 @@ if re.search(r"(?m)^##\s+Proposed split\s*$", text):
     if not re.search(r"(?m)^\s*\|.+\|.+\|", split_body):
         fail(f"{path}: Proposed split must list extra stories in a table (sentence, surface, dependency)")
 
-stories = [l for l in text.splitlines() if re.match(r"(?i)^As a .+?, I want .+?, so that \S", l)]
+stories = [l for l in text.splitlines() if re.match(r"(?i)^As an? .+?, I want .+?, so that \S", l)]
 if len(stories) != 1:
     fail(f"{path}: user story must be one line: As a [role], I want [goal], so that [benefit].")
 elif "<" in stories[0] or ">" in stories[0]:
@@ -184,7 +218,7 @@ elif not plain(trig).strip():
     fail(f"{path}: Security-review triggers is empty (write the triggers, or \"none\")")
     has_trigger = False
 else:
-    has_trigger = (not is_none(trig)) and bool(TRIGGER.search(plain(trig)))
+    has_trigger = (not is_none(trig)) and any(is_trigger_line(l) for l in plain(trig).splitlines())
 
 oq = section(secs, "open questions")
 if oq is None:
