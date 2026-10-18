@@ -19,9 +19,9 @@
 
 | Purpose | Command |
 |---------|---------|
-| Backend verify | <!-- from pack.json; Pack java: cd app/backend && ./mvnw -B clean verify --> |
+| Backend verify | <!-- from pack.json; Pack java: cd app/backend && ./mvnw -B clean verify -Pci-security --> |
 | Backend verify (fast, no OWASP) | <!-- Pack java: cd app/backend && ./mvnw -B clean verify -P!ci-security --> |
-| Service verify | <!-- multi-service repos only; {root} = the story's Service root. Pack java: ./mvnw -B -f {root}/pom.xml clean verify --> |
+| Service verify | <!-- multi-service repos only; {root} = the story's Service root. Pack java: ./mvnw -B -f {root}/pom.xml clean verify -Pci-security --> |
 | Service verify (fast, no OWASP) | <!-- Pack java: ./mvnw -B -f {root}/pom.xml clean verify -P!ci-security --> |
 | Frontend verify | <!-- e.g. npm run verify --> |
 | Frontend verify (fast) | <!-- e.g. cd app/frontend && npm test — required for the red–green loop; gate still uses Frontend verify --> |

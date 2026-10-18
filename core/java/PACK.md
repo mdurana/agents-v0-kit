@@ -11,7 +11,7 @@
 - **Database:** PostgreSQL 15, Flyway
 - **Tests:** JUnit (spring-boot-starter-test), ArchUnit 1.4.2, Testcontainers (H2 unit profile only; schema changes require target DB)
 - **Local run:** Compose API :8080, UI :8081, postgres:15-alpine
-- **Backend verify:** cd app/backend && ./mvnw -B clean verify
+- **Backend verify:** cd app/backend && ./mvnw -B clean verify -Pci-security
 - **Backend verify (fast):** cd app/backend && ./mvnw -B clean verify -P!ci-security
 - **Coverage:** target/site/jacoco/jacoco.xml
 - **Tests report:** target/surefire-reports/TEST-*.xml

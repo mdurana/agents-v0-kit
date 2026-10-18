@@ -20,7 +20,7 @@ sh .agents-v0/scripts/host-tools-macports.sh --install
 The commands in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`.agents-v0/ci/resolve-layout.sh`). They come from the bound pack's `pack.json`. Pack `java` is:
 
 ```bash
-cd app/backend && ./mvnw -B clean verify
+cd app/backend && ./mvnw -B clean verify -Pci-security
 cd app/frontend && npm run build   # React example; SvelteKit when the repo already uses it
 ```
 

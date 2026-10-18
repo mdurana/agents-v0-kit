@@ -34,7 +34,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 - Approval decisions go in the existing handoff artifact's `Delivery approvals` table (canonical 5-column format: Phase, Artifacts, Approver, Decision, Date).
 - Merge-request readiness is intermediate: completion is a human-authorized merge with CI green. On GitLab, after the merge request is approved, run the manual `delivery-approval` job. Commits, pushes, and merge-request creation each need their own authorization.
 - Smallest correct diff; no drive-by refactors; no unsolicited files.
-- Build gate: the profile Backend verify command passes (Pack `java`: `./mvnw -B clean verify` from the backend root), or the frontend verify command.
+- Build gate: the profile Backend verify command passes (Pack `java`: `./mvnw -B clean verify -Pci-security` from the backend root), or the frontend verify command.
 - No secrets in code, logs, or client bundles; sanitize log values; never dump environment variables.
 
 ## Rule precedence

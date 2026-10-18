@@ -350,6 +350,12 @@ mkdir_dec dec-evidence \
   '| Build | docs/agents-v0/build/missing/build-report.md | @ada | Approved | 2026-01-01 |' \
   '| Build | docs/agents-v0/build/dec/build-report.md | @ada | Approved | 2026-01-02 |'
 expect_pass "check-evidence reads the last row for a phase" "$d" env VERIFY_STALE=0 sh "$CI/check-evidence.sh" docs/agents-v0/requirements/dec-evidence.md build
+mkdir -p "$d/docs/agents-v0/build/p0-a-platform-skeleton"
+printf 'commit: abcdef1234567\n' > "$d/docs/agents-v0/build/p0-a-platform-skeleton/build-report.md"
+{
+  printf '# Story: P0-A\nMilestone: P0 — Platform Skeleton\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n'
+} > "$d/docs/agents-v0/requirements/p0-a-platform-skeleton.md"
+expect_pass "check-evidence accepts unapproved P0-A build evidence on disk" "$d" env VERIFY_STALE=0 sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md build
 # The state file follows the same rules.
 mkdir_dec dec-state \
   '| Intake | docs/agents-v0/requirements/dec-state.md | @ada | Approved | 2026-01-01 |' \

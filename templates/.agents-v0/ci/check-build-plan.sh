@@ -278,8 +278,13 @@ if os.path.isfile(red_json_path):
     has_machine_red_source = True
     machine_red_tokens.update(parse_failed_tests_from_file(red_json_path))
 for c in red_cards:
-    loc_text = " ".join([c.get("location", ""), c.get("report", "")])
-    for candidate in re.findall(r"[\w./\\-]+\.(?:xml|trx|json)\b", loc_text, re.I):
+    report_candidates = re.findall(r"[\w./\\-]+\.(?:xml|trx|json)\b", c.get("report", ""), re.I)
+    loc_candidates = [
+        cand
+        for cand in re.findall(r"[\w./\\-]+\.(?:xml|trx|json)\b", c.get("location", ""), re.I)
+        if REPORT_FILE_RE.search(cand.replace(os.sep, "/"))
+    ]
+    for candidate in report_candidates + loc_candidates:
         has_machine_red_source = True
         if not os.path.isfile(candidate):
             fail(f"{report_path}: red card references missing test report {candidate}")

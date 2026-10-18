@@ -440,7 +440,7 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
 
 
 def _commit_paths_are_evidence(parts: List[str]) -> bool:
-    """A reports-only commit (build/ or verify/ docs) does not ask again."""
+    """A reports-only commit (build/ or verify/ docs, or state.json) does not ask again."""
     if "--" not in parts:
         return False
     paths = [p for p in parts[parts.index("--") + 1 :] if p != "--"]
@@ -451,6 +451,9 @@ def _commit_paths_are_evidence(parts: List[str]) -> bool:
         if not (
             norm.startswith("docs/agents-v0/build/")
             or norm.startswith("docs/agents-v0/verify/")
+            or (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".state.json"))
+            or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("state.json"))
+            or norm == "docs/agents-v0/onboarding/state.json"
         ):
             return False
     return True

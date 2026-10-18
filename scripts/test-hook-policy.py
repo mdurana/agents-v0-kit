@@ -46,6 +46,7 @@ SHELL_CASES = [
     ("git push", "ask"),
     ("git commit -m x", "ask"),
     ("git commit -m x -- docs/agents-v0/build/orders/build-report.md", "allow"),
+    ("git commit -m x -- docs/agents-v0/build/orders/build-report.md docs/agents-v0/requirements/orders.state.json", "allow"),
     ("git commit -m x -- docs/agents-v0/verify/orders/test-report.md", "allow"),
     ("git commit -m x -- docs/agents-v0/requirements/orders.md", "ask"),
     ("git commit -m x --", "ask"),
