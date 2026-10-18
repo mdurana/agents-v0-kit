@@ -178,6 +178,10 @@ def discover_report_files(targets):
     return sorted(set(files))
 
 
+lock_path = os.path.join("docs", "agents-v0", "design", feature, "design.lock")
+lock_entries = [l.split() for l in (read(lock_path) or "").splitlines() if len(l.split()) >= 2]
+latest_lock_hash = lock_entries[-1][1] if lock_entries else ""
+
 if record_red:
     targets = sys.argv[1:]
     report_files = discover_report_files(targets)
@@ -200,8 +204,11 @@ if record_red:
             existing = {"failed": [], "sources": []}
     merged_failed = sorted(set(existing.get("failed") or []) | failed_tokens)
     merged_sources = sorted(set(existing.get("sources") or []) | set(used_sources))
+    payload = {"failed": merged_failed, "sources": merged_sources}
+    if latest_lock_hash:
+        payload["designLockHash"] = latest_lock_hash
     with open(red_json_path, "w", encoding="utf-8") as handle:
-        json.dump({"failed": merged_failed, "sources": merged_sources}, handle, indent=2)
+        json.dump(payload, handle, indent=2)
         handle.write("\n")
     print(f"OK: recorded {len(failed_tokens)} failing test token(s) for {feature} in {red_json_path}")
     raise SystemExit(0)
@@ -275,9 +282,33 @@ red_text = "\n".join(c.get("failing test", "") for c in red_cards)
 machine_red_tokens = set()
 has_machine_red_source = False
 has_red_json = os.path.isfile(red_json_path)
+red_json_lock_hash = ""
 if has_red_json:
     has_machine_red_source = True
     machine_red_tokens.update(parse_failed_tests_from_file(red_json_path))
+    try:
+        red_json_doc = json.loads(read(red_json_path) or "{}")
+        if isinstance(red_json_doc, dict):
+            red_json_lock_hash = str(red_json_doc.get("designLockHash") or "").strip()
+    except json.JSONDecodeError:
+        pass
+if require_red and len(lock_entries) > 1:
+    has_unwaived_done = any(
+        r.get("status", "").lower() == "done" and not re.search(r"\(no-red:\s*\S{4,}", r.get("test", ""))
+        for r in rows
+    )
+    if has_unwaived_done:
+        if len(red_cards) < len(lock_entries):
+            fail(
+                f"{report_path}: design.lock has {len(lock_entries)} pins (amended design), "
+                f"but only {len(red_cards)} red attempt card(s); record a new red run for the amendment"
+            )
+        if has_red_json and red_json_lock_hash != latest_lock_hash:
+            fail(
+                f"{red_json_path}: recorded before the latest design amendment pin "
+                f"({(red_json_lock_hash or 'none')[:12]} != {latest_lock_hash[:12]}); "
+                f"re-run the red test and sh .agents-v0/ci/check-build-plan.sh {feature} --record-red"
+            )
 for c in red_cards:
     report_candidates = re.findall(r"[\w./\\-]+\.(?:xml|trx|json)\b", c.get("report", ""), re.I)
     loc_candidates = [

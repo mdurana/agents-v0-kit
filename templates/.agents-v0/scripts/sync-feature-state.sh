@@ -118,6 +118,7 @@ statuses = {"in_progress", "awaiting_approval", "blocked"}
 positive = re.compile(
     r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
 )
+reopened_re = re.compile(r"^re-?opened\b", re.I)
 
 text = open(art, encoding="utf-8").read()
 tier_m = re.search(r"^\s*tier:\s*(\S+)", text, re.I | re.M)
@@ -137,9 +138,14 @@ for line in text.splitlines():
         rows[cells[0].lower()] = cells
 
 last_approved = ""
+first_reopened = ""
 for phase in phases:
-    if phase in rows and positive.match(rows[phase][3]):
-        last_approved = phase
+    if phase in rows:
+        if reopened_re.match(rows[phase][3]):
+            first_reopened = phase
+            break
+        if positive.match(rows[phase][3]):
+            last_approved = phase
 
 
 def evidence(phase):
@@ -175,6 +181,13 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
         raise SystemExit(1)
     if active_status != "blocked":
         blocked_reason = ""
+    if (
+        first_reopened
+        and active_status == "blocked"
+        and active_phase in phases
+        and phases.index(active_phase) > phases.index(first_reopened)
+    ):
+        active_phase = first_reopened
 else:
     active_phase = prev.get("activePhase") or ""
     active_status = prev.get("activeStatus") or ""
@@ -183,6 +196,14 @@ else:
         active_phase = ""
         active_status = ""
         blocked_reason = ""
+    if first_reopened and (
+        not active_phase
+        or (active_phase in phases and phases.index(active_phase) > phases.index(first_reopened))
+    ):
+        active_phase = first_reopened
+        if active_status not in ("in_progress", "blocked"):
+            active_status = "in_progress"
+            blocked_reason = ""
 
 def resolve_git_head(seed: str) -> str:
     if seed and re.match(r"^[0-9a-f]{7,40}$", seed, re.I):

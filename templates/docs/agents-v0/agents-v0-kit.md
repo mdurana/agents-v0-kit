@@ -103,7 +103,7 @@ Resume is the same in every phase. `.agents-v0/scripts/sync-feature-state.sh` wr
 
 The approvals table is five columns: Phase, Artifacts, Approver, Decision, Date. CI accepts `Approved`, `approved`, `yes`, or `pass` as the decision, and rejects `Not approved` and `Re-opened`. The Approver cell is the person's GitLab username (`@ada`), because the final job matches it to the real merge-request approval. Build and Verify evidence paths in that row must exist on disk and start with a `commit:` line for the tree that was tested. A later code change makes the line stale, and CI rejects it until the phase is re-run on the new commit. `/v0-verify` sets an Approved Verify row to `Re-opened` before that re-run.
 
-`docs/agents-v0/requirements/<feature>.phase-result.md` is the handoff the next phase reads. It names the phase, the status, the artifacts, and one blocker per line. An Intake result also copies the user story, the acceptance-criterion count, the failure-scenario count, the regulations, and the open questions.
+`docs/agents-v0/requirements/<feature>.phase-result.md` is the handoff the next phase reads. It names the phase, the status (`awaiting_approval` or `blocked` when stopping; `approved` or `local` after approval), the artifacts, and one blocker per line. An Intake result also copies the user story, the acceptance-criterion count, the failure-scenario count, the regulations, and the open questions.
 
 ## Change tiers
 

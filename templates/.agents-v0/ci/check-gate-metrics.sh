@@ -262,13 +262,68 @@ def go_json_totals(path):
     return tests, fails, 0, 0, True
 
 
+def resolve_merge_base(base):
+    """Resolve merge-base(base, HEAD). If base == HEAD (e.g. working directly on main), fall back to feature baseCommit or HEAD~1."""
+    merge_base = subprocess.run(
+        ["git", "-C", root, "merge-base", base, "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    head_sha = subprocess.run(
+        ["git", "-C", root, "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    if merge_base and merge_base == head_sha:
+        top = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=False,
+        ).stdout.strip() or os.getcwd()
+        candidates = []
+        for pattern in (
+            os.path.join(top, "docs", "agents-v0", "requirements", "*.state.json"),
+            os.path.join(top, "docs", "agents-v0", "maintain", "*", "state.json"),
+            os.path.join(os.getcwd(), "docs", "agents-v0", "requirements", "*.state.json"),
+            os.path.join(os.getcwd(), "docs", "agents-v0", "maintain", "*", "state.json"),
+        ):
+            for sf in glob.glob(pattern):
+                if os.path.isfile(sf):
+                    candidates.append(os.path.abspath(sf))
+        seen_sf = set()
+        ordered_sf = []
+        for sf in sorted(candidates, key=lambda p: os.path.getmtime(p), reverse=True):
+            if sf not in seen_sf:
+                seen_sf.add(sf)
+                ordered_sf.append(sf)
+        active_first = []
+        inactive = []
+        for sf in ordered_sf:
+            try:
+                st = json.load(open(sf, encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            (active_first if (st.get("activePhase") or "") else inactive).append(st)
+        for st in active_first + inactive:
+            bc = (st.get("baseCommit") or "").strip()
+            if bc and bc != head_sha:
+                alt = subprocess.run(
+                    ["git", "-C", root, "merge-base", bc, "HEAD"],
+                    capture_output=True, text=True, check=False,
+                )
+                if alt.returncode == 0 and alt.stdout.strip() and alt.stdout.strip() != head_sha:
+                    return alt.stdout.strip()
+        if not re.fullmatch(r"[0-9a-f]{7,40}", base, re.I):
+            parent = subprocess.run(
+                ["git", "-C", root, "rev-parse", "--verify", "-q", "HEAD~1"],
+                capture_output=True, text=True, check=False,
+            )
+            if parent.returncode == 0 and parent.stdout.strip():
+                return parent.stdout.strip()
+    return merge_base
+
+
 def git_added(glob_pattern, base):
     """Lines added since DIFF_BASE for one pathspec. Empty dict when the diff cannot be read."""
     try:
-        merge_base = subprocess.run(
-            ["git", "-C", root, "merge-base", base, "HEAD"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
+        merge_base = resolve_merge_base(base)
         diff = subprocess.run(
             ["git", "-C", root, "diff", "-U0", "--relative", merge_base, "HEAD", "--", glob_pattern],
             capture_output=True, text=True, check=True,
@@ -556,10 +611,7 @@ def check_schema_target_db():
     if not base or env("ALLOW_INMEMORY_MIGRATION_TEST") == "1":
         return
     try:
-        merge_base = subprocess.run(
-            ["git", "-C", root, "merge-base", base, "HEAD"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
+        merge_base = resolve_merge_base(base)
         changed = subprocess.run(
             ["git", "-C", root, "diff", "--name-only", "--relative", merge_base, "HEAD"],
             capture_output=True, text=True, check=True,
@@ -809,7 +861,25 @@ def measure_manifest(data):
     cve_rel = (data.get("cve") or {}).get("path") or ""
     if cve_rel:
         cve_files = files_for(cve_rel)
-        record_cve(cve_files[0] if cve_files else os.path.join(root, cve_rel))
+        cve_candidate = cve_files[0] if cve_files else os.path.join(root, cve_rel)
+        root_abs = os.path.abspath(root)
+        ci_gate_abs = os.path.abspath(os.path.join(os.getcwd(), "ci-artifacts", "gate"))
+        live_build_files = [
+            f for f in (test_files + cov_files)
+            if os.path.isfile(f)
+            and os.path.abspath(f).startswith(root_abs + os.sep)
+            and not os.path.abspath(f).startswith(ci_gate_abs + os.sep)
+        ]
+        if (
+            live_build_files
+            and os.path.isfile(cve_candidate)
+            and os.path.abspath(cve_candidate).startswith(ci_gate_abs + os.sep)
+            and not glob.glob(os.path.join(root, cve_rel), recursive=True)
+        ):
+            newest_live = max(os.path.getmtime(f) for f in live_build_files)
+            if os.path.getmtime(cve_candidate) + 1.0 < newest_live:
+                cve_candidate = os.path.join(root, cve_rel)
+        record_cve(cve_candidate)
     else:
         print("cve: SKIP (pack has no cve.path)")
 
@@ -915,10 +985,7 @@ if base and os.path.isfile(jacoco):
     default_diff = qg.get("diff_line_pct", 80.0)
     minimum = number("MIN_DIFF_LINE_PCT", default_diff)
     try:
-        merge_base = subprocess.run(
-            ["git", "-C", root, "merge-base", base, "HEAD"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
+        merge_base = resolve_merge_base(base)
         diff = subprocess.run(
             ["git", "-C", root, "diff", "-U0", "--relative", merge_base, "HEAD", "--", "*.java"],
             capture_output=True, text=True, check=True,

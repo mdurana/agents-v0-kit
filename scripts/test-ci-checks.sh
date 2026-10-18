@@ -383,6 +383,21 @@ PY
 expect_fail "check-feature-state fails when baseCommit is empty in a git repo" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-state2.md
 (cd "$d" && HOOK_BASE="" sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-state2.md >/dev/null 2>&1)
 expect_pass "sync-feature-state backfills empty baseCommit from .git/HEAD" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-state2.md
+mkdir_dec dec-reopen \
+  '| Intake | docs/agents-v0/requirements/dec-reopen.md | @ada | Approved | 2026-01-01 |' \
+  '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-02 |' \
+  '| Build | docs/agents-v0/build/x/build-report.md | @ada | Re-opened | 2026-01-03 |'
+(cd "$d" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md --active-phase verify --status blocked --reason "Build is Re-opened" >/dev/null 2>&1)
+if grep -Fq '"activePhase": "build"' "$d/docs/agents-v0/requirements/dec-reopen.state.json"; then pass "state: blocked verify with Re-opened build routes activePhase to build"; else fail "state: blocked verify with Re-opened build routes activePhase to build"; fi
+expect_pass "check-feature-state accepts activePhase routed to Re-opened build" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md
+python3 - "$d/docs/agents-v0/requirements/dec-reopen.state.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+data = json.load(open(p, encoding="utf-8"))
+data["activePhase"] = "verify"
+json.dump(data, open(p, "w", encoding="utf-8"), indent=2)
+PY
+expect_fail "check-feature-state rejects activePhase verify when build is Re-opened" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md
 expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/milestones/m.md plan
 expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/a.md plan
 expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
@@ -1477,6 +1492,34 @@ if [ -f "$dj/ci-artifacts/gate/target/dependency-check-report.json" ]; then
 else
   fail "collect-gate-reports did not stage java dependency-check-report.json"
 fi
+
+# Stale ci-artifacts/gate CVE report must not pass REQUIRE_CVE_REPORT=1 when target/ was rebuilt without it
+rm -f "$dj/target/dependency-check-report.json" "$dj/mvnw"
+mkdir -p "$dj/target/surefire-reports" "$dj/target/site/jacoco"
+printf '<testsuite tests="1" failures="0" errors="0" skipped="0"/>\n' > "$dj/target/surefire-reports/TEST-a.xml"
+cat > "$dj/target/site/jacoco/jacoco.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="x"><package name="com/acme"><sourcefile name="A.java"><line nr="3" mi="0" ci="1"/><counter type="LINE" missed="0" covered="1"/></sourcefile><counter type="LINE" missed="0" covered="1"/></package><counter type="LINE" missed="0" covered="1"/></report>
+EOF
+python3 - "$dj/ci-artifacts/gate/target/dependency-check-report.json" <<'PY'
+import os, sys, time
+old = time.time() - 3600
+os.utime(sys.argv[1], (old, old))
+PY
+expect_fail "check-gate-metrics rejects stale ci-artifacts/gate CVE report when module build is newer" "$dj" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" .
+expect_pass "collect-gate-reports purges stale ci-artifacts/gate files when scanner is absent" "$dj" env PATH="/usr/bin:/bin" sh "$CI/collect-gate-reports.sh" .
+if [ -f "$dj/ci-artifacts/gate/target/dependency-check-report.json" ]; then
+  fail "collect-gate-reports left stale dependency-check-report.json in ci-artifacts/gate/"
+else
+  pass "collect-gate-reports purged stale dependency-check-report.json from ci-artifacts/gate/"
+fi
+
+# DIFF_BASE=HEAD (checkout already on integration branch tip) falls back to feature baseCommit
+mkdir -p "$tmp/gate-diff/docs/agents-v0/requirements"
+cat > "$tmp/gate-diff/docs/agents-v0/requirements/orders.state.json" <<EOF
+{"feature":"orders","activePhase":"verify","baseCommit":"$diff_base"}
+EOF
+expect_fail "gate metrics: DIFF_BASE=HEAD on main falls back to state baseCommit and measures diff coverage" "$tmp/gate-diff" env DIFF_BASE=HEAD sh "$CI/check-gate-metrics.sh" .
 
 # --- .gitlab-ci.yml build script multi-service execution ---------------------
 d="$tmp/gitlab-build-sim"

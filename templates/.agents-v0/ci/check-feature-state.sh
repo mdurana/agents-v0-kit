@@ -30,6 +30,7 @@ statuses = {"", "in_progress", "awaiting_approval", "blocked"}
 positive = re.compile(
     r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
 )
+reopened_re = re.compile(r"^re-?opened\b", re.I)
 
 
 def resolve_git_head(seed: str) -> str:
@@ -106,9 +107,14 @@ for line in text.splitlines():
         rows[cells[0].lower()] = cells
 
 last = ""
+first_reopened = ""
 for phase in phases:
-    if phase in rows and positive.match(rows[phase][3]):
-        last = phase
+    if phase in rows:
+        if reopened_re.match(rows[phase][3]):
+            first_reopened = phase
+            break
+        if positive.match(rows[phase][3]):
+            last = phase
 
 recorded = state.get("lastApprovedPhase") or ""
 if recorded != last:
@@ -128,6 +134,12 @@ if status not in statuses:
     raise SystemExit(1)
 if status == "blocked" and not (state.get("blockedReason") or "").strip():
     print("FAIL: blocked status has no blockedReason", file=sys.stderr)
+    raise SystemExit(1)
+if first_reopened and active in phases and phases.index(active) > phases.index(first_reopened):
+    print(
+        f"FAIL: activePhase {active} is downstream of Re-opened phase {first_reopened}; re-run scripts/sync-feature-state.sh",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
 head_sha = resolve_git_head(os.environ.get("HOOK_BASE", ""))

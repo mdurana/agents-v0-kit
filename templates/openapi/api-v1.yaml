@@ -11,6 +11,8 @@ paths:
     get:
       summary: List <resources>
       operationId: list<Resources>
+      security:
+        - bearerAuth: []
       parameters:
         - name: page
           in: query
@@ -27,6 +29,8 @@ paths:
     post:
       summary: Create <resource>
       operationId: create<Resource>
+      security:
+        - bearerAuth: []
       parameters:
         - name: Idempotency-Key
           in: header
@@ -47,6 +51,8 @@ paths:
     get:
       summary: Get <resource> by id
       operationId: get<resource>
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -77,6 +83,7 @@ components:
         # ...fields
     <Resource>CreateRequest:
       type: object
+      additionalProperties: false
       required: [name]
       properties:
         name: { type: string, minLength: 1, maxLength: 100 }

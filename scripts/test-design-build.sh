@@ -203,6 +203,7 @@ doc = yaml.safe_load(open(p, encoding="utf-8"))
 doc["paths"]["/api/v1/<resources>"] = {
     "get": {
         "operationId": "list<Resources>",
+        "security": [{"bearerAuth": []}],
         "responses": {
             "200": {"description": "ok", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/<Resource>ListResponse"}}}},
             "404": {"description": "not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
@@ -213,8 +214,20 @@ doc["components"]["schemas"]["<Resource>ListResponse"] = {"type": "object"}
 doc["components"]["schemas"]["ErrorResponse"] = {"type": "object"}
 yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
 PY
-yaml_run pass "openapi lint: retained <resources> placeholder alongside real operations passes" "$o" sh "$CI/check-openapi.sh" lint cat-with-placeholder.yaml
-yaml_run pass "openapi merged: retained <resources> placeholder alongside merged draft passes" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-with-placeholder.yaml
+yaml_run pass "openapi lint: retained <resources> placeholder with security alongside real operations passes" "$o" sh "$CI/check-openapi.sh" lint cat-with-placeholder.yaml
+yaml_run pass "openapi merged: retained <resources> placeholder with security alongside merged draft passes" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-with-placeholder.yaml
+
+cp "$o/cat-with-placeholder.yaml" "$o/cat-placeholder-nosec.yaml"
+python3 - "$o/cat-placeholder-nosec.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc.pop("security", None)
+doc["paths"]["/api/v1/<resources>"]["get"].pop("security", None)
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run fail "openapi lint: retained <resources> placeholder without security fails" "$o" sh "$CI/check-openapi.sh" lint cat-placeholder-nosec.yaml
+yaml_run fail "openapi merged: retained <resources> placeholder without security fails merged too" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-placeholder-nosec.yaml
 
 cp "$o/newcat/api-v1.yaml" "$o/cat-invalid-extra.yaml"
 python3 - "$o/cat-invalid-extra.yaml" <<'PY'
@@ -246,6 +259,16 @@ yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
 PY
 yaml_run pass "openapi lint: server /api/v1 with relative path keys passes" "$o" sh "$CI/check-openapi.sh" lint cat-rel-paths.yaml
 yaml_run pass "openapi merged: draft with /api/v1/... paths matches catalog with server /api/v1 and relative paths" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-rel-paths.yaml
+
+cp "$o/newcat/api-v1.yaml" "$o/cat-tightened.yaml"
+python3 - "$o/cat-tightened.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc["components"]["schemas"]["CreateOrder"]["additionalProperties"] = False
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run pass "openapi merged: catalog schema tightening with additionalProperties: false passes" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-tightened.yaml
 
 # --- ci/check-design.sh ------------------------------------------------------
 d="$tmp/design"
@@ -678,6 +701,7 @@ printf '| mvn verify | 1 | 2 | OrderServiceTest#get_unknown_returns404 | OrderSe
 run fail "build plan: a markdown red card not backed by red-tests.json fails when red-tests.json is present" "$b" sh "$CI/check-build-plan.sh" orders
 rm -f "$b/docs/agents-v0/build/orders/red-tests.json"
 cp "$tmp/plan.keep" "$b/docs/agents-v0/build/orders/plan.md"
+sedi '/OrderService.java:20/d' "$b/docs/agents-v0/build/orders/build-report.md"
 sedi 's|OrderService.java:10|target/surefire-reports/TEST-OrderServiceTest.xml|' "$b/docs/agents-v0/build/orders/build-report.md"
 run fail "build plan: a card Location naming a green XML report fails machine verification" "$b" sh "$CI/check-build-plan.sh" orders
 cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
@@ -688,6 +712,21 @@ cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
 </testsuite>
 EOF
 run pass "build plan: a card Location naming a failing XML report passes machine verification" "$b" sh "$CI/check-build-plan.sh" orders
+mkdir -p "$b/docs/agents-v0/design/orders"
+cat > "$b/docs/agents-v0/design/orders/design.lock" <<'EOF'
+2026-01-01 1111111111111111111111111111111111111111111111111111111111111111 approved
+EOF
+run pass "build plan: --record-red captures designLockHash for initial pin" "$b" sh "$CI/check-build-plan.sh" orders --record-red
+cat >> "$b/docs/agents-v0/design/orders/design.lock" <<'EOF'
+2026-01-02 2222222222222222222222222222222222222222222222222222222222222222 amendment 1
+EOF
+sedi 's|target/surefire-reports/TEST-OrderServiceTest.xml|OrderService.java:10|' "$b/docs/agents-v0/build/orders/build-report.md"
+run fail "build plan: amended design.lock with only pre-amendment red card fails" "$b" sh "$CI/check-build-plan.sh" orders
+printf '| mvn verify | 1 | 2 | OrderServiceTest#create_valid_returnsId | OrderService.java:12 |\n' >> "$b/docs/agents-v0/build/orders/build-report.md"
+run fail "build plan: amended design.lock with stale red-tests.json designLockHash fails" "$b" sh "$CI/check-build-plan.sh" orders
+run pass "build plan: --record-red refreshes designLockHash for amended pin" "$b" sh "$CI/check-build-plan.sh" orders --record-red
+run pass "build plan: amended design.lock with a new red card and refreshed red-tests.json passes" "$b" sh "$CI/check-build-plan.sh" orders
+rm -rf "$b/docs/agents-v0/design" "$b/docs/agents-v0/build/orders/red-tests.json"
 
 # --- ci/check-endpoint-auth.sh -----------------------------------------------
 e="$tmp/endpoints"

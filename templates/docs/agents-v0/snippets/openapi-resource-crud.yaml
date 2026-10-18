@@ -132,11 +132,13 @@ components:
   schemas:
     <Resource>CreateRequest:
       type: object
+      additionalProperties: false
       required: [<field>]
       properties:
         <field>: { type: string, minLength: 1 }
     <Resource>UpdateRequest:
       type: object
+      additionalProperties: false
       properties:
         <field>: { type: string, minLength: 1 }
     <Resource>Response:

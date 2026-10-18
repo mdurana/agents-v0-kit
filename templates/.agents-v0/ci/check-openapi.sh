@@ -163,9 +163,9 @@ def lint(doc, label):
     schemes = ((doc.get("components") or {}).get("securitySchemes") or {})
     global_security = doc.get("security")
     seen_ids, error_types = set(), set()
-    ops_list = list(real_operations(doc)) or list(operations(doc))
+    has_real_ops = any(True for _ in real_operations(doc))
     srv_urls = server_urls(doc)
-    for path, method, op, item in ops_list:
+    for path, method, op, item in operations(doc):
         where = f"{label}: {method.upper()} {path}"
         for s_url in srv_urls:
             if s_url.rstrip("/").endswith("/api/v1") and (path.startswith("/api/v1/") or path == "/api/v1"):
@@ -183,6 +183,8 @@ def lint(doc, label):
             fail(f"{where}: no 2xx response")
         for code, resp in responses.items():
             if str(code).startswith(("4", "5")):
+                if has_real_ops and is_placeholder_path(path):
+                    continue
                 for ctype in (resolve(doc, resp).get("content") or {}):
                     error_types.add(ctype.split(";")[0].strip().lower())
         security = op.get("security", global_security)
@@ -282,6 +284,24 @@ def compat(draft, catalog):
                 fail(f"components.{kind}.{name} differs from the catalog (rename it, or amend the catalog on purpose)")
 
 
+def equal_or_tightened(draft_node, cat_node):
+    if draft_node == cat_node:
+        return True
+    if isinstance(draft_node, dict) and isinstance(cat_node, dict):
+        d_keys = set(draft_node.keys())
+        c_keys = set(cat_node.keys())
+        extra = c_keys - d_keys
+        if extra <= {"additionalProperties"} and cat_node.get("additionalProperties") is False and "additionalProperties" not in draft_node:
+            if d_keys == (c_keys - {"additionalProperties"}):
+                return all(equal_or_tightened(draft_node[k], cat_node[k]) for k in d_keys)
+        if d_keys == c_keys:
+            return all(equal_or_tightened(draft_node[k], cat_node[k]) for k in d_keys)
+        return False
+    if isinstance(draft_node, list) and isinstance(cat_node, list) and len(draft_node) == len(cat_node):
+        return all(equal_or_tightened(d, c) for d, c in zip(draft_node, cat_node))
+    return False
+
+
 def merged(draft, catalog):
     cat_paths = {canonical_path(catalog, p): v for p, v in (catalog.get("paths") or {}).items()}
     for path, item in (draft.get("paths") or {}).items():
@@ -290,14 +310,14 @@ def merged(draft, catalog):
             fail(f"{path}: missing from the catalog")
             continue
         for key, value in item.items():
-            if cat_paths[cpath].get(key) != value:
+            if not equal_or_tightened(value, cat_paths[cpath].get(key)):
                 fail(f"{path} {key}: the catalog differs from the approved draft")
     for kind in COMPONENT_KINDS:
         theirs = ((catalog.get("components") or {}).get(kind) or {})
         for name, definition in ((draft.get("components") or {}).get(kind) or {}).items():
             if name not in theirs:
                 fail(f"components.{kind}.{name}: missing from the catalog")
-            elif theirs[name] != definition:
+            elif not equal_or_tightened(definition, theirs[name]):
                 fail(f"components.{kind}.{name}: the catalog differs from the approved draft")
 
 

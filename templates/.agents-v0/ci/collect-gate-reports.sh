@@ -141,6 +141,9 @@ copied = 0
 for root in roots:
     if not os.path.isdir(root):
         continue
+    gate_root = os.path.normpath(os.path.join("ci-artifacts", "gate", root))
+    if os.path.isdir(gate_root):
+        shutil.rmtree(gate_root, ignore_errors=True)
     for pattern in patterns:
         for match in glob.glob(os.path.join(root, pattern), recursive=True):
             if not os.path.isfile(match):
