@@ -25,7 +25,96 @@ if [ -z "$base" ] || [ -z "$head" ]; then
   exit 1
 fi
 
+body_artifact=""
+body_note=""
+if [ -n "$body_file" ] && [ -f "$body_file" ]; then
+  body_artifact="$(grep -Ei '^[[:space:]]*\*{0,2}Feature-Artifact:\*{0,2}[[:space:]]*docs/agents-v0/requirements/' "$body_file" | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/^[*[:space:]]*//;s/[[:space:]]*$//' || true)"
+  body_note="$(grep -Ei '^[[:space:]]*\*{0,2}Maintain-Note:\*{0,2}[[:space:]]*docs/agents-v0/maintain/' "$body_file" | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/^[*[:space:]]*//;s/[[:space:]]*$//' || true)"
+fi
+
 from="$(git merge-base "$base" "$head" 2>/dev/null || echo "$base")"
+from_sha="$(git rev-parse --verify -q "${from}^{commit}" 2>/dev/null || true)"
+head_sha="$(git rev-parse --verify -q "${head}^{commit}" 2>/dev/null || true)"
+
+resolve_story_base() {
+  target_art="$1"
+  target_note="$2"
+  slug=""
+  state_file=""
+  if [ -n "$target_art" ]; then
+    slug="$(basename "$target_art" .md)"
+    state_file="docs/agents-v0/requirements/${slug}.state.json"
+  elif [ -n "$target_note" ]; then
+    slug="$(basename "$(dirname "$target_note")")"
+    state_file="docs/agents-v0/maintain/${slug}/state.json"
+  fi
+  [ -n "$slug" ] || return 0
+  rep_sha=""
+  for rp in "docs/agents-v0/build/${slug}/build-report.md" "docs/agents-v0/verify/${slug}/test-report.md"; do
+    if [ -f "$rp" ]; then
+      raw_rep="$(grep -Ei '^commit:[[:space:]]*[0-9a-f]{7,40}' "$rp" 2>/dev/null | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//' || true)"
+      if [ -n "$raw_rep" ]; then
+        rep_sha="$(git rev-parse --verify -q "${raw_rep}^{commit}" 2>/dev/null || true)"
+        [ -n "$rep_sha" ] && break
+      fi
+    fi
+  done
+  bc_sha=""
+  if [ -f "$state_file" ]; then
+    raw_bc="$(grep -Eo '"baseCommit"[[:space:]]*:[[:space:]]*"[0-9a-fA-F]{7,40}"' "$state_file" 2>/dev/null | head -n1 | sed 's/.*"baseCommit"[[:space:]]*:[[:space:]]*"//;s/"//' || true)"
+    if [ -n "$raw_bc" ]; then
+      bc_sha="$(git rev-parse --verify -q "${raw_bc}^{commit}" 2>/dev/null || true)"
+    fi
+  fi
+  if [ -n "$bc_sha" ]; then
+    if [ "$bc_sha" = "$head_sha" ] || ! git merge-base --is-ancestor "$bc_sha" "$head_sha" 2>/dev/null; then
+      bc_sha=""
+    elif [ -n "$rep_sha" ] && { [ "$bc_sha" = "$rep_sha" ] || ! git merge-base --is-ancestor "$bc_sha" "$rep_sha" 2>/dev/null; }; then
+      bc_sha=""
+    fi
+  fi
+  first_c="$(git log --reverse --format=%H "$head" -- \
+    ${target_art:+"$target_art"} ${target_note:+"$target_note"} \
+    "docs/agents-v0/design/${slug}" "docs/agents-v0/build/${slug}" \
+    "docs/agents-v0/verify/${slug}" "docs/agents-v0/maintain/${slug}" 2>/dev/null | head -n1 || true)"
+  first_parent=""
+  if [ -n "$first_c" ]; then
+    first_parent="$(git rev-parse --verify -q "${first_c}^" 2>/dev/null || true)"
+  fi
+  if [ -n "$first_parent" ]; then
+    if [ "$first_parent" = "$head_sha" ] || ! git merge-base --is-ancestor "$first_parent" "$head_sha" 2>/dev/null; then
+      first_parent=""
+    elif [ -n "$rep_sha" ] && { [ "$first_parent" = "$rep_sha" ] || ! git merge-base --is-ancestor "$first_parent" "$rep_sha" 2>/dev/null; }; then
+      first_parent=""
+    fi
+  fi
+  rep_parent=""
+  if [ -n "$rep_sha" ]; then
+    rep_parent="$(git rev-parse --verify -q "${rep_sha}^" 2>/dev/null || true)"
+  fi
+  if [ -n "$first_parent" ] && [ -n "$bc_sha" ]; then
+    if git merge-base --is-ancestor "$first_parent" "$bc_sha" 2>/dev/null; then
+      printf '%s\n' "$first_parent"
+    else
+      printf '%s\n' "$bc_sha"
+    fi
+  elif [ -n "$first_parent" ]; then
+    printf '%s\n' "$first_parent"
+  elif [ -n "$bc_sha" ]; then
+    printf '%s\n' "$bc_sha"
+  elif [ -n "$rep_parent" ]; then
+    printf '%s\n' "$rep_parent"
+  fi
+}
+
+if [ -n "$head_sha" ] && [ "$from_sha" = "$head_sha" ]; then
+  resolved_from="$(resolve_story_base "$body_artifact" "$body_note")"
+  if [ -n "$resolved_from" ]; then
+    from="$resolved_from"
+    from_sha="$resolved_from"
+  fi
+fi
+
 code_files="$(git diff --name-only "$from" "$head" -- \
   ':(exclude)docs/**' ':(exclude)*.md' ':(exclude)*.mdc' \
   ':(exclude).github/**' ':(exclude).gitlab/**' ':(exclude).gitlab-ci.yml' ':(exclude).agents-v0/**' 2>/dev/null || true)"
@@ -34,10 +123,7 @@ verify_docs="$(git diff --name-only "$from" "$head" -- 'docs/agents-v0/verify/**
 build_docs="$(git diff --name-only "$from" "$head" -- 'docs/agents-v0/build/**' 2>/dev/null || true)"
 req_docs="$(git diff --name-only "$from" "$head" -- 'docs/agents-v0/requirements/**/*.md' 2>/dev/null || true)"
 
-artifact=""
-if [ -n "$body_file" ] && [ -f "$body_file" ]; then
-  artifact="$(grep -Ei '^[[:space:]]*\*{0,2}Feature-Artifact:\*{0,2}[[:space:]]*docs/agents-v0/requirements/' "$body_file" | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/^[*[:space:]]*//;s/[[:space:]]*$//')"
-fi
+artifact="$body_artifact"
 if [ -z "$artifact" ]; then
   artifact="$(printf '%s\n' "$req_docs" | head -n1 || true)"
 fi
@@ -224,21 +310,61 @@ feature_design_and_plan() {
   sh "$here/check-arc.sh" "$1" || exit 1
 }
 
+require_committed_artifact() {
+  f="$1"
+  if [ "${VERIFY_STALE:-1}" != "0" ] && [ -n "$head_sha" ] && git cat-file -e "${head}^{commit}" 2>/dev/null; then
+    if ! git cat-file -e "${head}:${f}" 2>/dev/null; then
+      printf 'FAIL: %s is not committed in %s (untracked on disk) — commit the artifact before running the gate\n' "$f" "$head" >&2
+      exit 1
+    fi
+    if ! git diff --quiet "$head" -- "$f" 2>/dev/null; then
+      printf 'FAIL: %s has uncommitted changes on disk — commit the approval row before running the gate\n' "$f" >&2
+      exit 1
+    fi
+  fi
+}
+
+artifact_needs_verify() {
+  art="$1"
+  [ -n "$verify_docs" ] && return 0
+  [ "${REQUIRE_VERIFY:-0}" = "1" ] && return 0
+  [ -n "${CI_MERGE_REQUEST_IID:-}" ] && return 0
+  if [ -n "$art" ] && [ -f "$art" ]; then
+    [ -n "$(approval_field "$art" verify 5)" ] && return 0
+    [ -n "$(approval_field "$art" release 5)" ] && return 0
+  fi
+  return 1
+}
+
+artifact_needs_build() {
+  art="$1"
+  [ -n "$build_docs" ] && return 0
+  artifact_needs_verify "$art" && return 0
+  if [ -n "$art" ] && [ -f "$art" ]; then
+    [ -n "$(approval_field "$art" build 5)" ] && return 0
+  fi
+  return 1
+}
+
 if [ -z "$code_files" ]; then
   if [ -n "$req_docs" ]; then
     for f in $req_docs; do
+      require_committed_artifact "$f"
       sh "$here/check-approvals.sh" "$f" intake || exit 1
     done
   fi
-  if [ -n "$build_docs" ] && [ -n "$artifact" ] && [ -f "$artifact" ]; then
-    sh "$here/check-approvals.sh" "$artifact" build || exit 1
-    sh "$here/check-evidence.sh" "$artifact" build || exit 1
-    feature_design_and_plan "$artifact"
-  fi
-  if [ -n "$verify_docs" ] && [ -n "$artifact" ] && [ -f "$artifact" ]; then
-    sh "$here/check-approvals.sh" "$artifact" verify || exit 1
-    sh "$here/check-evidence.sh" "$artifact" verify || exit 1
-    bind_recorded_reviewer "$artifact" "$pr_number"
+  if [ -n "$artifact" ] && [ -f "$artifact" ]; then
+    require_committed_artifact "$artifact"
+    if artifact_needs_build "$artifact"; then
+      sh "$here/check-approvals.sh" "$artifact" build || exit 1
+      sh "$here/check-evidence.sh" "$artifact" build || exit 1
+      feature_design_and_plan "$artifact"
+    fi
+    if artifact_needs_verify "$artifact"; then
+      sh "$here/check-approvals.sh" "$artifact" verify || exit 1
+      sh "$here/check-evidence.sh" "$artifact" verify || exit 1
+      bind_recorded_reviewer "$artifact" "$pr_number"
+    fi
   fi
   printf 'OK: docs-only PR — phase checks applied\n'
   exit 0
@@ -249,6 +375,8 @@ if [ -z "$artifact" ] || [ ! -f "$artifact" ]; then
   exit 1
 fi
 
+require_committed_artifact "$artifact"
+
 # A feature artifact is evidence for this change only when this change carries evidence. Borrowing an
 # old feature's approvals for a bug fix or upgrade is what Maintain-Note is for.
 if [ -z "$build_docs" ] && [ -z "$verify_docs" ] && [ "${ALLOW_ARTIFACT_WITHOUT_EVIDENCE:-0}" != "1" ]; then
@@ -258,11 +386,11 @@ fi
 
 sh "$here/check-approvals.sh" "$artifact" build || exit 1
 bind_recorded_reviewer "$artifact" "$pr_number"
-if [ -n "$build_docs" ] || [ -n "$verify_docs" ]; then
+if [ -n "$build_docs" ] || [ -n "$verify_docs" ] || [ "${REQUIRE_VERIFY:-0}" = "1" ]; then
   sh "$here/check-evidence.sh" "$artifact" build || exit 1
   feature_design_and_plan "$artifact"
 fi
-if [ -n "$verify_docs" ]; then
+if artifact_needs_verify "$artifact"; then
   sh "$here/check-approvals.sh" "$artifact" verify || exit 1
   sh "$here/check-evidence.sh" "$artifact" verify || exit 1
 fi

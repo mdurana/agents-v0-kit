@@ -171,6 +171,82 @@ printf '| Integration branch | <!-- e.g. main --> |\n' > "$prof/docs/agents-v0/p
 got="$(cd "$prof" && sh "$resolve")"
 if [ "$got" = "HEAD" ]; then pass "integration branch: a placeholder falls through to HEAD"; else fail "integration branch: a placeholder falls through to HEAD (got $got)"; fi
 
+# --- local gate on main: untracked reports & merge-base(main, HEAD) == HEAD --
+gr="$tmp/git-local-gate"
+mkdir -p "$gr"
+(
+  cd "$gr"
+  git init -q -b main
+  git config user.email "test@example.com"
+  git config user.name "Test"
+  mkdir -p .agents-v0/ci .agents-v0/scripts .agents-v0/packs/dotnet .gitlab/merge_request_templates \
+    docs/agents-v0/requirements \
+    docs/agents-v0/build/p1-a-catalog-contract docs/agents-v0/verify/p1-a-catalog-contract src tests
+  cp "$KIT"/templates/.agents-v0/ci/*.sh "$KIT"/templates/.agents-v0/ci/*.py .agents-v0/ci/
+  cp "$KIT"/templates/.agents-v0/scripts/*.sh .agents-v0/scripts/
+  cp "$KIT"/core/dotnet/pack.json .agents-v0/packs/dotnet/pack.json
+  cp "$KIT"/templates/.gitlab/merge_request_templates/default.md .gitlab/merge_request_templates/default.md
+  printf '## Stack\n| Field | Value |\n|---|---|\n| Pack | dotnet |\n| Integration branch | <!-- e.g. main --> |\n' > docs/agents-v0/project-profile.md
+  git add .
+  git commit -qm "chore: base"
+)
+(
+  cd "$gr"
+  cat > docs/agents-v0/requirements/p1-a-catalog-contract.md <<'EOF'
+# P1-A Catalog Contract
+Story: P0-A
+
+As a consumer, I want a catalog contract, so that I can query items.
+
+### AC-1: GET /api/v1/items returns 200
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| intake | docs/agents-v0/requirements/p1-a-catalog-contract.md | @ada | Approved | 2026-02-01 |
+EOF
+  cat > docs/agents-v0/build/p1-a-catalog-contract/plan.md <<'EOF'
+| AC | Status | Test |
+|----|--------|------|
+| AC-1 | done | CatalogTests#GetItems |
+EOF
+  printf 'public class Catalog {}\n' > src/Catalog.cs
+  printf 'public class CatalogTests { public void GetItems() {} }\n' > tests/CatalogTests.cs
+  git add docs/agents-v0/requirements/p1-a-catalog-contract.md docs/agents-v0/build/p1-a-catalog-contract/plan.md src/Catalog.cs tests/CatalogTests.cs
+  git commit -qm "feat: catalog code"
+  code_sha="$(git rev-parse HEAD)"
+  cat > docs/agents-v0/build/p1-a-catalog-contract/build-report.md <<EOF
+commit: $code_sha
+
+| Command | Exit | Attempt | Failing test | Location |
+|---------|------|---------|--------------|----------|
+| dotnet test | 1 | 1 | CatalogTests#GetItems | src/Catalog.cs:1 |
+| dotnet test | 0 | 2 | - | - |
+EOF
+  printf '| build | docs/agents-v0/build/p1-a-catalog-contract/build-report.md | @ada | Approved | 2026-02-01 |\n' >> docs/agents-v0/requirements/p1-a-catalog-contract.md
+  git add docs/agents-v0/build/p1-a-catalog-contract/build-report.md docs/agents-v0/requirements/p1-a-catalog-contract.md
+  git commit -qm "docs: build report"
+  head_sha="$(git rev-parse HEAD)"
+  # Create untracked verify reports stamped with HEAD and uncommitted verify row
+  for f in test-report.md vapt-checklist.md review-notes.md; do
+    printf 'commit: %s\nLine coverage 90%%\nNo new high or critical CVE\n' "$head_sha" > "docs/agents-v0/verify/p1-a-catalog-contract/$f"
+  done
+  printf '| verify | docs/agents-v0/verify/p1-a-catalog-contract/test-report.md, docs/agents-v0/verify/p1-a-catalog-contract/vapt-checklist.md, docs/agents-v0/verify/p1-a-catalog-contract/review-notes.md | @ada | Approved | 2026-02-01 |\n' >> docs/agents-v0/requirements/p1-a-catalog-contract.md
+)
+exit_is 1 "local gate: untracked verify report stamped with HEAD is rejected by check-evidence" sh -c "cd '$gr' && sh .agents-v0/ci/check-evidence.sh docs/agents-v0/requirements/p1-a-catalog-contract.md verify"
+exit_is 1 "local gate: uncommitted verify row and untracked verify reports on main fail check-delivery-gate-local" sh -c "cd '$gr' && sh .agents-v0/scripts/check-delivery-gate-local.sh p1-a-catalog-contract --base main"
+
+(
+  cd "$gr"
+  git add docs/agents-v0/verify/p1-a-catalog-contract docs/agents-v0/requirements/p1-a-catalog-contract.md
+  git commit -qm "docs: record verify evidence and approval"
+  sh .agents-v0/scripts/check-delivery-gate-local.sh p1-a-catalog-contract --base main > "$tmp/gate-main.out" 2>&1 || { cat "$tmp/gate-main.out" >&2; exit 1; }
+)
+exit_is 0 "local gate: committed verify reports with earlier code/doc commit stamp pass check-evidence" sh -c "cd '$gr' && sh .agents-v0/ci/check-evidence.sh docs/agents-v0/requirements/p1-a-catalog-contract.md verify"
+has "local gate: on main (merge-base == HEAD) resolves pre-story base and checks code + verify linkage" "$tmp/gate-main.out" "OK: code changes linked to docs/agents-v0/requirements/p1-a-catalog-contract.md with build approval"
+lacks "local gate: on main does not take the empty-range docs-only shortcut" "$tmp/gate-main.out" "OK: docs-only PR"
+
 if [ "$status" -ne 0 ]; then
   echo "test-release: FAILED" >&2
   exit 1

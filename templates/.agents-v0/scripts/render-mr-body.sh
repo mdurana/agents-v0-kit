@@ -82,7 +82,27 @@ body = re.sub(r"<!--[^\n]*Do not give both[^\n]*-->\n?", "", body, flags=re.I)
 body = re.sub(r"<!-- One-line description of the change\. -->", lambda _m: summary + "\n\n" + line, body, count=1)
 changed = "(pass --base <ref> to list the changed files)"
 if base:
-    proc = subprocess.run(["git", "diff", "--name-status", f"{base}...HEAD"], capture_output=True, text=True)
+    eff_base = base
+    mb = subprocess.run(["git", "merge-base", base, "HEAD"], capture_output=True, text=True)
+    hd = subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD^{commit}"], capture_output=True, text=True)
+    if mb.returncode == 0 and hd.returncode == 0 and mb.stdout.strip() == hd.stdout.strip():
+        state_path = f"docs/agents-v0/maintain/{ident}/state.json" if note else f"docs/agents-v0/requirements/{ident}.state.json"
+        st_text = read(state_path) or ""
+        m_bc = re.search(r'"baseCommit"\s*:\s*"([0-9a-fA-F]{7,40})"', st_text)
+        if m_bc and m_bc.group(1) != hd.stdout.strip():
+            eff_base = m_bc.group(1)
+        else:
+            paths = [note, f"docs/agents-v0/maintain/{ident}", f"docs/agents-v0/verify/{ident}"] if note else [
+                f"docs/agents-v0/requirements/{ident}.md", f"docs/agents-v0/design/{ident}",
+                f"docs/agents-v0/build/{ident}", f"docs/agents-v0/verify/{ident}",
+            ]
+            lg = subprocess.run(["git", "log", "--reverse", "--format=%H", "HEAD", "--", *paths], capture_output=True, text=True)
+            first_c = (lg.stdout.splitlines() or [""])[0].strip() if lg.returncode == 0 else ""
+            if first_c:
+                par = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{first_c}^"], capture_output=True, text=True)
+                if par.returncode == 0 and par.stdout.strip():
+                    eff_base = par.stdout.strip()
+    proc = subprocess.run(["git", "diff", "--name-status", f"{eff_base}...HEAD"], capture_output=True, text=True)
     lines = proc.stdout.splitlines() if proc.returncode == 0 else []
     shown = [f"- `{ln.split(chr(9), 1)[0]}` {ln.split(chr(9), 1)[1]}" for ln in lines[:100] if "\t" in ln]
     changed = "\n".join(shown) + (f"\n- ... {len(lines) - 100} more" if len(lines) > 100 else "") if shown else "(no changes against " + base + ")"

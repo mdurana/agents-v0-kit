@@ -106,30 +106,51 @@ check_path() {
     return 0
   fi
   if [ -e "$p" ]; then
+    stale_base="${VERIFY_STALE_BASE:-HEAD}"
+    has_git_head=0
+    if [ "${VERIFY_STALE:-1}" != "0" ] && command -v git >/dev/null 2>&1 && git cat-file -e "${stale_base}^{commit}" 2>/dev/null; then
+      has_git_head=1
+    fi
+    if [ "$has_git_head" = "1" ]; then
+      if ! git cat-file -e "${stale_base}:${p}" 2>/dev/null; then
+        printf 'FAIL: recorded evidence %s is not committed in %s (untracked on disk) — commit the report without changing its commit: line\n' "$p" "$stale_base" >&2
+        missing=1
+      elif ! git diff --quiet "${stale_base}" -- "$p" 2>/dev/null; then
+        printf 'FAIL: recorded evidence %s has uncommitted changes on disk — commit it before running the gate\n' "$p" >&2
+        missing=1
+      fi
+    fi
     case "$p" in
       */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md|*/e2e-report.md|docs/agents-v0/onboarding/report.md)
         if ! grep -Eqi '^commit:[[:space:]]*[0-9a-f]{7,40}' "$p" 2>/dev/null; then
           printf 'FAIL: report missing commit: line (workflow-orchestration.mdc): %s\n' "$p" >&2
           missing=1
         fi
-        if [ "${VERIFY_STALE:-1}" != "0" ] && command -v git >/dev/null 2>&1; then
+        if [ "$has_git_head" = "1" ]; then
           rep_commit="$(grep -Ei '^commit:' "$p" 2>/dev/null | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//')"
-          stale_base="${VERIFY_STALE_BASE:-HEAD}"
-          if [ -n "$rep_commit" ] && git cat-file -e "${rep_commit}^{commit}" 2>/dev/null; then
-            stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|.*\.(md|mdc|txt|adoc)$)' || true)"
-            if [ -n "$stale" ]; then
-              case "$phase" in
-                verify)
-                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-verify; set an Approved Verify row to Re-opened, then stamp %s on the new SHA\n' "$rep_commit" "$p" >&2
-                  ;;
-                build)
-                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-build before using %s\n' "$rep_commit" "$p" >&2
-                  ;;
-                *)
-                  printf 'FAIL: non-doc files changed since evidence commit %s — re-run that phase before using %s\n' "$rep_commit" "$p" >&2
-                  ;;
-              esac
+          if [ -n "$rep_commit" ]; then
+            if ! git cat-file -e "${rep_commit}^{commit}" 2>/dev/null; then
+              printf 'FAIL: commit: %s in %s is not a commit in git\n' "$rep_commit" "$p" >&2
               missing=1
+            elif ! git merge-base --is-ancestor "$rep_commit" "$stale_base" 2>/dev/null; then
+              printf 'FAIL: commit: %s in %s is not an ancestor of %s\n' "$rep_commit" "$p" "$stale_base" >&2
+              missing=1
+            else
+              stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|.*\.(md|mdc|txt|adoc)$)' || true)"
+              if [ -n "$stale" ]; then
+                case "$phase" in
+                  verify)
+                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-verify; set an Approved Verify row to Re-opened, then stamp %s on the new SHA\n' "$rep_commit" "$p" >&2
+                    ;;
+                  build)
+                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-build before using %s\n' "$rep_commit" "$p" >&2
+                    ;;
+                  *)
+                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run that phase before using %s\n' "$rep_commit" "$p" >&2
+                    ;;
+                esac
+                missing=1
+              fi
             fi
           fi
         fi
