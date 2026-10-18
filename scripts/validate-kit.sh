@@ -13,6 +13,7 @@
 # each tool is not verified.
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
+export KIT_VALIDATING=1
 
 usage() {
   printf 'usage: %s                validate the kit itself (no arguments)\n' "$(basename "$0")" >&2

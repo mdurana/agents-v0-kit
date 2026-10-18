@@ -138,6 +138,13 @@ def is_placeholder_name(name):
     return "<" in name or ">" in name
 
 
+# Operations of the catalog seed shipped before the seed declared security. A catalog seeded by an earlier
+# kit is not rejected for untouched seed operations when real operations exist (set KIT_LEGACY_SEED_SECURITY=0
+# to reject them). Nothing else is waived: a real operation, or a renamed placeholder, is linted in full.
+LEGACY_SEED_OPERATION_IDS = {"list<resource>", "create<resource>", "get<resource>"}
+legacy_seed_ok = os.environ.get("KIT_LEGACY_SEED_SECURITY", "1") != "0"
+
+
 def real_operations(doc):
     for path, method, op, item in operations(doc):
         if not is_placeholder_path(path):
@@ -188,7 +195,18 @@ def lint(doc, label):
                 for ctype in (resolve(doc, resp).get("content") or {}):
                     error_types.add(ctype.split(";")[0].strip().lower())
         security = op.get("security", global_security)
-        if security is None:
+        if (
+            security is None
+            and legacy_seed_ok
+            and has_real_ops
+            and is_placeholder_path(path)
+            and op_id in LEGACY_SEED_OPERATION_IDS
+        ):
+            print(
+                f"WARN: {where}: legacy seed operation {op_id!r} without security tolerated alongside real operations; run 'check-openapi.sh merge' to strip seed placeholders",
+                file=sys.stderr,
+            )
+        elif security is None:
             fail(f"{where}: no security (set it on the operation or globally)")
         elif security == [] and not op.get("x-public"):
             fail(f"{where}: empty security needs x-public: true and a reason")

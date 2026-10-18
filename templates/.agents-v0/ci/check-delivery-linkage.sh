@@ -117,7 +117,8 @@ fi
 
 code_files="$(git diff --name-only "$from" "$head" -- \
   ':(exclude)docs/**' ':(exclude)*.md' ':(exclude)*.mdc' \
-  ':(exclude).github/**' ':(exclude).gitlab/**' ':(exclude).gitlab-ci.yml' ':(exclude).agents-v0/**' 2>/dev/null || true)"
+  ':(exclude).github/**' ':(exclude).gitlab/**' ':(exclude).gitlab-ci.yml' \
+  ':(exclude).agents-v0/**' ':(exclude).cursor/**' ':(exclude).agents-kit-version' 2>/dev/null || true)"
 
 verify_docs="$(git diff --name-only "$from" "$head" -- 'docs/agents-v0/verify/**' 2>/dev/null || true)"
 build_docs="$(git diff --name-only "$from" "$head" -- 'docs/agents-v0/build/**' 2>/dev/null || true)"

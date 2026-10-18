@@ -4,6 +4,7 @@
 # Usage:
 #   sh .agents-v0/ci/check-design.sh <feature>                  structure and traceability
 #   sh .agents-v0/ci/check-design.sh <feature> --hash           print the hash of the design files
+#   sh .agents-v0/ci/check-design.sh <feature> --legacy-hash    print the hash an earlier kit pinned (a lock made with it still verifies)
 #   sh .agents-v0/ci/check-design.sh <feature> --pin "<why>"    check, then append "date hash why" to design.lock
 #   sh .agents-v0/ci/check-design.sh <feature> --verify-lock    the files still match the last pin
 #
@@ -25,6 +26,7 @@
 # hash and has no open Critical, then docs/agents-v0/design/<feature>/amendments.md needs an Approved
 # row naming the first 12 characters of that hash, then a new pin line. A changed decision supersedes
 # the ADR (ci/check-adr.sh) instead of rewriting it. Pin only after that review and the person's approval.
+# A lock pinned by an earlier kit (see --legacy-hash) keeps verifying; the next pin is written with the current hash.
 
 set -eu
 
@@ -36,7 +38,7 @@ if [ -z "$feature" ]; then
   exit 1
 fi
 case "$action" in
-  check | --hash | --pin | --verify-lock) ;;
+  check | --hash | --legacy-hash | --pin | --verify-lock) ;;
   *) printf 'FAIL: unknown option %s\n' "$action" >&2; exit 1 ;;
 esac
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
@@ -144,6 +146,17 @@ def current_hash():
     for path in design_files():
         digest.update(path.replace(os.sep, "/").encode() + b"\0")
         digest.update(file_bytes_for_hash(path, adr_path) + b"\0")
+    return digest.hexdigest()
+
+
+def legacy_hash():
+    """Hash used before the ADR Status line was excluded: every design file, raw bytes.
+    A lock pinned by an earlier kit still verifies; --pin always writes current_hash()."""
+    digest = hashlib.sha256()
+    for path in design_files():
+        digest.update(path.replace(os.sep, "/").encode() + b"\0")
+        with open(path, "rb") as handle:
+            digest.update(handle.read() + b"\0")
     return digest.hexdigest()
 
 
@@ -337,7 +350,7 @@ def verify_lock():
         return
     now = current_hash()
     last = lines[-1].split()
-    if len(last) < 2 or last[1] != now:
+    if len(last) < 2 or last[1] not in (now, legacy_hash()):
         fail(f"the design changed since the last pin ({last[1][:12] if len(last) > 1 else '?'} -> {now[:12]}): "
              f"run design-reviewer so {base}/review.md names {now[:12]} and has no open Critical, "
              f"add an Approved row in {base}/amendments.md, then pin")
@@ -358,6 +371,9 @@ if not os.path.isdir(base):
 
 if action == "--hash":
     print(current_hash())
+    raise SystemExit(0)
+if action == "--legacy-hash":
+    print(legacy_hash())
     raise SystemExit(0)
 if action == "--verify-lock":
     verify_lock()

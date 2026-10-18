@@ -107,9 +107,38 @@ def extract_bullets(section_text):
     return bullets
 
 
-def check_discovery_sections(disc_text, filename):
+def is_git_tracked_and_clean(paths):
+    import subprocess
+    for p in paths:
+        try:
+            r1 = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", "--", str(p)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if r1.returncode != 0:
+                return False
+            r2 = subprocess.run(
+                ["git", "status", "--porcelain", "--", str(p)],
+                capture_output=True,
+                text=True,
+            )
+            if r2.returncode != 0 or r2.stdout.strip():
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def check_discovery_sections(disc_text, filename, issues=None):
     sections = parse_markdown_sections(disc_text)
     matched_sections = {}
+
+    def report(msg):
+        if issues is not None:
+            issues.append(msg)
+        else:
+            sys.exit(f"FAIL: {msg}")
 
     for name, pattern in CANONICAL_HEADINGS:
         found_key = None
@@ -118,15 +147,19 @@ def check_discovery_sections(disc_text, filename):
                 found_key = key
                 break
         if not found_key:
-            sys.exit(f"FAIL: discovery document {filename} missing required heading: {name}")
+            report(f"discovery document {filename} missing required heading: {name}")
+            matched_sections[name] = ""
+            continue
 
         body = sections[found_key]
         if not body:
-            sys.exit(f"FAIL: heading '{name}' in {filename} is empty")
+            report(f"heading '{name}' in {filename} is empty")
+            matched_sections[name] = ""
+            continue
 
         ph = PLACEHOLDER.search(body)
         if ph:
-            sys.exit(f"FAIL: heading '{name}' in {filename} contains placeholder: '{ph.group(0)}'")
+            report(f"heading '{name}' in {filename} contains placeholder: '{ph.group(0)}'")
 
         matched_sections[name] = body
 
@@ -173,11 +206,24 @@ if mode == "roadmap":
                 f"Re-run /v0-roadmap --refresh."
             )
 
-    disc_text = disc_bytes.decode("utf-8", errors="replace")
-    disc_sections = check_discovery_sections(disc_text, str(disc_path))
+    sealed_legacy = (
+        recorded_hash is None
+        and os.environ.get("KIT_STRICT_ROADMAP") != "1"
+        and is_git_tracked_and_clean([target_path, disc_path])
+    )
+    issues = [] if sealed_legacy else None
 
-    in_scope_bullets = extract_bullets(disc_sections["In scope"])
-    out_of_scope_bullets = extract_bullets(disc_sections["Out of scope"])
+    def report_roadmap(msg):
+        if issues is not None:
+            issues.append(msg)
+        else:
+            sys.exit(f"FAIL: {msg}")
+
+    disc_text = disc_bytes.decode("utf-8", errors="replace")
+    disc_sections = check_discovery_sections(disc_text, str(disc_path), issues=issues)
+
+    in_scope_bullets = extract_bullets(disc_sections.get("In scope", ""))
+    out_of_scope_bullets = extract_bullets(disc_sections.get("Out of scope", ""))
 
     roadmap_sections = parse_markdown_sections(roadmap_text)
 
@@ -195,16 +241,16 @@ if mode == "roadmap":
     # 1. No invented themes: every horizon bullet must be in In scope
     for horizon, item in all_roadmap_items:
         if item not in in_scope_set:
-            sys.exit(
-                f"FAIL: roadmap horizon '{horizon}' contains item not found in discovery In scope: '{item}'"
+            report_roadmap(
+                f"roadmap horizon '{horizon}' contains item not found in discovery In scope: '{item}'"
             )
 
     # 2. Exclusivity: each in-scope item must be in at most one horizon
     seen_items = {}
     for horizon, item in all_roadmap_items:
         if item in seen_items:
-            sys.exit(
-                f"FAIL: in-scope item '{item}' is placed in multiple horizons "
+            report_roadmap(
+                f"in-scope item '{item}' is placed in multiple horizons "
                 f"('{seen_items[item]}' and '{horizon}'). Each item must belong to exactly one horizon."
             )
         seen_items[item] = horizon
@@ -212,16 +258,25 @@ if mode == "roadmap":
     # 3. Completeness: every In scope item must appear in at least one horizon
     for item in in_scope_bullets:
         if item not in seen_items:
-            sys.exit(
-                f"FAIL: in-scope item '{item}' is missing from all roadmap horizons (Now, Next, Later)"
+            report_roadmap(
+                f"in-scope item '{item}' is missing from all roadmap horizons (Now, Next, Later)"
             )
 
     # 4. Out of scope exclusivity: no out of scope item in horizons
     for horizon, item in all_roadmap_items:
         if item in out_of_scope_set:
-            sys.exit(
-                f"FAIL: out-of-scope item '{item}' appears in roadmap horizon '{horizon}'"
+            report_roadmap(
+                f"out-of-scope item '{item}' appears in roadmap horizon '{horizon}'"
             )
+
+    if issues:
+        print(
+            f"WARN: {target_path}: {issues[0]} "
+            f"(tolerated for pre-sha256 Approved roadmap committed in git; re-opening or editing enforces strict validation)",
+            file=sys.stderr,
+        )
+        print(f"OK: roadmap passed validation (pre-sha256 sealed roadmap): {target_path}")
+        sys.exit(0)
 
     print(f"OK: roadmap passed validation: {target_path}")
     sys.exit(0)

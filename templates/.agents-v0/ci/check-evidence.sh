@@ -75,6 +75,25 @@ fi
 missing=0
 checked=0
 
+default_stale_base="${VERIFY_STALE_BASE:-HEAD}"
+if [ -z "${VERIFY_STALE_BASE:-}" ] && [ "${VERIFY_STALE:-1}" != "0" ] && command -v git >/dev/null 2>&1 && git cat-file -e "HEAD^{commit}" 2>/dev/null; then
+  rel_row="$(printf '%s' "$section" | grep -i "|[[:space:]]*release[[:space:]]*|" | tail -n1 || true)"
+  rel_dec="$(printf '%s' "$rel_row" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $5); print tolower($5)}')"
+  phase_dec="$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $5); print tolower($5)}')"
+  if printf '%s' "$rel_dec" | grep -Eqi '^(approved|approve|yes|pass|local)([^a-z]|$)' && printf '%s' "$phase_dec" | grep -Eqi '^(approved|approve|yes|pass)([^a-z]|$)'; then
+    if [ -z "$(git status --porcelain -- "$art" 2>/dev/null || true)" ]; then
+      art_slug="$(basename "$art" .md)"
+      art_commit="$(git log -1 --format=%H -- "$art" "${art%.md}.state.json" "docs/agents-v0/build/${art_slug}" "docs/agents-v0/verify/${art_slug}" 2>/dev/null || true)"
+      if [ -n "$art_commit" ] && git merge-base --is-ancestor "$art_commit" HEAD 2>/dev/null; then
+        other_req="$(git diff --name-only "$art_commit"..HEAD -- 'docs/agents-v0/requirements/*.md' 2>/dev/null | grep -Fxv "$art" | grep -Ev '(^|/)_template\.md$' || true)"
+        if [ -n "$other_req" ]; then
+          default_stale_base="$art_commit"
+        fi
+      fi
+    fi
+  fi
+fi
+
 check_path() {
   p="$1"
   if [ "$is_p0_unapproved" = "1" ]; then
@@ -106,7 +125,7 @@ check_path() {
     return 0
   fi
   if [ -e "$p" ]; then
-    stale_base="${VERIFY_STALE_BASE:-HEAD}"
+    stale_base="$default_stale_base"
     has_git_head=0
     if [ "${VERIFY_STALE:-1}" != "0" ] && command -v git >/dev/null 2>&1 && git cat-file -e "${stale_base}^{commit}" 2>/dev/null; then
       has_git_head=1
@@ -136,7 +155,7 @@ check_path() {
               printf 'FAIL: commit: %s in %s is not an ancestor of %s\n' "$rep_commit" "$p" "$stale_base" >&2
               missing=1
             else
-              stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|.*\.(md|mdc|txt|adoc)$)' || true)"
+              stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|\.(agents-v0|cursor|gitlab|github)/|\.(gitlab-ci\.yml|agents-kit-version)$|.*\.(md|mdc|txt|adoc)$)' || true)"
               if [ -n "$stale" ]; then
                 case "$phase" in
                   verify)

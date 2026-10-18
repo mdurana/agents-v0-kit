@@ -332,6 +332,7 @@ docs/agents-v0/brownfield-onboarding.md
   if [ -f "$dest" ] && ! grep -Fq '## Applicable VAPT findings' "$dest"; then
     printf '\n' >> "$dest"
     awk 'BEGIN{p=0} /^## Applicable VAPT findings/{p=1} p{print}' "$src" >> "$dest"
+    printf 'MIGRATED (project-owned file edited): docs/agents-v0/design/system/threat-model.md gained the Applicable VAPT findings table.\n'
   fi
   prof="$t/docs/agents-v0/project-profile.md"
   if [ -f "$prof" ] && grep -Eq '^\|[[:space:]]*(Backend|Service) verify[[:space:]]*\|[^|]*mvnw -B ([^|]* )?clean verify`?[[:space:]]*\|' "$prof"; then
@@ -348,6 +349,7 @@ updated = re.sub(
 if updated != text:
     with open(p, "w", encoding="utf-8") as fh:
         fh.write(updated)
+    print("MIGRATED (project-owned file edited): docs/agents-v0/project-profile.md Backend/Service verify rows now include -Pci-security. Review with git diff.")
 PY
   fi
 }
@@ -422,11 +424,13 @@ require_pyyaml() {
 
 if [ "$UPDATE" = 1 ]; then
   require_pyyaml
-  if [ "$QUICK" = 1 ]; then
-    printf 'Quick update: validate-kit skips the app-template build test (needs Maven and network).\n'
-    KIT_SKIP_APP_TEMPLATE_TEST=1 "$KIT/scripts/validate-kit.sh"
-  else
-    "$KIT/scripts/validate-kit.sh"
+  if [ "${KIT_VALIDATING:-0}" != 1 ]; then
+    if [ "$QUICK" = 1 ]; then
+      printf 'Quick update: validate-kit skips the app-template build test (needs Maven and network).\n'
+      KIT_SKIP_APP_TEMPLATE_TEST=1 "$KIT/scripts/validate-kit.sh"
+    else
+      "$KIT/scripts/validate-kit.sh"
+    fi
   fi
   if [ "$TARGET_ABS" = "$KIT" ]; then
     printf 'Kit repo: validate-kit passed.\n'
@@ -492,7 +496,15 @@ install_cursor "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 
 if [ -f "$KIT/VERSION" ]; then
-  cp "$KIT/VERSION" "$TARGET_ABS/.agents-kit-version"
+  kit_version="$(tr -d '\n' < "$KIT/VERSION")"
+  kit_sha="$(git -C "$KIT" rev-parse --short=12 HEAD 2>/dev/null || true)"
+  if [ -n "$kit_sha" ]; then
+    kit_dirty="$(git -C "$KIT" status --porcelain 2>/dev/null | head -n 1)"
+    [ -z "$kit_dirty" ] || kit_sha="${kit_sha}-dirty"
+    printf '%s+%s\n' "$kit_version" "$kit_sha" > "$TARGET_ABS/.agents-kit-version"
+  else
+    cp "$KIT/VERSION" "$TARGET_ABS/.agents-kit-version"
+  fi
 fi
 
 printf 'Installed agents-v0 (cursor) into %s\n' "$TARGET_ABS"

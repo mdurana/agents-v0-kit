@@ -229,6 +229,37 @@ PY
 yaml_run fail "openapi lint: retained <resources> placeholder without security fails" "$o" sh "$CI/check-openapi.sh" lint cat-placeholder-nosec.yaml
 yaml_run fail "openapi merged: retained <resources> placeholder without security fails merged too" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-placeholder-nosec.yaml
 
+# The seed shipped before it declared security: its exact <resource> operations are waived only on request.
+python3 - "$o/cat-with-placeholder.yaml" "$o/cat-legacy-seed.yaml" "$o/cat-legacy-seed-realnosec.yaml" <<'PYEOF'
+import copy, sys, yaml
+src, seed_out, realnosec_out = sys.argv[1:4]
+doc = yaml.safe_load(open(src, encoding="utf-8"))
+doc.pop("security", None)
+for path, item in doc["paths"].items():
+    for method, op in item.items():
+        if isinstance(op, dict) and "<" not in path:
+            op.setdefault("security", [{"bearerAuth": []}])
+seed = doc["paths"]["/api/v1/<resources>"]["get"]
+seed.pop("security", None)
+seed["operationId"] = "list<resource>"
+yaml.safe_dump(doc, open(seed_out, "w", encoding="utf-8"), sort_keys=False)
+bad = copy.deepcopy(doc)
+done = False
+for path, item in bad["paths"].items():
+    if "<" in path or done:
+        continue
+    for method, op in item.items():
+        if isinstance(op, dict):
+            op.pop("security", None)
+            done = True
+            break
+yaml.safe_dump(bad, open(realnosec_out, "w", encoding="utf-8"), sort_keys=False)
+PYEOF
+yaml_run pass "openapi lint: the exact legacy seed operation without security is tolerated alongside real operations" "$o" sh "$CI/check-openapi.sh" lint cat-legacy-seed.yaml
+yaml_run fail "openapi lint: KIT_LEGACY_SEED_SECURITY=0 rejects the legacy seed operation without security" "$o" env KIT_LEGACY_SEED_SECURITY=0 sh "$CI/check-openapi.sh" lint cat-legacy-seed.yaml
+yaml_run fail "openapi lint: the legacy-seed waiver does not cover a renamed placeholder" "$o" sh "$CI/check-openapi.sh" lint cat-placeholder-nosec.yaml
+yaml_run fail "openapi lint: the legacy-seed waiver does not cover a real operation without security" "$o" sh "$CI/check-openapi.sh" lint cat-legacy-seed-realnosec.yaml
+
 cp "$o/newcat/api-v1.yaml" "$o/cat-invalid-extra.yaml"
 python3 - "$o/cat-invalid-extra.yaml" <<'PY'
 import sys, yaml
@@ -508,6 +539,18 @@ run pass "design: the lock passes once the amendment is approved" "$d" sh "$CI/c
 sedi 's/Approved/Pending/' "$d/docs/agents-v0/design/orders/amendments.md"
 run fail "design: a pin with no Approved amendment row fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 
+# A lock pinned by an earlier kit (raw-bytes hash) keeps verifying; a later change to the design still fails it.
+lh="$(cd "$d" && sh "$CI/check-design.sh" orders --legacy-hash)"
+nh="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
+if [ -n "$lh" ] && [ "$lh" != "$nh" ]; then pass "design: the legacy and current hash differ when the cited ADR carries a Status line"; else fail "design: the legacy and current hash differ when the cited ADR carries a Status line"; fi
+printf '2026-01-01 %s approved\n' "$lh" > "$d/docs/agents-v0/design/orders/design.lock"
+run pass "design: a lock pinned with the legacy hash still verifies" "$d" sh "$CI/check-design.sh" orders --verify-lock
+printf '2026-01-01 %s approved\n' "$nh" > "$d/docs/agents-v0/design/orders/design.lock"
+run pass "design: a lock pinned with the current hash verifies" "$d" sh "$CI/check-design.sh" orders --verify-lock
+printf '2026-01-01 %s approved\n' "$lh" > "$d/docs/agents-v0/design/orders/design.lock"
+printf 'One more line after the legacy pin.\n' >> "$d/docs/agents-v0/design/orders/design.md"
+run fail "design: a design changed after a legacy pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+
 # --- ci/check-adr.sh ---------------------------------------------------------
 adr="$tmp/adr-records"
 mkdir -p "$adr/docs/agents-v0/adr"
@@ -726,6 +769,31 @@ printf '| mvn verify | 1 | 2 | OrderServiceTest#create_valid_returnsId | OrderSe
 run fail "build plan: amended design.lock with stale red-tests.json designLockHash fails" "$b" sh "$CI/check-build-plan.sh" orders
 run pass "build plan: --record-red refreshes designLockHash for amended pin" "$b" sh "$CI/check-build-plan.sh" orders --record-red
 run pass "build plan: amended design.lock with a new red card and refreshed red-tests.json passes" "$b" sh "$CI/check-build-plan.sh" orders
+
+# Evidence recorded by an earlier kit has no designLockHash. It stays valid while the build is Approved at a
+# commit that already holds the latest pin; re-opening the build or a later pin makes the new rule apply.
+bl="$tmp/build-legacy"
+rm -rf "$bl"
+cp -R "$b" "$bl"
+python3 - "$bl/docs/agents-v0/build/orders/red-tests.json" <<'PYEOF'
+import json, sys
+p = sys.argv[1]
+doc = json.load(open(p))
+doc.pop("designLockHash", None)
+json.dump(doc, open(p, "w"), indent=2)
+PYEOF
+rm -rf "$bl/target"
+(cd "$bl" && git init -q && git add -A && git_c commit -q -m "build")
+bl_sha="$(cd "$bl" && git rev-parse HEAD)"
+run fail "build plan: red-tests.json without designLockHash fails when no Approved build row seals it" "$bl" sh "$CI/check-build-plan.sh" orders
+printf '\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n| build | docs/agents-v0/build/orders/build-report.md commit: %s | dev | Approved | 2026-01-02 |\n' "$bl_sha" >> "$bl/docs/agents-v0/requirements/orders.md"
+run pass "build plan: legacy red-tests.json (no designLockHash) passes when the build is Approved at a commit holding the latest pin" "$bl" sh "$CI/check-build-plan.sh" orders
+sedi 's/| dev | Approved | 2026-01-02 |/| dev | Re-opened | 2026-01-03 |/' "$bl/docs/agents-v0/requirements/orders.md"
+run fail "build plan: legacy red-tests.json fails once the build is re-opened" "$bl" sh "$CI/check-build-plan.sh" orders
+sedi 's/| dev | Re-opened | 2026-01-03 |/| dev | Approved | 2026-01-02 |/' "$bl/docs/agents-v0/requirements/orders.md"
+sedi 's/^2026-01-02 2222222222222222222222222222222222222222222222222222222222222222/2026-01-03 4444444444444444444444444444444444444444444444444444444444444444/' "$bl/docs/agents-v0/design/orders/design.lock"
+(cd "$bl" && git add -A && git_c commit -q -m "later amendment pin")
+run fail "build plan: legacy red-tests.json fails when a design pin landed after the approved build commit" "$bl" sh "$CI/check-build-plan.sh" orders
 rm -rf "$b/docs/agents-v0/design" "$b/docs/agents-v0/build/orders/red-tests.json"
 
 # --- ci/check-endpoint-auth.sh -----------------------------------------------

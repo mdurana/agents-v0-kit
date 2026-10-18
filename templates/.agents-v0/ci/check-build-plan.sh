@@ -182,6 +182,40 @@ lock_path = os.path.join("docs", "agents-v0", "design", feature, "design.lock")
 lock_entries = [l.split() for l in (read(lock_path) or "").splitlines() if len(l.split()) >= 2]
 latest_lock_hash = lock_entries[-1][1] if lock_entries else ""
 
+
+def sealed_before_current_pin():
+    """True when the Build row is Approved at a stamped commit and the latest design.lock change is
+    committed at or before that commit. Re-opening the build or pinning a later amendment makes this
+    false, so such evidence must then carry designLockHash. Any git failure means False."""
+    import subprocess
+
+    def git(*args):
+        res = subprocess.run(["git", *args], capture_output=True, text=True)
+        return res.returncode, res.stdout.strip()
+
+    text = read(req_path) or ""
+    row = None
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.strip().startswith("|") and len(cells) >= 4 and cells[0].lower() == "build":
+            row = cells
+    if not row or row[3].lower() != "approved":
+        return False
+    m = re.search(r"commit:\s*([0-9a-f]{7,40})", row[1])
+    if not m:
+        return False
+    rc, build_commit = git("rev-parse", "--verify", "--quiet", m.group(1) + "^{commit}")
+    if rc != 0 or not build_commit:
+        return False
+    rc, dirty = git("status", "--porcelain", "--", lock_path)
+    if rc != 0 or dirty:
+        return False
+    rc, lock_commit = git("log", "-1", "--format=%H", "--", lock_path)
+    if rc != 0 or not lock_commit:
+        return False
+    rc, _ = git("merge-base", "--is-ancestor", lock_commit, build_commit)
+    return rc == 0
+
 if record_red:
     targets = sys.argv[1:]
     report_files = discover_report_files(targets)
@@ -304,11 +338,19 @@ if require_red and len(lock_entries) > 1:
                 f"but only {len(red_cards)} red attempt card(s); record a new red run for the amendment"
             )
         if has_red_json and red_json_lock_hash != latest_lock_hash:
-            fail(
-                f"{red_json_path}: recorded before the latest design amendment pin "
-                f"({(red_json_lock_hash or 'none')[:12]} != {latest_lock_hash[:12]}); "
-                f"re-run the red test and sh .agents-v0/ci/check-build-plan.sh {feature} --record-red"
-            )
+            if not red_json_lock_hash and sealed_before_current_pin():
+                print(
+                    f"WARN: {red_json_path} has no designLockHash (recorded by an earlier kit); accepted because the "
+                    f"build is Approved at a commit that already contains the latest design pin. "
+                    f"Re-record with --record-red when the build is re-opened.",
+                    file=sys.stderr,
+                )
+            else:
+                fail(
+                    f"{red_json_path}: recorded before the latest design amendment pin "
+                    f"({(red_json_lock_hash or 'none')[:12]} != {latest_lock_hash[:12]}); "
+                    f"re-run the red test and sh .agents-v0/ci/check-build-plan.sh {feature} --record-red"
+                )
 for c in red_cards:
     report_candidates = re.findall(r"[\w./\\-]+\.(?:xml|trx|json)\b", c.get("report", ""), re.I)
     loc_candidates = [

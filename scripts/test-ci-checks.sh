@@ -1108,6 +1108,42 @@ Discovery: docs/product/claims-discovery.md (sha256: 000000000000000000000000000
 EOF
 expect_fail "check-roadmap rejects hash mismatch when discovery document changed" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-hash-mismatch.md
 
+# Pre-sha256 sealed roadmap committed in git passes with warning; editing or re-opening enforces strict check
+d_legacy_rm="$tmp/roadmap-legacy-git"
+mkdir -p "$d_legacy_rm/docs/product" "$d_legacy_rm/docs/agents-v0/roadmap"
+cp "$d/docs/product/claims-discovery-placeholder.md" "$d_legacy_rm/docs/product/disc.md"
+cat > "$d_legacy_rm/docs/agents-v0/roadmap/legacy.md" <<'EOF'
+# Roadmap: legacy
+
+Discovery: docs/product/disc.md
+
+## Now
+- Summarized horizon bullet from earlier kit
+
+## Next
+
+## Later
+
+## Out of scope
+- Item 2
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/legacy.md, docs/product/disc.md | dev | Approved | 2026-01-01 |
+EOF
+(
+  cd "$d_legacy_rm"
+  git init -q
+  git add docs/product/disc.md docs/agents-v0/roadmap/legacy.md
+  git_commit "docs: legacy approved roadmap"
+)
+expect_pass "check-roadmap tolerates pre-sha256 Approved roadmap committed and clean in git" "$d_legacy_rm" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/legacy.md
+expect_fail "check-roadmap KIT_STRICT_ROADMAP=1 rejects pre-sha256 roadmap with horizon mismatch" "$d_legacy_rm" env KIT_STRICT_ROADMAP=1 sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/legacy.md
+printf '\n<!-- edit -->\n' >> "$d_legacy_rm/docs/agents-v0/roadmap/legacy.md"
+expect_fail "check-roadmap enforces strict check when pre-sha256 roadmap is edited on disk" "$d_legacy_rm" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/legacy.md
+
 expect_pass "check-arc ignores a story that is not material" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md
 printf 'Material: yes\nARC: docs/agents-v0/design/system/arc-record.md\n' > "$d/docs/agents-v0/requirements/a.md"
 expect_fail "check-arc fails a material story with no ARC record" "$d" sh "$CI/check-arc.sh" docs/agents-v0/requirements/a.md

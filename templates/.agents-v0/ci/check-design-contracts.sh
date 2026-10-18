@@ -19,9 +19,11 @@ failed=0
 
 sh "$here/check-adr.sh" || failed=1
 
+# KIT_LEGACY_SEED_SECURITY=1: a catalog seeded by an earlier kit still holds the seed's <resource> operations
+# without security; check-openapi.sh waives only those exact operations (and only here).
 for cat_file in openapi/*.yaml openapi/*.yml; do
   [ -f "$cat_file" ] || continue
-  sh "$here/check-openapi.sh" lint "$cat_file" || failed=1
+  KIT_LEGACY_SEED_SECURITY=1 sh "$here/check-openapi.sh" lint "$cat_file" || failed=1
 done
 
 for f in docs/agents-v0/design/*/openapi.yaml; do
@@ -38,7 +40,7 @@ for f in docs/agents-v0/design/*/openapi.yaml; do
   if [ -n "$catalog" ]; then
     sh "$here/check-openapi.sh" compat "$f" "$catalog" || failed=1
     if [ -f "docs/agents-v0/build/$feature/build-report.md" ] || sh "$here/check-approvals.sh" "docs/agents-v0/requirements/$feature.md" build >/dev/null 2>&1; then
-      sh "$here/check-openapi.sh" merged "$f" "$catalog" || failed=1
+      KIT_LEGACY_SEED_SECURITY=1 sh "$here/check-openapi.sh" merged "$f" "$catalog" || failed=1
     fi
   fi
 done
