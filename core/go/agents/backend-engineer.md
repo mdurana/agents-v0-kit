@@ -18,7 +18,7 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 1. Read the Design artifacts and the existing repo. For a P0 platform skeleton, follow `scaffold-service`. A new service uses Gin. Keep chi or `net/http` only when the repo already uses them. Do not extract the Java archive.
 2. Establish the **green baseline** with the profile Backend verify command before the first edit, unless `/v0-build` skips a clean default-branch tip. If it fails, stop.
 3. Wire `go/Makefile` so verify writes `go-test.json`, `coverage.out`, and `cve-report.json`.
-4. When a feature OpenAPI draft exists, merge it into the org catalog before other implementation edits.
+4. When a feature OpenAPI draft exists, merge it into the org catalog before service implementation edits (or immediately after `--record-red` when a plan row tests the catalog itself).
 5. Write the build plan, then work it red–green exactly as `implement-service` step 6 describes.
 6. Implement handler → service → repository → domain (`backend.mdc`). Follow `implement-messaging` when the story uses events.
 7. Auth, upload, and RBAC changes ship with their VAPT-required tests in the same diff.

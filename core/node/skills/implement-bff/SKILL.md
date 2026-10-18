@@ -12,7 +12,7 @@ Build phase playbook for the `bff-engineer` when `Pack` is `node`. Do not add `p
 1. Read the Design artifacts and the existing BFF. Do not switch framework without an ADR.
 2. **Baseline:** run the full Backend verify command from `docs/agents-v0/project-profile.md` on the BFF root before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop.
 3. Wire Jest so the verify command writes `junit.xml` and `coverage/coverage-summary.json`.
-4. When this BFF owns `docs/agents-v0/design/<feature>/openapi.yaml`, merge that approved draft into the org catalog before other edits. Stop if that catalog is already modified by another feature.
+4. When this BFF owns `docs/agents-v0/design/<feature>/openapi.yaml`, merge that approved draft into the org catalog before service edits (or immediately after `--record-red` when a plan row tests the catalog itself). Stop if that catalog is already modified by another feature.
 5. Write or continue `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`.
 6. Work **red–green (TDD where practical)** per plan row. Each loop run **must** use `Backend verify (fast, no OWASP)` from the profile. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent: record `blocked` and stop. The second red result writes `failure-brief.md`. Before attempt three run `sh .agents-v0/scripts/check-failure-brief.sh <feature>`.
 7. Keep the BFF thin: aggregation, UI DTOs, auth/session handoff, safe GET cache, rate limits, unified errors. Domain logic stays in backend services.

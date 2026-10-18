@@ -111,6 +111,39 @@ def op_params(doc, op, item):
     return out
 
 
+def server_urls(doc):
+    out = []
+    for srv in (doc.get("servers") or []):
+        if isinstance(srv, dict) and isinstance(srv.get("url"), str):
+            out.append(srv["url"].strip())
+    return out
+
+
+def has_api_v1_server(doc):
+    urls = server_urls(doc)
+    return bool(urls) and all(u.rstrip("/").endswith("/api/v1") for u in urls)
+
+
+def canonical_path(doc, path):
+    if has_api_v1_server(doc) and not path.startswith("/api/v1/") and path != "/api/v1":
+        return "/api/v1" + (path if path.startswith("/") else "/" + path)
+    return path
+
+
+def is_placeholder_path(path):
+    return "<" in path or ">" in path
+
+
+def is_placeholder_name(name):
+    return "<" in name or ">" in name
+
+
+def real_operations(doc):
+    for path, method, op, item in operations(doc):
+        if not is_placeholder_path(path):
+            yield path, method, op, item
+
+
 def lint(doc, label):
     if not isinstance(doc, dict):
         fail(f"{label}: not an OpenAPI document")
@@ -130,9 +163,14 @@ def lint(doc, label):
     schemes = ((doc.get("components") or {}).get("securitySchemes") or {})
     global_security = doc.get("security")
     seen_ids, error_types = set(), set()
-    for path, method, op, item in operations(doc):
+    ops_list = list(real_operations(doc)) or list(operations(doc))
+    srv_urls = server_urls(doc)
+    for path, method, op, item in ops_list:
         where = f"{label}: {method.upper()} {path}"
-        if not path.startswith("/api/v1/"):
+        for s_url in srv_urls:
+            if s_url.rstrip("/").endswith("/api/v1") and (path.startswith("/api/v1/") or path == "/api/v1"):
+                fail(f"{where}: server URL {s_url} with path {path} doubles /api/v1")
+        if not canonical_path(doc, path).startswith("/api/v1/"):
             fail(f"{where}: paths live under /api/v1/")
         op_id = op.get("operationId")
         if not op_id:
@@ -188,20 +226,6 @@ def json_schema(doc, holder):
     return None
 
 
-def is_placeholder_path(path):
-    return "<" in path or ">" in path
-
-
-def is_placeholder_name(name):
-    return "<" in name or ">" in name
-
-
-def real_operations(doc):
-    for path, method, op, item in operations(doc):
-        if not is_placeholder_path(path):
-            yield path, method, op, item
-
-
 def doc_error_types(doc):
     error_types = set()
     for path, method, op, item in real_operations(doc):
@@ -213,11 +237,12 @@ def doc_error_types(doc):
 
 
 def compat(draft, catalog):
-    cat_ops = {(p, m): (op, item) for p, m, op, item in operations(catalog)}
+    cat_ops = {(canonical_path(catalog, p), m): (op, item) for p, m, op, item in operations(catalog)}
     for path, method, op, item in operations(draft):
-        if (path, method) not in cat_ops:
+        cpath = canonical_path(draft, path)
+        if (cpath, method) not in cat_ops:
             continue
-        cop, citem = cat_ops[(path, method)]
+        cop, citem = cat_ops[(cpath, method)]
         where = f"{method.upper()} {path}"
         for code in cop.get("responses") or {}:
             if str(code).startswith("2") and code not in (op.get("responses") or {}):
@@ -258,13 +283,14 @@ def compat(draft, catalog):
 
 
 def merged(draft, catalog):
-    cat_paths = catalog.get("paths") or {}
+    cat_paths = {canonical_path(catalog, p): v for p, v in (catalog.get("paths") or {}).items()}
     for path, item in (draft.get("paths") or {}).items():
-        if path not in cat_paths:
+        cpath = canonical_path(draft, path)
+        if cpath not in cat_paths:
             fail(f"{path}: missing from the catalog")
             continue
         for key, value in item.items():
-            if cat_paths[path].get(key) != value:
+            if cat_paths[cpath].get(key) != value:
                 fail(f"{path} {key}: the catalog differs from the approved draft")
     for kind in COMPONENT_KINDS:
         theirs = ((catalog.get("components") or {}).get(kind) or {})
@@ -301,11 +327,21 @@ def merge(draft, catalog_path):
                     del catalog["components"]["schemas"]["ErrorResponse"]
     if draft.get("info") and catalog.get("info", {}).get("title") == "<service> API":
         catalog["info"] = copy.deepcopy(draft["info"])
-    if draft.get("servers"):
-        if not catalog.get("servers") or catalog.get("servers") == [{"url": "/api/v1"}]:
-            catalog["servers"] = copy.deepcopy(draft["servers"])
+    draft_paths = list((draft.get("paths") or {}).keys())
+    existing_real_paths = [p for p in catalog["paths"] if not is_placeholder_path(p)]
+    if has_api_v1_server(catalog) and not has_api_v1_server(draft) and any(p.startswith("/api/v1/") for p in draft_paths):
+        if not existing_real_paths or all(p.startswith("/api/v1/") for p in existing_real_paths):
+            catalog["servers"] = copy.deepcopy(draft["servers"]) if draft.get("servers") else [{"url": "/"}]
+    elif draft.get("servers") and not catalog.get("servers"):
+        catalog["servers"] = copy.deepcopy(draft["servers"])
+    cat_has_v1_srv = has_api_v1_server(catalog)
     for path, item in (draft.get("paths") or {}).items():
-        target = catalog["paths"].setdefault(path, {})
+        cpath = canonical_path(draft, path)
+        if cat_has_v1_srv and cpath.startswith("/api/v1/"):
+            target_path = cpath[len("/api/v1"):] or "/"
+        else:
+            target_path = cpath
+        target = catalog["paths"].setdefault(target_path, {})
         for key, value in item.items():
             target[key] = copy.deepcopy(value)
     for kind in COMPONENT_KINDS:
@@ -324,7 +360,9 @@ if mode == "lint":
 elif mode == "compat":
     compat(load(arg1), load(arg2))
 elif mode == "merged":
-    merged(load(arg1), load(arg2))
+    draft_doc, cat_doc = load(arg1), load(arg2)
+    lint(cat_doc, arg2)
+    merged(draft_doc, cat_doc)
 elif mode == "merge":
     draft_doc = load(arg1)
     lint(draft_doc, arg1)

@@ -59,7 +59,11 @@ if not catalogs:
 try:
     cat_paths = []
     for c in catalogs:
-        cat_paths += list(((load(c) or {}).get("paths") or {}).keys())
+        doc = load(c) or {}
+        srv = [str((s or {}).get("url") or "").rstrip("/") for s in (doc.get("servers") or []) if isinstance(s, dict)]
+        pfx = "/api/v1" if srv and all(u.endswith("/api/v1") for u in srv) else ""
+        for p in (doc.get("paths") or {}).keys():
+            cat_paths.append(pfx + (p if p.startswith("/") else "/" + p) if pfx and not p.startswith("/api/v1") else p)
 except ImportError:
     print("FAIL: PyYAML is required for YAML catalogs (python3 -m pip install pyyaml, apk add py3-yaml, or on Intel macOS: sh .agents-v0/scripts/host-tools-macports.sh)", file=sys.stderr)
     raise SystemExit(1)

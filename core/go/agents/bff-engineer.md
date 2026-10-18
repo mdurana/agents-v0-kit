@@ -18,7 +18,7 @@ You are the **bff-engineer** for the Build phase (`workflow-orchestration.mdc`).
 1. Read the Design artifacts and the existing BFF. Do not add a Spring BFF.
 2. Establish the **green baseline** with the profile Backend verify command before the first edit, unless `/v0-build` skips a clean default-branch tip. If it fails, stop.
 3. Wire `go test` coverage when it is missing.
-4. When this BFF owns the feature OpenAPI draft, merge it into the org catalog before other edits.
+4. When this BFF owns the feature OpenAPI draft, merge it into the org catalog before service edits (or immediately after `--record-red` when a plan row tests the catalog itself).
 5. Write or continue the build plan, then work it red–green exactly as `implement-bff` step 6 describes.
 6. Keep the BFF thin. Authorize the caller before proxying an admin or `{id}` call.
 7. Run the full Backend verify command once, with **bounded fix attempts (≤ 3 per failure)**.

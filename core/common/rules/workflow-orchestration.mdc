@@ -103,7 +103,7 @@ A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fi
 
 ## Phase result
 
-When a phase reaches `awaiting_approval` or `blocked`, write `docs/agents-v0/requirements/<feature>.phase-result.md` before stopping, with `phase`, `status` (`awaiting_approval` or `blocked`), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes (per-feature, not shared).
+When a phase stops, write `docs/agents-v0/requirements/<feature>.phase-result.md` with `phase`, `status` (`awaiting_approval` or `blocked`; `approved`/`local` after approval), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes (per-feature, not shared).
 
 ## Command results
 
@@ -158,7 +158,7 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 - **Baseline green** before first edit, unless `/v0-build` skips a checkout that is already the default branch tip; otherwise the profile verify command. Stop on a pre-existing failure unless the profile allows it.
 - **Build plan** at `docs/agents-v0/build/<feature>/plan.md` before the first implementation edit: one row per approved `AC-*` (AC, Status `pending`/`done`/`blocked`, Test). A green unit sets its row to `done` and names the test. Do not add, delete, or rewrite AC rows.
 - **Red–green loop** on the profile's **fast** verify cell (real command, not a placeholder). Capture the red report with `check-build-plan.sh <feature> --record-red` before green. A done row needs a red card; when `red-tests.json` exists, the test name must be in it. Gate: full verify once (coverage/static/CVE). Second red for the same test → `failure-brief.md` + `check-failure-brief.sh` before attempt three; third red stops. Do not read `build-output.txt` again. ≤ 3 fixes per failure.
-- When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before other implementation edits. Stop when the catalog is already modified by another feature. A story with no draft records N/A in the build report.
+- When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog (after `--record-red` if a row tests the catalog, else before service edits). Stop if another feature modified the catalog. No draft → N/A in the build report.
 - Quality tooling wired from the pack. Red–green tests for new behavior; VAPT-required tests in the same diff when applicable.
 - Contract conformance and the pack layer check where wired; methods ≤ 30 lines; auth+authz; correlation/tracing; DTOs only; pack migrations; no secrets. A migration or SQL diff with `DIFF_BASE` set must hit the profile database; H2 does not count. No down script is legal with a rollback note (`migration-safety`).
 - UX spec implemented for UI changes: component defaults, layout matching the approved mockups, API client only for operations named on those rows.

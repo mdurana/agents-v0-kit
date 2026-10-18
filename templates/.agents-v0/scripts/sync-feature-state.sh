@@ -184,6 +184,53 @@ else:
         active_status = ""
         blocked_reason = ""
 
+def resolve_git_head(seed: str) -> str:
+    if seed and re.match(r"^[0-9a-f]{7,40}$", seed, re.I):
+        return seed
+    cur = os.path.abspath(".")
+    while True:
+        dot_git = os.path.join(cur, ".git")
+        git_dir = ""
+        if os.path.isdir(dot_git):
+            git_dir = dot_git
+        elif os.path.isfile(dot_git):
+            try:
+                raw = open(dot_git, encoding="utf-8").read().strip()
+                if raw.startswith("gitdir:"):
+                    rel = raw.split(":", 1)[1].strip()
+                    git_dir = rel if os.path.isabs(rel) else os.path.normpath(os.path.join(cur, rel))
+            except OSError:
+                git_dir = ""
+        if git_dir and os.path.isfile(os.path.join(git_dir, "HEAD")):
+            try:
+                head = open(os.path.join(git_dir, "HEAD"), encoding="utf-8").read().strip()
+                if re.match(r"^[0-9a-f]{40}$", head, re.I):
+                    return head
+                if head.startswith("ref:"):
+                    ref = head.split(":", 1)[1].strip()
+                    for base in (git_dir, os.path.dirname(os.path.dirname(git_dir))):
+                        ref_file = os.path.join(base, ref)
+                        if os.path.isfile(ref_file):
+                            sha = open(ref_file, encoding="utf-8").read().strip()
+                            if re.match(r"^[0-9a-f]{40}$", sha, re.I):
+                                return sha
+                        packed = os.path.join(base, "packed-refs")
+                        if os.path.isfile(packed):
+                            for pline in open(packed, encoding="utf-8").read().splitlines():
+                                parts = pline.strip().split()
+                                if len(parts) == 2 and parts[1] == ref and re.match(r"^[0-9a-f]{40}$", parts[0], re.I):
+                                    return parts[0]
+            except OSError:
+                pass
+            return ""
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return ""
+        cur = parent
+
+
+base_commit = (prev.get("baseCommit") or "").strip() or resolve_git_head(os.environ.get("HOOK_BASE", ""))
+
 data = {
     "feature": ("onboarding" if onboarding
                 else os.path.basename(os.path.dirname(rel_art)) if maintain_note
@@ -194,7 +241,7 @@ data = {
     "activeStatus": active_status,
     "blockedReason": blocked_reason,
     "artifact": art,
-    "baseCommit": os.environ.get("HOOK_BASE", ""),
+    "baseCommit": base_commit,
     "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "evidence": {
         "build": evidence("build") or prev.get("evidence", {}).get("build", []),

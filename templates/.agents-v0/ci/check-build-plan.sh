@@ -274,7 +274,8 @@ red_text = "\n".join(c.get("failing test", "") for c in red_cards)
 # Machine-captured red evidence: red-tests.json (from --record-red) or report files cited in red cards.
 machine_red_tokens = set()
 has_machine_red_source = False
-if os.path.isfile(red_json_path):
+has_red_json = os.path.isfile(red_json_path)
+if has_red_json:
     has_machine_red_source = True
     machine_red_tokens.update(parse_failed_tests_from_file(red_json_path))
 for c in red_cards:
@@ -287,10 +288,11 @@ for c in red_cards:
     for candidate in report_candidates + loc_candidates:
         has_machine_red_source = True
         if not os.path.isfile(candidate):
-            fail(f"{report_path}: red card references missing test report {candidate}")
+            if not has_red_json:
+                fail(f"{report_path}: red card references missing test report {candidate}")
         else:
             tokens = parse_failed_tests_from_file(candidate)
-            if not tokens:
+            if not tokens and not has_red_json:
                 fail(f"{report_path}: red card references {candidate}, which contains no failing test case")
             machine_red_tokens.update(tokens)
 
@@ -333,8 +335,7 @@ for r in rows:
             if not any(n in machine_red_tokens for n in names):
                 fail(
                     f"{plan_path}: {ac} has no machine-verified red test report for {test} "
-                    f"(run sh .agents-v0/ci/check-build-plan.sh {feature} --record-red after the red run, "
-                    "or cite the failing JUnit/TRX/JSON report in the card Location)"
+                    f"(run sh .agents-v0/ci/check-build-plan.sh {feature} --record-red before the green run overwrites the runner report)"
                 )
 
 if failures:

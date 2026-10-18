@@ -366,8 +366,23 @@ mkdir_dec dec-state2 \
   '| Intake | docs/agents-v0/requirements/dec-state2.md | @ada | Approved | 2026-01-01 |' \
   '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-02 |' \
   '| Design | docs/agents-v0/design/x/design.md | @ada | Re-opened | 2026-01-03 |'
+mkdir -p "$d/.git/refs/heads"
+printf 'ref: refs/heads/main\n' > "$d/.git/HEAD"
+printf '0123456789abcdef0123456789abcdef01234567\n' > "$d/.git/refs/heads/main"
 (cd "$d" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-state2.md >/dev/null 2>&1)
 if grep -Fq '"lastApprovedPhase": "intake"' "$d/docs/agents-v0/requirements/dec-state2.state.json"; then pass "state: a later Re-opened row withdraws an earlier Approved design"; else fail "state: a later Re-opened row withdraws an earlier Approved design"; fi
+if grep -Eq '"baseCommit": "[0-9a-f]{40}"' "$d/docs/agents-v0/requirements/dec-state2.state.json"; then pass "state: sync-feature-state records baseCommit SHA"; else fail "state: sync-feature-state records baseCommit SHA"; fi
+expect_pass "check-feature-state passes when baseCommit is set" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-state2.md
+python3 - "$d/docs/agents-v0/requirements/dec-state2.state.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+data = json.load(open(p, encoding="utf-8"))
+data["baseCommit"] = ""
+json.dump(data, open(p, "w", encoding="utf-8"), indent=2)
+PY
+expect_fail "check-feature-state fails when baseCommit is empty in a git repo" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-state2.md
+(cd "$d" && HOOK_BASE="" sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-state2.md >/dev/null 2>&1)
+expect_pass "sync-feature-state backfills empty baseCommit from .git/HEAD" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-state2.md
 expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/milestones/m.md plan
 expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/a.md plan
 expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake

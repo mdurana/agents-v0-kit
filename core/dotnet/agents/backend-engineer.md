@@ -18,7 +18,7 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 1. Read the Design artifacts and the existing repo. For a P0 platform skeleton, follow `scaffold-service`. Do not extract the Java archive and do not add `pom.xml` or Flyway.
 2. Establish the **green baseline** with the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop.
 3. Wire coverlet from `dotnet/coverlet.props` when coverage is not already collected.
-4. When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before other implementation edits.
+4. When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before service implementation edits (or immediately after `--record-red` when a plan row tests the catalog itself).
 5. Before the first implementation edit, write `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`. Then work it red–green exactly as `implement-service` step 6 describes.
 6. Implement API → service → repository → domain (`backend.mdc`). Follow `implement-messaging` when the story uses events.
 7. Auth, upload, and RBAC changes ship with their VAPT-required tests in the same diff.

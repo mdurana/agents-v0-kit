@@ -4,6 +4,8 @@ info:
   version: 1.0.0
 servers:
   - url: /
+security:
+  - bearerAuth: []
 paths:
   /api/v1/<resources>:
     get:
@@ -62,6 +64,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     <Resource>:
       type: object

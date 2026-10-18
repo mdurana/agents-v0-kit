@@ -195,6 +195,58 @@ yaml_run pass "openapi merge: writes a new catalog from the draft" "$o" sh "$CI/
 yaml_run pass "openapi merged: the merged catalog contains the draft" "$o" sh "$CI/check-openapi.sh" merged draft.yaml newcat/api-v1.yaml
 yaml_run fail "openapi merged: a catalog without the draft fails" "$o" sh "$CI/check-openapi.sh" merged draft.yaml catalog-ok.yaml
 
+cp "$o/newcat/api-v1.yaml" "$o/cat-with-placeholder.yaml"
+python3 - "$o/cat-with-placeholder.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc["paths"]["/api/v1/<resources>"] = {
+    "get": {
+        "operationId": "list<Resources>",
+        "responses": {
+            "200": {"description": "ok", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/<Resource>ListResponse"}}}},
+            "404": {"description": "not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+        },
+    }
+}
+doc["components"]["schemas"]["<Resource>ListResponse"] = {"type": "object"}
+doc["components"]["schemas"]["ErrorResponse"] = {"type": "object"}
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run pass "openapi lint: retained <resources> placeholder alongside real operations passes" "$o" sh "$CI/check-openapi.sh" lint cat-with-placeholder.yaml
+yaml_run pass "openapi merged: retained <resources> placeholder alongside merged draft passes" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-with-placeholder.yaml
+
+cp "$o/newcat/api-v1.yaml" "$o/cat-invalid-extra.yaml"
+python3 - "$o/cat-invalid-extra.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc["paths"]["/v2/broken"] = {"get": {"operationId": "brokenOp", "responses": {"200": {"description": "ok"}}}}
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run fail "openapi merged: fails when the combined catalog fails lint" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-invalid-extra.yaml
+
+cp "$o/newcat/api-v1.yaml" "$o/cat-double-prefix.yaml"
+python3 - "$o/cat-double-prefix.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc["servers"] = [{"url": "/api/v1"}]
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run fail "openapi lint: server /api/v1 with /api/v1/... path keys fails (double prefix)" "$o" sh "$CI/check-openapi.sh" lint cat-double-prefix.yaml
+
+cp "$o/cat-double-prefix.yaml" "$o/cat-rel-paths.yaml"
+python3 - "$o/cat-rel-paths.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+doc = yaml.safe_load(open(p, encoding="utf-8"))
+doc["paths"] = {k[len("/api/v1"):]: v for k, v in doc["paths"].items()}
+yaml.safe_dump(doc, open(p, "w", encoding="utf-8"), sort_keys=False)
+PY
+yaml_run pass "openapi lint: server /api/v1 with relative path keys passes" "$o" sh "$CI/check-openapi.sh" lint cat-rel-paths.yaml
+yaml_run pass "openapi merged: draft with /api/v1/... paths matches catalog with server /api/v1 and relative paths" "$o" sh "$CI/check-openapi.sh" merged draft.yaml cat-rel-paths.yaml
+
 # --- ci/check-design.sh ------------------------------------------------------
 d="$tmp/design"
 mkdir -p "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/orders" "$d/docs/agents-v0/adr"
@@ -618,6 +670,9 @@ cat > "$b/target/surefire-reports/TEST-OrderServiceTest.xml" <<'EOF'
 </testsuite>
 EOF
 run pass "build plan: REQUIRE_RED_REPORT=1 passes after --record-red even when green overwrote the XML" "$b" env REQUIRE_RED_REPORT=1 sh "$CI/check-build-plan.sh" orders
+sedi 's|OrderService.java:10|target/surefire-reports/TEST-OrderServiceTest.xml|' "$b/docs/agents-v0/build/orders/build-report.md"
+run pass "build plan: a card Location naming a green-overwritten XML report passes when red-tests.json recorded the failure" "$b" sh "$CI/check-build-plan.sh" orders
+sedi 's|target/surefire-reports/TEST-OrderServiceTest.xml|OrderService.java:10|' "$b/docs/agents-v0/build/orders/build-report.md"
 sedi 's/| AC-2 | pending | |/| AC-2 | done | OrderServiceTest#get_unknown_returns404 |/' "$b/docs/agents-v0/build/orders/plan.md"
 printf '| mvn verify | 1 | 2 | OrderServiceTest#get_unknown_returns404 | OrderService.java:20 |\n' >> "$b/docs/agents-v0/build/orders/build-report.md"
 run fail "build plan: a markdown red card not backed by red-tests.json fails when red-tests.json is present" "$b" sh "$CI/check-build-plan.sh" orders
