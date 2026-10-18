@@ -527,6 +527,19 @@ EOF
 m="$tmp/gate-ok"
 write_module "$m"
 expect_pass "gate metrics: executed tests and coverage report pass" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
+
+# Stage a copy under ci-artifacts/gate/<rel_root> as collect-gate-reports.sh does:
+rel_m="$(python3 -c "import os; print(os.path.relpath('$m', '$tmp'))")"
+mkdir -p "$tmp/ci-artifacts/gate/$rel_m/target/surefire-reports"
+cp "$m/target/surefire-reports/TEST-a.xml" "$tmp/ci-artifacts/gate/$rel_m/target/surefire-reports/"
+out="$(cd "$tmp" && sh "$CI/check-gate-metrics.sh" "$m" 2>&1)"
+if printf '%s\n' "$out" | grep -Fq "tests: run=3"; then
+  pass "gate metrics: does not double-count tests when ci-artifacts/gate copy exists"
+else
+  fail "gate metrics: double-counted tests with ci-artifacts/gate copy: $out"
+fi
+rm -rf "$tmp/ci-artifacts"
+
 expect_fail "gate metrics: bundle coverage below MIN_LINE_PCT fails" "$tmp" env MIN_LINE_PCT=80 sh "$CI/check-gate-metrics.sh" "$m"
 printf '<testsuite tests="1" failures="1" errors="0" skipped="0"/>\n' > "$m/target/surefire-reports/TEST-b.xml"
 expect_fail "gate metrics: a failing test fails" "$tmp" sh "$CI/check-gate-metrics.sh" "$m"
@@ -1411,6 +1424,36 @@ cat > "$d/cve-report.json" <<'EOF'
 EOF
 expect_pass "collect-gate-reports copies real pip-audit cve-report.json" "$d" sh "$CI/collect-gate-reports.sh" .
 expect_fail "check-gate-metrics fails closed on pip-audit dependencies[].vulns[] entry" "$d" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh"
+
+# Test Java collect-gate-reports invokes mvnw when pom.xml exists and cve.path is absent
+dj="$tmp/java-cve-test"
+mkdir -p "$dj/.agents-v0/ci" "$dj/.agents-v0/packs/java" "$dj/docs/agents-v0"
+cp "$CI/"*.sh "$CI/"*.py "$dj/.agents-v0/ci/"
+cp "$KIT/core/java/pack.json" "$dj/.agents-v0/packs/java/pack.json"
+cat > "$dj/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | java |
+EOF
+cat > "$dj/pom.xml" <<'EOF'
+<project></project>
+EOF
+cat > "$dj/mvnw" <<'EOF'
+#!/bin/sh
+mkdir -p target
+cat > target/dependency-check-report.json <<'JEOF'
+{"dependencies": [{"fileName": "log4j.jar", "vulnerabilities": []}]}
+JEOF
+EOF
+chmod +x "$dj/mvnw"
+expect_pass "collect-gate-reports invokes mvnw -Pci-security for java when report is absent" "$dj" sh "$CI/collect-gate-reports.sh" .
+if [ -f "$dj/ci-artifacts/gate/target/dependency-check-report.json" ]; then
+  pass "collect-gate-reports staged java dependency-check-report.json under ci-artifacts/gate/"
+else
+  fail "collect-gate-reports did not stage java dependency-check-report.json"
+fi
 
 # --- .gitlab-ci.yml build script multi-service execution ---------------------
 d="$tmp/gitlab-build-sim"

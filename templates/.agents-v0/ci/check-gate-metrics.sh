@@ -738,12 +738,16 @@ def files_for(relpath):
     if not rel_root.startswith(".."):
         bases.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_root))
     found = []
+    seen_rel = set()
     for base in bases:
         pattern = os.path.join(base, relpath)
         for match in glob.glob(pattern, recursive=True):
             if os.path.isfile(match):
-                found.append(match)
-    return list(dict.fromkeys(found))
+                rel = os.path.relpath(match, base)
+                if rel not in seen_rel:
+                    seen_rel.add(rel)
+                    found.append(match)
+    return found
 
 
 def jacoco_report(path):

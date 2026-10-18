@@ -53,7 +53,7 @@ else:
 
 
 def ensure_cve_artifact(root_dir, cve_rel, pid):
-    if not cve_rel or "*" in cve_rel or pid == "java":
+    if not cve_rel or "*" in cve_rel:
         return 0
     if glob.glob(os.path.join(root_dir, cve_rel), recursive=True):
         return 0
@@ -105,6 +105,26 @@ def ensure_cve_artifact(root_dir, cve_rel, pid):
                     mod = str(trace[0].get("module") or "?") if trace and isinstance(trace[0], dict) else "?"
                     deps.setdefault(mod, []).append({"name": str(finding.get("osv") or "?"), "severity": "HIGH"})
                 payload = {"dependencies": [{"fileName": k, "vulnerabilities": v} for k, v in sorted(deps.items())]}
+        elif pid == "java" and os.path.isfile(os.path.join(root_dir, "pom.xml")):
+            mvn_cmd = None
+            for cand in (os.path.join(root_dir, "mvnw"), os.path.join(os.getcwd(), "mvnw"), "mvn"):
+                if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                    mvn_cmd = [os.path.abspath(cand)]
+                    break
+                elif shutil.which(cand):
+                    mvn_cmd = [cand]
+                    break
+            if mvn_cmd:
+                subprocess.run(
+                    mvn_cmd + ["-B", "verify", "-Pci-security", "-DskipTests"],
+                    cwd=root_dir, capture_output=True, text=True, timeout=300,
+                )
+                target_json = os.path.join(root_dir, cve_rel)
+                if os.path.isfile(target_json):
+                    dest = os.path.join("ci-artifacts", "gate", root_dir, cve_rel)
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    shutil.copy2(target_json, dest)
+                    return 1
     except Exception:
         payload = None
     if payload is None:
