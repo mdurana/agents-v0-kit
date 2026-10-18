@@ -401,6 +401,52 @@ expect_fail "check-milestone fails Build when a dependency manifest has no miles
 printf '| milestone | docs/agents-v0/milestones/earlier.md | dev | Approved | 2026-01-06 |\n' >> "$d/docs/agents-v0/milestones/earlier.md"
 expect_pass "check-milestone accepts a dependency manifest with an approved milestone row" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
 
+# Cross-milestone story dependencies and plan phase
+cat > "$d/docs/agents-v0/milestones/m2.md" <<'EOF'
+# Milestone: M2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency |
+|----------|-----------|------------------|--------|------------|
+| M2-A | As a user, I want g, so that h. | docs/agents-v0/requirements/g.md | planned | M-A |
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| plan | docs/agents-v0/milestones/m2.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/requirements/g.md" <<'EOF'
+# G
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| Intake | docs/agents-v0/requirements/g.md | dev | Approved | 2026-01-01 |
+| Build | docs/agents-v0/build/g/build-report.md | dev | Approved | 2026-01-05 |
+EOF
+expect_pass "check-milestone cross-milestone: M2-A passes when dependency M-A has verify approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md intake
+sedi '/Verify.*Approved/d' "$d/docs/agents-v0/requirements/a.md"
+expect_fail "check-milestone cross-milestone: M2-A fails when dependency M-A lacks verify approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md intake
+printf '| Verify | docs/agents-v0/verify/a/test-report.md | dev | Approved | 2026-01-04 |\n' >> "$d/docs/agents-v0/requirements/a.md"
+
+expect_pass "check-milestone plan phase accepts acyclic concrete stories" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md plan
+
+cat > "$d/docs/agents-v0/milestones/cycle.md" <<'EOF'
+# Milestone: Cycle
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency |
+|----------|-----------|------------------|--------|------------|
+| C-A | As a user, I want c1, so that c2. | docs/agents-v0/requirements/ca.md | planned | C-B |
+| C-B | As a user, I want c3, so that c4. | docs/agents-v0/requirements/cb.md | planned | C-A |
+EOF
+expect_fail "check-milestone detects dependency cycle and fails" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/cycle.md plan
+rm -f "$d/docs/agents-v0/milestones/cycle.md"
+
 # --- check-milestone.sh SLO waivers -----------------------------------------
 d="$tmp/slo"
 mkdir -p "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/system" "$d/docs/agents-v0/verify/s"

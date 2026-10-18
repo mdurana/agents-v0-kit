@@ -9,7 +9,7 @@ Incremental features (P3-1..N) each with independent gated artifacts.
 |----------|-----------|------------------|--------|------------|---------|------|
 | P3-A | As a [role], I want [one named capability beyond the MVP], so that [the outcome that capability produces]. | docs/agents-v0/requirements/p3-a-feature.md | planned | P2 | — | — |
 
-> Do not run `/v0-intake` until the brackets are replaced with a real role, action, and outcome. One capability per row; add P3-B, P3-C for further features.
+> Replace this template stub during /v0-plan with concrete expansion stories and exact story-ID dependencies. Do not run `/v0-intake` until the brackets are replaced with a real role, action, and outcome. One capability per row; add P3-B, P3-C for further features.
 
 ## Delivery approvals
 

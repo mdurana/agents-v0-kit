@@ -9,7 +9,7 @@ End-to-end MVP user journeys with full gated delivery per story.
 |----------|-----------|------------------|--------|------------|---------|------|
 | P2-A | As a [role], I want to [one named primary journey], so that [the outcome that journey produces]. | docs/agents-v0/requirements/p2-a-mvp-journey.md | planned | P1 | — | — |
 
-> Do not run `/v0-intake` until the brackets are replaced with a real role, action, and outcome.
+> Replace this template stub during /v0-plan with concrete MVP stories and exact story-ID dependencies. Do not run `/v0-intake` until the brackets are replaced with a real role, action, and outcome.
 
 ## Delivery approvals
 

@@ -14,7 +14,7 @@
 #
 # Usage: sh check-milestone.sh <manifest> <phase>
 #   <manifest>  e.g. docs/agents-v0/milestones/p2-mvp-core-features.md
-#   <phase>     intake | design | build | verify | release
+#   <phase>     plan | intake | design | build | verify | release
 #   The milestone-level decision row itself is checked by
 #   ci/check-approvals.sh <manifest> milestone.
 #
@@ -32,13 +32,14 @@ if [ -z "$manifest" ] || [ -z "$phase" ]; then
   exit 1
 fi
 case "$phase" in
-  intake|design|build|verify|release) ;;
+  plan|intake|design|build|verify|release) ;;
   *)
-    printf 'FAIL: unknown phase "%s" (expected intake|design|build|verify|release)\n' "$phase" >&2
+    printf 'FAIL: unknown phase "%s" (expected plan|intake|design|build|verify|release)\n' "$phase" >&2
     exit 1
     ;;
 esac
 [ -f "$manifest" ] || { printf 'FAIL: milestone manifest not found: %s\n' "$manifest" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -75,36 +76,52 @@ artifacts="$(printf '%s\n' "$section" | awk -F'|' '
 
 missing=0
 checked=0
-for a in $artifacts; do
-  case "$a" in
-    *'<'*|*'>'*)
-      printf 'FAIL: milestone story row still has placeholder artifact path: %s\n' "$a" >&2
+if [ "$phase" = "plan" ]; then
+  for a in $artifacts; do
+    case "$a" in
+      *'<'*|*'>'*)
+        printf 'FAIL: milestone story row still has placeholder artifact path: %s\n' "$a" >&2
+        missing=1
+        continue
+        ;;
+    esac
+    checked=$((checked + 1))
+  done
+  [ "$checked" -gt 0 ] || { printf 'FAIL: %s has no story rows\n' "$manifest" >&2; missing=1; }
+else
+  for a in $artifacts; do
+    case "$a" in
+      *'<'*|*'>'*)
+        printf 'FAIL: milestone story row still has placeholder artifact path: %s\n' "$a" >&2
+        missing=1
+        continue
+        ;;
+    esac
+    if [ ! -f "$a" ]; then
+      printf 'FAIL: milestone story artifact missing on disk: %s\n' "$a" >&2
       missing=1
       continue
-      ;;
-  esac
-  if [ ! -f "$a" ]; then
-    printf 'FAIL: milestone story artifact missing on disk: %s\n' "$a" >&2
-    missing=1
-    continue
-  fi
-  if ! sh "$here/check-approvals.sh" "$a" "$phase"; then
-    missing=1
-    continue
-  fi
-  case "$phase" in
-    build|verify)
-      sh "$here/check-evidence.sh" "$a" "$phase" || missing=1
-      ;;
-  esac
-  checked=$((checked + 1))
-done
+    fi
+    if ! sh "$here/check-approvals.sh" "$a" "$phase"; then
+      missing=1
+      continue
+    fi
+    case "$phase" in
+      build|verify)
+        sh "$here/check-evidence.sh" "$a" "$phase" || missing=1
+        ;;
+    esac
+    checked=$((checked + 1))
+  done
+fi
 
 # Story order: a story with a build approval needs a verify approval on every story
-# it names in the Dependency column. A dependency that is a manifest path (*.md)
-# instead needs an Approved milestone row on that file. Other tokens that are not
-# story IDs of this manifest (milestone names such as P1, or a dash) are prose and
-# are skipped.
+# it names in the Dependency column (including cross-milestone story dependencies).
+# A dependency that is a manifest path (*.md) instead needs an Approved milestone row
+# on that file. Other tokens that are not story IDs (milestone names such as P1, or a dash)
+# are prose and are skipped.
+# The story dependency graph is checked across all milestone manifests to enforce
+# that it is strictly acyclic.
 # MILESTONE_ORDER=0 turns the check off.
 has_approval() {
   sh "$here/check-approvals.sh" "$1" "$2" >/dev/null 2>&1
@@ -121,14 +138,119 @@ check_story_order() {
       if (id != "") printf "%s^%s^%s\n", id, art, dep
     }')"
   ids="$(printf '%s\n' "$rows" | awk -F'^' '{ print $1 }')"
+
+  # Gather story rows across all manifests in the milestone directory
+  manifest_dir="$(dirname "$manifest")"
+  all_manifests="$(find "$manifest_dir" -maxdepth 1 -name '*.md' 2>/dev/null || true)"
+  all_rows="$(awk -F'|' '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    /^#+[[:space:]]*[Ss]tories/ { in_section = 1; next }
+    /^#+[[:space:]]/ { in_section = 0 }
+    !in_section { next }
+    /---/ { next }
+    /Story [Ii][Dd]/ { next }
+    /^[[:space:]]*\|/ {
+      id = trim($2); art = trim($4); dep = trim($6)
+      if (id != "") printf "%s^%s^%s^%s\n", id, art, dep, FILENAME
+    }
+  ' $all_manifests 2>/dev/null || true)"
+  all_ids="$(printf '%s\n' "$all_rows" | awk -F'^' '{ print $1 }')"
+
   order_fail=0
+
+  # 1. Enforce acyclic story dependency graph
+  if [ -n "$all_rows" ]; then
+    cycle_out="$(ALL_ROWS="$all_rows" python3 - <<'PY' 2>&1
+import sys, os, re
+
+rows_text = os.environ.get("ALL_ROWS", "")
+lines = [l.strip() for l in rows_text.strip().split("\n") if l.strip()]
+
+all_ids = set()
+for line in lines:
+    parts = line.split("^")
+    if len(parts) >= 1 and parts[0].strip():
+        all_ids.add(parts[0].strip())
+
+graph = {uid: [] for uid in all_ids}
+
+for line in lines:
+    parts = line.split("^")
+    if len(parts) >= 3:
+        sid = parts[0].strip()
+        deps_raw = parts[2].strip()
+        deps = [d.strip() for d in re.split(r'[,;\s]+', deps_raw) if d.strip()]
+        for d in deps:
+            if d == sid:
+                print(f"FAIL: story dependency cycle detected: {sid} -> {sid}")
+                sys.exit(1)
+            if d in all_ids:
+                graph[sid].append(d)
+
+WHITE, GRAY, BLACK = 0, 1, 2
+color = {u: WHITE for u in all_ids}
+
+def dfs(u, path):
+    color[u] = GRAY
+    for v in graph.get(u, []):
+        if color.get(v) == GRAY:
+            cycle = path + [v]
+            idx = cycle.index(v)
+            cycle_str = " -> ".join(cycle[idx:])
+            print(f"FAIL: story dependency cycle detected: {cycle_str}")
+            sys.exit(1)
+        elif color.get(v) == WHITE:
+            dfs(v, path + [v])
+    color[u] = BLACK
+
+for u in sorted(all_ids):
+    if color[u] == WHITE:
+        dfs(u, [u])
+PY
+    )" || {
+      printf '%s\n' "$cycle_out" >&2
+      order_fail=1
+    }
+  fi
+
+  # 2. Check dependencies for stories in the current manifest
   while IFS='^' read -r sid sart sdep; do
     [ -n "$sid" ] || continue
+
+    if [ "$phase" = "plan" ]; then
+      for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
+        case "$dep" in
+          ''|'-'|'—'|'None'|'none') continue ;;
+          P[0-9]|P[0-9][0-9]) continue ;;
+          *.md)
+            if [ ! -f "$dep" ]; then
+              printf 'FAIL: story %s names dependency manifest that does not exist: %s\n' "$sid" "$dep" >&2
+              order_fail=1
+            fi
+            continue
+            ;;
+        esac
+        case "$dep" in
+          *-*)
+            if ! printf '%s\n' "$all_ids" | grep -Fxq "$dep"; then
+              printf 'FAIL: story %s names unknown dependency story %s\n' "$sid" "$dep" >&2
+              order_fail=1
+            fi
+            ;;
+        esac
+      done
+      continue
+    fi
+
+    # Build/verify/intake/design/release: check verify approval on build-approved stories
     case "$sart" in ''|*'<'*|*'>'*) continue ;; esac
     [ -f "$sart" ] || continue
     has_approval "$sart" build || continue
+
     for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
       case "$dep" in
+        ''|'-'|'—'|'None'|'none') continue ;;
+        P[0-9]|P[0-9][0-9]) continue ;;
         *.md)
           if [ ! -f "$dep" ] || ! has_approval "$dep" milestone; then
             printf 'FAIL: story %s is build-approved but dependency manifest %s has no approved milestone row\n' "$sid" "$dep" >&2
@@ -137,17 +259,26 @@ check_story_order() {
           continue
           ;;
       esac
-      printf '%s\n' "$ids" | grep -Fxq "$dep" || continue
-      dart="$(printf '%s\n' "$rows" | awk -F'^' -v d="$dep" '$1 == d { print $2; exit }')"
-      case "$dart" in ''|*'<'*|*'>'*)
-        printf 'FAIL: story %s is build-approved but its dependency %s has no concrete artifact\n' "$sid" "$dep" >&2
-        order_fail=1
-        continue
-        ;;
-      esac
-      if [ ! -f "$dart" ] || ! has_approval "$dart" verify; then
-        printf 'FAIL: story %s is build-approved but its dependency %s has no verify approval (%s)\n' "$sid" "$dep" "$dart" >&2
-        order_fail=1
+
+      if printf '%s\n' "$all_ids" | grep -Fxq "$dep"; then
+        dart="$(printf '%s\n' "$all_rows" | awk -F'^' -v d="$dep" '$1 == d { print $2; exit }')"
+        case "$dart" in ''|*'<'*|*'>'*)
+          printf 'FAIL: story %s is build-approved but its dependency %s has no concrete artifact\n' "$sid" "$dep" >&2
+          order_fail=1
+          continue
+          ;;
+        esac
+        if [ ! -f "$dart" ] || ! has_approval "$dart" verify; then
+          printf 'FAIL: story %s is build-approved but its dependency %s has no verify approval (%s)\n' "$sid" "$dep" "$dart" >&2
+          order_fail=1
+        fi
+      else
+        case "$dep" in
+          *-*)
+            printf 'FAIL: story %s is build-approved but its dependency %s was not found in any milestone manifest\n' "$sid" "$dep" >&2
+            order_fail=1
+            ;;
+        esac
       fi
     done
   done <<EOF
