@@ -194,39 +194,77 @@ def install_cursor(data):
             os.path.basename(os.path.dirname(path))
             for path in glob.glob(os.path.join(other_dir, "skills", "*", "SKILL.md"))
         )
-    org = os.path.join(".cursor", "rules", "org")
-    for name in other_rule_names:
-        path = os.path.join(org, name)
-        if os.path.isfile(path) or os.path.islink(path):
-            os.remove(path)
-    skills_root = os.path.join(".cursor", "skills")
-    for name in other_skill_names:
-        path = os.path.join(skills_root, name)
-        if os.path.isdir(path) and not os.path.islink(path):
-            shutil.rmtree(path)
-        elif os.path.lexists(path):
-            os.remove(path)
-    for path in selected_rules:
-        shutil.copyfile(path, os.path.join(org, os.path.basename(path)))
-    for path in sorted(glob.glob(os.path.join(directory, "skills", "*", "SKILL.md"))):
-        name = os.path.basename(os.path.dirname(path))
-        dest = os.path.join(skills_root, name)
-        os.makedirs(dest, exist_ok=True)
-        shutil.copyfile(path, os.path.join(dest, "SKILL.md"))
-    agents = os.path.join(".cursor", "agents")
-    os.makedirs(agents, exist_ok=True)
-    for path in glob.glob(os.path.join(directory, "agents", "*.md")):
-        shutil.copyfile(path, os.path.join(agents, os.path.basename(path)))
-    scan = os.path.join(directory, "hooks", "pack-scan.sh")
-    if os.path.isfile(scan):
-        hooks = os.path.join(".cursor", "hooks")
-        os.makedirs(hooks, exist_ok=True)
-        dst = os.path.join(hooks, "pack-scan.sh")
-        shutil.copyfile(scan, dst)
-        try:
-            os.chmod(dst, 0o755)
-        except OSError as e:
-            sys.stderr.write(f"WARN: could not chmod {dst}: {e}\n")
+    import tempfile
+    tracked_dirs = [
+        os.path.join(".cursor", "rules", "org"),
+        os.path.join(".cursor", "skills"),
+        os.path.join(".cursor", "agents"),
+        os.path.join(".cursor", "hooks"),
+    ]
+    backup_root = tempfile.mkdtemp(prefix="cursor_backup_")
+    try:
+        for t in tracked_dirs:
+            if os.path.exists(t):
+                b_dst = os.path.join(backup_root, os.path.relpath(t, "."))
+                os.makedirs(os.path.dirname(b_dst), exist_ok=True)
+                if os.path.isdir(t):
+                    shutil.copytree(t, b_dst, symlinks=True)
+                else:
+                    shutil.copy2(t, b_dst)
+
+        org = os.path.join(".cursor", "rules", "org")
+        os.makedirs(org, exist_ok=True)
+        for name in other_rule_names:
+            path = os.path.join(org, name)
+            if os.path.isfile(path) or os.path.islink(path):
+                os.remove(path)
+        skills_root = os.path.join(".cursor", "skills")
+        os.makedirs(skills_root, exist_ok=True)
+        for name in other_skill_names:
+            path = os.path.join(skills_root, name)
+            if os.path.isdir(path) and not os.path.islink(path):
+                shutil.rmtree(path)
+            elif os.path.lexists(path):
+                os.remove(path)
+        for path in selected_rules:
+            shutil.copyfile(path, os.path.join(org, os.path.basename(path)))
+        for path in sorted(glob.glob(os.path.join(directory, "skills", "*", "SKILL.md"))):
+            name = os.path.basename(os.path.dirname(path))
+            dest = os.path.join(skills_root, name)
+            os.makedirs(dest, exist_ok=True)
+            shutil.copyfile(path, os.path.join(dest, "SKILL.md"))
+        agents = os.path.join(".cursor", "agents")
+        os.makedirs(agents, exist_ok=True)
+        for path in glob.glob(os.path.join(directory, "agents", "*.md")):
+            shutil.copyfile(path, os.path.join(agents, os.path.basename(path)))
+        scan = os.path.join(directory, "hooks", "pack-scan.sh")
+        if os.path.isfile(scan):
+            hooks = os.path.join(".cursor", "hooks")
+            os.makedirs(hooks, exist_ok=True)
+            dst = os.path.join(hooks, "pack-scan.sh")
+            shutil.copyfile(scan, dst)
+            try:
+                os.chmod(dst, 0o755)
+            except OSError as e:
+                sys.stderr.write(f"WARN: could not chmod {dst}: {e}\n")
+    except Exception as exc:
+        for t in tracked_dirs:
+            b_src = os.path.join(backup_root, os.path.relpath(t, "."))
+            if os.path.exists(b_src):
+                if os.path.isdir(b_src):
+                    if os.path.exists(t):
+                        shutil.rmtree(t)
+                    shutil.copytree(b_src, t, symlinks=True)
+                else:
+                    shutil.copy2(b_src, t)
+            else:
+                if os.path.isdir(t) and not os.path.islink(t):
+                    shutil.rmtree(t)
+                elif os.path.lexists(t):
+                    os.remove(t)
+        raise exc
+    finally:
+        shutil.rmtree(backup_root, ignore_errors=True)
 
 
 def with_backend_root(text, command):
@@ -321,11 +359,13 @@ for heading, row, value in mapping:
     text = set_row(text, heading, row, value, force or owned_be or owned_fe)
 try:
     install_cursor(info)
-except OSError as exc:
+except Exception as exc:
     fail(f"could not install cursor configuration: {exc}", 1)
 
 os.makedirs(os.path.dirname(profile_path), exist_ok=True)
-with open(profile_path, "w", encoding="utf-8") as handle:
+tmp_profile = profile_path + ".tmp"
+with open(tmp_profile, "w", encoding="utf-8") as handle:
     handle.write(text)
+os.replace(tmp_profile, profile_path)
 print(f"pack: {requested}")
 PY

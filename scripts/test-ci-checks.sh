@@ -816,6 +816,16 @@ sedi 's/| Frontend root | <!-- `app\/frontend\/` or n\/a --> |/| Frontend root |
 expect_pass "activate-stack-pack binds dotnet on an app profile" "$d" sh "$act" dotnet
 grep -Fq '| Frontend verify | cd app/frontend && npm run verify |' "$d/docs/agents-v0/project-profile.md" \
   && pass "activate-stack-pack prefixes Frontend root on Frontend verify" || fail "activate-stack-pack prefixes Frontend root on Frontend verify"
+d="$tmp/activate-rollback"
+mkdir -p "$d/docs/agents-v0" "$d/app/backend" "$d/.cursor/rules/org"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+printf 'pre-existing rule\n' > "$d/.cursor/rules/org/pre-existing.mdc"
+printf 'blocking\n' > "$d/.cursor/skills"
+expect_fail "activate-stack-pack rolls back and fails when cursor install fails" "$d" sh "$act" dotnet
+[ -f "$d/.cursor/rules/org/pre-existing.mdc" ] \
+  && pass "activate-stack-pack rollback preserves existing rules on failure" || fail "activate-stack-pack rollback preserves existing rules on failure"
+grep -Fq '<!-- pack id;' "$d/docs/agents-v0/project-profile.md" \
+  && pass "activate-stack-pack leaves profile unmutated on failure" || fail "activate-stack-pack leaves profile unmutated on failure"
 
 link="$tmp/link-project"
 mkdir -p "$link"
@@ -948,6 +958,7 @@ Option A.
 - Real-time mobile push notifications
 EOF
 expect_pass "check-roadmap preflight accepts normalized ## **Success Metrics**" "$d" sh "$CI/check-roadmap.sh" --preflight docs/product/claims-discovery.md
+expect_fail "check-roadmap preflight rejects unfilled discovery _template.md" "$d" sh "$CI/check-roadmap.sh" --preflight "$KIT/templates/docs/agents-v0/discovery/_template.md"
 
 cat > "$d/docs/product/claims-discovery-placeholder.md" <<'EOF'
 # Claims Discovery
