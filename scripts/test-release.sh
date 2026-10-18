@@ -140,6 +140,27 @@ has "local release: clear-active drops the phase in flight" "$r/docs/agents-v0/r
 exit_is 1 "local release: Decision Local is not an Approved release row" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/local-story.md" release
 exit_is 0 "local release: the verify row is still approved" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/local-story.md" verify
 
+# P0-A batch approval writing Approved for first 4 rows and Local for release
+cat > "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.md" <<'EOF'
+# Story: P0-A
+Milestone: P0 — Platform Skeleton
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| intake | docs/agents-v0/requirements/p0-a-platform-skeleton.md | @ada | Approved | 2026-02-01 |
+| design | docs/agents-v0/design/p0-a-platform-skeleton/design.md | @ada | Approved | 2026-02-01 |
+| build | docs/agents-v0/build/p0-a-platform-skeleton/build-report.md | @ada | Approved | 2026-02-01 |
+| verify | docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md | @ada | Approved | 2026-02-01 |
+| release | feature/p0-a 1234567890abcdef | @ada | Local | 2026-02-01 |
+EOF
+(cd "$r" && sh "$state_sh" --clear-active docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null)
+has "local release: P0-A four approved rows advance lastApprovedPhase to verify" "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.state.json" '"lastApprovedPhase": "verify"'
+exit_is 0 "local release: P0-A build row is approved" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.md" build
+exit_is 0 "local release: P0-A verify row is approved" sh "$KIT/templates/.agents-v0/ci/check-approvals.sh" "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.md" verify
+exit_is 1 "local release: Decision Local is rejected for build row" sh -c "printf '| build | ... | @ada | Local | 2026-02-01 |\n' | grep -i '|[[:space:]]*build[[:space:]]*|' | awk -F'|' '{print tolower(\$5)}' | grep -Eqi '^(approved|approve|yes|pass)([^a-z]|$)'"
+
 resolve="$KIT/templates/.agents-v0/scripts/resolve-integration-branch.sh"
 prof="$tmp/profile"
 mkdir -p "$prof/docs/agents-v0"
