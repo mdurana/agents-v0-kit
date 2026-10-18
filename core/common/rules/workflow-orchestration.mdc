@@ -88,7 +88,7 @@ A fix, CVE patch, upgrade, or hotfix is recorded in `docs/agents-v0/maintain/<id
 
 ## Helper agents
 
-Phase agents do not launch helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`). A known `/api/v1` contract launches `schema-author` in the same turn with no brief. Any other helper is a brief the phase agent writes and returns; the main session launches it once and passes `return:` back. Repeating the same `ask` is a loop: stop. Delete the brief once the result is back.
+Phase agents do not launch helper agents (`explore-researcher`, `schema-author`, `debug-investigator`, `docs-author`). A known `/api/v1` contract launches `schema-author` before `solution-architect` with no brief, so the architect and UX designer build on the authored draft. Any other helper is a brief the phase agent writes and returns; the main session launches it once and passes `return:` back. Repeating the same `ask` is a loop: stop. Delete the brief once the result is back.
 
 A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fields to return), and `ask:` (one paragraph naming the files and rules).
 

@@ -128,12 +128,22 @@ def require_accepted_adr():
              "set Status to Accepted before the pin, or supersede it and cite the successor")
 
 
+def file_bytes_for_hash(path, adr_path):
+    if adr_path and os.path.abspath(path) == os.path.abspath(adr_path):
+        text = read(path) or ""
+        lines = [ln for ln in text.splitlines(True) if not re.search(r"(?im)^(?:[-*]\s*)?(?:\*\*)?Status(?:\*\*)?\s*:", ln)]
+        return "".join(lines).encode("utf-8")
+    with open(path, "rb") as handle:
+        return handle.read()
+
+
 def current_hash():
     digest = hashlib.sha256()
+    adr = named_adr(read(os.path.join(base, "design.md")))
+    adr_path = adr if adr and os.path.isfile(adr) else None
     for path in design_files():
         digest.update(path.replace(os.sep, "/").encode() + b"\0")
-        with open(path, "rb") as handle:
-            digest.update(handle.read() + b"\0")
+        digest.update(file_bytes_for_hash(path, adr_path) + b"\0")
     return digest.hexdigest()
 
 

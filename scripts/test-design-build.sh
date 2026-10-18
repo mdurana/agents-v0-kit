@@ -151,6 +151,46 @@ yaml_run pass "openapi compat: a compatible draft passes" "$o" sh "$CI/check-ope
 cp "$o/catalog-ok.yaml" "$o/catalog-break.yaml"
 sedi 's/sku: {type: string}}}/sku: {type: string}, legacy: {type: string}}}/' "$o/catalog-break.yaml"
 yaml_run fail "openapi compat: a lost response property and a changed component fail" "$o" sh "$CI/check-openapi.sh" compat draft.yaml catalog-break.yaml
+
+cat > "$o/catalog-json-errors.yaml" <<'EOF'
+openapi: 3.0.3
+info: {title: Orders, version: "1"}
+paths:
+  /api/v1/users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200": {description: ok, content: {application/json: {schema: {type: object}}}}
+        "404": {description: not found, content: {application/json: {schema: {type: object}}}}
+EOF
+yaml_run fail "openapi compat: mixed error envelopes between draft (problem+json) and catalog (json) fail" "$o" sh "$CI/check-openapi.sh" compat draft.yaml catalog-json-errors.yaml
+
+cat > "$o/catalog-placeholder.yaml" <<'EOF'
+openapi: 3.0.3
+info: {title: <service> API, version: "1.0.0"}
+paths:
+  /api/v1/<resources>:
+    get:
+      operationId: list<Resources>
+      responses:
+        "200": {description: ok, content: {application/json: {schema: {$ref: '#/components/schemas/<Resource>ListResponse'}}}}
+        "404": {description: not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+components:
+  schemas:
+    <Resource>ListResponse: {type: object}
+    ErrorResponse: {type: object}
+EOF
+yaml_run pass "openapi compat: placeholder catalog does not clash on error envelope" "$o" sh "$CI/check-openapi.sh" compat draft.yaml catalog-placeholder.yaml
+cp "$o/catalog-placeholder.yaml" "$o/cat-merge.yaml"
+yaml_run pass "openapi merge: prunes placeholder paths and lints combined catalog" "$o" sh "$CI/check-openapi.sh" merge draft.yaml cat-merge.yaml
+if grep -q '<resources>' "$o/cat-merge.yaml"; then
+  fail "openapi merge: placeholder path was not pruned"
+else
+  pass "openapi merge: placeholder path was pruned"
+fi
+
 yaml_run pass "openapi merge: writes a new catalog from the draft" "$o" sh "$CI/check-openapi.sh" merge draft.yaml newcat/api-v1.yaml
 yaml_run pass "openapi merged: the merged catalog contains the draft" "$o" sh "$CI/check-openapi.sh" merged draft.yaml newcat/api-v1.yaml
 yaml_run fail "openapi merged: a catalog without the draft fails" "$o" sh "$CI/check-openapi.sh" merged draft.yaml catalog-ok.yaml
@@ -358,6 +398,14 @@ printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evide
 run pass "design: a Proposed ADR still passes the structure check" "$d" sh "$CI/check-design.sh" orders
 run fail "design: a Proposed ADR cannot be pinned" "$d" sh "$CI/check-design.sh" orders --pin approved
 sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-orders.md"
+ha_same="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
+if [ "$hp" = "$ha_same" ]; then
+  pass "design: setting ADR from Proposed to Accepted preserves the design hash"
+else
+  fail "design: setting ADR from Proposed to Accepted preserves the design hash (wanted $hp, got $ha_same)"
+fi
+run pass "design: pinning succeeds after setting ADR to Accepted without re-reviewing" "$d" sh "$CI/check-design.sh" orders --pin approved
+rm -f "$d/docs/agents-v0/design/orders/design.lock"
 cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
 sedi 's/N\/A: no event contract/Channel orders.order-created in asyncapi.yaml./' "$d/docs/agents-v0/design/orders/design.md"
 ha="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"

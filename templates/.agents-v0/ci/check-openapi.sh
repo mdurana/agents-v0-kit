@@ -188,6 +188,30 @@ def json_schema(doc, holder):
     return None
 
 
+def is_placeholder_path(path):
+    return "<" in path or ">" in path
+
+
+def is_placeholder_name(name):
+    return "<" in name or ">" in name
+
+
+def real_operations(doc):
+    for path, method, op, item in operations(doc):
+        if not is_placeholder_path(path):
+            yield path, method, op, item
+
+
+def doc_error_types(doc):
+    error_types = set()
+    for path, method, op, item in real_operations(doc):
+        for code, resp in (op.get("responses") or {}).items():
+            if str(code).startswith(("4", "5")):
+                for ctype in (resolve(doc, resp).get("content") or {}):
+                    error_types.add(ctype.split(";")[0].strip().lower())
+    return error_types
+
+
 def compat(draft, catalog):
     cat_ops = {(p, m): (op, item) for p, m, op, item in operations(catalog)}
     for path, method, op, item in operations(draft):
@@ -217,11 +241,19 @@ def compat(draft, catalog):
                     removed = props_of(catalog, old_s) - props_of(draft, new_s)
                     if removed:
                         fail(f"{where}: response {code} lost properties {sorted(removed)}")
+    d_errors = doc_error_types(draft)
+    c_errors = doc_error_types(catalog)
+    if c_errors and d_errors:
+        combined = d_errors | c_errors
+        if "application/problem+json" in combined and (combined - {"application/problem+json"}):
+            fail(f"mixed error envelopes between draft ({sorted(d_errors)}) and catalog ({sorted(c_errors)}); pick one per API surface")
     for kind in COMPONENT_KINDS:
         mine = ((draft.get("components") or {}).get(kind) or {})
         theirs = ((catalog.get("components") or {}).get(kind) or {})
         for name, definition in mine.items():
-            if name in theirs and theirs[name] != definition:
+            if is_placeholder_name(name):
+                continue
+            if name in theirs and not is_placeholder_name(name) and theirs[name] != definition:
                 fail(f"components.{kind}.{name} differs from the catalog (rename it, or amend the catalog on purpose)")
 
 
@@ -253,6 +285,25 @@ def merge(draft, catalog_path):
     compat(draft, catalog)
     if failures:
         return None
+    placeholder_paths = [p for p in catalog["paths"] if is_placeholder_path(p)]
+    for p in placeholder_paths:
+        del catalog["paths"][p]
+    if "components" in catalog and isinstance(catalog["components"], dict):
+        for kind in COMPONENT_KINDS:
+            if kind in catalog["components"] and isinstance(catalog["components"][kind], dict):
+                p_names = [n for n in catalog["components"][kind] if is_placeholder_name(n)]
+                for n in p_names:
+                    del catalog["components"][kind][n]
+        if placeholder_paths and "schemas" in catalog["components"] and "ErrorResponse" in catalog["components"]["schemas"]:
+            if "application/problem+json" in doc_error_types(draft):
+                refs = set(walk_refs(catalog.get("paths") or {}))
+                if "#/components/schemas/ErrorResponse" not in refs:
+                    del catalog["components"]["schemas"]["ErrorResponse"]
+    if draft.get("info") and catalog.get("info", {}).get("title") == "<service> API":
+        catalog["info"] = copy.deepcopy(draft["info"])
+    if draft.get("servers"):
+        if not catalog.get("servers") or catalog.get("servers") == [{"url": "/api/v1"}]:
+            catalog["servers"] = copy.deepcopy(draft["servers"])
     for path, item in (draft.get("paths") or {}).items():
         target = catalog["paths"].setdefault(path, {})
         for key, value in item.items():
@@ -279,8 +330,10 @@ elif mode == "merge":
     lint(draft_doc, arg1)
     if not failures:
         result = merge(draft_doc, arg2)
-        if result is not None:
-            merged(draft_doc, result)
+        if result is not None and not failures:
+            lint(result, arg2)
+            if not failures:
+                merged(draft_doc, result)
 
 if failures:
     for item in failures:
