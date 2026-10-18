@@ -927,8 +927,23 @@ printf '{"name":"orders-api","dependencies":{"express":"4.19.0"}}\n' > "$fnode/p
 printf "app.get('/api/v1/unlisted', (req, res) => res.json({}));\n" > "$fnode/src/routes.ts"
 run pass "frontend calls: a root-level backend Node package.json is not scanned as a frontend root" "$fnode" sh "$CI/check-frontend-calls.sh"
 
+# --- ci/check-design-contracts.sh catalog lint & merged check ----------------
+dc="$tmp/design-contracts-cat"
+mkdir -p "$dc/openapi" "$dc/docs/agents-v0/design/orders" "$dc/docs/agents-v0/build/orders"
+cp "$o/cat-placeholder-nosec.yaml" "$dc/openapi/api-v1.yaml"
+yaml_run fail "design contracts: catalog openapi/api-v1.yaml with unauthenticated placeholder fails lint" "$dc" sh "$CI/check-design-contracts.sh"
+cp "$o/cat-with-placeholder.yaml" "$dc/openapi/api-v1.yaml"
+yaml_run pass "design contracts: valid catalog openapi/api-v1.yaml passes lint" "$dc" sh "$CI/check-design-contracts.sh"
+cp "$o/draft.yaml" "$dc/docs/agents-v0/design/orders/openapi.yaml"
+cp "$o/catalog-ok.yaml" "$dc/openapi/api-v1.yaml"
+printf '# Build Report\ncommit: deadbeef\n' > "$dc/docs/agents-v0/build/orders/build-report.md"
+yaml_run fail "design contracts: built feature whose draft was not merged into openapi/api-v1.yaml fails" "$dc" sh "$CI/check-design-contracts.sh"
+cp "$o/newcat/api-v1.yaml" "$dc/openapi/api-v1.yaml"
+yaml_run pass "design contracts: built feature with draft merged into openapi/api-v1.yaml passes" "$dc" sh "$CI/check-design-contracts.sh"
+
 if [ "$status" -ne 0 ]; then
   echo "test-design-build: FAILED" >&2
   exit 1
 fi
 echo "test-design-build: OK"
+

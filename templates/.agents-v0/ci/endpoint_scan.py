@@ -255,6 +255,62 @@ def main(args):
     if code != 0:
         print(f"FAIL: git diff {' '.join(span)} failed", file=sys.stderr)
         return 1
+    if not out.strip() and not re.fullmatch(r"[0-9a-f]{7,40}", base, re.I):
+        _c_b, b_sha = _git("rev-parse", "--verify", "-q", f"{base}^{{commit}}")
+        _c_h, h_sha = _git("rev-parse", "--verify", "-q", f"{head or 'HEAD'}^{{commit}}")
+        if b_sha.strip() and b_sha.strip() == h_sha.strip():
+            eff_base = ""
+            for sf in sorted(glob.glob(os.path.join("docs", "agents-v0", "requirements", "*.state.json")), key=os.path.getmtime, reverse=True):
+                try:
+                    st = json.load(open(sf, encoding="utf-8"))
+                    slug = (st.get("feature") or "").strip()
+                    rep_sha = ""
+                    for rp in (
+                        os.path.join("docs", "agents-v0", "build", slug, "build-report.md"),
+                        os.path.join("docs", "agents-v0", "verify", slug, "test-report.md"),
+                    ):
+                        if slug and os.path.isfile(rp):
+                            m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(rp, encoding="utf-8").read(), re.I | re.M)
+                            if m:
+                                _cr, r_full = _git("rev-parse", "--verify", "-q", f"{m.group(1)}^{{commit}}")
+                                if r_full.strip():
+                                    rep_sha = r_full.strip()
+                                    break
+                    bc = (st.get("baseCommit") or "").strip()
+                    if bc:
+                        _cb, bc_full = _git("rev-parse", "--verify", "-q", f"{bc}^{{commit}}")
+                        bc_full = bc_full.strip()
+                        if bc_full and bc_full != h_sha.strip():
+                            if rep_sha:
+                                _cm, mb = _git("merge-base", bc_full, rep_sha)
+                                if mb.strip() == bc_full and bc_full != rep_sha:
+                                    eff_base = bc_full
+                                    break
+                            else:
+                                eff_base = bc_full
+                                break
+                    if rep_sha:
+                        _cp, par = _git("rev-parse", "--verify", "-q", f"{rep_sha}^")
+                        if par.strip():
+                            eff_base = par.strip()
+                            break
+                except (OSError, ValueError):
+                    pass
+            if not eff_base:
+                for rp in sorted(glob.glob(os.path.join("docs", "agents-v0", "build", "*", "build-report.md")), key=os.path.getmtime, reverse=True):
+                    try:
+                        m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(rp, encoding="utf-8").read(), re.I | re.M)
+                        if m:
+                            _cp, par = _git("rev-parse", "--verify", "-q", f"{m.group(1)}^")
+                            if par.strip():
+                                eff_base = par.strip()
+                                break
+                    except OSError:
+                        pass
+            if eff_base:
+                base = eff_base
+                span = [base, head or "HEAD"]
+                code, out = _git("diff", "--name-only", "--diff-filter=AM", *span)
     failures, checked = [], 0
     for path in [p for p in out.splitlines() if watched(p, pack, stacks)]:
         if head:

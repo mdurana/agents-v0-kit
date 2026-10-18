@@ -263,7 +263,7 @@ def go_json_totals(path):
 
 
 def resolve_merge_base(base):
-    """Resolve merge-base(base, HEAD). If base == HEAD (e.g. working directly on main), fall back to feature baseCommit or HEAD~1."""
+    """Resolve merge-base(base, HEAD). If base == HEAD (e.g. working directly on main), fall back to feature baseCommit, build-report commit^, or pre-doc parent."""
     merge_base = subprocess.run(
         ["git", "-C", root, "merge-base", base, "HEAD"],
         capture_output=True, text=True, check=True,
@@ -277,6 +277,36 @@ def resolve_merge_base(base):
             ["git", "-C", root, "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, check=False,
         ).stdout.strip() or os.getcwd()
+
+        def rev_commit(rev):
+            if not rev:
+                return ""
+            r = subprocess.run(
+                ["git", "-C", root, "rev-parse", "--verify", "-q", f"{rev}^{{commit}}"],
+                capture_output=True, text=True, check=False,
+            )
+            return r.stdout.strip() if r.returncode == 0 else ""
+
+        def report_commit_for(slug):
+            if not slug:
+                return ""
+            for base_dir in (top, os.getcwd()):
+                for rel in (
+                    os.path.join("docs", "agents-v0", "build", slug, "build-report.md"),
+                    os.path.join("docs", "agents-v0", "verify", slug, "test-report.md"),
+                ):
+                    p = os.path.join(base_dir, rel)
+                    if os.path.isfile(p):
+                        try:
+                            m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(p, encoding="utf-8").read(), re.I | re.M)
+                            if m:
+                                sha = rev_commit(m.group(1))
+                                if sha:
+                                    return sha
+                        except OSError:
+                            pass
+            return ""
+
         candidates = []
         for pattern in (
             os.path.join(top, "docs", "agents-v0", "requirements", "*.state.json"),
@@ -302,21 +332,67 @@ def resolve_merge_base(base):
                 continue
             (active_first if (st.get("activePhase") or "") else inactive).append(st)
         for st in active_first + inactive:
-            bc = (st.get("baseCommit") or "").strip()
+            slug = (st.get("feature") or "").strip()
+            rep_sha = report_commit_for(slug)
+            bc = rev_commit((st.get("baseCommit") or "").strip())
             if bc and bc != head_sha:
-                alt = subprocess.run(
-                    ["git", "-C", root, "merge-base", bc, "HEAD"],
-                    capture_output=True, text=True, check=False,
-                )
-                if alt.returncode == 0 and alt.stdout.strip() and alt.stdout.strip() != head_sha:
-                    return alt.stdout.strip()
+                if rep_sha:
+                    mb_rep = subprocess.run(
+                        ["git", "-C", root, "merge-base", bc, rep_sha],
+                        capture_output=True, text=True, check=False,
+                    )
+                    if mb_rep.returncode == 0 and mb_rep.stdout.strip() == bc and bc != rep_sha:
+                        return bc
+                else:
+                    alt = subprocess.run(
+                        ["git", "-C", root, "merge-base", bc, "HEAD"],
+                        capture_output=True, text=True, check=False,
+                    )
+                    if alt.returncode == 0 and alt.stdout.strip() and alt.stdout.strip() != head_sha:
+                        return alt.stdout.strip()
+            if rep_sha:
+                rep_parent = rev_commit(f"{rep_sha}^")
+                if rep_parent:
+                    return rep_parent
+        for base_dir in (top, os.getcwd()):
+            for pattern in (
+                os.path.join(base_dir, "docs", "agents-v0", "build", "*", "build-report.md"),
+                os.path.join(base_dir, "docs", "agents-v0", "verify", "*", "test-report.md"),
+            ):
+                for rp in sorted(glob.glob(pattern), key=lambda p: os.path.getmtime(p), reverse=True):
+                    try:
+                        m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(rp, encoding="utf-8").read(), re.I | re.M)
+                        if m:
+                            sha = rev_commit(m.group(1))
+                            parent = rev_commit(f"{sha}^") if sha else ""
+                            if parent:
+                                return parent
+                    except OSError:
+                        pass
         if not re.fullmatch(r"[0-9a-f]{7,40}", base, re.I):
-            parent = subprocess.run(
-                ["git", "-C", root, "rev-parse", "--verify", "-q", "HEAD~1"],
+            revs = subprocess.run(
+                ["git", "-C", root, "rev-list", "--max-count=10", "HEAD"],
                 capture_output=True, text=True, check=False,
             )
-            if parent.returncode == 0 and parent.stdout.strip():
-                return parent.stdout.strip()
+            if revs.returncode == 0:
+                doc_re = re.compile(r"^(docs/|.*\.(md|mdc|txt|adoc)$)")
+                for c in revs.stdout.splitlines():
+                    c = c.strip()
+                    if not c:
+                        continue
+                    dt = subprocess.run(
+                        ["git", "-C", root, "diff-tree", "--no-commit-id", "--name-only", "-r", c],
+                        capture_output=True, text=True, check=False,
+                    )
+                    files = [f.strip() for f in dt.stdout.splitlines() if f.strip()]
+                    if any(not doc_re.match(f) for f in files):
+                        p = rev_commit(f"{c}^")
+                        if p:
+                            return p
+                        break
+            parent = rev_commit("HEAD~1")
+            if parent:
+                return parent
     return merge_base
 
 
@@ -789,16 +865,23 @@ def files_for(relpath):
     rel_root = os.path.relpath(os.path.abspath(root), os.getcwd())
     if not rel_root.startswith(".."):
         bases.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_root))
+    ci_gate_abs = os.path.abspath(os.path.join(os.getcwd(), "ci-artifacts", "gate"))
     found = []
     seen_rel = set()
-    for base in bases:
+    for idx, base in enumerate(bases):
+        base_abs = os.path.abspath(base)
         pattern = os.path.join(base, relpath)
         for match in glob.glob(pattern, recursive=True):
             if os.path.isfile(match):
-                rel = os.path.relpath(match, base)
+                match_abs = os.path.abspath(match)
+                if idx == 0 and (match_abs == ci_gate_abs or match_abs.startswith(ci_gate_abs + os.sep)):
+                    continue
+                rel = os.path.relpath(match_abs, base_abs)
                 if rel not in seen_rel:
                     seen_rel.add(rel)
                     found.append(match)
+        if idx == 0 and found:
+            break
     return found
 
 
@@ -870,14 +953,18 @@ def measure_manifest(data):
             and os.path.abspath(f).startswith(root_abs + os.sep)
             and not os.path.abspath(f).startswith(ci_gate_abs + os.sep)
         ]
+        root_cve_files = [
+            f for f in glob.glob(os.path.join(root, cve_rel), recursive=True)
+            if os.path.isfile(f) and not os.path.abspath(f).startswith(ci_gate_abs + os.sep)
+        ]
         if (
             live_build_files
             and os.path.isfile(cve_candidate)
             and os.path.abspath(cve_candidate).startswith(ci_gate_abs + os.sep)
-            and not glob.glob(os.path.join(root, cve_rel), recursive=True)
+            and not root_cve_files
         ):
             newest_live = max(os.path.getmtime(f) for f in live_build_files)
-            if os.path.getmtime(cve_candidate) + 1.0 < newest_live:
+            if pack_id == "java" or os.path.getmtime(cve_candidate) + 1.0 < newest_live:
                 cve_candidate = os.path.join(root, cve_rel)
         record_cve(cve_candidate)
     else:

@@ -139,9 +139,10 @@ build:
         fi
         cd "$repo/$root"
         if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
-        run_verify "$MVN" -B clean verify
         if grep -q '<id>ci-security</id>' pom.xml; then
-          run_verify "$MVN" -B verify -Pci-security
+          run_verify "$MVN" -B clean verify -Pci-security
+        else
+          run_verify "$MVN" -B clean verify
         fi
         cd "$repo"
       }

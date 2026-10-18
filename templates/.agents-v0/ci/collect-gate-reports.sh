@@ -44,18 +44,25 @@ if data and not packlib.errors_of(data, "backend"):
     if cve:
         patterns.append(cve)
 else:
+    cve = "target/dependency-check-report.json"
     patterns = [
         "target/site/jacoco/jacoco.xml",
         "target/surefire-reports/TEST-*.xml",
         "target/failsafe-reports/TEST-*.xml",
-        "target/dependency-check-report.json",
+        cve,
     ]
+
+ci_gate_abs = os.path.abspath(os.path.join(os.getcwd(), "ci-artifacts", "gate"))
 
 
 def ensure_cve_artifact(root_dir, cve_rel, pid):
     if not cve_rel or "*" in cve_rel:
         return 0
-    if glob.glob(os.path.join(root_dir, cve_rel), recursive=True):
+    existing = [
+        f for f in glob.glob(os.path.join(root_dir, cve_rel), recursive=True)
+        if os.path.isfile(f) and not os.path.abspath(f).startswith(ci_gate_abs + os.sep)
+    ]
+    if existing:
         return 0
     payload = None
     try:
@@ -148,12 +155,17 @@ for root in roots:
         for match in glob.glob(os.path.join(root, pattern), recursive=True):
             if not os.path.isfile(match):
                 continue
+            match_abs = os.path.abspath(match)
+            if match_abs == ci_gate_abs or match_abs.startswith(ci_gate_abs + os.sep):
+                continue
             rel = os.path.relpath(match, root)
             dest = os.path.join("ci-artifacts", "gate", root, rel)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copy2(match, dest)
             copied += 1
-    if cve and data:
-        copied += ensure_cve_artifact(root, cve, data.get("id") or "")
+    if cve:
+        eff_pid = (data.get("id") if data else "") or ("java" if os.path.isfile(os.path.join(root, "pom.xml")) else "")
+        if eff_pid:
+            copied += ensure_cve_artifact(root, cve, eff_pid)
 print(f"gate reports: copied {copied} file(s) into ci-artifacts/gate/")
 PY

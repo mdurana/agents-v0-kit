@@ -333,6 +333,23 @@ docs/agents-v0/brownfield-onboarding.md
     printf '\n' >> "$dest"
     awk 'BEGIN{p=0} /^## Applicable VAPT findings/{p=1} p{print}' "$src" >> "$dest"
   fi
+  prof="$t/docs/agents-v0/project-profile.md"
+  if [ -f "$prof" ] && grep -Eq '^\|[[:space:]]*(Backend|Service) verify[[:space:]]*\|[^|]*mvnw -B ([^|]* )?clean verify`?[[:space:]]*\|' "$prof"; then
+    python3 - "$prof" <<'PY'
+import re, sys
+p = sys.argv[1]
+text = open(p, encoding="utf-8").read()
+updated = re.sub(
+    r"^(\|\s*(?:Backend|Service) verify\s*\|\s*`?[^|\n]*?\bmvnw\s+-B\s+(?:[^|\n]*?\s+)?clean\s+verify)(`?\s*\|)",
+    r"\1 -Pci-security\2",
+    text,
+    flags=re.M,
+)
+if updated != text:
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(updated)
+PY
+  fi
 }
 
 while [ $# -gt 0 ]; do

@@ -1514,12 +1514,46 @@ else
   pass "collect-gate-reports purged stale dependency-check-report.json from ci-artifacts/gate/"
 fi
 
+# Even if ci-artifacts/gate/target/dependency-check-report.json has a NEWER mtime than target/, Java live build must reject missing target/dependency-check-report.json
+cat > "$dj/ci-artifacts/gate/target/dependency-check-report.json" <<'EOF'
+{"dependencies": []}
+EOF
+expect_fail "check-gate-metrics rejects ci-artifacts/gate CVE report for java when target/dependency-check-report.json is absent even if gate copy is newer" "$dj" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" .
+
+# When both target/ and ci-artifacts/gate/target/ have reports, tests must not be double-counted
+mkdir -p "$dj/ci-artifacts/gate/target/surefire-reports"
+cp "$dj/target/surefire-reports/TEST-a.xml" "$dj/ci-artifacts/gate/target/surefire-reports/TEST-a.xml"
+cp "$dj/ci-artifacts/gate/target/dependency-check-report.json" "$dj/target/dependency-check-report.json"
+out="$(cd "$dj" && env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" . 2>&1)"
+if printf '%s\n' "$out" | grep -Fq "tests: run=1 "; then
+  pass "check-gate-metrics does not double-count JUnit XML under ci-artifacts/gate/"
+else
+  fail "check-gate-metrics double-counted JUnit XML when ci-artifacts/gate/ was populated: $out"
+fi
+
 # DIFF_BASE=HEAD (checkout already on integration branch tip) falls back to feature baseCommit
-mkdir -p "$tmp/gate-diff/docs/agents-v0/requirements"
+mkdir -p "$tmp/gate-diff/docs/agents-v0/requirements" "$tmp/gate-diff/docs/agents-v0/build/orders"
 cat > "$tmp/gate-diff/docs/agents-v0/requirements/orders.state.json" <<EOF
 {"feature":"orders","activePhase":"verify","baseCommit":"$diff_base"}
 EOF
 expect_fail "gate metrics: DIFF_BASE=HEAD on main falls back to state baseCommit and measures diff coverage" "$tmp/gate-diff" env DIFF_BASE=HEAD sh "$CI/check-gate-metrics.sh" .
+
+# When baseCommit equals the code commit (e.g. stamped after code commit on main) and doc-only commits follow, resolve_merge_base uses <report-commit>^
+code_sha="$(cd "$tmp/gate-diff" && git log -1 --format=%H -- src/main/java/com/acme/A.java)"
+cat > "$tmp/gate-diff/docs/agents-v0/build/orders/build-report.md" <<EOF
+# Build Report — orders
+commit: $code_sha
+EOF
+cat > "$tmp/gate-diff/docs/agents-v0/requirements/orders.state.json" <<EOF
+{"feature":"orders","activePhase":"verify","baseCommit":"$code_sha"}
+EOF
+(
+  cd "$tmp/gate-diff"
+  git add docs/agents-v0/build/orders/build-report.md docs/agents-v0/requirements/orders.state.json
+  git_commit "docs: record build report and state"
+)
+expect_fail "gate metrics: DIFF_BASE=HEAD on main with doc commits after build-report commit resolves <report-commit>^ and measures diff coverage" "$tmp/gate-diff" env DIFF_BASE=HEAD sh "$CI/check-gate-metrics.sh" .
+
 
 # --- .gitlab-ci.yml build script multi-service execution ---------------------
 d="$tmp/gitlab-build-sim"

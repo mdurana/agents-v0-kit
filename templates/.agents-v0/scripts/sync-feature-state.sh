@@ -250,12 +250,46 @@ def resolve_git_head(seed: str) -> str:
         cur = parent
 
 
-base_commit = (prev.get("baseCommit") or "").strip() or resolve_git_head(os.environ.get("HOOK_BASE", ""))
+feature_id = (
+    "onboarding" if onboarding
+    else os.path.basename(os.path.dirname(rel_art)) if maintain_note
+    else os.environ.get("HOOK_SLUG", "")
+)
+prev_bc = (prev.get("baseCommit") or "").strip()
+head_bc = resolve_git_head(os.environ.get("HOOK_BASE", ""))
+rep_parent = ""
+if feature_id and not onboarding:
+    for rep_path in (
+        os.path.join("docs", "agents-v0", "build", feature_id, "build-report.md"),
+        os.path.join("docs", "agents-v0", "verify", feature_id, "test-report.md"),
+    ):
+        if os.path.isfile(rep_path):
+            try:
+                m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(rep_path, encoding="utf-8").read(), re.I | re.M)
+                if m:
+                    import subprocess
+                    rep_sha = m.group(1)
+                    r_full = subprocess.run(
+                        ["git", "rev-parse", "--verify", "-q", f"{rep_sha}^{{commit}}"],
+                        capture_output=True, text=True, check=False,
+                    )
+                    full_rep = r_full.stdout.strip() if r_full.returncode == 0 else ""
+                    r_par = subprocess.run(
+                        ["git", "rev-parse", "--verify", "-q", f"{rep_sha}^"],
+                        capture_output=True, text=True, check=False,
+                    )
+                    if r_par.returncode == 0 and r_par.stdout.strip():
+                        rep_parent = r_par.stdout.strip()
+                    if prev_bc and full_rep and (prev_bc == full_rep or full_rep.startswith(prev_bc)):
+                        prev_bc = ""
+                    break
+            except OSError:
+                pass
+
+base_commit = prev_bc or rep_parent or head_bc
 
 data = {
-    "feature": ("onboarding" if onboarding
-                else os.path.basename(os.path.dirname(rel_art)) if maintain_note
-                else os.environ.get("HOOK_SLUG", "")),
+    "feature": feature_id,
     "tier": tier,
     "lastApprovedPhase": last_approved,
     "activePhase": active_phase,
