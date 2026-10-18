@@ -8,7 +8,7 @@
 Wire the quality toolchain **before** heavy coding, not after. A failing gate
 early in the build is cheaper than a retrofit at merge time. Gates run in CI and
 must fail the build on breach. Establish a **green baseline** (the profile Backend verify command; Pack `java`: `./mvnw -B clean
-verify` from the backend root, or the frontend build/test script) before the first edit; Build starts
+verify -Pci-security` from the backend root, or the frontend build/test script) before the first edit; Build starts
 only from green.
 
 ## Toolchain (Java pipeline example)

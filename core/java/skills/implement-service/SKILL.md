@@ -26,14 +26,14 @@ Build phase playbook for the `backend-engineer` agent (`workflow-orchestration.m
 15. Validate JWTs with an algorithm allowlist, `iss`/`aud`/`exp`/`nbf`, and known `kid` values. Rotate refresh tokens.
 16. Emit security audit events for auth, denial, revocation, admin mutation, and upload outcome (`security-baseline.mdc` §12).
 17. Use parameterized queries/JPA named parameters only. Sort and filter fields come from an allowlist.
-18. Run the full Backend verify command from `docs/agents-v0/project-profile.md` once for the Build gate (`./mvnw -B clean verify` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
+18. Run the full Backend verify command from `docs/agents-v0/project-profile.md` once for the Build gate (`./mvnw -B clean verify -Pci-security` when that row names it), with **bounded fix attempts (≤ 3 per failure)**; on exhaustion stop and present the blocker. For a security-critical or complex unit, hand it to `solution-architect` for a design review instead of a further attempt. The fast loop does not replace this gate.
 19. Persist evidence to `docs/agents-v0/build/<feature>/build-report.md` (command, result, attempt cards, per-criterion file:line evidence) and `docs/agents-v0/build/<feature>/build-output.txt` (raw output; no secrets). Do not read `build-output.txt` on the next attempt.
 
 ## Rule-compliance checklist
 - [ ] `backend.mdc`: constructor injection; `@Transactional(readOnly=true)`; `@Enumerated(STRING)`; no N+1; DTOs only; `Encode.forJava`; no empty catch; methods ≤ 30 lines.
 - [ ] `quality-and-testing.mdc`: red–green per behavior unit; methods ≤ 30 lines; cognitive complexity ≤ 15; coverage targets on changed code.
 - [ ] `docs/agents-v0/build/<feature>/plan.md` has one row per approved `AC-*`; done rows name a test.
-- [ ] Baseline green before the first edit; red–green loop uses `Backend verify (fast, no OWASP)` when that cell is a real command; quality gate executed once in `./mvnw -B clean verify`.
+- [ ] Baseline green before the first edit; red–green loop uses `Backend verify (fast, no OWASP)` when that cell is a real command; quality gate executed once in `./mvnw -B clean verify -Pci-security`.
 - [ ] Attempt cards recorded; `build-output.txt` not read back. Second failure uses `failure-brief.md`; `check-failure-brief.sh` passes before attempt three.
 - [ ] Approved feature draft merged into the org catalog, or N/A recorded.
 - [ ] Contract conformance diff clean (or recorded N/A reason); ArchUnit layer rules where wired.
