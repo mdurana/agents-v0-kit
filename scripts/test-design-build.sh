@@ -402,6 +402,9 @@ PostgreSQL.
 EOF
 (cd "$adr" && git init -q && git add -A && git_c commit -q -m accepted)
 run pass "adr: a committed accepted ADR passes" "$adr" sh "$CI/check-adr.sh"
+cp "$KIT/templates/docs/agents-v0/adr/_template.md" "$adr/docs/agents-v0/adr/_template.md"
+run pass "adr: ADR check ignores _template.md" "$adr" sh "$CI/check-adr.sh"
+rm -f "$adr/docs/agents-v0/adr/_template.md"
 sedi 's/PostgreSQL./MongoDB./' "$adr/docs/agents-v0/adr/01-store.md"
 run fail "adr: rewriting a committed accepted ADR fails" "$adr" sh "$CI/check-adr.sh"
 (cd "$adr" && git checkout -q -- docs/agents-v0/adr/01-store.md)

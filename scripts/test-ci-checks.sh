@@ -1260,6 +1260,7 @@ d="$tmp/pack-review"
 write_pack "$d"
 rm "$d/docs/agents-v0/design/system/architecture-review.md"
 expect_fail "check-architecture-pack needs the independent review" "$d" sh "$CI/check-architecture-pack.sh"
+expect_pass "check-architecture-pack --without-review passes without the independent review" "$d" sh "$CI/check-architecture-pack.sh" --without-review
 write_pack "$d"
 printf '| 2 | Critical | no failure row for the bus | architecture.md | Open |\n' >> "$d/docs/agents-v0/design/system/architecture-review.md"
 expect_fail "check-architecture-pack rejects an open Critical review finding" "$d" sh "$CI/check-architecture-pack.sh"

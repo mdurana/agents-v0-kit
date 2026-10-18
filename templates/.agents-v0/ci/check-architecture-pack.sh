@@ -2,10 +2,11 @@
 # check-architecture-pack.sh — the program architecture pack is complete and consistent
 # (program-architecture, workflow-orchestration.mdc Architecture).
 #
-# Usage: sh check-architecture-pack.sh [--approved] [<architecture.md>]
+# Usage: sh check-architecture-pack.sh [--approved] [--without-review] [<architecture.md>]
 #   <architecture.md>  default docs/agents-v0/architecture.md. The other pack files are read
 #                      from the same docs/agents-v0/ tree.
 #   --approved         the pattern ADR must already be Accepted (CI, after the architecture row).
+#   --without-review   skip architecture-review.md check (for pre-review check by architect or reviewer).
 #
 # Fails when:
 #   - C4 Context or C4 Container is empty or has no Mermaid block, or names a product technology;
@@ -17,16 +18,19 @@
 #   - arc-record.md does not name an existing pattern ADR, or has no structural fitness function row;
 #   - nfr-slo.md, threat-model.md, ops-readiness.md, or context-map.md has no filled row;
 #   - a context-map row has no existing component plan and no "N/A: <reason>";
-#   - architecture-review.md is missing, was not written by design-reviewer, or has an open Critical.
+#   - architecture-review.md is missing, was not written by design-reviewer, or has an open Critical
+#     (unless --without-review is set).
 
 set -eu
 
 approved=0
+without_review=0
 arch=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --approved) approved=1; shift ;;
-    -*) printf 'usage: %s [--approved] [<architecture.md>]\n' "$0" >&2; exit 1 ;;
+    --without-review) without_review=1; shift ;;
+    -*) printf 'usage: %s [--approved] [--without-review] [<architecture.md>]\n' "$0" >&2; exit 1 ;;
     *) arch="$1"; shift ;;
   esac
 done
@@ -35,7 +39,7 @@ done
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-ARCH="$arch" APPROVED="$approved" PACKLIB_DIR="$DIR" python3 - <<'PY'
+ARCH="$arch" APPROVED="$approved" WITHOUT_REVIEW="$without_review" PACKLIB_DIR="$DIR" python3 - <<'PY'
 import os
 import re
 import sys
@@ -45,6 +49,7 @@ import packlib
 
 arch = os.environ["ARCH"]
 approved = os.environ["APPROVED"] == "1"
+without_review = os.environ["WITHOUT_REVIEW"] == "1"
 base = os.path.dirname(arch) or "."
 system = os.path.join(base, "design", "system")
 failures = []
@@ -154,7 +159,7 @@ def node_ids(diagram):
     ids = set()
     for raw in diagram.splitlines():
         line = raw.split("%%", 1)[0].strip()
-        if not line or re.split(r"\s+", line, 1)[0].lower() in KEYWORDS:
+        if not line or line.split(None, 1)[0].lower() in KEYWORDS:
             continue
         line = re.sub(r"\|[^|]*\|", " ", line)
         line = re.sub(r"\"[^\"]*\"", " ", line)
@@ -361,16 +366,17 @@ if body is not None:
                 fail(f"{plan.group(0)}: must link its parent docs/agents-v0/architecture.md")
 
 # --- independent review ------------------------------------------------------
-path = os.path.join(system, "architecture-review.md")
-body = read(path)
-if body is None:
-    fail(f"{path} is missing: run design-reviewer on the pack before the architecture approval")
-else:
-    if not re.search(r"^agent:\s*design-reviewer\s*$", body, re.M):
-        fail(f"{path}: first lines must say 'agent: design-reviewer'")
-    for line in body.splitlines():
-        if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
-            fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")
+if not without_review:
+    path = os.path.join(system, "architecture-review.md")
+    body = read(path)
+    if body is None:
+        fail(f"{path} is missing: run design-reviewer on the pack before the architecture approval")
+    else:
+        if not re.search(r"^agent:\s*design-reviewer\s*$", body, re.M):
+            fail(f"{path}: first lines must say 'agent: design-reviewer'")
+        for line in body.splitlines():
+            if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
+                fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")
 
 if failures:
     for message in failures:

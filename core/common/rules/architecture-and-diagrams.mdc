@@ -41,7 +41,7 @@ Service-specific ADRs override this file. Implementation: `backend.mdc`, `fronte
 
 ## Architecture principles
 
-- **Service boundaries:** database per service; versioned APIs and/or events — not shared-DB coupling.
+- **Service boundaries:** database per service (modular monoliths may share a database provided schema namespaces and bounded context boundaries are strictly isolated in code and migrations); versioned APIs and/or events — not shared-DB coupling.
 - **Contract-first:** OpenAPI and/or event schema before cross-service implementation.
 - **DDD:** entities with behavior; immutable value objects; aggregate consistency at root; domain events where used.
 - **Composition** over deep inheritance; explicit dependencies.

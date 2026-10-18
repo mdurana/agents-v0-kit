@@ -79,7 +79,14 @@ def alternative_count(text):
         if "alternatives" in name:
             body = part
             break
-    return len([ln for ln in body.splitlines() if re.match(r"^\s*[-*]\s+\S", ln) and "TEMPLATE" not in ln])
+    count = 0
+    for ln in body.splitlines():
+        if not re.match(r"^\s*[-*]\s+\S", ln) or "TEMPLATE" in ln:
+            continue
+        no_comment = re.sub(r"<!--.*?-->", "", ln).strip(" -*").strip()
+        if no_comment and not no_comment.startswith("<"):
+            count += 1
+    return count
 
 
 def norm_lines(text):
@@ -247,7 +254,7 @@ if not os.path.isdir(adr_dir):
     raise SystemExit(0)
 
 for name in sorted(os.listdir(adr_dir)):
-    if not name.endswith(".md"):
+    if not name.endswith(".md") or name.startswith("_"):
         continue
     path = os.path.join(adr_dir, name)
     text = read(path)

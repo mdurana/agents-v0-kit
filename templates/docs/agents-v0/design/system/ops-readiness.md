@@ -1,6 +1,6 @@
 # Operations readiness
 
-> Produced by `program-architecture`. Who runs the system, how an error budget is spent, what must be true before go-live, and how the database is kept healthy. SLO numbers live only in `docs/agents-v0/design/system/nfr-slo.md`; do not copy them here. `.agents-v0/ci/check-architecture-pack.sh` requires these sections to be written. It does not tick the checklist. The P5 readiness story closes the boxes.
+> Produced by `program-architecture`. Who runs the system, how an error budget is spent, what must be true before go-live, and how the database is kept healthy. SLO targets and error budgets live only in `docs/agents-v0/design/system/nfr-slo.md` (do not duplicate SLO tables here; operational parameters such as backup schedules for RPO and restore targets for RTO reference `nfr-slo.md`). `.agents-v0/ci/check-architecture-pack.sh` requires these sections to be written. It does not tick the checklist. The P5 readiness story closes the boxes.
 
 ## Build and run ownership
 

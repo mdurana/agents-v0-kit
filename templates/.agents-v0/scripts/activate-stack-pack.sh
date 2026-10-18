@@ -221,8 +221,12 @@ def install_cursor(data):
     if os.path.isfile(scan):
         hooks = os.path.join(".cursor", "hooks")
         os.makedirs(hooks, exist_ok=True)
-        shutil.copyfile(scan, os.path.join(hooks, "pack-scan.sh"))
-        os.chmod(os.path.join(hooks, "pack-scan.sh"), 0o755)
+        dst = os.path.join(hooks, "pack-scan.sh")
+        shutil.copyfile(scan, dst)
+        try:
+            os.chmod(dst, 0o755)
+        except OSError as e:
+            sys.stderr.write(f"WARN: could not chmod {dst}: {e}\n")
 
 
 def with_backend_root(text, command):
@@ -315,9 +319,13 @@ for heading, row, value in mapping:
     elif owned_fe:
         value = with_frontend_root(text, value)
     text = set_row(text, heading, row, value, force or owned_be or owned_fe)
+try:
+    install_cursor(info)
+except OSError as exc:
+    fail(f"could not install cursor configuration: {exc}", 1)
+
 os.makedirs(os.path.dirname(profile_path), exist_ok=True)
 with open(profile_path, "w", encoding="utf-8") as handle:
     handle.write(text)
-install_cursor(info)
 print(f"pack: {requested}")
 PY
