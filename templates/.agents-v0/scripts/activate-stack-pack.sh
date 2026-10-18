@@ -172,12 +172,31 @@ def require_complete(pack_id):
     return data
 
 
+def same_file(src, dst):
+    if not os.path.isfile(dst) or os.path.islink(dst):
+        return False
+    try:
+        with open(src, "rb") as f1, open(dst, "rb") as f2:
+            return f1.read() == f2.read()
+    except OSError:
+        return False
+
+
 def install_cursor(data):
+    import tempfile
     pack_id = data["id"]
     directory = data["dir"]
-    os.makedirs(os.path.join(".cursor", "rules", "org"), exist_ok=True)
-    os.makedirs(os.path.join(".cursor", "skills"), exist_ok=True)
+    org = os.path.join(".cursor", "rules", "org")
+    skills_root = os.path.join(".cursor", "skills")
+    agents = os.path.join(".cursor", "agents")
+    hooks = os.path.join(".cursor", "hooks")
+
     selected_rules = sorted(glob.glob(os.path.join(directory, "rules", "*.mdc")))
+    selected_rule_names = {os.path.basename(p) for p in selected_rules}
+    selected_skills = sorted(glob.glob(os.path.join(directory, "skills", "*", "SKILL.md")))
+    selected_skill_names = {os.path.basename(os.path.dirname(p)) for p in selected_skills}
+    selected_agents = sorted(glob.glob(os.path.join(directory, "agents", "*.md")))
+
     other_rule_names = set()
     other_skill_names = set()
     for other_id in packlib.all_ids():
@@ -194,77 +213,161 @@ def install_cursor(data):
             os.path.basename(os.path.dirname(path))
             for path in glob.glob(os.path.join(other_dir, "skills", "*", "SKILL.md"))
         )
-    import tempfile
-    tracked_dirs = [
-        os.path.join(".cursor", "rules", "org"),
-        os.path.join(".cursor", "skills"),
-        os.path.join(".cursor", "agents"),
-        os.path.join(".cursor", "hooks"),
-    ]
-    backup_root = tempfile.mkdtemp(prefix="cursor_backup_")
-    try:
-        for t in tracked_dirs:
-            if os.path.exists(t):
-                b_dst = os.path.join(backup_root, os.path.relpath(t, "."))
-                os.makedirs(os.path.dirname(b_dst), exist_ok=True)
-                if os.path.isdir(t):
-                    shutil.copytree(t, b_dst, symlinks=True)
-                else:
-                    shutil.copy2(t, b_dst)
+    other_rule_names -= selected_rule_names
+    other_skill_names -= selected_skill_names
 
-        org = os.path.join(".cursor", "rules", "org")
-        os.makedirs(org, exist_ok=True)
-        for name in other_rule_names:
-            path = os.path.join(org, name)
-            if os.path.isfile(path) or os.path.islink(path):
-                os.remove(path)
-        skills_root = os.path.join(".cursor", "skills")
-        os.makedirs(skills_root, exist_ok=True)
-        for name in other_skill_names:
-            path = os.path.join(skills_root, name)
-            if os.path.isdir(path) and not os.path.islink(path):
-                shutil.rmtree(path)
-            elif os.path.lexists(path):
-                os.remove(path)
-        for path in selected_rules:
-            shutil.copyfile(path, os.path.join(org, os.path.basename(path)))
-        for path in sorted(glob.glob(os.path.join(directory, "skills", "*", "SKILL.md"))):
-            name = os.path.basename(os.path.dirname(path))
-            dest = os.path.join(skills_root, name)
-            os.makedirs(dest, exist_ok=True)
-            shutil.copyfile(path, os.path.join(dest, "SKILL.md"))
-        agents = os.path.join(".cursor", "agents")
-        os.makedirs(agents, exist_ok=True)
-        for path in glob.glob(os.path.join(directory, "agents", "*.md")):
-            shutil.copyfile(path, os.path.join(agents, os.path.basename(path)))
-        scan = os.path.join(directory, "hooks", "pack-scan.sh")
-        if os.path.isfile(scan):
-            hooks = os.path.join(".cursor", "hooks")
-            os.makedirs(hooks, exist_ok=True)
-            dst = os.path.join(hooks, "pack-scan.sh")
-            shutil.copyfile(scan, dst)
+    # Build list of (src, dst, is_exec) writes needed
+    planned_writes = []
+    for path in selected_rules:
+        dst = os.path.join(org, os.path.basename(path))
+        if not same_file(path, dst):
+            planned_writes.append((path, dst, False))
+    for path in selected_skills:
+        name = os.path.basename(os.path.dirname(path))
+        dst = os.path.join(skills_root, name, "SKILL.md")
+        if not same_file(path, dst):
+            planned_writes.append((path, dst, False))
+    for path in selected_agents:
+        dst = os.path.join(agents, os.path.basename(path))
+        if not same_file(path, dst):
+            planned_writes.append((path, dst, False))
+    scan = os.path.join(directory, "hooks", "pack-scan.sh")
+    if os.path.isfile(scan):
+        dst = os.path.join(hooks, "pack-scan.sh")
+        if not same_file(scan, dst):
+            planned_writes.append((scan, dst, True))
+        elif not os.access(dst, os.X_OK):
             try:
                 os.chmod(dst, 0o755)
             except OSError as e:
                 sys.stderr.write(f"WARN: could not chmod {dst}: {e}\n")
-    except Exception as exc:
-        for t in tracked_dirs:
-            b_src = os.path.join(backup_root, os.path.relpath(t, "."))
-            if os.path.exists(b_src):
-                if os.path.isdir(b_src):
-                    if os.path.exists(t):
-                        shutil.rmtree(t)
-                    shutil.copytree(b_src, t, symlinks=True)
-                else:
-                    shutil.copy2(b_src, t)
+
+    # Phase 1: Ensure directories and stage all writes to <dst>.tmp before deleting anything
+    created_dirs = []
+    staged_tmps = []
+
+    def ensure_dir(d):
+        parts = []
+        cur = d
+        while cur and cur not in (".", "/") and not os.path.exists(cur):
+            parts.append(cur)
+            cur = os.path.dirname(cur)
+        for p in reversed(parts):
+            os.mkdir(p)
+            created_dirs.append(p)
+        if os.path.exists(d) and not os.path.isdir(d):
+            raise OSError(f"{d} is not a directory")
+
+    try:
+        ensure_dir(org)
+        ensure_dir(skills_root)
+        for src, dst, is_exec in planned_writes:
+            ensure_dir(os.path.dirname(dst))
+            tmp_dst = dst + ".tmp"
+            shutil.copyfile(src, tmp_dst)
+            staged_tmps.append((tmp_dst, dst))
+            if is_exec:
+                try:
+                    os.chmod(tmp_dst, 0o755)
+                except OSError as e:
+                    sys.stderr.write(f"WARN: could not chmod {dst}: {e}\n")
+    except Exception:
+        for tmp_dst, _ in staged_tmps:
+            try:
+                if os.path.lexists(tmp_dst):
+                    os.remove(tmp_dst)
+            except OSError:
+                pass
+        for d in reversed(created_dirs):
+            try:
+                os.rmdir(d)
+            except OSError:
+                pass
+        raise
+
+    # Phase 2: Back up only the specific pack-owned files/dirs being overwritten or removed, then commit
+    obsolete_rules = [
+        os.path.join(org, name) for name in sorted(other_rule_names)
+        if os.path.isfile(os.path.join(org, name)) or os.path.islink(os.path.join(org, name))
+    ]
+    obsolete_skills = [
+        os.path.join(skills_root, name) for name in sorted(other_skill_names)
+        if os.path.lexists(os.path.join(skills_root, name))
+    ]
+    overwritten_files = [dst for _, dst in staged_tmps if os.path.lexists(dst)]
+    created_files = [dst for _, dst in staged_tmps if not os.path.lexists(dst)]
+
+    backup_root = tempfile.mkdtemp(prefix="cursor_backup_")
+    backed_up = []  # list of (target_path, backup_path, is_dir)
+    restore_ok = True
+    try:
+        for p in overwritten_files + obsolete_rules:
+            b_dst = os.path.join(backup_root, os.path.relpath(p, "."))
+            os.makedirs(os.path.dirname(b_dst), exist_ok=True)
+            shutil.copy2(p, b_dst, follow_symlinks=False)
+            backed_up.append((p, b_dst, False))
+        for p in obsolete_skills:
+            b_dst = os.path.join(backup_root, os.path.relpath(p, "."))
+            os.makedirs(os.path.dirname(b_dst), exist_ok=True)
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.copytree(p, b_dst, symlinks=True)
+                backed_up.append((p, b_dst, True))
             else:
-                if os.path.isdir(t) and not os.path.islink(t):
-                    shutil.rmtree(t)
-                elif os.path.lexists(t):
-                    os.remove(t)
-        raise exc
+                shutil.copy2(p, b_dst, follow_symlinks=False)
+                backed_up.append((p, b_dst, False))
+
+        for tmp_dst, dst in staged_tmps:
+            os.replace(tmp_dst, dst)
+        for p in obsolete_rules:
+            os.remove(p)
+        for p in obsolete_skills:
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            elif os.path.lexists(p):
+                os.remove(p)
+    except Exception as exc:
+        for tmp_dst, _ in staged_tmps:
+            try:
+                if os.path.lexists(tmp_dst):
+                    os.remove(tmp_dst)
+            except OSError:
+                pass
+        for dst in created_files:
+            try:
+                if os.path.lexists(dst):
+                    os.remove(dst)
+            except OSError:
+                restore_ok = False
+        for target_p, b_src, is_dir in backed_up:
+            try:
+                if is_dir:
+                    tmp_restore = target_p + ".restore_tmp"
+                    if os.path.lexists(tmp_restore):
+                        shutil.rmtree(tmp_restore)
+                    shutil.copytree(b_src, tmp_restore, symlinks=True)
+                    if os.path.isdir(target_p) and not os.path.islink(target_p):
+                        shutil.rmtree(target_p)
+                    elif os.path.lexists(target_p):
+                        os.remove(target_p)
+                    os.replace(tmp_restore, target_p)
+                else:
+                    tmp_restore = target_p + ".restore_tmp"
+                    shutil.copy2(b_src, tmp_restore, follow_symlinks=False)
+                    os.replace(tmp_restore, target_p)
+            except OSError:
+                restore_ok = False
+        for d in reversed(created_dirs):
+            try:
+                os.rmdir(d)
+            except OSError:
+                pass
+        if not restore_ok:
+            raise OSError(f"{exc} (backup preserved at {backup_root})") from exc
+        raise
     finally:
-        shutil.rmtree(backup_root, ignore_errors=True)
+        if restore_ok:
+            shutil.rmtree(backup_root, ignore_errors=True)
+
 
 
 def with_backend_root(text, command):

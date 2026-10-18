@@ -875,6 +875,25 @@ expect_fail "activate-stack-pack rolls back and fails when cursor install fails"
   && pass "activate-stack-pack rollback preserves existing rules on failure" || fail "activate-stack-pack rollback preserves existing rules on failure"
 grep -Fq '<!-- pack id;' "$d/docs/agents-v0/project-profile.md" \
   && pass "activate-stack-pack leaves profile unmutated on failure" || fail "activate-stack-pack leaves profile unmutated on failure"
+d="$tmp/activate-hooks-ro"
+mkdir -p "$d/docs/agents-v0" "$d/app/backend" "$d/.cursor/rules/org" "$d/.cursor/skills/spec-intake" "$d/.cursor/agents" "$d/.cursor/hooks"
+cp "$KIT/templates/docs/agents-v0/project-profile.md" "$d/docs/agents-v0/project-profile.md"
+printf 'shared rule\n' > "$d/.cursor/rules/org/workflow-orchestration.mdc"
+printf 'shared skill\n' > "$d/.cursor/skills/spec-intake/SKILL.md"
+printf 'shared agent\n' > "$d/.cursor/agents/solution-architect.md"
+chmod 500 "$d/.cursor/hooks"
+expect_fail "activate-stack-pack fails cleanly when .cursor/hooks is read-only" "$d" sh "$act" java
+chmod 755 "$d/.cursor/hooks"
+[ -f "$d/.cursor/rules/org/workflow-orchestration.mdc" ] && [ -f "$d/.cursor/skills/spec-intake/SKILL.md" ] && [ -f "$d/.cursor/agents/solution-architect.md" ] \
+  && pass "activate-stack-pack failure on .cursor/hooks preserves shared .cursor rules, skills, and agents" \
+  || fail "activate-stack-pack failure on .cursor/hooks preserves shared .cursor rules, skills, and agents"
+expect_pass "activate-stack-pack succeeds on retry after .cursor/hooks is writable" "$d" sh "$act" java
+[ -f "$d/.cursor/rules/org/workflow-orchestration.mdc" ] && [ -f "$d/.cursor/skills/spec-intake/SKILL.md" ] && [ -f "$d/.cursor/agents/solution-architect.md" ] \
+  && pass "activate-stack-pack retry keeps shared .cursor files intact" \
+  || fail "activate-stack-pack retry keeps shared .cursor files intact"
+chmod 500 "$d/.cursor/hooks"
+expect_pass "activate-stack-pack re-bind skips unchanged .cursor/hooks/pack-scan.sh when read-only" "$d" sh "$act" java
+chmod 755 "$d/.cursor/hooks"
 
 link="$tmp/link-project"
 mkdir -p "$link"
