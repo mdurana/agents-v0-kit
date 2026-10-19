@@ -1996,6 +1996,29 @@ EOF
   git add docs/agents-v0/build/p0-a-platform-skeleton/build-report.md && git_commit "docs: stamp build-report"
 )
 expect_pass "check-evidence passes when stamped commit contains approved build row and cleared state" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md build
+(
+  cd "$dp0"
+  mkdir -p docs/agents-v0/verify/p0-a-platform-skeleton
+  sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md --active-phase verify --status in_progress >/dev/null 2>&1
+  printf 'class AppTest {}\n' > src/AppTest.java
+  git add src/AppTest.java docs/agents-v0/requirements/p0-a-platform-skeleton.state.json
+  git_commit "test: add verify test while verify is in_progress"
+  verify_sha="$(git rev-parse HEAD)"
+  cat > docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md <<EOF
+commit: $verify_sha
+EOF
+  printf '| verify | docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md | mdurana | Approved | 2026-10-19 |\n' >> docs/agents-v0/requirements/p0-a-platform-skeleton.md
+  git add docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md docs/agents-v0/requirements/p0-a-platform-skeleton.md
+  git_commit "docs: add verify report before syncing state"
+)
+expect_fail "check-evidence rejects verify report when HEAD still records activePhase=verify in_progress" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
+(
+  cd "$dp0"
+  sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null 2>&1
+  git add docs/agents-v0/requirements/p0-a-platform-skeleton.state.json
+  git_commit "docs: sync state after verify approval"
+)
+expect_pass "check-evidence passes for verify report stamped on test commit once HEAD clears activePhase" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
 
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2

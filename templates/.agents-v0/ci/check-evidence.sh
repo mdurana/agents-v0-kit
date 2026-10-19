@@ -175,11 +175,15 @@ check_path() {
                 docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) art_state="docs/agents-v0/onboarding/state.json" ;;
                 docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) art_state="$(dirname "$art")/state.json" ;;
               esac
-              if git cat-file -e "${rep_commit}:${art_state}" 2>/dev/null; then
-                rep_state="$(git show "${rep_commit}:${art_state}" 2>/dev/null || true)"
+              state_check_ref="$stale_base"
+              if [ "$phase" = "build" ]; then
+                state_check_ref="$rep_commit"
+              fi
+              if git cat-file -e "${state_check_ref}:${art_state}" 2>/dev/null; then
+                rep_state="$(git show "${state_check_ref}:${art_state}" 2>/dev/null || true)"
                 if printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activePhase"[[:space:]]*:[[:space:]]*"'"$phase"'"' \
                   && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activeStatus"[[:space:]]*:[[:space:]]*"(in_progress|awaiting_approval)"'; then
-                  printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$rep_commit" "$p" "$art_state" "$phase" >&2
+                  printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$state_check_ref" "$p" "$art_state" "$phase" >&2
                   missing=1
                 fi
                 if [ "$phase" = "build" ] && [ "$is_p0_unapproved" = "0" ] && [ -z "$(printf '%s' "$section" | grep -i '|[[:space:]]*release[[:space:]]*|' || true)" ]; then
