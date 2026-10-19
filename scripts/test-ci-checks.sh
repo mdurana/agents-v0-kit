@@ -443,9 +443,9 @@ cat > "$d/docs/agents-v0/milestones/m2.md" <<'EOF'
 
 ## Stories
 
-| Story ID | User story | Feature artifact | Status | Dependency |
-|----------|-----------|------------------|--------|------------|
-| M2-A | As a user, I want g, so that h. | docs/agents-v0/requirements/g.md | planned | M-A |
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| M2-A | As a user, I want g, so that h. | docs/agents-v0/requirements/g.md | planned | M-A | backend | 3 |
 
 ## Delivery approvals
 
@@ -468,17 +468,75 @@ sedi '/Verify.*Approved/d' "$d/docs/agents-v0/requirements/a.md"
 expect_fail "check-milestone cross-milestone: M2-A fails when dependency M-A lacks verify approval" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md intake
 printf '| Verify | docs/agents-v0/verify/a/test-report.md | dev | Approved | 2026-01-04 |\n' >> "$d/docs/agents-v0/requirements/a.md"
 
-expect_pass "check-milestone plan phase accepts acyclic concrete stories" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md plan
+cp "$KIT/templates/docs/agents-v0/milestones/_template.md" "$d/docs/agents-v0/milestones/_template.md"
+expect_pass "check-milestone plan phase accepts acyclic concrete stories and ignores _template.md" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md plan
+
+cat > "$d/docs/agents-v0/milestones/dup.md" <<'EOF'
+# Milestone: Dup
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| M2-A | As a user, I want dup, so that x. | docs/agents-v0/requirements/dup.md | planned | — | backend | 2 |
+EOF
+expect_fail "check-milestone detects duplicate story ID across manifests" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md plan
+rm -f "$d/docs/agents-v0/milestones/dup.md"
+
+cat > "$d/docs/agents-v0/milestones/bad-plan.md" <<'EOF'
+# Milestone: Bad
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| B-A | As a [role], I want g, so that h. | docs/agents-v0/requirements/ba.md | planned | M-A | backend | 3 |
+EOF
+expect_fail "check-milestone plan phase rejects [role] placeholder in user story" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/bad-plan.md plan
+
+cat > "$d/docs/agents-v0/milestones/bad-plan.md" <<'EOF'
+# Milestone: Bad
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| B-A | As a user, I want g, so that h. | docs/agents-v0/requirements/ba.md | planned | P1 | backend | 3 |
+EOF
+expect_fail "check-milestone plan phase rejects bare milestone label dependency stub P1" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/bad-plan.md plan
+
+cat > "$d/docs/agents-v0/milestones/bad-plan.md" <<'EOF'
+# Milestone: Bad
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| B-A | As a user, I want g, so that h. | docs/agents-v0/requirements/ba.md | planned | M-A | — | 3 |
+EOF
+expect_fail "check-milestone plan phase rejects unassigned Surface" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/bad-plan.md plan
+
+cat > "$d/docs/agents-v0/milestones/bad-plan.md" <<'EOF'
+# Milestone: Bad
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| B-A | As a user, I want g, so that h. | docs/agents-v0/requirements/ba.md | planned | M-A | backend | 9 |
+EOF
+expect_fail "check-milestone plan phase rejects Size > 8" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/bad-plan.md plan
+rm -f "$d/docs/agents-v0/milestones/bad-plan.md"
 
 cat > "$d/docs/agents-v0/milestones/cycle.md" <<'EOF'
 # Milestone: Cycle
 
 ## Stories
 
-| Story ID | User story | Feature artifact | Status | Dependency |
-|----------|-----------|------------------|--------|------------|
-| C-A | As a user, I want c1, so that c2. | docs/agents-v0/requirements/ca.md | planned | C-B |
-| C-B | As a user, I want c3, so that c4. | docs/agents-v0/requirements/cb.md | planned | C-A |
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| C-A | As a user, I want c1, so that c2. | docs/agents-v0/requirements/ca.md | planned | C-B | backend | 2 |
+| C-B | As a user, I want c3, so that c4. | docs/agents-v0/requirements/cb.md | planned | C-A | backend | 2 |
 EOF
 expect_fail "check-milestone detects dependency cycle and fails" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/cycle.md plan
 rm -f "$d/docs/agents-v0/milestones/cycle.md"
@@ -1500,6 +1558,22 @@ sedi 's#N/A: single service in this release#docs/agents-v0/design/system/compone
 expect_fail "check-architecture-pack needs the component plan file a context names" "$d" sh "$CI/check-architecture-pack.sh"
 printf '# Component plan: orders\n\nParent: `docs/agents-v0/architecture.md`\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_pass "check-architecture-pack accepts a component plan that links its parent" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+cat > "$d/docs/agents-v0/design/system/components/orders.md" <<'EOF'
+# Component plan: orders
+
+Parent: `docs/agents-v0/architecture.md`
+
+## Consistency check
+
+- [x] Names match `docs/agents-v0/adr/01-pattern.md` (Proposed).
+EOF
+expect_fail "check-architecture-pack --approved rejects component plan labeling ADR (Proposed)" "$d" sh "$CI/check-architecture-pack.sh" --approved
+sedi 's/(Proposed)/(Accepted)/' "$d/docs/agents-v0/design/system/components/orders.md"
+sedi 's/- \[x\]/- [ ]/' "$d/docs/agents-v0/design/system/components/orders.md"
+expect_fail "check-architecture-pack --approved rejects component plan with unchecked Consistency check box" "$d" sh "$CI/check-architecture-pack.sh" --approved
+sedi 's/- \[ \]/- [x]/' "$d/docs/agents-v0/design/system/components/orders.md"
+expect_pass "check-architecture-pack --approved accepts component plan with Accepted ADR and checked Consistency check" "$d" sh "$CI/check-architecture-pack.sh" --approved
 printf '# Component plan: orders\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack rejects a component plan with no parent link" "$d" sh "$CI/check-architecture-pack.sh"
 

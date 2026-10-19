@@ -15,6 +15,8 @@ P4 `verify` and `release` require `docs/agents-v0/design/system/slo-evidence.md`
 | P4-B | As a security reviewer, I want a VAPT retest with no open Critical findings, so that the agreed vulnerability checks are closed before release. | docs/agents-v0/requirements/p4-b-vapt-retest.md | planned | P3 | — | — |
 | P4-C | As an operator, I want a tested rollback for the current release, so that a bad deploy can be reversed without data loss. | docs/agents-v0/requirements/p4-c-rollback.md | planned | P3 | — | — |
 
+> Replace these template stubs during `/v0-plan`: map each filled row in `docs/agents-v0/design/system/nfr-slo.md` to a P4 hardening story (splitting across rows so each story fits one surface and Size ≤ 8), replace milestone stub `P3` with concrete story-ID dependencies, and fill Surface and Size.
+
 ## Delivery approvals
 
 | Phase | Artifacts | Approver | Decision | Date |

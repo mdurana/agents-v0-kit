@@ -35,7 +35,7 @@ Service-specific ADRs override this file. Implementation: `backend.mdc`, `fronte
 - **Node IDs:** camelCase or PascalCase; no spaces; avoid reserved words (`end`, `subgraph` as ID).
 - **Edge labels** with special chars: quote them — `-->|"retry"|`.
 - **Subgraphs** for boundaries: frontend, BFF, backend, data, messaging.
-- ≤ ~**50 nodes**; split if larger.
+- ≤ ~**50 nodes** per diagram; split if larger (in `docs/agents-v0/milestones/plan.md`, use one `flowchart TD` per milestone when the backlog exceeds ~50 stories).
 - **Data flow** reuses the C4 Container node IDs and relabels edges only (`transport / payload`). Data models use `erDiagram` (logical: every field; physical: every field with its type, underscores in type tokens). Lifecycles use `stateDiagram-v2`.
 - Renders in Cursor; export to Lucid/draw.io via import or converter.
 

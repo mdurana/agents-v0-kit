@@ -1,6 +1,6 @@
 # Operations readiness
 
-> Produced by `program-architecture`. Who runs the system, how an error budget is spent, what must be true before go-live, and how the database is kept healthy. SLO targets and error budgets live only in `docs/agents-v0/design/system/nfr-slo.md` (do not duplicate SLO tables here; operational parameters such as backup schedules for RPO and restore targets for RTO reference `nfr-slo.md`). `.agents-v0/ci/check-architecture-pack.sh` requires these sections to be written. It does not tick the checklist. The P5 readiness story closes the boxes.
+> Produced by `program-architecture`. Who runs the system, how an error budget is spent, what must be true before go-live, and how the database is kept healthy. SLO targets and error budgets live only in `docs/agents-v0/design/system/nfr-slo.md` (do not duplicate SLO tables here; operational parameters such as backup schedules for RPO and restore targets for RTO reference `nfr-slo.md`). `.agents-v0/ci/check-architecture-pack.sh` requires these sections to be written. It does not tick the checklist. The P5 readiness stories close the boxes.
 
 ## Build and run ownership
 
@@ -27,7 +27,7 @@
 
 ## Production readiness checklist
 
-The P5 readiness story ticks these boxes (`docs/agents-v0/milestones/p5-release-readiness.md`). A box stays open only with a named reason. A production deploy waits on that (`release-deploy`).
+The P5 readiness stories (`P5-A`, `P5-B`, … in `docs/agents-v0/milestones/p5-release-readiness.md`, split so each story stays within the Size ≤ 8 cap) tick these boxes. A box stays open only with a named reason. A production deploy waits on that (`release-deploy`).
 
 - [ ] On-call rotation and escalation path are defined.
 - [ ] SLOs and error budgets are measurable (`slo-evidence.md`).

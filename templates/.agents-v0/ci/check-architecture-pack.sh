@@ -364,6 +364,12 @@ if body is not None:
                 fail(f"{plan.group(0)}: still carries template placeholders")
             elif "docs/agents-v0/architecture.md" not in plan_text:
                 fail(f"{plan.group(0)}: must link its parent docs/agents-v0/architecture.md")
+            elif approved:
+                if re.search(r"\(\s*Proposed\s*\)", plan_text, re.I):
+                    fail(f"{plan.group(0)}: still labels an ADR '(Proposed)' after architecture approval (update to Accepted)")
+                cc_sec = split_sections(plan_text, 2).get("consistency check", "")
+                if re.search(r"^\s*-\s*\[\s\]", cc_sec, re.M):
+                    fail(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]') on an approved architecture pack")
 
 # --- independent review ------------------------------------------------------
 if not without_review:

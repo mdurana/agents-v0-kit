@@ -53,8 +53,8 @@ if [ -n "$arch" ]; then
   sh "$here/check-architecture-pack.sh" --approved "$arch" || exit 1
 fi
 
-# Stories table: | Story ID | User story | Feature artifact | Status | Dependency |
-# Surface and Size may follow Dependency. They are not read here.
+# Stories table: | Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+# In "plan" phase, User story, Dependency, Surface, and Size are validated against the Plan gate.
 # A "Roadmap:" line names a file that must carry an Approved roadmap row.
 # An "Architecture:" line names a file that must carry an Approved architecture row and a
 # complete pack (check-architecture-pack.sh --approved).
@@ -79,7 +79,7 @@ checked=0
 if [ "$phase" = "plan" ]; then
   for a in $artifacts; do
     case "$a" in
-      *'<'*|*'>'*)
+      *'<'*|*'>'*|*'['*|*']'*)
         printf 'FAIL: milestone story row still has placeholder artifact path: %s\n' "$a" >&2
         missing=1
         continue
@@ -118,10 +118,13 @@ fi
 # Story order: a story with a build approval needs a verify approval on every story
 # it names in the Dependency column (including cross-milestone story dependencies).
 # A dependency that is a manifest path (*.md) instead needs an Approved milestone row
-# on that file. Other tokens that are not story IDs (milestone names such as P1, or a dash)
-# are prose and are skipped.
-# The story dependency graph is checked across all milestone manifests to enforce
-# that it is strictly acyclic.
+# on that file.
+# The story dependency graph is checked across all milestone manifests (excluding
+# _template.md and plan.md) to reject duplicate/placeholder story IDs and enforce
+# that the graph is strictly acyclic.
+# In "plan" phase, every story row in the target manifest is also checked for a complete
+# As a / I want / so that sentence without placeholders, concrete story-ID dependencies
+# (rejecting bare milestone stubs like P0/P1/P3), valid Surface, and Size 1..8 (4 for P0-A).
 # MILESTONE_ORDER=0 turns the check off.
 has_approval() {
   sh "$here/check-approvals.sh" "$1" "$2" >/dev/null 2>&1
@@ -134,16 +137,22 @@ check_story_order() {
     /---/ { next }
     /Story [Ii][Dd]/ { next }
     /^[[:space:]]*\|/ {
-      id = trim($2); art = trim($4); dep = trim($6)
-      if (id != "") printf "%s^%s^%s\n", id, art, dep
+      id = trim($2); story = trim($3); art = trim($4); status = trim($5); dep = trim($6); surf = trim($7); sz = trim($8)
+      if (id != "") printf "%s^%s^%s^%s^%s^%s^%s\n", id, art, dep, story, surf, sz, status
     }')"
   ids="$(printf '%s\n' "$rows" | awk -F'^' '{ print $1 }')"
 
-  # Gather story rows across all manifests in the milestone directory
+  # Gather story rows across all milestone manifests in the directory (excluding _*.md and plan.md)
   manifest_dir="$(dirname "$manifest")"
-  all_manifests="$(find "$manifest_dir" -maxdepth 1 -name '*.md' 2>/dev/null || true)"
+  all_manifests="$(find "$manifest_dir" -maxdepth 1 -name '*.md' ! -name '_*.md' ! -name 'plan.md' 2>/dev/null | tr '\n' ' ' || true)"
+  case " $all_manifests " in
+    *" $manifest "*) ;;
+    *) all_manifests="$all_manifests $manifest" ;;
+  esac
   all_rows="$(awk -F'|' '
     function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    FNR == 1 { file_seen[FILENAME]++; in_section = 0 }
+    file_seen[FILENAME] > 1 { next }
     /^#+[[:space:]]*[Ss]tories/ { in_section = 1; next }
     /^#+[[:space:]]/ { in_section = 0 }
     !in_section { next }
@@ -158,19 +167,38 @@ check_story_order() {
 
   order_fail=0
 
-  # 1. Enforce acyclic story dependency graph
+  # 1. Enforce unique, non-placeholder story IDs, acyclic graph, and (in plan phase) full row rules
   if [ -n "$all_rows" ]; then
-    cycle_out="$(ALL_ROWS="$all_rows" python3 - <<'PY' 2>&1
+    cycle_out="$(ALL_ROWS="$all_rows" TARGET_ROWS="$rows" PHASE="$phase" MANIFEST="$manifest" python3 - <<'PY' 2>&1
 import sys, os, re
 
 rows_text = os.environ.get("ALL_ROWS", "")
-lines = [l.strip() for l in rows_text.strip().split("\n") if l.strip()]
+target_text = os.environ.get("TARGET_ROWS", "")
+phase = os.environ.get("PHASE", "")
+manifest = os.environ.get("MANIFEST", "")
 
+lines = [l.strip() for l in rows_text.strip().split("\n") if l.strip()]
+target_lines = [l.strip() for l in target_text.strip().split("\n") if l.strip()]
+
+errors = []
+seen_ids = {}
 all_ids = set()
+
 for line in lines:
     parts = line.split("^")
-    if len(parts) >= 1 and parts[0].strip():
-        all_ids.add(parts[0].strip())
+    if len(parts) >= 4:
+        sid = parts[0].strip()
+        fname = parts[3].strip()
+        if not sid:
+            continue
+        if re.search(r"[<>]|\[.*\]", sid):
+            errors.append(f"FAIL: story row in {fname} still has placeholder story ID: {sid}")
+            continue
+        if sid in seen_ids:
+            errors.append(f"FAIL: duplicate story ID {sid} (in {seen_ids[sid]} and {fname})")
+        else:
+            seen_ids[sid] = fname
+            all_ids.add(sid)
 
 graph = {uid: [] for uid in all_ids}
 
@@ -178,13 +206,14 @@ for line in lines:
     parts = line.split("^")
     if len(parts) >= 3:
         sid = parts[0].strip()
+        if sid not in graph:
+            continue
         deps_raw = parts[2].strip()
         deps = [d.strip() for d in re.split(r'[,;\s]+', deps_raw) if d.strip()]
         for d in deps:
             if d == sid:
-                print(f"FAIL: story dependency cycle detected: {sid} -> {sid}")
-                sys.exit(1)
-            if d in all_ids:
+                errors.append(f"FAIL: story dependency cycle detected: {sid} -> {sid}")
+            elif d in all_ids:
                 graph[sid].append(d)
 
 WHITE, GRAY, BLACK = 0, 1, 2
@@ -197,8 +226,7 @@ def dfs(u, path):
             cycle = path + [v]
             idx = cycle.index(v)
             cycle_str = " -> ".join(cycle[idx:])
-            print(f"FAIL: story dependency cycle detected: {cycle_str}")
-            sys.exit(1)
+            errors.append(f"FAIL: story dependency cycle detected: {cycle_str}")
         elif color.get(v) == WHITE:
             dfs(v, path + [v])
     color[u] = BLACK
@@ -206,6 +234,48 @@ def dfs(u, path):
 for u in sorted(all_ids):
     if color[u] == WHITE:
         dfs(u, [u])
+
+if phase == "plan":
+    valid_surfaces = {"backend", "bff", "frontend", "vertical slice"}
+    for line in target_lines:
+        parts = line.split("^")
+        while len(parts) < 7:
+            parts.append("")
+        sid, art, dep, story, surf, sz, status = [p.strip() for p in parts[:7]]
+        if not sid:
+            continue
+        if re.search(r"<[^>]+>|\[[^\]]+\]", story):
+            errors.append(f"FAIL: story {sid} user story still has placeholder tokens: {story}")
+        elif not re.match(r"^As an?\s+\S.*,\s*I want\s+\S.*,\s*so that\s+\S+", story, re.I):
+            errors.append(f"FAIL: story {sid} user story must follow 'As a <role>, I want <goal>, so that <benefit>.': {story}")
+        if not dep:
+            errors.append(f"FAIL: story {sid} has an empty Dependency cell (use — when there is no dependency)")
+        else:
+            for d in [x.strip() for x in re.split(r'[,;\s]+', dep) if x.strip()]:
+                if d in {"-", "—", "None", "none"}:
+                    continue
+                if re.match(r"^P[0-9]+$", d):
+                    errors.append(f"FAIL: story {sid} still has milestone-level dependency stub '{d}' (replace with concrete story IDs or —)")
+                elif d.endswith(".md"):
+                    if not os.path.isfile(d):
+                        errors.append(f"FAIL: story {sid} names dependency manifest that does not exist: {d}")
+                elif d not in all_ids:
+                    errors.append(f"FAIL: story {sid} names unknown dependency story {d}")
+        if surf.lower() not in valid_surfaces:
+            errors.append(f"FAIL: story {sid} has invalid or missing Surface '{surf}' (expected backend|bff|frontend|vertical slice)")
+        try:
+            sz_int = int(sz)
+            if sid == "P0-A" and sz_int != 4:
+                errors.append(f"FAIL: seeded story P0-A Size must be 4 (got {sz_int})")
+            elif sz_int < 1 or sz_int > 8:
+                errors.append(f"FAIL: story {sid} Size must be between 1 and 8 (got {sz_int})")
+        except ValueError:
+            errors.append(f"FAIL: story {sid} has invalid or missing Size '{sz}' (expected integer 1..8)")
+
+if errors:
+    for e in errors:
+        print(e)
+    sys.exit(1)
 PY
     )" || {
       printf '%s\n' "$cycle_out" >&2
@@ -213,36 +283,13 @@ PY
     }
   fi
 
-  # 2. Check dependencies for stories in the current manifest
-  while IFS='^' read -r sid sart sdep; do
+  if [ "$phase" = "plan" ]; then
+    return "$order_fail"
+  fi
+
+  # 2. Build/verify/intake/design/release: check verify approval on build-approved stories
+  while IFS='^' read -r sid sart sdep _rest; do
     [ -n "$sid" ] || continue
-
-    if [ "$phase" = "plan" ]; then
-      for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
-        case "$dep" in
-          ''|'-'|'—'|'None'|'none') continue ;;
-          P[0-9]|P[0-9][0-9]) continue ;;
-          *.md)
-            if [ ! -f "$dep" ]; then
-              printf 'FAIL: story %s names dependency manifest that does not exist: %s\n' "$sid" "$dep" >&2
-              order_fail=1
-            fi
-            continue
-            ;;
-        esac
-        case "$dep" in
-          *-*)
-            if ! printf '%s\n' "$all_ids" | grep -Fxq "$dep"; then
-              printf 'FAIL: story %s names unknown dependency story %s\n' "$sid" "$dep" >&2
-              order_fail=1
-            fi
-            ;;
-        esac
-      done
-      continue
-    fi
-
-    # Build/verify/intake/design/release: check verify approval on build-approved stories
     case "$sart" in ''|*'<'*|*'>'*) continue ;; esac
     [ -f "$sart" ] || continue
     has_approval "$sart" build || continue

@@ -35,7 +35,7 @@
 >   Out of scope stays a separate list. Intake does not invent a role, goal, or benefit.
 > - Surface is `backend`, `bff`, `frontend`, or `vertical slice`. Size is the number of
 >   acceptance criteria, at most 8, including that negative or edge. `/v0-plan` fills both.
->   `.agents-v0/ci/check-milestone.sh` does not read them. Seeded P0-A stays at 4.
+>   `.agents-v0/ci/check-milestone.sh <manifest> plan` validates them. Seeded P0-A stays at 4.
 > - Each linked feature artifact records `Milestone: <Pn-name>`,
 >   `Milestone file: docs/agents-v0/milestones/<this-file>.md`, and `Story: <story-id>`
 >   under its title (`spec-intake` skill) for traceability.
@@ -43,10 +43,10 @@
 >   `.agents-v0/ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
 >   exist and record the phase approval — build/verify also require the recorded evidence
 >   paths to exist (`.agents-v0/ci/check-evidence.sh`).
-> - Dependency lists story IDs of this manifest, comma-separated (`P2-A, P2-B`). A
+> - Dependency lists concrete story IDs across the program, comma-separated (`P1-B, P2-A`). A
 >   build-approved story fails `.agents-v0/ci/check-milestone.sh` until each story it names has a
->   `verify` approval. Milestone names (`P1`) and a dash are prose and are not checked.
->   `/v0-plan` writes these rows (`program-planning` skill).
+>   `verify` approval. Bare milestone labels (`P1`) are rejected at `plan` time; use `—` when a
+>   story has no dependency. `/v0-plan` writes these rows (`program-planning` skill).
 > - Rows with placeholder paths (`<...>`) or no path are skipped — a milestone go/no-go
 >   passes only when every story row has a concrete, approved artifact.
 > - Hardening/readiness milestones: run `/v0-verify` once more with this manifest's linked
