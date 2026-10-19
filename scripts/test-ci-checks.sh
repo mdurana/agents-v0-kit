@@ -2380,11 +2380,11 @@ Story: P0-A
 | design | N/A: no /api/v1 operation, docs/agents-v0/design/p0-a-platform-skeleton/design.md | mdurana | Approved | 2026-10-19 |
 | build | docs/agents-v0/build/p0-a-platform-skeleton/build-report.md | mdurana | Approved | 2026-10-19 |
 EOF
+(cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md --active-phase verify --status in_progress >/dev/null 2>&1)
 cat > "$dp0/docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md" <<'EOF'
 phase: build
 status: approved
 EOF
-(cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md --active-phase verify --status in_progress >/dev/null 2>&1)
 expect_fail "check-feature-state rejects story in two phases at once (phase-result build/approved vs state verify/in_progress)" "$dp0" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md
 (cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null 2>&1)
 expect_pass "check-feature-state passes when intake+design+build are approved and sync-feature-state clears activePhase" "$dp0" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md

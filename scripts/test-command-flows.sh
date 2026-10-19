@@ -289,6 +289,75 @@ git -C "$r" reset -q --hard HEAD
 
 write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
 (cd "$r" && git add -A && commit "$r" "approve intake") && pass "intake: a correct Approved intake row commits" || fail "intake: a correct Approved intake row commits"
+expect_pass "intake: gate.sh intake --approved passes for approved intake" "$r" sh .agents-v0/ci/gate.sh intake --approved "$ORD"
+
+# check-intake warns when story surface is bff and BFF root is n/a
+cat > "$r/docs/agents-v0/project-profile.md" <<'EOF'
+## Layout
+| This repo | Value |
+|-----------|--------|
+| Profile | app |
+| Backend root | app/backend/ |
+| Frontend root | app/frontend/ |
+| BFF root | n/a |
+EOF
+BFF_STORY="docs/agents-v0/requirements/bff-story.md"
+cat > "$r/$BFF_STORY" <<'EOF'
+# Story: BFF story
+Story: B-1
+Milestone: P1
+Milestone file: docs/agents-v0/milestones/p1.md
+Surfaces: bff
+Material: no
+
+As a user, I want a bff session, so that I can access services.
+
+## Preconditions
+Fixture user exists.
+
+## Desk check
+Run curl against the endpoint and verify response code.
+
+### AC-1 — valid call
+Kind: happy
+Given a signed-in user
+When session is requested
+Then HTTP 200 and session details are returned
+
+### AC-2 — invalid call
+Kind: negative
+Given an unknown user
+When session is requested
+Then HTTP 401 unauthorized refusal
+
+## Out of scope
+none
+
+## NFRs
+Latency under 200ms.
+
+## Regulations
+N/A: none
+
+## Security-review triggers
+- auth: requires authentication
+
+## Open questions
+none
+
+## Delivery approvals
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+EOF
+mkdir -p "$r/docs/agents-v0/milestones"
+printf '# Milestone\nB-1\n' > "$r/docs/agents-v0/milestones/p1.md"
+intake_out="$(cd "$r" && sh .agents-v0/ci/check-intake.sh "$BFF_STORY" 2>&1 || true)"
+if echo "$intake_out" | grep -q "WARN:.*story surface is 'bff' but project-profile.md records BFF root as 'n/a'"; then
+  pass "check-intake: warns when surface is bff and project-profile records BFF root n/a"
+else
+  fail "check-intake: warns when surface is bff and project-profile records BFF root n/a"
+fi
+rm -f "$r/$BFF_STORY" "$r/docs/agents-v0/milestones/p1.md" "$r/docs/agents-v0/project-profile.md"
 
 # A conditional approval is not an approval, so the gate does not run and cannot be skipped by wording it differently.
 write_story "$r/$ORD" "| intake | $ORD | dev | Approved with conditions: add AC | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
@@ -415,6 +484,27 @@ mkdir -p "$r/docs/agents-v0/verify/orders"
 printf 'commit: %s\nkit-version: test\nagent: test-engineer\n' "$b_commit" > "$r/docs/agents-v0/verify/orders/test-report.md"
 (cd "$r" && git add "$ORD" docs/agents-v0/verify/orders/test-report.md && commit "$r" "verify report matching build commit")
 expect_pass "verify: gate.sh verify --approved passes when non-doc files are unchanged since build stamp" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
+# Entering release after verify approved passes check-feature-state
+(cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase release --status in_progress)
+expect_pass "release: entering release after verify approved passes check-feature-state" "$r" sh .agents-v0/ci/check-feature-state.sh "$ORD"
+
+# Verify phase-result preserves custom fields and syncs status
+cat > "$r/docs/agents-v0/requirements/orders.phase-result.md" <<'EOF'
+# Orders phase result
+Phase: verify
+Status: approved
+Notes: keep this note intact
+EOF
+(cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase release --status in_progress)
+if grep -q "keep this note intact" "$r/docs/agents-v0/requirements/orders.phase-result.md" && \
+   grep -iq "phase:\s*release" "$r/docs/agents-v0/requirements/orders.phase-result.md" && \
+   grep -iq "status:\s*in_progress" "$r/docs/agents-v0/requirements/orders.phase-result.md"; then
+  pass "sync-feature-state: phase-result preserves custom content while updating phase and status"
+else
+  fail "sync-feature-state: phase-result preserves custom content while updating phase and status"
+fi
+(cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh "$ORD")
 
 # ---------------------------------------------------------------------------------------------
 # gate.sh itself

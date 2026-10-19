@@ -155,6 +155,37 @@ def evidence(phase):
     return sorted({item.rstrip(".,;") for item in found if "<" not in item})
 
 
+pr_path = (
+    os.path.join(os.path.dirname(art), "phase-result.md")
+    if (onboarding or maintain_note)
+    else os.path.splitext(art)[0] + ".phase-result.md"
+)
+
+
+def update_phase_result(target_phase, target_status):
+    if not target_phase or not target_status or not os.path.isfile(pr_path):
+        return
+    try:
+        content = open(pr_path, encoding="utf-8").read()
+    except OSError:
+        return
+    new_content = content
+    if re.search(r"^[ \t]*phase:[ \t]*.*$", new_content, re.M | re.I):
+        new_content = re.sub(r"^[ \t]*phase:[ \t]*.*$", f"phase: {target_phase}", new_content, count=1, flags=re.M | re.I)
+    else:
+        new_content = f"phase: {target_phase}\n" + new_content
+    if re.search(r"^[ \t]*status:[ \t]*.*$", new_content, re.M | re.I):
+        new_content = re.sub(r"^[ \t]*status:[ \t]*.*$", f"status: {target_status}", new_content, count=1, flags=re.M | re.I)
+    else:
+        new_content = f"status: {target_status}\n" + new_content
+    if new_content != content:
+        try:
+            with open(pr_path, "w", encoding="utf-8") as handle:
+                handle.write(new_content)
+        except OSError:
+            pass
+
+
 prev = {}
 if os.path.isfile(out):
     try:
@@ -166,6 +197,10 @@ if os.environ.get("HOOK_CLEAR_ACTIVE") == "1":
     active_phase = ""
     active_status = ""
     blocked_reason = ""
+    if rows.get("release") and re.match(r"^local\b", rows["release"][3], re.I):
+        update_phase_result("release", "local")
+    elif last_approved:
+        update_phase_result(last_approved, "approved")
 elif os.environ.get("HOOK_SET_ACTIVE") == "1":
     active_phase = os.environ.get("HOOK_ACTIVE_PHASE", "")
     active_status = os.environ.get("HOOK_ACTIVE_STATUS", "")
@@ -188,15 +223,11 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
         and phases.index(active_phase) > phases.index(first_reopened)
     ):
         active_phase = first_reopened
+    update_phase_result(active_phase, active_status)
 else:
     active_phase = prev.get("activePhase") or ""
     active_status = prev.get("activeStatus") or ""
     blocked_reason = prev.get("blockedReason") or ""
-    pr_path = (
-        os.path.join(os.path.dirname(art), "phase-result.md")
-        if (onboarding or maintain_note)
-        else os.path.splitext(art)[0] + ".phase-result.md"
-    )
     pr_approved_last = False
     pr_approved_active = False
     if os.path.isfile(pr_path):
@@ -228,6 +259,12 @@ else:
         if active_status not in ("in_progress", "blocked"):
             active_status = "in_progress"
             blocked_reason = ""
+    if active_phase:
+        update_phase_result(active_phase, active_status)
+    elif rows.get("release") and re.match(r"^local\b", rows["release"][3], re.I):
+        update_phase_result("release", "local")
+    elif last_approved:
+        update_phase_result(last_approved, "approved")
 
 def resolve_git_head(seed: str) -> str:
     if seed and re.match(r"^[0-9a-f]{7,40}$", seed, re.I):

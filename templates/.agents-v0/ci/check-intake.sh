@@ -159,6 +159,18 @@ else:
         fail(f"{path}: Surfaces: must be backend, bff, or frontend")
     elif not vert and len(parts) != 1:
         fail(f"{path}: Surfaces: must be one surface unless Vertical slice: yes")
+    if "bff" in [p.lower() for p in parts]:
+        prof_path = "docs/agents-v0/project-profile.md"
+        if os.path.isfile(prof_path):
+            prof_text = open(prof_path, encoding="utf-8", errors="replace").read()
+            m_bff = re.search(r"(?mi)^[|]\s*BFF\s+root\s*[|]\s*([^|]+?)\s*[|]", prof_text)
+            if m_bff:
+                raw_bff = m_bff.group(1).strip()
+                bff_val = re.sub(r"<!--.*?-->", "", raw_bff).strip().strip("`").lower()
+                if not bff_val or bff_val in ("n/a", "none", "-", "absent"):
+                    print(f"WARN: {path}: story surface is 'bff' but project-profile.md records BFF root as '{raw_bff}' (ensure catalog-only / no-BFF-root topology is recorded)", file=sys.stderr)
+            else:
+                print(f"WARN: {path}: story surface is 'bff' but project-profile.md records no BFF root row (ensure catalog-only / no-BFF-root topology is recorded)", file=sys.stderr)
 
 ms = re.search(r"(?m)^Milestone:\s*\S", text)
 mf = re.search(r"(?m)^Milestone file:\s*(\S+)", text)
