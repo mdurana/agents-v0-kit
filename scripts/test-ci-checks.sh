@@ -471,6 +471,12 @@ printf '| Verify | docs/agents-v0/verify/a/test-report.md | dev | Approved | 202
 cp "$KIT/templates/docs/agents-v0/milestones/_template.md" "$d/docs/agents-v0/milestones/_template.md"
 expect_pass "check-milestone plan phase accepts acyclic concrete stories and ignores _template.md" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m2.md plan
 
+d_p0="$tmp/milestone-p0-seeded"
+mkdir -p "$d_p0/docs/agents-v0/milestones"
+cp "$KIT/templates/docs/agents-v0/milestones/"*.md "$d_p0/docs/agents-v0/milestones/"
+expect_pass "check-milestone plan phase accepts seeded p0-platform-skeleton.md alongside unfilled sibling templates" "$d_p0" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p0-platform-skeleton.md plan
+expect_fail "check-milestone plan phase rejects unfilled p1-contracts-and-data-models.md" "$d_p0" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1-contracts-and-data-models.md plan
+
 cat > "$d/docs/agents-v0/milestones/dup.md" <<'EOF'
 # Milestone: Dup
 
@@ -1574,6 +1580,35 @@ sedi 's/- \[x\]/- [ ]/' "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack --approved rejects component plan with unchecked Consistency check box" "$d" sh "$CI/check-architecture-pack.sh" --approved
 sedi 's/- \[ \]/- [x]/' "$d/docs/agents-v0/design/system/components/orders.md"
 expect_pass "check-architecture-pack --approved accepts component plan with Accepted ADR and checked Consistency check" "$d" sh "$CI/check-architecture-pack.sh" --approved
+
+# Sealed git-tracked Approved component plan with (Proposed) or - [ ] passes with warning; editing or KIT_STRICT_COMPONENT_PLAN=1 fails
+cat >> "$d/docs/agents-v0/architecture.md" <<'EOF'
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| architecture | docs/agents-v0/architecture.md | dev | Approved | 2026-01-01 |
+EOF
+cat > "$d/docs/agents-v0/design/system/components/orders.md" <<'EOF'
+# Component plan: orders
+
+Parent: `docs/agents-v0/architecture.md`
+
+## Consistency check
+
+- [ ] Names match `docs/agents-v0/adr/01-pattern.md` (Proposed).
+EOF
+(
+  cd "$d"
+  git init -q
+  git add -A && git_commit "docs: sealed approved architecture and component plan"
+)
+expect_pass "check-architecture-pack --approved tolerates sealed git-tracked component plan with (Proposed) and - [ ]" "$d" sh "$CI/check-architecture-pack.sh" --approved
+expect_fail "check-architecture-pack --approved KIT_STRICT_COMPONENT_PLAN=1 rejects sealed component plan with (Proposed)" "$d" env KIT_STRICT_COMPONENT_PLAN=1 sh "$CI/check-architecture-pack.sh" --approved
+printf '\n<!-- edit -->\n' >> "$d/docs/agents-v0/design/system/components/orders.md"
+expect_fail "check-architecture-pack --approved rejects sealed component plan once edited on disk" "$d" sh "$CI/check-architecture-pack.sh" --approved
+
 printf '# Component plan: orders\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack rejects a component plan with no parent link" "$d" sh "$CI/check-architecture-pack.sh"
 

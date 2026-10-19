@@ -192,7 +192,8 @@ for line in lines:
         if not sid:
             continue
         if re.search(r"[<>]|\[.*\]", sid):
-            errors.append(f"FAIL: story row in {fname} still has placeholder story ID: {sid}")
+            if os.path.abspath(fname) == os.path.abspath(manifest):
+                errors.append(f"FAIL: story row in {fname} still has placeholder story ID: {sid}")
             continue
         if sid in seen_ids:
             errors.append(f"FAIL: duplicate story ID {sid} (in {seen_ids[sid]} and {fname})")
@@ -246,7 +247,7 @@ if phase == "plan":
             continue
         if re.search(r"<[^>]+>|\[[^\]]+\]", story):
             errors.append(f"FAIL: story {sid} user story still has placeholder tokens: {story}")
-        elif not re.match(r"^As an?\s+\S.*,\s*I want\s+\S.*,\s*so that\s+\S+", story, re.I):
+        elif not re.match(r"^As an?\s+\S.*,\s*I want\s+\S.*(?:,|\s+[—–-])\s*so that\s+\S+", story, re.I):
             errors.append(f"FAIL: story {sid} user story must follow 'As a <role>, I want <goal>, so that <benefit>.': {story}")
         if not dep:
             errors.append(f"FAIL: story {sid} has an empty Dependency cell (use — when there is no dependency)")

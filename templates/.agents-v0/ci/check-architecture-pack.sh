@@ -365,11 +365,38 @@ if body is not None:
             elif "docs/agents-v0/architecture.md" not in plan_text:
                 fail(f"{plan.group(0)}: must link its parent docs/agents-v0/architecture.md")
             elif approved:
+                def is_sealed_component_plan(arch_path, comp_path):
+                    if os.environ.get("KIT_STRICT_COMPONENT_PLAN") == "1":
+                        return False
+                    arch_txt = read(arch_path) or ""
+                    m_rows = re.findall(r"(?im)^\s*\|\s*architecture\s*\|[^|]*\|[^|]*\|\s*([^|]+?)\s*\|", arch_txt)
+                    if not m_rows or not re.match(r"^(approved|approve|yes|pass)(\b|[^a-z])", m_rows[-1].strip(), re.I):
+                        return False
+                    import subprocess
+                    for p in (arch_path, comp_path):
+                        try:
+                            if subprocess.run(["git", "ls-files", "--error-unmatch", "--", p], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                                return False
+                            st = subprocess.run(["git", "status", "--porcelain", "--", p], capture_output=True, text=True)
+                            if st.returncode != 0 or st.stdout.strip():
+                                return False
+                        except Exception:
+                            return False
+                    return True
+
+                comp_issues = []
                 if re.search(r"\(\s*Proposed\s*\)", plan_text, re.I):
-                    fail(f"{plan.group(0)}: still labels an ADR '(Proposed)' after architecture approval (update to Accepted)")
+                    comp_issues.append(f"{plan.group(0)}: still labels an ADR '(Proposed)' after architecture approval (update to Accepted)")
                 cc_sec = split_sections(plan_text, 2).get("consistency check", "")
                 if re.search(r"^\s*-\s*\[\s\]", cc_sec, re.M):
-                    fail(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]') on an approved architecture pack")
+                    comp_issues.append(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]') on an approved architecture pack")
+                if comp_issues:
+                    if is_sealed_component_plan(arch, plan.group(0)):
+                        for msg in comp_issues:
+                            sys.stderr.write(f"WARN: {msg} (tolerated for Approved architecture pack committed in git; editing or re-opening enforces strict check)\n")
+                    else:
+                        for msg in comp_issues:
+                            fail(msg)
 
 # --- independent review ------------------------------------------------------
 if not without_review:
