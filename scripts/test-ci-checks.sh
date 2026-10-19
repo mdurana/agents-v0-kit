@@ -1849,6 +1849,36 @@ else
   fail ".gitlab-ci.yml build script did not stage per-service gate artifacts"
 fi
 
+# --- Sibling frontend CVE check when measuring app/backend -------------------
+dfe="$tmp/app-fe-cve"
+mkdir -p "$dfe/.agents-v0/ci" "$dfe/.agents-v0/packs/java" "$dfe/.agents-v0/ui/react" "$dfe/docs/agents-v0" "$dfe/app/backend/target/surefire-reports" "$dfe/app/backend/target/site/jacoco" "$dfe/app/frontend"
+cp "$CI/"*.sh "$CI/"*.py "$dfe/.agents-v0/ci/"
+cp "$KIT/core/java/pack.json" "$dfe/.agents-v0/packs/java/pack.json"
+cp "$KIT/core/ui/react/pack.json" "$dfe/.agents-v0/ui/react/pack.json"
+cat > "$dfe/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | java |
+EOF
+printf '<project></project>\n' > "$dfe/app/backend/pom.xml"
+printf '<testsuite tests="1" failures="0" errors="0" skipped="0"/>\n' > "$dfe/app/backend/target/surefire-reports/TEST-a.xml"
+cat > "$dfe/app/backend/target/site/jacoco/jacoco.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="x"><counter type="LINE" missed="0" covered="5"/></report>
+EOF
+printf '{"dependencies": []}\n' > "$dfe/app/backend/target/dependency-check-report.json"
+printf '{"name":"app-frontend"}\n' > "$dfe/app/frontend/package.json"
+cat > "$dfe/app/frontend/cve-report.json" <<'EOF'
+{"vulnerabilities": {"tinypool": {"name": "tinypool", "severity": "critical"}}}
+EOF
+expect_fail "gate metrics: critical CVE in sibling app/frontend fails check-gate-metrics.sh app/backend" "$dfe" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
+cat > "$dfe/app/frontend/cve-report.json" <<'EOF'
+{"vulnerabilities": {}}
+EOF
+expect_pass "gate metrics: clean sibling app/frontend CVE report passes check-gate-metrics.sh app/backend" "$dfe" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
+
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2
   exit 1

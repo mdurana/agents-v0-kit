@@ -1009,6 +1009,67 @@ yaml_run fail "design contracts: built feature whose draft was not merged into o
 cp "$o/newcat/api-v1.yaml" "$dc/openapi/api-v1.yaml"
 yaml_run pass "design contracts: built feature with draft merged into openapi/api-v1.yaml passes" "$dc" sh "$CI/check-design-contracts.sh"
 
+# --- Untracked controller endpoint-auth & P0-A seeded build-plan tests -------
+cat > "$e/docs/agents-v0/project-profile.md" <<'EOF'
+## Stack
+
+| Layer | Value |
+|-------|--------|
+| Pack | java |
+EOF
+cat > "$e/UntrackedHealthController.java" <<'EOF'
+import org.springframework.web.bind.annotation.*;
+@RestController
+class UntrackedHealthController {
+  @GetMapping("/health")
+  String health() { return "UP"; }
+}
+EOF
+run fail "endpoint auth: untracked controller without auth annotation fails check-endpoint-auth.sh HEAD" "$e" sh "$CI/check-endpoint-auth.sh" HEAD
+cat > "$e/UntrackedHealthController.java" <<'EOF'
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+@RestController
+class UntrackedHealthController {
+  @PreAuthorize("permitAll()")
+  @GetMapping("/health")
+  String health() { return "UP"; }
+}
+EOF
+run pass "endpoint auth: untracked controller with @PreAuthorize(permitAll()) passes check-endpoint-auth.sh HEAD" "$e" sh "$CI/check-endpoint-auth.sh" HEAD
+rm -f "$e/UntrackedHealthController.java"
+
+p0b="$tmp/p0-build-plan"
+mkdir -p "$p0b/docs/agents-v0/requirements" "$p0b/docs/agents-v0/build/p0-a-platform-skeleton" "$p0b/src/test/java/com/example/app"
+cat > "$p0b/docs/agents-v0/requirements/p0-a-platform-skeleton.md" <<'EOF'
+# Story: P0-A
+Milestone: P0 — Platform Skeleton
+- AC-1: build and tests pass
+- AC-2: milestone is tracked manifest
+- AC-3: quality plugins bound to verify
+- AC-4: app runs locally with Dockerfile and Compose
+EOF
+cat > "$p0b/src/test/java/com/example/app/SeedTests.java" <<'EOF'
+class HealthControllerTest { void health_returnsOk() {} }
+class KitPresenceTest { void kitAlreadyPresent_doesNotReinstall() {} }
+class QualityPluginsTest { void qualityPluginsBoundToVerify() {} }
+class ComposeStackTest { void composeFileDeclaresAppService() {} }
+EOF
+cat > "$p0b/docs/agents-v0/build/p0-a-platform-skeleton/plan.md" <<'EOF'
+| AC | Status | Test |
+|----|--------|------|
+| AC-1 | done | HealthControllerTest#health_returnsOk |
+| AC-2 | done | KitPresenceTest#kitAlreadyPresent_doesNotReinstall |
+| AC-3 | done | QualityPluginsTest#qualityPluginsBoundToVerify |
+| AC-4 | done | ComposeStackTest#composeFileDeclaresAppService |
+EOF
+cat > "$p0b/docs/agents-v0/build/p0-a-platform-skeleton/build-report.md" <<'EOF'
+| Command | Exit | Attempt | Failing test | Location |
+|---------|------|---------|--------------|----------|
+| ./mvnw test | 0 | 1 | - | - |
+EOF
+run pass "build plan: p0-a-platform-skeleton seeded tests pass --complete without artificial red cards" "$p0b" sh "$CI/check-build-plan.sh" p0-a-platform-skeleton --complete
+
 if [ "$status" -ne 0 ]; then
   echo "test-design-build: FAILED" >&2
   exit 1

@@ -391,10 +391,17 @@ def main(args):
                         pass
             if eff_base:
                 base = eff_base
-                span = [base, head or "HEAD"]
+                span = [base, head] if head else [base]
                 code, out = _git("diff", "--name-only", "--diff-filter=AM", *span)
+    paths = [p for p in out.splitlines() if p]
+    if not head:
+        _u_code, u_out = _git("ls-files", "--others", "--exclude-standard")
+        if _u_code == 0:
+            for p in u_out.splitlines():
+                if p and p not in paths:
+                    paths.append(p)
     failures, checked = [], 0
-    for path in [p for p in out.splitlines() if watched(p, pack, stacks)]:
+    for path in [p for p in paths if watched(p, pack, stacks)]:
         if head:
             _code, text = _git("show", f"{head}:{path}")
         else:

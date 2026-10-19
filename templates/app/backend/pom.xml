@@ -20,7 +20,7 @@
     <java.version>21</java.version>
     <maven.compiler.release>21</maven.compiler.release>
     <tomcat.version>11.0.26</tomcat.version>
-    <kit.maven.dir>${project.basedir}/../../maven</kit.maven.dir>
+    <kit.maven.dir>${project.basedir}/maven</kit.maven.dir>
   </properties>
 
   <dependencies>
@@ -152,6 +152,17 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>repo-root-maven-dir</id>
+      <activation>
+        <file>
+          <exists>${project.basedir}/../../maven/checkstyle.xml</exists>
+        </file>
+      </activation>
+      <properties>
+        <kit.maven.dir>${project.basedir}/../../maven</kit.maven.dir>
+      </properties>
+    </profile>
     <profile>
       <id>ci-security</id>
       <build>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check suppressions starter. Add entries only with a
+  documented reason — CVE exceptions must be documented per
+  quality-and-testing.mdc and recorded in the Verify test report.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd"/>

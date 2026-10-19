@@ -16,7 +16,7 @@ command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2
 DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ "$#" -eq 0 ]; then
   eval "$(sh "$DIR/resolve-layout.sh")"
-  set -- ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-}
+  set -- ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-} ${FRONTEND_ROOT:-}
 fi
 
 COLLECT_DIR="$DIR" COLLECT_ROOTS="$*" python3 - <<'PY'
@@ -30,7 +30,16 @@ import sys
 sys.path.insert(0, os.environ["COLLECT_DIR"])
 import packlib
 
-roots = [item for item in os.environ.get("COLLECT_ROOTS", "").split() if item]
+raw_roots = [item for item in os.environ.get("COLLECT_ROOTS", "").split() if item]
+roots = []
+for r in raw_roots:
+    if r not in roots:
+        roots.append(r)
+    if os.path.basename(os.path.normpath(r)) == "backend":
+        sib = os.path.join(os.path.dirname(os.path.normpath(r)) or ".", "frontend")
+        if os.path.isdir(sib) and sib not in roots:
+            roots.append(sib)
+
 pack_id = packlib.profile_pack()
 data = packlib.load(pack_id) if pack_id else None
 patterns = []
@@ -55,6 +64,14 @@ else:
 ci_gate_abs = os.path.abspath(os.path.join(os.getcwd(), "ci-artifacts", "gate"))
 
 
+def is_frontend_root(root_dir):
+    return (
+        os.path.isfile(os.path.join(root_dir, "package.json"))
+        and not os.path.isfile(os.path.join(root_dir, "pom.xml"))
+        and (not data or data.get("id") != "node")
+    )
+
+
 def ensure_cve_artifact(root_dir, cve_rel, pid):
     if not cve_rel or "*" in cve_rel:
         return 0
@@ -75,9 +92,10 @@ def ensure_cve_artifact(root_dir, cve_rel, pid):
                 parsed = json.loads(proc.stdout)
                 if "projects" in parsed:
                     payload = parsed
-        elif pid == "node" and shutil.which("npm") and os.path.isfile(os.path.join(root_dir, "package-lock.json")):
+        elif pid in ("node", "react") and shutil.which("npm") and os.path.isfile(os.path.join(root_dir, "package-lock.json")):
+            cmd = ["npm", "audit", "--json"] if pid == "react" else ["npm", "audit", "--omit=dev", "--json"]
             proc = subprocess.run(
-                ["npm", "audit", "--omit=dev", "--json"],
+                cmd,
                 cwd=root_dir, capture_output=True, text=True, timeout=60,
             )
             if proc.stdout.strip().startswith("{"):
@@ -151,6 +169,28 @@ for root in roots:
     gate_root = os.path.normpath(os.path.join("ci-artifacts", "gate", root))
     if os.path.isdir(gate_root):
         shutil.rmtree(gate_root, ignore_errors=True)
+    if is_frontend_root(root):
+        ui_pack = (data.get("uiPack") if data and isinstance(data.get("uiPack"), dict) else None) or {}
+        fe_cve = (ui_pack.get("cve") or {}).get("path") or "cve-report.json"
+        fe_patterns = [
+            (ui_pack.get("coverage") or {}).get("path") or "coverage/coverage-summary.json",
+            "junit.xml",
+            fe_cve,
+        ]
+        for pattern in fe_patterns:
+            for match in glob.glob(os.path.join(root, pattern), recursive=True):
+                if not os.path.isfile(match):
+                    continue
+                match_abs = os.path.abspath(match)
+                if match_abs == ci_gate_abs or match_abs.startswith(ci_gate_abs + os.sep):
+                    continue
+                rel = os.path.relpath(match, root)
+                dest = os.path.join("ci-artifacts", "gate", root, rel)
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                shutil.copy2(match, dest)
+                copied += 1
+        copied += ensure_cve_artifact(root, fe_cve, "react")
+        continue
     for pattern in patterns:
         for match in glob.glob(os.path.join(root, pattern), recursive=True):
             if not os.path.isfile(match):

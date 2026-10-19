@@ -134,7 +134,8 @@ for doc in sorted(set(docs)):
         body = handle.read()
     if norm_doc == "docs/agents-v0/onboarding/report.md" or norm_doc.endswith("/docs/agents-v0/onboarding/report.md"):
         report_body = body
-    if "TEMPLATE:" in body:
+    content_lines = [ln for ln in body.splitlines() if not ln.lstrip().startswith(">")]
+    if any("TEMPLATE:" in ln for ln in content_lines):
         failures.append(f"{doc}: a TEMPLATE: marker is still present (replace or delete the sample row)")
     doc_unv = count_unverified_statements(body)
     unverified += doc_unv
@@ -142,7 +143,8 @@ for doc in sorted(set(docs)):
         non_report_unverified += doc_unv
     if norm_doc.startswith("docs/agents-v0/onboarding/") and not re.search(r"^commit:\s*[0-9a-f]{7,40}\b", body, re.M):
         failures.append(f"{doc}: no `commit: <sha>` line (the commit this document describes)")
-    for m in CITE.finditer(body):
+    cite_body = re.sub(r"<!--.*?-->", "", "\n".join(content_lines), flags=re.S)
+    for m in CITE.finditer(cite_body):
         cites += 1
         path, start = m.group(1), int(m.group(2))
         end = int(m.group(3)) if m.group(3) else start

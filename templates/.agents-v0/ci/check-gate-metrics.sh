@@ -969,6 +969,50 @@ def measure_manifest(data):
         record_cve(cve_candidate)
     else:
         print("cve: SKIP (pack has no cve.path)")
+    check_sibling_frontend_cve()
+
+
+def check_sibling_frontend_cve():
+    """When measuring a backend root with a sibling frontend root (e.g. app/backend + app/frontend), check frontend CVEs too."""
+    import shutil
+    norm_r = os.path.normpath(root)
+    if os.path.basename(norm_r) != "backend":
+        return
+    sib = os.path.join(os.path.dirname(norm_r) or ".", "frontend")
+    if not os.path.isdir(sib):
+        return
+    ui_pack = (bound_pack or {}).get("uiPack") if isinstance((bound_pack or {}).get("uiPack"), dict) else {}
+    fe_cve_rel = (ui_pack.get("cve") or {}).get("path") or "cve-report.json"
+    fe_candidates = [os.path.join(sib, fe_cve_rel)]
+    rel_sib = os.path.relpath(os.path.abspath(sib), os.getcwd())
+    if not rel_sib.startswith(".."):
+        fe_candidates.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_sib, fe_cve_rel))
+    fe_report = next((p for p in fe_candidates if os.path.isfile(p)), "")
+    fe_data = None
+    if fe_report:
+        try:
+            with open(fe_report, encoding="utf-8") as handle:
+                fe_data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            fe_data = None
+    elif env("REQUIRE_CVE_REPORT") == "1" and os.path.isfile(os.path.join(sib, "package-lock.json")) and shutil.which("npm"):
+        try:
+            proc = subprocess.run(
+                ["npm", "audit", "--json"],
+                cwd=sib, capture_output=True, text=True, timeout=60,
+            )
+            if proc.stdout.strip().startswith("{"):
+                parsed = json.loads(proc.stdout)
+                if "vulnerabilities" in parsed:
+                    fe_data = parsed
+        except Exception:
+            fe_data = None
+    if isinstance(fe_data, dict):
+        fe_found = sorted(set(cve_names(fe_data)))
+        summary["frontendHighCriticalCves"] = fe_found
+        print(f"cve ({sib}): {len(fe_found)} unsuppressed HIGH/CRITICAL")
+        if fe_found:
+            failures.append(f"unsuppressed frontend HIGH/CRITICAL CVEs in {sib}: " + ", ".join(fe_found))
 
 
 def kind_from_pack():
@@ -991,6 +1035,12 @@ def kind_from_pack():
     global bound_pack
     bound_pack = data
     summary["pack"] = pack_id
+    if (
+        pack_id != "node"
+        and os.path.isfile(os.path.join(root, "package.json"))
+        and not os.path.isfile(os.path.join(root, "pom.xml"))
+    ):
+        return "node"
     return "manifest"
 
 
@@ -1129,5 +1179,6 @@ elif env("REQUIRE_CVE_REPORT") == "1":
 else:
     print("cve: SKIP (no target/dependency-check-report.json)")
 
+check_sibling_frontend_cve()
 finish()
 PY

@@ -7,6 +7,7 @@
   "tests": "Vitest 3",
   "layout": "src/pages/, src/features/, src/components/{layout,common}, src/services/api, src/store/slices",
   "coverage": {"path": "coverage/coverage-summary.json", "format": "jest-summary"},
+  "cve": {"path": "cve-report.json"},
   "hostChecks": ["node", "npm"],
   "hostPorts": ["nodejs22", "npm11"]
 }

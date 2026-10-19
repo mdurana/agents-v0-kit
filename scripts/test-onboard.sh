@@ -254,6 +254,9 @@ sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agent
 printf '<!-- TEMPLATE: replace -->\n' >> "$r/docs/agents-v0/onboarding/report.md"
 expect_fail "onboarding docs: a TEMPLATE: marker fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
 sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
+printf '> Instruction: cite code as `path/File.java:42` and delete each `TEMPLATE:` line when you replace it.\n' >> "$r/docs/agents-v0/onboarding/report.md"
+expect_pass "onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
 printf 'Owner: UNVERIFIED\n\n## Open questions and UNVERIFIED items\n\n| # | Item | Source | Owner |\n|---|------|--------|-------|\n| 1 | Order retry policy | %s | UNVERIFIED |\n' "$cite" >> "$r/docs/agents-v0/onboarding/report.md"
 expect_pass "onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0" "$r" env MAX_UNVERIFIED=0 sh .agents-v0/scripts/check-onboarding-docs.sh
 sed -i.bak '/^Owner: UNVERIFIED/,$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
