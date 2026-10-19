@@ -573,7 +573,7 @@ done
 # The local container script installs under .agents-v0/scripts, not scripts/.
 if grep -rIlF './scripts/run-local-container.sh' templates README.md >/dev/null 2>&1; then err "docs name ./scripts/run-local-container.sh; the script installs at .agents-v0/scripts/run-local-container.sh"; fi
 # Onboarding: layout-aware, cited, verified, gated.
-for onboard_file in templates/.agents-v0/scripts/discover-codebase.sh templates/.agents-v0/scripts/check-onboarding-docs.sh templates/docs/agents-v0/onboarding/_report.template.md templates/docs/agents-v0/onboarding/_module.template.md; do
+for onboard_file in templates/.agents-v0/scripts/discover-codebase.sh templates/.agents-v0/scripts/check-onboarding-docs.sh templates/.agents-v0/scripts/audit-brownfield-baseline.sh templates/docs/agents-v0/onboarding/_report.template.md templates/docs/agents-v0/onboarding/_module.template.md; do
   [ -f "$onboard_file" ] || err "required onboarding file missing: $onboard_file"
 done
 grep -Fq 'codebase-documenter' core/common/commands/v0-onboard.md || err "/v0-onboard must launch the codebase-documenter"
@@ -602,7 +602,7 @@ grep -Fq 'onboard' templates/.agents-v0/ci/check-delivery-linkage.sh || err "che
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/common/commands/v0-intake.md || err "/v0-intake must wait for the onboard approval on a brownfield repo"
 grep -Fq 'docs/agents-v0/onboarding/report.md' core/common/commands/v0-plan.md || err "/v0-plan must wait for the onboard approval on a brownfield repo"
 grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/scripts/check-onboarding-docs.sh (every kit script)"
-for onboard_script in discover-codebase.sh check-onboarding-docs.sh; do
+for onboard_script in discover-codebase.sh check-onboarding-docs.sh audit-brownfield-baseline.sh; do
   grep -Fq ".agents-v0/scripts/$onboard_script" scripts/install.sh || err "install.sh does not seed .agents-v0/scripts/$onboard_script"
 done
 if grep -q 'TEMPLATE:' templates/docs/agents-v0/architecture.md && ! grep -q 'Brownfield' templates/docs/agents-v0/architecture.md; then err "architecture.md template must say /v0-onboard replaces it"; fi

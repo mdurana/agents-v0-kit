@@ -219,6 +219,10 @@ write("outbound.txt", "Outbound HTTP clients",
 # ---- Configuration: key names only -----------------------------------------
 CONFIG_FILE = re.compile(r"^(application|bootstrap)[\w.-]*\.(ya?ml|properties)$|^appsettings[\w.-]*\.json$|^\.env\.(example|sample|template)$")
 SECRET_KEY = re.compile(r"(password|passwd|secret|token|api[-_.]?key|private[-_.]?key|credential)", re.I)
+PLACEHOLDER_VAL = re.compile(
+    r"^(changeme|change[-_]?me|todo|fixme|replace[-_]?me|placeholder|dummy|example|sample|none|null|nil|false|true|n/?a|xxx+|\*+|<[^>]+>|\{\{[^}]+\}\}|__[^_]+__)$",
+    re.I,
+)
 keys, env_refs, secret_keys = [], [], []
 for path in files:
     if not CONFIG_FILE.match(os.path.basename(path)):
@@ -252,7 +256,14 @@ for path in files:
         keys.append(f"{path}:{i}  {full}")
         if SECRET_KEY.search(full):
             clean_val = value.strip("\"'")
-            kind = "empty-or-nested" if not clean_val else ("env-ref" if "${" in clean_val else "LITERAL-IN-FILE")
+            if not clean_val:
+                kind = "empty-or-nested"
+            elif "${" in clean_val or clean_val.startswith("$"):
+                kind = "env-ref"
+            elif PLACEHOLDER_VAL.match(clean_val) or os.path.basename(path).startswith(".env."):
+                kind = "placeholder"
+            else:
+                kind = "LITERAL-IN-FILE"
             secret_keys.append(f"{path}:{i}  {full}  ({kind})")
 write("config.txt", "Configuration (key names only; values are never printed)",
       ["## keys"] + keys + ["", "## environment references"] + sorted(set(env_refs)) + ["", "## secret-like keys"] + secret_keys)
@@ -342,7 +353,7 @@ for base in ROOTS:
     if GATE and os.path.isfile(GATE):
         env = dict(os.environ, GATE_REPORT_ONLY="1", ALLOW_NO_TESTS="1")
         subprocess.run(["sh", GATE, base], env=env, capture_output=True, text=True)
-    summary_path = os.path.join(target, "gate-metrics.json") if os.path.isdir(target) else os.path.join(base, "gate-metrics.json")
+    summary_path = os.path.join(target, "gate-metrics.json")
     if not os.path.isfile(summary_path):
         alt = os.path.join(base, "gate-metrics.json")
         if os.path.isfile(alt):

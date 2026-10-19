@@ -258,7 +258,12 @@ feature_id = (
 prev_bc = (prev.get("baseCommit") or "").strip()
 head_bc = resolve_git_head(os.environ.get("HOOK_BASE", ""))
 rep_parent = ""
-if feature_id and not onboarding:
+if onboarding:
+    m_onb = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", text, re.I | re.M)
+    if m_onb:
+        rep_parent = m_onb.group(1)
+        prev_bc = ""
+elif feature_id:
     for rep_path in (
         os.path.join("docs", "agents-v0", "build", feature_id, "build-report.md"),
         os.path.join("docs", "agents-v0", "verify", feature_id, "test-report.md"),

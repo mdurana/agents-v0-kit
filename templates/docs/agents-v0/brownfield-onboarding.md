@@ -43,10 +43,10 @@ The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/`
 
 ## 2. Audit the baseline (do this before `/v0-build` or `/v0-maintain`)
 
-From the agents-v0 kit repo:
+In the target repo (or `./scripts/audit-brownfield-baseline.sh /path/to/existing-repo` from the kit repo):
 
 ```bash
-./scripts/audit-brownfield-baseline.sh /path/to/existing-repo
+sh .agents-v0/scripts/audit-brownfield-baseline.sh
 ```
 
 The script runs the repo’s Backend verify command from `docs/agents-v0/project-profile.md` (or detects Maven, Gradle, npm, pytest, Go, or dotnet test when the profile cell is not yet set) and

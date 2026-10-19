@@ -1,16 +1,12 @@
 #!/bin/sh
 # audit-brownfield-baseline.sh — run the target repo baseline build/test and report status.
 #
-# Usage: audit-brownfield-baseline.sh <target-repo>
+# Usage: audit-brownfield-baseline.sh [<target-repo>]
 #
 # Use before /v0-build or /v0-maintain on brownfield repos. See docs/agents-v0/brownfield-onboarding.md.
 set -eu
 
-TARGET="${1:-}"
-if [ -z "$TARGET" ]; then
-  printf 'usage: %s <target-repo>\n' "$(basename "$0")" >&2
-  exit 1
-fi
+TARGET="${1:-.}"
 [ -d "$TARGET" ] || {
   printf 'FAIL: target not found: %s\n' "$TARGET" >&2
   exit 1
@@ -34,7 +30,7 @@ run_maven() {
     return 0
   fi
   ran=1
-  printf '--- %s -B clean verify ---\n' "$MVN"
+  printf -- '--- %s -B clean verify ---\n' "$MVN"
   if "$MVN" -B clean verify; then
     printf 'OK: Maven verify passed\n'
   else
@@ -54,7 +50,7 @@ run_gradle() {
     return 0
   fi
   ran=1
-  printf '--- %s clean check ---\n' "$GW"
+  printf -- '--- %s clean check ---\n' "$GW"
   if "$GW" clean check; then
     printf 'OK: Gradle check passed\n'
   else
@@ -70,7 +66,7 @@ run_npm() {
   fi
   ran=1
   if grep -q '"verify"' package.json 2>/dev/null; then
-    printf '--- npm run verify ---\n'
+    printf -- '--- npm run verify ---\n'
     if npm run verify; then
       printf 'OK: npm run verify passed\n'
     else
@@ -80,7 +76,7 @@ run_npm() {
     return 0
   fi
   if grep -q '"test"' package.json 2>/dev/null; then
-    printf '--- npm test ---\n'
+    printf -- '--- npm test ---\n'
     if npm test; then
       printf 'OK: npm test passed\n'
     else
@@ -90,7 +86,7 @@ run_npm() {
     return 0
   fi
   if grep -q '"build"' package.json 2>/dev/null; then
-    printf '--- npm run build ---\n'
+    printf -- '--- npm run build ---\n'
     if npm run build; then
       printf 'OK: npm run build passed\n'
     else
@@ -106,13 +102,13 @@ run_node() {
   if [ -f pnpm-lock.yaml ] && command -v pnpm >/dev/null 2>&1; then
     ran=1
     if grep -q '"verify"' package.json 2>/dev/null; then
-      printf '--- pnpm run verify ---\n'
+      printf -- '--- pnpm run verify ---\n'
       pnpm run verify || status=1
     elif grep -q '"test"' package.json 2>/dev/null; then
-      printf '--- pnpm test ---\n'
+      printf -- '--- pnpm test ---\n'
       pnpm test || status=1
     elif grep -q '"build"' package.json 2>/dev/null; then
-      printf '--- pnpm run build ---\n'
+      printf -- '--- pnpm run build ---\n'
       pnpm run build || status=1
     else
       run_npm
@@ -120,13 +116,13 @@ run_node() {
   elif [ -f yarn.lock ] && command -v yarn >/dev/null 2>&1; then
     ran=1
     if grep -q '"verify"' package.json 2>/dev/null; then
-      printf '--- yarn verify ---\n'
+      printf -- '--- yarn verify ---\n'
       yarn verify || status=1
     elif grep -q '"test"' package.json 2>/dev/null; then
-      printf '--- yarn test ---\n'
+      printf -- '--- yarn test ---\n'
       yarn test || status=1
     elif grep -q '"build"' package.json 2>/dev/null; then
-      printf '--- yarn build ---\n'
+      printf -- '--- yarn build ---\n'
       yarn build || status=1
     else
       run_npm
@@ -149,7 +145,7 @@ audit_root() {
     return 0
   fi
   cd "$TARGET_ABS/$root"
-  printf '--- layout root %s ---\n' "$root"
+  printf -- '--- layout root %s ---\n' "$root"
   if [ -f pom.xml ]; then
     run_maven
   fi
@@ -162,7 +158,7 @@ audit_root() {
   if [ -f go.mod ]; then
     if command -v go >/dev/null 2>&1; then
       ran=1
-      printf '--- go test ./... ---\n'
+      printf -- '--- go test ./... ---\n'
       go test ./... || status=1
     else
       printf 'SKIP: go.mod present but go not on PATH\n'
@@ -171,17 +167,28 @@ audit_root() {
   if [ -f pyproject.toml ] || [ -f pytest.ini ]; then
     if command -v python3 >/dev/null 2>&1 && python3 -m pytest --version >/dev/null 2>&1; then
       ran=1
-      printf '--- python3 -m pytest ---\n'
+      printf -- '--- python3 -m pytest ---\n'
       python3 -m pytest || status=1
     else
       printf 'SKIP: pyproject.toml present but pytest not available\n'
     fi
   fi
-  if find . -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) -print -quit 2>/dev/null | grep -q .; then
+  if find . -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) -print 2>/dev/null | head -n 1 | grep -q .; then
     if command -v dotnet >/dev/null 2>&1; then
       ran=1
-      printf '--- dotnet test ---\n'
-      dotnet test || status=1
+      printf -- '--- dotnet test ---\n'
+      dt_out="$(mktemp)"
+      if dotnet test >"$dt_out" 2>&1; then
+        cat "$dt_out"
+        if ! grep -Eqi 'Total tests:[[:space:]]*[1-9]|Passed![[:space:]]*-[[:space:]]*Failed:[[:space:]]*[0-9]+,[[:space:]]*Passed:[[:space:]]*[1-9]' "$dt_out"; then
+          printf 'FAIL: dotnet test executed 0 tests — add a test project before /v0-build or /v0-maintain\n'
+          status=1
+        fi
+      else
+        cat "$dt_out"
+        status=1
+      fi
+      rm -f "$dt_out"
     else
       printf 'SKIP: .NET project present but dotnet not on PATH\n'
     fi
@@ -201,21 +208,36 @@ if [ -f .agents-v0/ci/run-backend-verify.sh ]; then
   fe_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
   if [ -n "$be_cmd" ] && { [ "$have_layout" = 0 ] || [ -n "${BACKEND_ROOT:-}" ] || { [ -z "${BFF_ROOT:-}" ] && [ -z "${SERVICE_ROOTS:-}" ]; }; }; then
     ran=1
-    printf '--- Backend verify: %s ---\n' "$be_cmd"
-    sh -c "$be_cmd" || status=1
+    printf -- '--- Backend verify: %s ---\n' "$be_cmd"
+    be_out="$(mktemp)"
+    if sh -c "$be_cmd" >"$be_out" 2>&1; then
+      cat "$be_out"
+      case "$be_cmd" in
+        *dotnet\ test*)
+          if ! grep -Eqi 'Total tests:[[:space:]]*[1-9]|Passed![[:space:]]*-[[:space:]]*Failed:[[:space:]]*[0-9]+,[[:space:]]*Passed:[[:space:]]*[1-9]' "$be_out"; then
+            printf 'FAIL: dotnet test executed 0 tests — add a test project before /v0-build or /v0-maintain\n'
+            status=1
+          fi
+          ;;
+      esac
+    else
+      cat "$be_out"
+      status=1
+    fi
+    rm -f "$be_out"
   fi
   if [ -n "$svc_cmd" ]; then
     for r in ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
       [ -n "$r" ] && [ -d "$r" ] || continue
       ran=1
       rcmd="$(printf '%s' "$svc_cmd" | sed "s|{root}|$r|g")"
-      printf '--- Service verify (%s): %s ---\n' "$r" "$rcmd"
+      printf -- '--- Service verify (%s): %s ---\n' "$r" "$rcmd"
       sh -c "$rcmd" || status=1
     done
   fi
   if [ -n "$fe_cmd" ] && { [ "$have_layout" = 0 ] || [ -n "${FRONTEND_ROOT:-}" ]; }; then
     ran=1
-    printf '--- Frontend verify: %s ---\n' "$fe_cmd"
+    printf -- '--- Frontend verify: %s ---\n' "$fe_cmd"
     sh -c "$fe_cmd" || status=1
   fi
 fi

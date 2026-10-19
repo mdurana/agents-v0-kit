@@ -23,7 +23,7 @@ expect_fail() { desc="$1"; dir="$2"; shift 2; if (cd "$dir" && "$@") >/dev/null 
 r="$tmp/repo"
 mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/docs/agents-v0"
 cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh \
-   "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$KIT"/templates/.agents-v0/ci/packlib.py "$r/.agents-v0/ci/"
+   "$KIT"/templates/.agents-v0/ci/check-feature-state.sh "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$KIT"/templates/.agents-v0/ci/packlib.py "$r/.agents-v0/ci/"
 mkdir -p "$r/.agents-v0/ui/react"
 cp "$KIT/core/ui/react/pack.json" "$r/.agents-v0/ui/react/pack.json"
 for id in java dotnet node python go; do
@@ -32,7 +32,7 @@ for id in java dotnet node python go; do
 done
 cp "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
    "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
-   "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$r/.agents-v0/scripts/"
+   "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$KIT"/templates/.agents-v0/scripts/audit-brownfield-baseline.sh "$r/.agents-v0/scripts/"
 cat > "$r/docs/agents-v0/project-profile.md" <<'EOF'
 | This repo | Value |
 |-----------|--------|
@@ -254,11 +254,32 @@ sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agent
 printf '<!-- TEMPLATE: replace -->\n' >> "$r/docs/agents-v0/onboarding/report.md"
 expect_fail "onboarding docs: a TEMPLATE: marker fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
 sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
+printf 'Owner: UNVERIFIED\n\n## Open questions and UNVERIFIED items\n\n| # | Item | Source | Owner |\n|---|------|--------|-------|\n| 1 | Order retry policy | %s | UNVERIFIED |\n' "$cite" >> "$r/docs/agents-v0/onboarding/report.md"
+expect_pass "onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0" "$r" env MAX_UNVERIFIED=0 sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '/^Owner: UNVERIFIED/,$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
 printf 'Retention is UNVERIFIED.\n' >> "$r/docs/agents-v0/onboarding/report.md"
 expect_pass "onboarding docs: UNVERIFIED is counted, not failed, by default" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
 expect_fail "onboarding docs: MAX_UNVERIFIED=0 fails on an unknown" "$r" env MAX_UNVERIFIED=0 sh .agents-v0/scripts/check-onboarding-docs.sh
+sed -i.bak '$d' "$r/docs/agents-v0/onboarding/report.md" && rm -f "$r/docs/agents-v0/onboarding/report.md.bak"
 printf '# Module: order\n\nNo commit line here.\n' > "$r/docs/agents-v0/onboarding/modules/order.md"
 expect_fail "onboarding docs: a module document needs a commit line" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+cat > "$r/docs/agents-v0/onboarding/modules/order.md" <<'EOF'
+# Module: order
+
+commit: abcdef1234567
+
+- Retry policy: UNVERIFIED — not in config.
+EOF
+expect_fail "onboarding docs: module UNVERIFIED without an open question row in report.md fails" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
+cat >> "$r/docs/agents-v0/onboarding/report.md" <<EOF
+
+## Open questions and UNVERIFIED items
+
+| # | Question or unverified item | Where seen | Suggested owner |
+|---|-----------------------------|------------|-----------------|
+| 1 | Order retry policy | $cite | UNVERIFIED |
+EOF
+expect_pass "onboarding docs: module UNVERIFIED listed in report.md Open questions passes" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
 rm -f "$r/docs/agents-v0/onboarding/modules/order.md"
 mv "$r/docs/agents-v0/onboarding/report.md" "$r/docs/agents-v0/onboarding/report.keep"
 expect_fail "onboarding docs: the default run needs the report" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
@@ -269,9 +290,76 @@ expect_pass "check-approvals accepts an Approved onboard row" "$r" sh .agents-v0
 expect_pass "state: onboarding in progress" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status in_progress
 has "state: written beside the report" "$r/docs/agents-v0/onboarding/state.json" '"activePhase": "onboard"'
 has "state: feature is onboarding" "$r/docs/agents-v0/onboarding/state.json" '"feature": "onboarding"'
+has "state: baseCommit pinned from report commit header" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
+expect_pass "check-feature-state: accepts active onboard phase on onboarding/state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
 expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
 has "state: last approved phase is onboard" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
+has "state: baseCommit preserved across approval sync" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
+expect_pass "check-feature-state: accepts approved onboarding state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
+sed -i.bak 's/"lastApprovedPhase": "onboard"/"lastApprovedPhase": ""/' "$r/docs/agents-v0/onboarding/state.json" && rm -f "$r/docs/agents-v0/onboarding/state.json.bak"
+expect_fail "check-feature-state: detects drift in docs/agents-v0/onboarding/state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
+expect_pass "state: restore approved onboarding state.json" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
 expect_fail "state: an intake phase is not valid for onboarding" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase intake --status in_progress
+
+# --- C# controller route resolution, placeholder secrets, and dotnet baseline -
+disc="$r/docs/agents-v0/discovery"
+cs="$r/services/inventory"
+cat > "$cs/InventoryController.cs" <<'EOF'
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Acme.Inventory;
+
+[ApiController]
+[Route("api/[controller]")]
+public class InventoryController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult ListAll() => Ok();
+
+    [Authorize]
+    [HttpPost("{id}/[action]")]
+    public IActionResult Reserve(int id) => Ok();
+}
+EOF
+cat > "$cs/appsettings.json" <<'EOF'
+{
+  "Emailer": {
+    "senderPassword": "CHANGEME"
+  }
+}
+EOF
+expect_pass "discover-codebase runs with C# controller and placeholder config" "$r" sh .agents-v0/scripts/discover-codebase.sh
+has "endpoints: C# [controller] token resolved on class route" "$disc/endpoints.txt" "GET /api/inventory  NO-ANNOTATION"
+has "endpoints: C# [controller] and [action] tokens resolved with [Authorize]" "$disc/endpoints.txt" "POST /api/inventory/{id}/reserve  annotated"
+lacks "endpoints: raw [controller] template token is not stored" "$disc/endpoints.txt" "[controller]"
+has "config: CHANGEME placeholder classified as (placeholder)" "$disc/config.txt" "Emailer.senderPassword  (placeholder)"
+lacks "security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE" "$disc/security-baseline.md" "Emailer.senderPassword"
+
+b="$tmp/dotnet-baseline"
+mkdir -p "$b/.agents-v0/scripts" "$b/bin"
+cp "$KIT"/templates/.agents-v0/scripts/audit-brownfield-baseline.sh "$b/.agents-v0/scripts/"
+printf 'Microsoft Visual Studio Solution File, Format Version 12.00\n' > "$b/App.sln"
+cat > "$b/bin/dotnet" <<'EOF'
+#!/bin/sh
+case "$1" in
+  build) printf 'Build succeeded.\n' ;;
+  test) printf 'Test run for App.dll (.NETCoreApp,Version=v8.0)\nNo test is available in App.dll.\n' ;;
+  list) printf 'The given project has no vulnerable packages given the current sources.\n' ;;
+esac
+EOF
+chmod +x "$b/bin/dotnet"
+expect_fail "audit-brownfield-baseline: fails when dotnet test executes 0 tests" "$b" env PATH="$b/bin:$PATH" sh .agents-v0/scripts/audit-brownfield-baseline.sh
+cat > "$b/bin/dotnet" <<'EOF'
+#!/bin/sh
+case "$1" in
+  build) printf 'Build succeeded.\n' ;;
+  test) printf 'Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2\n' ;;
+  list) printf 'The given project has no vulnerable packages given the current sources.\n' ;;
+esac
+EOF
+chmod +x "$b/bin/dotnet"
+expect_pass "audit-brownfield-baseline: passes when dotnet test runs real tests" "$b" env PATH="$b/bin:$PATH" sh .agents-v0/scripts/audit-brownfield-baseline.sh
 
 if [ "$status" -ne 0 ]; then
   echo "test-onboard: FAILED" >&2

@@ -72,14 +72,75 @@ for raw in os.environ["CHECK_PATHS"].splitlines():
     elif os.path.isfile(raw):
         docs.append(raw)
 
+def count_unverified_statements(body):
+    count = 0
+    in_comment = False
+    for line in body.splitlines():
+        s = line.strip()
+        if "<!--" in s:
+            if "-->" not in s:
+                in_comment = True
+            continue
+        if in_comment:
+            if "-->" in s:
+                in_comment = False
+            continue
+        if not s or s.startswith(("#", ">")):
+            continue
+        if re.match(r"^Owner:\s*UNVERIFIED\b", s, re.I):
+            continue
+        if s.startswith("|"):
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            # Module table in report.md: | Module | Document | Owner | Confidence |
+            if len(cells) == 4 and cells[1].startswith("docs/") and cells[2].upper() == "UNVERIFIED":
+                continue
+            # Open questions table in report.md: | # | Question or unknown | Where it matters | Owner |
+            if len(cells) == 4 and cells[0].isdigit() and cells[3].upper() == "UNVERIFIED":
+                cells = cells[:3]
+                s = "| " + " | ".join(cells) + " |"
+        count += len(re.findall(r"\bUNVERIFIED\b", s))
+    return count
+
+
+def report_open_question_rows(body):
+    in_oq = False
+    rows = 0
+    for line in body.splitlines():
+        s = line.strip()
+        if re.match(r"^#+\s*(open questions|unverified)", s, re.I):
+            in_oq = True
+            continue
+        if in_oq and re.match(r"^#+\s", s):
+            break
+        if not in_oq or not s or "<!--" in s:
+            continue
+        if s.startswith("|"):
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            if not cells or cells[0].lower() in ("#", "") or set(cells[0]) <= set("-: "):
+                continue
+            if any(c for c in cells[1:]):
+                rows += 1
+        elif s.startswith(("- ", "* ")) and len(s) > 3:
+            rows += 1
+    return rows
+
+
+report_body = None
+non_report_unverified = 0
 for doc in sorted(set(docs)):
     checked += 1
+    norm_doc = doc.replace(os.sep, "/")
     with open(doc, encoding="utf-8", errors="replace") as handle:
         body = handle.read()
+    if norm_doc == "docs/agents-v0/onboarding/report.md" or norm_doc.endswith("/docs/agents-v0/onboarding/report.md"):
+        report_body = body
     if "TEMPLATE:" in body:
         failures.append(f"{doc}: a TEMPLATE: marker is still present (replace or delete the sample row)")
-    unverified += len(re.findall(r"\bUNVERIFIED\b", body))
-    if doc.replace(os.sep, "/").startswith("docs/agents-v0/onboarding/") and not re.search(r"^commit:\s*[0-9a-f]{7,40}\b", body, re.M):
+    doc_unv = count_unverified_statements(body)
+    unverified += doc_unv
+    if norm_doc != "docs/agents-v0/onboarding/report.md" and not norm_doc.endswith("/docs/agents-v0/onboarding/report.md"):
+        non_report_unverified += doc_unv
+    if norm_doc.startswith("docs/agents-v0/onboarding/") and not re.search(r"^commit:\s*[0-9a-f]{7,40}\b", body, re.M):
         failures.append(f"{doc}: no `commit: <sha>` line (the commit this document describes)")
     for m in CITE.finditer(body):
         cites += 1
@@ -90,6 +151,12 @@ for doc in sorted(set(docs)):
             failures.append(f"{doc}: cited file does not exist: {path}")
         elif start < 1 or end < start or end > count:
             failures.append(f"{doc}: {path}:{m.group(2)}{('-' + m.group(3)) if m.group(3) else ''} is outside the file ({count} lines)")
+
+if report_body is not None and non_report_unverified > 0 and report_open_question_rows(report_body) == 0:
+    failures.append(
+        f"docs/agents-v0/onboarding/report.md: {non_report_unverified} UNVERIFIED item(s) in onboarding documents "
+        "but Open questions and UNVERIFIED items in report.md is empty"
+    )
 
 limit = os.environ.get("MAX_UNVERIFIED")
 if limit and limit.isdigit() and unverified > int(limit):

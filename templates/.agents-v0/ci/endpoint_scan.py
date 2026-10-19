@@ -128,8 +128,58 @@ def profile_stacks(profile="docs/agents-v0/project-profile.md"):
     return stacks
 
 
+def _dotnet_class_context(lines):
+    """Return (decl_idx, class_route, controller_name) for a C# controller file."""
+    decl = next(
+        (i for i, ln in enumerate(lines)
+         if CLASS_DECL.search(ln) and not ln.lstrip().startswith(("*", "//", "/*"))),
+        None,
+    )
+    if decl is None:
+        return None, "", ""
+    m_cls = re.search(r"\bclass\s+(\w+)", lines[decl])
+    cls_name = m_cls.group(1) if m_cls else ""
+    ctrl = re.sub(r"Controller$", "", cls_name, flags=re.I) if cls_name else ""
+    header = lines[max(0, decl - 12): decl + 1]
+    base = ""
+    for ln in header:
+        m_rt = re.search(r'\[Route\(\s*"([^"]*)"\s*\)\]', ln)
+        if m_rt:
+            base = m_rt.group(1)
+    return decl, base, ctrl
+
+
+def _nest_class_base(lines):
+    decl = next(
+        (i for i, ln in enumerate(lines)
+         if CLASS_DECL.search(ln) and not ln.lstrip().startswith(("*", "//", "/*"))),
+        None,
+    )
+    if decl is None:
+        return ""
+    for ln in lines[max(0, decl - 12): decl + 1]:
+        m_ct = re.search(r'@Controller\(\s*["\']([^"\']*)["\']', ln)
+        if m_ct:
+            return m_ct.group(1)
+    return ""
+
+
+def _resolve_dotnet_route(class_route, sub_route, ctrl_name, action_name):
+    sub = (sub_route or "").strip()
+    if sub.startswith("/") or sub.startswith("~/"):
+        raw = sub.lstrip("~")
+    else:
+        parts = [p.strip("/") for p in (class_route, sub) if p and p.strip("/")]
+        raw = "/" + "/".join(parts) if parts else "/"
+    if ctrl_name:
+        raw = re.sub(r"\[controller\]", ctrl_name.lower(), raw, flags=re.I)
+    if action_name:
+        raw = re.sub(r"\[action\]", action_name.lower(), raw, flags=re.I)
+    return raw
+
+
 def extra_endpoints(lines, spec):
-    _suffix, marker_re, mapping, security, _stack = spec
+    suffix, marker_re, mapping, security, stack = spec
     blob = "\n".join(lines)
     if marker_re:
         try:
@@ -142,13 +192,28 @@ def extra_endpoints(lines, spec):
         security_re = re.compile(security)
     except re.error:
         return
-    file_secured = any(security_re.search(ln) for ln in lines[:40])
+    is_cs_mvc = suffix == ".cs" and "Http(" in mapping
+    cs_decl, cs_base, cs_ctrl = _dotnet_class_context(lines) if is_cs_mvc else (None, "", "")
+    nest_base = _nest_class_base(lines) if (suffix == ".ts" and stack == "nest") else ""
+    if is_cs_mvc and cs_decl is not None:
+        file_secured = any(security_re.search(ln) for ln in lines[max(0, cs_decl - 12): cs_decl + 1])
+    else:
+        file_secured = any(security_re.search(ln) for ln in lines[:40])
     verbs = {"get", "post", "put", "patch", "delete"}
     for i, ln in enumerate(lines):
         match = mapping_re.search(ln)
         if not match:
             continue
-        window = lines[max(0, i - 12): i + 9]
+        if is_cs_mvc and cs_decl is not None:
+            top = i
+            while top - 1 > cs_decl and not re.search(r"[;{}]\s*$", lines[top - 1].strip()):
+                top -= 1
+            bottom = i
+            while bottom < len(lines) - 1 and bottom - i < 8 and not re.search(r"[{};]\s*$", lines[bottom].strip()):
+                bottom += 1
+            window = lines[top: bottom + 1]
+        else:
+            window = lines[max(0, i - 12): i + 9]
         ok = file_secured or any(security_re.search(w) for w in window)
         if match.lastindex and match.lastindex >= 2 and match.group(1):
             verb = match.group(1).upper()
@@ -161,7 +226,24 @@ def extra_endpoints(lines, spec):
                 verb, route = "ANY", token
         else:
             verb, route = "ANY", match.group(0)
-        yield i + 1, verb, route.strip(" '\"")[:120], ok
+        route = route.strip(" '\"")
+        if is_cs_mvc:
+            sub_rt = route
+            for w in window:
+                m_rt = re.search(r'\[Route\(\s*"([^"]*)"\s*\)\]', w)
+                if m_rt and not sub_rt:
+                    sub_rt = m_rt.group(1)
+            act_name = ""
+            for w in lines[i: min(len(lines), i + 10)]:
+                m_act = re.search(r"\b(?:public|protected|internal)\s+(?:async\s+)?(?:Task<[^>]+>|Task|IActionResult|ActionResult<[^>]+>|ActionResult|\w+)\s+(\w+)\s*\(", w)
+                if m_act:
+                    act_name = re.sub(r"Async$", "", m_act.group(1))
+                    break
+            route = _resolve_dotnet_route(cs_base, sub_rt, cs_ctrl, act_name)
+        elif nest_base:
+            parts = [p.strip("/") for p in (nest_base, route) if p and p.strip("/")]
+            route = "/" + "/".join(parts) if parts else "/"
+        yield i + 1, verb, route[:120], ok
 
 
 def _scan_pack(path, lines, pack):

@@ -10,6 +10,10 @@ art="${1:-}"
 [ -f "$art" ] || { printf 'FAIL: artifact not found: %s\n' "$art" >&2; exit 1; }
 slug="$(basename "$art" .md)"
 state="docs/agents-v0/requirements/${slug}.state.json"
+case "$art" in
+  docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) state="docs/agents-v0/onboarding/state.json" ;;
+  docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) state="$(dirname "$art")/state.json" ;;
+esac
 [ -f "$state" ] || { printf 'OK: no state file (optional): %s\n' "$state"; exit 0; }
 
 base_commit=""
@@ -25,7 +29,16 @@ import sys
 
 art = os.environ["HOOK_ART"]
 state_path = os.environ["HOOK_STATE"]
-phases = ["intake", "design", "build", "verify", "release"]
+rel_art = art.replace("\\", "/")
+onboarding = "docs/agents-v0/onboarding/" in rel_art
+maintain_note = "docs/agents-v0/maintain/" in rel_art
+if onboarding:
+    phases = ["onboard"]
+elif maintain_note:
+    phases = ["maintain", "verify"]
+else:
+    phases = ["intake", "design", "build", "verify", "release"]
+active_phases = phases if (onboarding or maintain_note) else phases + ["maintain"]
 statuses = {"", "in_progress", "awaiting_approval", "blocked"}
 positive = re.compile(
     r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
@@ -126,7 +139,7 @@ if recorded != last:
 
 active = state.get("activePhase") or ""
 status = state.get("activeStatus") or ""
-if active and active not in phases + ["maintain"]:
+if active and active not in active_phases:
     print(f"FAIL: activePhase {active} is not a lifecycle phase", file=sys.stderr)
     raise SystemExit(1)
 if status not in statuses:
