@@ -8,8 +8,10 @@
     "'draft' runs before the person approves (advisory in after-edit). 'approved' runs when the staged",
     "approval file adds an Approved row for the phase (blocking in pre-commit).",
     "'sealedEdits': true also runs 'approved' when an already-approved file of that phase is edited.",
-    "Build, Verify, and Release evidence (check-evidence.sh, check-gate-metrics.sh) needs the report to",
-    "be committed first, so it is enforced by pre-push (check-delivery-gate-local.sh) and CI, not here."
+    "Build and Release evidence (check-evidence.sh, check-gate-metrics.sh) needs the commit to be finalized",
+    "first, so it is enforced by pre-push (check-delivery-gate-local.sh) and CI. Verify approved gate runs",
+    "ci/check-evidence.sh (staged or committed mode) and ci/check-cve-report.sh to verify test/review evidence",
+    "and CVE scan report presence before sealing the Verify approval row."
   ],
   "version": 1,
   "phases": {
@@ -300,6 +302,19 @@
       ],
       "draft": [],
       "approved": [
+        {
+          "run": [
+            "ci/check-evidence.sh",
+            "{artifact}",
+            "verify"
+          ]
+        },
+        {
+          "run": [
+            "ci/check-cve-report.sh",
+            "{artifact}"
+          ]
+        },
         {
           "run": [
             "ci/check-feature-state.sh",

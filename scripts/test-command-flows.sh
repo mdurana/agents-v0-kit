@@ -295,6 +295,37 @@ write_story "$r/$ORD" "| intake | $ORD | dev | Approved with conditions: add AC 
 expect_fail "intake: gate.sh intake --approved rejects a conditional approval" "$r" sh .agents-v0/ci/gate.sh intake --approved "$ORD"
 git -C "$r" checkout -q -- "$ORD"
 
+# verify gate: gate.sh verify --approved enforces evidence checks
+write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |
+| verify | $ORD | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
+expect_fail "verify: gate.sh verify --approved fails when evidence reports are missing" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+git -C "$r" checkout -q -- "$ORD"
+
+head_sha="$(git -C "$r" rev-parse HEAD)"
+mkdir -p "$r/docs/agents-v0/verify/orders"
+write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |
+| verify | docs/agents-v0/verify/orders/test-report.md | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
+
+# (1) untracked report -> gate.sh verify --approved FAILS
+printf 'commit: %s\nkit-version: test\nagent: test-engineer\n' "$head_sha" > "$r/docs/agents-v0/verify/orders/test-report.md"
+expect_fail "verify: gate.sh verify --approved fails with untracked verify report" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
+# (2) staged report -> passes the evidence check
+(cd "$r" && git add docs/agents-v0/verify/orders/test-report.md)
+expect_pass "verify: gate.sh verify --approved passes with staged verify report" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
+# (3) non-SHA commit: stamp -> FAILS
+printf 'commit: not-a-sha\nkit-version: test\nagent: test-engineer\n' > "$r/docs/agents-v0/verify/orders/test-report.md"
+(cd "$r" && git add docs/agents-v0/verify/orders/test-report.md)
+expect_fail "verify: gate.sh verify --approved fails when commit: is non-SHA" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
+# committed report passes
+printf 'commit: %s\nkit-version: test\nagent: test-engineer\n' "$head_sha" > "$r/docs/agents-v0/verify/orders/test-report.md"
+(cd "$r" && git add docs/agents-v0/verify/orders/test-report.md && commit "$r" "verify report")
+expect_pass "verify: gate.sh verify --approved passes with committed verify report" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+git -C "$r" reset -q --hard HEAD~1
+git -C "$r" checkout -q -- "$ORD"
+
 # ---------------------------------------------------------------------------------------------
 # gate.sh itself
 # ---------------------------------------------------------------------------------------------

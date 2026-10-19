@@ -529,31 +529,44 @@ def lcov_lines(path):
     return tracked
 
 
+def candidate_bases(target_root=None):
+    r = target_root or root
+    bases = [r]
+    rel_r = os.path.relpath(os.path.abspath(r), os.getcwd())
+    if not rel_r.startswith(".."):
+        bases.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_r))
+    return bases
+
+
 def node_lines(base=None):
-    base = base or root
-    lcov = os.path.join(base, "coverage", "lcov.info")
-    if os.path.isfile(lcov):
-        return lcov_lines(lcov)
-    final = os.path.join(base, "coverage", "coverage-final.json")
-    if not os.path.isfile(final):
-        return None
-    tracked = {}
-    with open(final, encoding="utf-8") as handle:
-        data = json.load(handle)
-    for path, info in data.items():
-        lines = {}
-        counts = info.get("s") or {}
-        for key, span in (info.get("statementMap") or {}).items():
-            start = (span.get("start") or {}).get("line")
-            end = (span.get("end") or {}).get("line") or start
-            if not start:
-                continue
-            hit = int(counts.get(key) or 0) > 0
-            for n in range(int(start), int(end) + 1):
-                lines[n] = lines.get(n, False) or hit
-        if lines:
-            tracked[path.replace("\\", "/")] = lines
-    return tracked
+    bases = [base] if base else candidate_bases()
+    for b in bases:
+        for name in (os.path.join("coverage", "lcov.info"), "lcov.info"):
+            lcov = os.path.join(b, name)
+            if os.path.isfile(lcov):
+                return lcov_lines(lcov)
+    for b in bases:
+        for name in (os.path.join("coverage", "coverage-final.json"), "coverage-final.json"):
+            final = os.path.join(b, name)
+            if os.path.isfile(final):
+                tracked = {}
+                with open(final, encoding="utf-8") as handle:
+                    data = json.load(handle)
+                for path, info in data.items():
+                    lines = {}
+                    counts = info.get("s") or {}
+                    for key, span in (info.get("statementMap") or {}).items():
+                        start = (span.get("start") or {}).get("line")
+                        end = (span.get("end") or {}).get("line") or start
+                        if not start:
+                            continue
+                        hit = int(counts.get(key) or 0) > 0
+                        for n in range(int(start), int(end) + 1):
+                            lines[n] = lines.get(n, False) or hit
+                    if lines:
+                        tracked[path.replace("\\", "/")] = lines
+                return tracked
+    return None
 
 
 def alt_diff(kind):
@@ -592,20 +605,48 @@ def measure_alt(kind):
         record_tests(*junit_totals(reports))
         record_coverage(cobertura_pct(os.path.join(root, "coverage.xml")), "coverage.xml")
     elif kind == "node":
-        reports = [path for path in (
-            os.path.join(root, "junit.xml"),
-            os.path.join(root, "test-results.xml"),
-            os.path.join(root, "reports", "junit.xml"),
-        ) if os.path.isfile(path)]
+        reports = []
+        seen_reports = set()
+        for b in candidate_bases():
+            for name in ("junit.xml", "test-results.xml", os.path.join("reports", "junit.xml")):
+                p = os.path.join(b, name)
+                if os.path.isfile(p):
+                    rel = os.path.relpath(os.path.abspath(p), os.path.abspath(b))
+                    if rel not in seen_reports:
+                        seen_reports.add(rel)
+                        reports.append(p)
+            if reports:
+                break
         record_tests(*junit_totals(reports))
-        record_coverage(jest_pct(os.path.join(root, "coverage", "coverage-summary.json")), "coverage/coverage-summary.json")
+        cov_summary = None
+        for b in candidate_bases():
+            for name in (os.path.join("coverage", "coverage-summary.json"), "coverage-summary.json"):
+                p = os.path.join(b, name)
+                if os.path.isfile(p):
+                    cov_summary = p
+                    break
+            if cov_summary:
+                break
+        record_coverage(
+            jest_pct(cov_summary) if cov_summary else None,
+            "coverage/coverage-summary.json",
+        )
     elif kind == "go":
         record_tests(*go_json_totals(os.path.join(root, "go-test.json")))
         record_coverage(gocover_pct(os.path.join(root, "coverage.out")), "coverage.out")
     else:
         failures.append(f"unknown pack {kind}")
     alt_diff(kind)
-    record_cve(os.path.join(root, "cve-report.json"))
+    if kind == "node":
+        cve_candidate = None
+        for b in candidate_bases():
+            p = os.path.join(b, "cve-report.json")
+            if os.path.isfile(p):
+                cve_candidate = p
+                break
+        record_cve(cve_candidate or os.path.join(root, "cve-report.json"))
+    else:
+        record_cve(os.path.join(root, "cve-report.json"))
 
 
 def cve_names(data):
@@ -1033,6 +1074,8 @@ def check_sibling_frontend_cve():
     rel_sib = os.path.relpath(os.path.abspath(sib), os.getcwd())
     if not rel_sib.startswith(".."):
         fe_candidates.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_sib, fe_cve_rel))
+        if fe_cve_rel != "cve-report.json":
+            fe_candidates.append(os.path.join(os.getcwd(), "ci-artifacts", "gate", rel_sib, "cve-report.json"))
     fe_report = next((p for p in fe_candidates if os.path.isfile(p)), "")
     fe_data = None
     if fe_report:

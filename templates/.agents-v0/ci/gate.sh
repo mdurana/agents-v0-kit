@@ -109,7 +109,7 @@ def expand(token, artifact):
     return token.replace("{artifact}", artifact or "").replace("{feature}", feature)
 
 
-def run_list(phase, mode, artifact, entries):
+def run_list(phase, mode, artifact, entries, staged_mode=""):
     """Run one gate list. Returns True when every check passed."""
     label = f"gate {phase}{' --approved' if mode == 'approved' else ''}" + (f" {artifact}" if artifact else "")
     if not entries:
@@ -117,6 +117,9 @@ def run_list(phase, mode, artifact, entries):
         return True
     ok = True
     print(f"{label}:")
+    child_env = os.environ.copy()
+    if staged_mode:
+        child_env["CHECK_EVIDENCE_STAGED"] = staged_mode
     for entry in entries:
         cond = entry.get("ifExists")
         conds = [cond] if isinstance(cond, str) else (cond or [])
@@ -129,7 +132,7 @@ def run_list(phase, mode, artifact, entries):
             print(f"  FAIL {shown}\n      script not found: {script}")
             ok = False
             continue
-        proc = subprocess.run(["sh", script, *args[1:]], capture_output=True, text=True)
+        proc = subprocess.run(["sh", script, *args[1:]], capture_output=True, text=True, env=child_env)
         if proc.returncode == 0:
             print(f"  PASS {shown}")
         else:
@@ -156,7 +159,7 @@ def cmd_phase(phases, argv):
     if not os.path.isfile(artifact):
         sys.stderr.write(f"FAIL: artifact not found: {artifact}\n")
         sys.exit(1)
-    return 0 if run_list(phase, mode, artifact, phases[phase].get(mode, [])) else 1
+    return 0 if run_list(phase, mode, artifact, phases[phase].get(mode, []), staged_mode="staged" if mode == "approved" else "") else 1
 
 
 def cmd_staged(phases):
@@ -185,7 +188,7 @@ def cmd_staged(phases):
             if git("diff", "--quiet", "--", path).returncode != 0:
                 print(f"WARN: {path} has unstaged changes; the gate checks the working tree, not the staged content")
             ran = True
-            if not run_list(phase, "approved", path, spec.get("approved", [])):
+            if not run_list(phase, "approved", path, spec.get("approved", []), staged_mode="staged"):
                 ok = False
     if ran and not ok:
         print("pre-commit: the delivery gate failed. Fix the files above, or withdraw the Approved row, then commit again.")

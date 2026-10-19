@@ -45,8 +45,8 @@ section="$(awk '
 row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" | tail -n1 || true)"
 is_p0_unapproved=0
 if [ -z "$row" ]; then
-  # For Story: P0-A in Milestone: P0, approval rows are only written at Release.
-  # Before release, build and verify evidence on disk with commit: is valid.
+  # For Story: P0-A in Milestone: P0, approval rows may be deferred until Release when run via /v0-deliver.
+  # Before release (or when rows are not yet written), build and verify evidence on disk with commit: is valid.
   if grep -Eqi 'Story:[[:space:]]*P0-A\b' "$art" && grep -Eqi 'Milestone:[[:space:]]*P0\b' "$art"; then
     case "$phase" in
       build|verify)
@@ -131,12 +131,22 @@ check_path() {
       has_git_head=1
     fi
     if [ "$has_git_head" = "1" ]; then
-      if ! git cat-file -e "${stale_base}:${p}" 2>/dev/null; then
-        printf 'FAIL: recorded evidence %s is not committed in %s (untracked on disk) — commit the report without changing its commit: line\n' "$p" "$stale_base" >&2
-        missing=1
-      elif ! git diff --quiet "${stale_base}" -- "$p" 2>/dev/null; then
-        printf 'FAIL: recorded evidence %s has uncommitted changes on disk — commit it before running the gate\n' "$p" >&2
-        missing=1
+      if [ "${CHECK_EVIDENCE_STAGED:-}" = "staged" ]; then
+        if ! git cat-file -e "${stale_base}:${p}" 2>/dev/null && ! git cat-file -e ":${p}" 2>/dev/null; then
+          printf 'FAIL: recorded evidence %s is neither staged nor committed in %s (untracked on disk) — stage or commit the report without changing its commit: line\n' "$p" "$stale_base" >&2
+          missing=1
+        elif ! git diff --quiet -- "$p" 2>/dev/null; then
+          printf 'FAIL: recorded evidence %s has unstaged changes relative to the index — stage it before running the gate\n' "$p" >&2
+          missing=1
+        fi
+      else
+        if ! git cat-file -e "${stale_base}:${p}" 2>/dev/null; then
+          printf 'FAIL: recorded evidence %s is not committed in %s (untracked on disk) — commit the report without changing its commit: line\n' "$p" "$stale_base" >&2
+          missing=1
+        elif ! git diff --quiet "${stale_base}" -- "$p" 2>/dev/null; then
+          printf 'FAIL: recorded evidence %s has uncommitted changes on disk — commit it before running the gate\n' "$p" >&2
+          missing=1
+        fi
       fi
     fi
     case "$p" in
@@ -179,8 +189,17 @@ check_path() {
               if [ "$phase" = "build" ]; then
                 state_check_ref="$rep_commit"
               fi
-              if git cat-file -e "${state_check_ref}:${art_state}" 2>/dev/null; then
+              rep_state=""
+              if [ -n "${CHECK_EVIDENCE_STAGED:-}" ]; then
+                if [ -f "$art_state" ]; then
+                  rep_state="$(cat "$art_state" 2>/dev/null || true)"
+                elif git cat-file -e ":${art_state}" 2>/dev/null; then
+                  rep_state="$(git show ":${art_state}" 2>/dev/null || true)"
+                fi
+              elif git cat-file -e "${state_check_ref}:${art_state}" 2>/dev/null; then
                 rep_state="$(git show "${state_check_ref}:${art_state}" 2>/dev/null || true)"
+              fi
+              if [ -n "$rep_state" ]; then
                 if printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activePhase"[[:space:]]*:[[:space:]]*"'"$phase"'"' \
                   && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activeStatus"[[:space:]]*:[[:space:]]*"(in_progress|awaiting_approval)"'; then
                   printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$state_check_ref" "$p" "$art_state" "$phase" >&2
@@ -221,6 +240,34 @@ else
     esac
     check_path "$p"
   done
+  if [ "$is_p0_unapproved" = "0" ]; then
+    case "$phase" in
+      verify)
+        has_verify_rep=0
+        for p in $(printf '%s' "$artifacts" | tr -d '`' | tr ',;:' '\n\n\n'); do
+          case "$p" in
+            */test-report.md|docs/agents-v0/verify/*|docs/agents-v0/maintain/*) has_verify_rep=1; break ;;
+          esac
+        done
+        if [ "$has_verify_rep" = "0" ]; then
+          printf 'FAIL: no verify test report recorded in the "verify" row of %s\n' "$art" >&2
+          missing=1
+        fi
+        ;;
+      build)
+        has_build_rep=0
+        for p in $(printf '%s' "$artifacts" | tr -d '`' | tr ',;:' '\n\n\n'); do
+          case "$p" in
+            */build-report.md|docs/agents-v0/build/*|docs/agents-v0/maintain/*) has_build_rep=1; break ;;
+          esac
+        done
+        if [ "$has_build_rep" = "0" ]; then
+          printf 'FAIL: no build report recorded in the "build" row of %s\n' "$art" >&2
+          missing=1
+        fi
+        ;;
+    esac
+  fi
   if [ "$checked" -eq 0 ] && [ "$missing" -eq 0 ]; then
     if [ "$is_p0_unapproved" = "1" ]; then
       printf 'FAIL: no concrete docs/ evidence path found for phase "%s" of %s\n' "$phase" "$art" >&2

@@ -24,7 +24,7 @@
 
 ## Tooling
 
-The reporting toolchain is determined by the bound pack's `pack.json` (Pack `java`: JaCoCo, Checkstyle, SpotBugs, OWASP Dependency-Check, ArchUnit; Pack `dotnet`: Coverlet, xUnit; Pack `node`: Jest; Pack `python`: pytest-cov; Pack `go`: go test -cover). Thresholds and principles apply across all packs. Java starter wiring includes OpenAPI contract diff (`core/java/starters/maven/contract-conformance.xml`) and ArchUnit layer rules (`core/java/starters/maven/archunit/LayerRulesTest.java`).
+The reporting toolchain is determined by the bound pack's `pack.json` (Pack `java`: JaCoCo, Checkstyle, SpotBugs, OWASP Dependency-Check, ArchUnit; Pack `dotnet`: Coverlet, xUnit; Pack `node`: Jest; Pack `python`: pytest-cov; Pack `go`: go test -cover). Thresholds and principles apply across all packs. Java starter wiring includes OpenAPI contract diff (`core/java/starters/maven/contract-conformance.xml`) and ArchUnit layer rules (`core/java/starters/maven/archunit/LayerRulesTest.java`). Frontend verification (`npm run verify`) writes test reports (`junit.xml`), coverage reports (`coverage/coverage-summary.json`, `coverage/lcov.info`), and vulnerability scans (`cve-report.json`) under the frontend module root (`app/frontend/`). `.agents-v0/ci/collect-gate-reports.sh` copies or stages these into `ci-artifacts/gate/<root>/` (`junit.xml`, `coverage/coverage-summary.json`, `cve-report.json`). `.agents-v0/ci/check-gate-metrics.sh` looks consistently in both the module root and `ci-artifacts/gate/<root>/`.
 
 ## CVE policy
 

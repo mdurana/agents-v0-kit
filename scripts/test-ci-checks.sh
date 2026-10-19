@@ -2309,6 +2309,14 @@ cat > "$dfe/app/frontend/cve-report.json" <<'EOF'
 EOF
 expect_pass "gate metrics: clean sibling app/frontend CVE report passes check-gate-metrics.sh app/backend" "$dfe" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
 
+d_fe_gate="$tmp/frontend-gate-reading"
+mkdir -p "$d_fe_gate/app/frontend" "$d_fe_gate/ci-artifacts/gate/app/frontend/coverage"
+printf '{"name":"fe-app"}\n' > "$d_fe_gate/app/frontend/package.json"
+printf '<testsuite tests="2" failures="0" errors="0" skipped="0"/>\n' > "$d_fe_gate/ci-artifacts/gate/app/frontend/junit.xml"
+printf '{"total":{"lines":{"pct":85.5}}}\n' > "$d_fe_gate/ci-artifacts/gate/app/frontend/coverage/coverage-summary.json"
+printf '{"vulnerabilities":{}}\n' > "$d_fe_gate/ci-artifacts/gate/app/frontend/cve-report.json"
+expect_pass "gate metrics: frontend reads junit, coverage, and cve-report from ci-artifacts/gate/" "$d_fe_gate" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/frontend
+
 (
   cd "$dfe"
   git init -q -b main
@@ -2449,6 +2457,63 @@ expect_fail "check-evidence rejects verify report when HEAD still records active
   git_commit "docs: sync state after verify approval"
 )
 expect_pass "check-evidence passes for verify report stamped on test commit once HEAD clears activePhase" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
+
+cve_dir="$tmp/cve_test"
+mkdir -p "$cve_dir/docs/agents-v0/requirements" "$cve_dir/docs/agents-v0/verify"
+(
+  cd "$cve_dir"
+  cat > pom.xml <<'EOF'
+<project><modelVersion>4.0.0</modelVersion><groupId>com.example</groupId><artifactId>test</artifactId><version>1.0</version></project>
+EOF
+
+  # 1. missing CVE report fails
+  expect_fail "check-cve-report: missing CVE report fails" "$cve_dir" sh "$CI/check-cve-report.sh"
+
+  # 2. report under ci-artifacts/gate/<root>/ passes
+  mkdir -p ci-artifacts/gate/target
+  echo '{"report": "ok"}' > ci-artifacts/gate/target/dependency-check-report.json
+  expect_pass "check-cve-report: report under ci-artifacts/gate/<root>/ passes" "$cve_dir" sh "$CI/check-cve-report.sh"
+  rm -rf ci-artifacts
+
+  # 3. P0-A never skips
+  cat > docs/agents-v0/requirements/p0-a-platform-skeleton.md <<'EOF'
+# Platform Skeleton
+Milestone: P0
+Story: P0-A
+## Out of scope
+- Diff coverage and CVE scanning deferred to P0-B
+EOF
+  mkdir -p docs/agents-v0/verify/p0-a-platform-skeleton
+  cat > docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md <<'EOF'
+commit: 1111111111111111111111111111111111111111
+Diff coverage and the CVE report were skipped until P0-B.
+EOF
+  expect_fail "check-cve-report: P0-A never skips CVE scanning" "$cve_dir" sh "$CI/check-cve-report.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md
+
+  # 4. deferral without test-report quote does not skip
+  cat > docs/agents-v0/requirements/orders.md <<'EOF'
+# Orders
+Milestone: P1
+Story: P1-A
+## Out of scope
+- Diff coverage and CVE scanning deferred to P1-B
+EOF
+  expect_fail "check-cve-report: deferral without test-report does not skip" "$cve_dir" sh "$CI/check-cve-report.sh" docs/agents-v0/requirements/orders.md
+  mkdir -p docs/agents-v0/verify/orders
+  cat > docs/agents-v0/verify/orders/test-report.md <<'EOF'
+commit: 1111111111111111111111111111111111111111
+All tests passed.
+EOF
+  expect_fail "check-cve-report: deferral without test-report quote does not skip" "$cve_dir" sh "$CI/check-cve-report.sh" docs/agents-v0/requirements/orders.md
+
+  # 5. valid deferral skips
+  cat > docs/agents-v0/verify/orders/test-report.md <<'EOF'
+commit: 1111111111111111111111111111111111111111
+Diff coverage and the CVE report were skipped until P1-B.
+EOF
+  expect_pass "check-cve-report: valid deferral skips" "$cve_dir" sh "$CI/check-cve-report.sh" docs/agents-v0/requirements/orders.md
+)
+
 
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2

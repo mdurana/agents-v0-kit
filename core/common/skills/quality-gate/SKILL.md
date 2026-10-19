@@ -28,4 +28,4 @@ Verify phase playbook for the `test-engineer` agent (`workflow-orchestration.mdc
 - [ ] UX spec: for UI-affecting changes, a11y check green (no serious/critical violations), UX acceptance criteria covered; UX report persisted to `docs/agents-v0/verify/<feature>/ux-report.md`.
 - [ ] Mocks: external I/O only; domain tests deterministic.
 - [ ] P4 SLO story: `docs/agents-v0/design/system/slo-evidence.md` records a measurement or a waiver for every filled NFR/SLO row (`slo-evidence`).
-- [ ] `workflow-orchestration.mdc`: Verify gate (quality) criteria met; report persisted to `docs/agents-v0/verify/<feature>/test-report.md`.
+- [ ] `workflow-orchestration.mdc`: Verify gate (quality) criteria met; report persisted to `docs/agents-v0/verify/<feature>/test-report.md`. The `Approved` verify row may not be written until `sh .agents-v0/ci/check-evidence.sh <artifact> verify` and `sh .agents-v0/ci/check-gate-metrics.sh` with `REQUIRE_CVE_REPORT=1` pass.
