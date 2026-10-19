@@ -96,9 +96,52 @@ fi
 body="$(mktemp)"
 trap 'rm -f "$body"' EXIT
 
-sh .agents-v0/scripts/render-mr-body.sh "$feature" --base "$base" >"$body"
-REQUIRE_VERIFY=1 CHECK_MR_APPROVER=0 sh .agents-v0/ci/check-delivery-linkage.sh "$base" HEAD "$body"
-sh .agents-v0/ci/check-design-contracts.sh
-sh .agents-v0/ci/check-build-plan.sh "$feature"
-sh .agents-v0/ci/check-endpoint-auth.sh "$base" HEAD
+gate_failed=0
+total_checks=5
+passed_checks=0
+
+if sh .agents-v0/scripts/render-mr-body.sh "$feature" --base "$base" >"$body"; then
+  printf 'PASS render-mr-body\n'
+  passed_checks=$((passed_checks + 1))
+else
+  printf 'FAIL render-mr-body\n'
+  gate_failed=1
+fi
+
+if REQUIRE_VERIFY=1 CHECK_MR_APPROVER=0 sh .agents-v0/ci/check-delivery-linkage.sh "$base" HEAD "$body"; then
+  printf 'PASS check-delivery-linkage\n'
+  passed_checks=$((passed_checks + 1))
+else
+  printf 'FAIL check-delivery-linkage\n'
+  gate_failed=1
+fi
+
+if sh .agents-v0/ci/check-design-contracts.sh; then
+  printf 'PASS check-design-contracts\n'
+  passed_checks=$((passed_checks + 1))
+else
+  printf 'FAIL check-design-contracts\n'
+  gate_failed=1
+fi
+
+if sh .agents-v0/ci/check-build-plan.sh "$feature"; then
+  printf 'PASS check-build-plan\n'
+  passed_checks=$((passed_checks + 1))
+else
+  printf 'FAIL check-build-plan\n'
+  gate_failed=1
+fi
+
+if sh .agents-v0/ci/check-endpoint-auth.sh "$base" HEAD; then
+  printf 'PASS check-endpoint-auth\n'
+  passed_checks=$((passed_checks + 1))
+else
+  printf 'FAIL check-endpoint-auth\n'
+  gate_failed=1
+fi
+
+if [ "$gate_failed" -ne 0 ]; then
+  printf 'FAIL: local delivery gate failed for %s (%d of %d checks passed)\n' "$feature" "$passed_checks" "$total_checks" >&2
+  exit 1
+fi
 printf 'OK: local delivery gate passed for %s\n' "$feature"

@@ -61,7 +61,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
-| `/v0-local-release` | Optional, after verify. Records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
+| `/v0-local-release` | Optional, after verify. Runs the local gate, sets blocked if any check fails, and on your approval records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
 | `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |

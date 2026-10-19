@@ -103,7 +103,7 @@ A brief holds `helper:` (agent name), `outputs:` (files to write), `return:` (fi
 
 ## Phase result
 
-When a feature phase stops (`intake`, `design`, `build`, `verify`, `release`), write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `docs/agents-v0/maintain/<id>/phase-result.md` for `maintain`; `/v0-onboard` uses `onboarding/report.md` only) with `phase`, `status` (`awaiting_approval` or `blocked`; `approved`/`local` after approval), `artifacts` (paths), and `blockers` (one per line). Intake also copies `user_story`, `ac_count`, `negative_count`, `regulations`, and `open_questions`. The next phase agent reads that file and the requirements artifact. Overwrite it when the phase changes (per-feature, not shared).
+When a feature phase stops (`intake`, `design`, `build`, `verify`, `release`), write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `maintain/<id>/phase-result.md`; `/v0-onboard` uses `onboarding/report.md`) with `phase`, `status` (`awaiting_approval` or `blocked`; `approved`/`local` after approval), `artifacts` (paths), and `blockers` (one per line). Failed `check-delivery-gate-local.sh` sets `status: blocked`, never `awaiting_approval`. Intake copies `user_story`, `ac_count`, `negative_count`, `regulations`, `open_questions`. Next agent reads that file and the requirements artifact. Overwrite when phase changes.
 
 ## Command results
 

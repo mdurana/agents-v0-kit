@@ -236,6 +236,16 @@ EOF
 )
 exit_is 1 "local gate: untracked verify report stamped with HEAD is rejected by check-evidence" sh -c "cd '$gr' && sh .agents-v0/ci/check-evidence.sh docs/agents-v0/requirements/p1-a-catalog-contract.md verify"
 exit_is 1 "local gate: uncommitted verify row and untracked verify reports on main fail check-delivery-gate-local" sh -c "cd '$gr' && sh .agents-v0/scripts/check-delivery-gate-local.sh p1-a-catalog-contract --base main"
+(
+  cd "$gr"
+  # Also introduce a build-plan failure to verify multiple checks run even when linkage fails first
+  cp docs/agents-v0/build/p1-a-catalog-contract/plan.md docs/agents-v0/build/p1-a-catalog-contract/plan.md.bak
+  printf '| AC-1 | done | CatalogTests#NoSuchTest |\n' > docs/agents-v0/build/p1-a-catalog-contract/plan.md
+  sh .agents-v0/scripts/check-delivery-gate-local.sh p1-a-catalog-contract --base main > "$tmp/gate-multi-fail.out" 2>&1 || true
+  mv docs/agents-v0/build/p1-a-catalog-contract/plan.md.bak docs/agents-v0/build/p1-a-catalog-contract/plan.md
+)
+has "local gate reports earlier failure" "$tmp/gate-multi-fail.out" "FAIL check-delivery-linkage"
+has "local gate still reports later failure when earlier failed" "$tmp/gate-multi-fail.out" "FAIL check-build-plan"
 
 (
   cd "$gr"
