@@ -23,7 +23,7 @@ Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orche
 7. **Operations.** Update `docs/agents-v0/design/system/nfr-slo.md` and `docs/agents-v0/design/system/threat-model.md`. The SLO numbers live only in `nfr-slo.md`. Fill `docs/agents-v0/design/system/ops-readiness.md`: build-and-run ownership, the error budget policy, database maintenance and operation, and leave the readiness checklist for P5. Async, messaging, and cache appear only when the problem source or the pattern ADR justifies them.
 8. **ARC.** Fill `docs/agents-v0/design/system/arc-record.md`. Name the discovery file or the requirements artifact, and name the pattern ADR. Do not copy their text. Name the recommendation. Point `## Fitness functions` at `docs/agents-v0/design/system/nfr-slo.md` for the SLO targets, and fill the structural table (principle, check, threshold, on failure) with checks that exist or `planned: <milestone>`. Do not copy the SLO rows.
 9. Run `sh .agents-v0/ci/check-architecture-pack.sh --without-review` and fix what it reports. It does not replace the review in the next step.
-10. **Independent review.** The main session launches `design-reviewer` on the pack. It writes `docs/agents-v0/design/system/architecture-review.md`. Fix each Critical finding, mark it `Resolved` after the reviewer re-checks, and run the check again.
+10. **Independent review.** The main session launches `design-reviewer` on the pack. It writes `docs/agents-v0/design/system/architecture-review.md` (with `pack-hash:` from `sh .agents-v0/ci/check-architecture-pack.sh --hash`). Fix or disposition each open finding (`Resolved`, `Deferred`, or `Accepted` after the reviewer re-checks), and run the check again.
 11. Stop for one explicit approval. Append only the `architecture` row on `docs/agents-v0/architecture.md`. Its Artifacts cell names every pack path, including `docs/agents-v0/design/system/arc-record.md` and `docs/agents-v0/design/system/architecture-review.md`. Do not add an `arc` row. That row is only for a later story that amends the recommendation. After the row is `Approved`, run `sh .agents-v0/scripts/activate-stack-pack.sh <pack>` with the ADR's `Pack:` value. That fills still-placeholder stack and verify cells and installs that pack's rules and skills. Exit 2 means the profile already names another pack: stop and do not force it. Do not start `/v0-plan` until the profile `Pack` cell matches the ADR.
 
    | Phase | Artifacts | Approver | Decision | Date |
@@ -45,5 +45,6 @@ Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orche
 - [ ] The context map is the service map, and each context has a component plan or `N/A: <reason>`.
 - [ ] `ops-readiness.md` names an owner and an error budget policy. The ARC record has a structural fitness function row.
 - [ ] No feature OpenAPI draft and no story rows were written.
-- [ ] `.agents-v0/ci/check-architecture-pack.sh` passes and `architecture-review.md` has no open Critical.
+- [ ] `.agents-v0/ci/check-architecture-pack.sh` passes and `architecture-review.md` has a current `pack-hash` and no `Open` finding.
 - [ ] The `architecture` row names the ARC file and the review. No `arc` row was added.
+

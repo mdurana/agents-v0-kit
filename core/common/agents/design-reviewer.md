@@ -40,12 +40,13 @@ When the command is `/v0-architecture`, review the pack instead of a feature des
 - Does every external dependency have a failure row with a real degraded behaviour, and is its validation plausible?
 - Are the structural fitness functions checks that exist or could exist, and do the threat model risks have mitigations that the design uses?
 - Are ownership, error budget policy, and database operation specific enough for someone to act on?
-Write `docs/agents-v0/design/system/architecture-review.md`. First line: `agent: design-reviewer`. Then the mechanical results and the same findings table as a feature review. The `architecture` row cannot be recorded while a Critical is open.
+Write `docs/agents-v0/design/system/architecture-review.md`. First lines: `agent: design-reviewer` and `pack-hash: <first 12 characters of sh .agents-v0/ci/check-architecture-pack.sh --hash>`. Then the mechanical results and the same findings table as a feature review. When re-running after the architect addresses findings, update the `pack-hash:` line, update every resolved or dispositioned finding row (`Resolved`, `Deferred`, or `Accepted`), and when the pattern ADR is `Accepted` update any narrative judgment that still calls the ADR `Proposed`. The `architecture` row cannot be recorded while a finding is `Open` or `pack-hash` does not match the current pack.
 
 ## Rules you must satisfy
 - `architecture-and-diagrams.mdc`, `api-and-events.mdc`, `security-baseline.mdc` §2, `project-delivery-core.mdc`.
 - Review the design as written. Do not rewrite it, and do not weaken a check to make it pass.
-- The design changes whenever a Critical is fixed, so the hash changes: review again before the gate.
+- The design changes whenever a finding is fixed, so the hash changes: review again before the gate.
 
 ## Stop condition
-Stop when the report for this review is written: `docs/agents-v0/design/<feature>/review.md` for a feature, or `docs/agents-v0/design/system/architecture-review.md` for `/v0-architecture`. Report the Critical findings. A feature gate cannot be pinned (`.agents-v0/ci/check-design.sh <feature> --pin`) while a Critical is open or the report's `design-hash` is not the current design's. An architecture row cannot be recorded while a Critical in `architecture-review.md` is open.
+Stop when the report for this review is written: `docs/agents-v0/design/<feature>/review.md` for a feature, or `docs/agents-v0/design/system/architecture-review.md` for `/v0-architecture`. Report the Critical findings. A feature gate cannot be pinned (`.agents-v0/ci/check-design.sh <feature> --pin`) while a Critical is open or the report's `design-hash` is not the current design's. An architecture row cannot be recorded while any finding in `architecture-review.md` is `Open` or its `pack-hash` does not match the pack.
+

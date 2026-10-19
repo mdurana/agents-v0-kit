@@ -2,11 +2,12 @@
 # check-architecture-pack.sh — the program architecture pack is complete and consistent
 # (program-architecture, workflow-orchestration.mdc Architecture).
 #
-# Usage: sh check-architecture-pack.sh [--approved] [--without-review] [<architecture.md>]
+# Usage: sh check-architecture-pack.sh [--approved] [--without-review] [--hash] [<architecture.md>]
 #   <architecture.md>  default docs/agents-v0/architecture.md. The other pack files are read
 #                      from the same docs/agents-v0/ tree.
 #   --approved         the pattern ADR must already be Accepted (CI, after the architecture row).
 #   --without-review   skip architecture-review.md check (for pre-review check by architect or reviewer).
+#   --hash             print the SHA-256 hash of the architecture pack files and exit.
 #
 # Fails when:
 #   - C4 Context or C4 Container is empty or has no Mermaid block, or names a product technology;
@@ -18,19 +19,21 @@
 #   - arc-record.md does not name an existing pattern ADR, or has no structural fitness function row;
 #   - nfr-slo.md, threat-model.md, ops-readiness.md, or context-map.md has no filled row;
 #   - a context-map row has no existing component plan and no "N/A: <reason>";
-#   - architecture-review.md is missing, was not written by design-reviewer, or has an open Critical
-#     (unless --without-review is set).
+#   - architecture-review.md is missing, was not written by design-reviewer, has a stale pack-hash,
+#     or has an open finding (unless --without-review is set).
 
 set -eu
 
 approved=0
 without_review=0
+print_hash=0
 arch=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --approved) approved=1; shift ;;
     --without-review) without_review=1; shift ;;
-    -*) printf 'usage: %s [--approved] [--without-review] [<architecture.md>]\n' "$0" >&2; exit 1 ;;
+    --hash) print_hash=1; shift ;;
+    -*) printf 'usage: %s [--approved] [--without-review] [--hash] [<architecture.md>]\n' "$0" >&2; exit 1 ;;
     *) arch="$1"; shift ;;
   esac
 done
@@ -39,7 +42,8 @@ done
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-ARCH="$arch" APPROVED="$approved" WITHOUT_REVIEW="$without_review" PACKLIB_DIR="$DIR" python3 - <<'PY'
+ARCH="$arch" APPROVED="$approved" WITHOUT_REVIEW="$without_review" PRINT_HASH="$print_hash" PACKLIB_DIR="$DIR" python3 - <<'PY'
+import hashlib
 import os
 import re
 import sys
@@ -50,6 +54,7 @@ import packlib
 arch = os.environ["ARCH"]
 approved = os.environ["APPROVED"] == "1"
 without_review = os.environ["WITHOUT_REVIEW"] == "1"
+print_hash = os.environ["PRINT_HASH"] == "1"
 base = os.path.dirname(arch) or "."
 system = os.path.join(base, "design", "system")
 failures = []
@@ -111,6 +116,48 @@ def table_rows(body):
 
 def filled_rows(rows, minimum=2):
     return [r for r in rows if sum(1 for c in r if c and not c.startswith("<")) >= minimum]
+
+
+def current_pack_hash():
+    """Compute a SHA-256 hex digest over the architecture pack files, invariant across the approval flip."""
+    h = hashlib.sha256()
+
+    def feed(label, content):
+        h.update(f"=== {label} ===\n".encode("utf-8"))
+        h.update((content or "").encode("utf-8"))
+        h.update(b"\n")
+
+    arch_t = read(arch) or ""
+    arch_pre = re.split(r"(?mi)^##\s+delivery approvals\b", arch_t, maxsplit=1)[0].rstrip()
+    feed("architecture.md", arch_pre)
+
+    net_t = read(os.path.join(base, "network.md")) or ""
+    feed("network.md", net_t.rstrip())
+
+    for name in ("nfr-slo.md", "threat-model.md", "ops-readiness.md", "arc-record.md", "context-map.md"):
+        t = read(os.path.join(system, name)) or ""
+        feed(f"system/{name}", t.rstrip())
+
+    arc_t = read(os.path.join(system, "arc-record.md")) or ""
+    arc_opts = split_sections(arc_t, 2).get("options", "")
+    for adr_p in sorted(set(re.findall(r"docs/agents-v0/adr/[A-Za-z0-9_.-]+\.md", arc_opts))):
+        adr_t = read(adr_p) or ""
+        adr_norm = re.sub(r"(?im)^([ \t]*[-*]?[ \t]*\*?\*?Status\*?\*?[ \t]*:).*$", r"\1", adr_t).rstrip()
+        feed(f"adr:{adr_p}", adr_norm)
+
+    cmap_t = read(os.path.join(system, "context-map.md")) or ""
+    for comp_p in sorted(set(re.findall(r"docs/agents-v0/design/system/components/[A-Za-z0-9_.-]+\.md", cmap_t))):
+        comp_t = read(comp_p) or ""
+        comp_norm = re.sub(r"\(\s*(?:Proposed|Accepted)\s*\)", "(ADR-Status)", comp_t, flags=re.I).rstrip()
+        feed(f"component:{comp_p}", comp_norm)
+
+    return h.hexdigest()
+
+
+if print_hash:
+    print(current_pack_hash())
+    sys.exit(0)
+
 
 
 def substantive(body):
@@ -364,9 +411,12 @@ if body is not None:
                 fail(f"{plan.group(0)}: still carries template placeholders")
             elif "docs/agents-v0/architecture.md" not in plan_text:
                 fail(f"{plan.group(0)}: must link its parent docs/agents-v0/architecture.md")
-            elif approved:
+            else:
                 def is_sealed_component_plan(arch_path, comp_path):
                     if os.environ.get("KIT_STRICT_COMPONENT_PLAN") == "1":
+                        return False
+                    rev_txt = read(os.path.join(system, "architecture-review.md")) or ""
+                    if re.search(r"(?im)^(?:pack|design)-hash:\s*[0-9a-f]{12,64}\s*$", rev_txt):
                         return False
                     arch_txt = read(arch_path) or ""
                     m_rows = re.findall(r"(?im)^\s*\|\s*architecture\s*\|[^|]*\|[^|]*\|\s*([^|]+?)\s*\|", arch_txt)
@@ -385,13 +435,13 @@ if body is not None:
                     return True
 
                 comp_issues = []
-                if re.search(r"\(\s*Proposed\s*\)", plan_text, re.I):
+                if approved and re.search(r"\(\s*Proposed\s*\)", plan_text, re.I):
                     comp_issues.append(f"{plan.group(0)}: still labels an ADR '(Proposed)' after architecture approval (update to Accepted)")
                 cc_sec = split_sections(plan_text, 2).get("consistency check", "")
                 if re.search(r"^\s*-\s*\[\s\]", cc_sec, re.M):
-                    comp_issues.append(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]') on an approved architecture pack")
+                    comp_issues.append(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]')")
                 if comp_issues:
-                    if is_sealed_component_plan(arch, plan.group(0)):
+                    if approved and is_sealed_component_plan(arch, plan.group(0)):
                         for msg in comp_issues:
                             sys.stderr.write(f"WARN: {msg} (tolerated for Approved architecture pack committed in git; editing or re-opening enforces strict check)\n")
                     else:
@@ -407,9 +457,34 @@ if not without_review:
     else:
         if not re.search(r"^agent:\s*design-reviewer\s*$", body, re.M):
             fail(f"{path}: first lines must say 'agent: design-reviewer'")
-        for line in body.splitlines():
+        hm = re.search(r"(?im)^(?:pack|design)-hash:\s*([0-9a-f]{12,64})\s*$", body)
+        if hm:
+            recorded_hash = hm.group(1).lower()
+            actual_hash = current_pack_hash()
+            if not actual_hash.startswith(recorded_hash):
+                fail(
+                    f"{path}: pack-hash mismatch (review recorded {recorded_hash}, current pack is {actual_hash[:12]}; re-run design-reviewer)"
+                )
+        elif os.environ.get("KIT_STRICT_ARCH_REVIEW") == "1":
+            fail(f"{path}: missing 'pack-hash: <sha256>' header (compute via 'sh .agents-v0/ci/check-architecture-pack.sh --hash')")
+        for line in strip_comments(body).splitlines():
             if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
                 fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")
+            elif re.search(r"\|\s*(?:Suggestion|Nice\s+to\s+have)\s*\|", line, re.I):
+                if re.search(r"\|\s*Open\s*\|", line, re.I) or not re.search(
+                    r"\b(?:Resolved|Accepted|Deferred|Won'?t\s+fix|N/A)\b", line, re.I
+                ):
+                    fail(
+                        f"{path} has an open finding (mark Resolved, Deferred, or Accepted before approval): {line.strip()[:100]}"
+                    )
+            elif approved and not line.lstrip().startswith("|"):
+                if re.search(r"\b(?:ADR|Status)\b[^\n]*\bProposed\b|\bProposed\b[^\n]*\bADR\b", line, re.I) and not re.search(
+                    r"\bAccepted\b", line, re.I
+                ):
+                    fail(
+                        f"{path}: review still describes the ADR as 'Proposed' after approval (update review judgment to 'Accepted'): {line.strip()[:100]}"
+                    )
+
 
 if failures:
     for message in failures:

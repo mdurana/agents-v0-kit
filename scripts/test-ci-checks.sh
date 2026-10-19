@@ -231,7 +231,7 @@ agent: design-reviewer
 
 | # | Label | Finding | Evidence | Status |
 |---|-------|---------|----------|--------|
-| 1 | Suggestion | name the retry budget | architecture.md | Open |
+| 1 | Suggestion | name the retry budget | architecture.md | Resolved |
 EOF
 }
 
@@ -1552,6 +1552,29 @@ printf '| 2 | Critical | no failure row for the bus | architecture.md | Open |\n
 expect_fail "check-architecture-pack rejects an open Critical review finding" "$d" sh "$CI/check-architecture-pack.sh"
 sedi 's/| Critical | no failure row for the bus | architecture.md | Open |/| Critical | no failure row for the bus | architecture.md | Resolved |/' "$d/docs/agents-v0/design/system/architecture-review.md"
 expect_pass "check-architecture-pack accepts a Resolved Critical" "$d" sh "$CI/check-architecture-pack.sh"
+printf '| 3 | Suggestion | clarify timeout retry | architecture.md | Open |\n' >> "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_fail "check-architecture-pack rejects an Open Suggestion review finding" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/| Suggestion | clarify timeout retry | architecture.md | Open |/| Suggestion | clarify timeout retry | architecture.md | Deferred |/' "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_pass "check-architecture-pack accepts a Deferred Suggestion" "$d" sh "$CI/check-architecture-pack.sh"
+
+# pack-hash verification and post-approval ADR status prose in architecture-review.md
+phash="$(cd "$d" && sh "$CI/check-architecture-pack.sh" --hash | cut -c1-12)"
+cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<EOF
+agent: design-reviewer
+pack-hash: 000000000000
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Suggestion | name the retry budget | architecture.md | Resolved |
+EOF
+expect_fail "check-architecture-pack rejects stale pack-hash in architecture-review.md" "$d" sh "$CI/check-architecture-pack.sh"
+sedi "s/pack-hash: 000000000000/pack-hash: $phash/" "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_pass "check-architecture-pack accepts matching pack-hash in architecture-review.md" "$d" sh "$CI/check-architecture-pack.sh"
+printf '\nJudgment: ADR 0001 is Proposed and sound.\n' >> "$d/docs/agents-v0/design/system/architecture-review.md"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+expect_fail "check-architecture-pack --approved rejects review judgment still calling ADR Proposed" "$d" sh "$CI/check-architecture-pack.sh" --approved
+sedi 's/ADR 0001 is Proposed/ADR 0001 is Accepted/' "$d/docs/agents-v0/design/system/architecture-review.md"
+expect_pass "check-architecture-pack --approved accepts review judgment updated to Accepted (and pack-hash survives ADR approval flip)" "$d" sh "$CI/check-architecture-pack.sh" --approved
 
 d="$tmp/pack-fitness"
 write_pack "$d"
@@ -1564,7 +1587,6 @@ sedi 's#N/A: single service in this release#docs/agents-v0/design/system/compone
 expect_fail "check-architecture-pack needs the component plan file a context names" "$d" sh "$CI/check-architecture-pack.sh"
 printf '# Component plan: orders\n\nParent: `docs/agents-v0/architecture.md`\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_pass "check-architecture-pack accepts a component plan that links its parent" "$d" sh "$CI/check-architecture-pack.sh"
-sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
 cat > "$d/docs/agents-v0/design/system/components/orders.md" <<'EOF'
 # Component plan: orders
 
@@ -1572,8 +1594,12 @@ Parent: `docs/agents-v0/architecture.md`
 
 ## Consistency check
 
-- [x] Names match `docs/agents-v0/adr/01-pattern.md` (Proposed).
+- [ ] Names match `docs/agents-v0/adr/01-pattern.md` (Proposed).
 EOF
+expect_fail "check-architecture-pack rejects component plan with unchecked Consistency check box before approval" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/- \[ \]/- [x]/' "$d/docs/agents-v0/design/system/components/orders.md"
+expect_pass "check-architecture-pack accepts component plan with (Proposed) and checked Consistency check before approval" "$d" sh "$CI/check-architecture-pack.sh"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
 expect_fail "check-architecture-pack --approved rejects component plan labeling ADR (Proposed)" "$d" sh "$CI/check-architecture-pack.sh" --approved
 sedi 's/(Proposed)/(Accepted)/' "$d/docs/agents-v0/design/system/components/orders.md"
 sedi 's/- \[x\]/- [ ]/' "$d/docs/agents-v0/design/system/components/orders.md"
@@ -1581,7 +1607,7 @@ expect_fail "check-architecture-pack --approved rejects component plan with unch
 sedi 's/- \[ \]/- [x]/' "$d/docs/agents-v0/design/system/components/orders.md"
 expect_pass "check-architecture-pack --approved accepts component plan with Accepted ADR and checked Consistency check" "$d" sh "$CI/check-architecture-pack.sh" --approved
 
-# Sealed git-tracked Approved component plan with (Proposed) or - [ ] passes with warning; editing or KIT_STRICT_COMPONENT_PLAN=1 fails
+# Sealed git-tracked Approved component plan with (Proposed) or - [ ] passes with warning only for legacy packs without pack-hash; pack-hash, editing, or KIT_STRICT_COMPONENT_PLAN=1 fails
 cat >> "$d/docs/agents-v0/architecture.md" <<'EOF'
 
 ## Delivery approvals
@@ -1604,10 +1630,22 @@ EOF
   git init -q
   git add -A && git_commit "docs: sealed approved architecture and component plan"
 )
-expect_pass "check-architecture-pack --approved tolerates sealed git-tracked component plan with (Proposed) and - [ ]" "$d" sh "$CI/check-architecture-pack.sh" --approved
+expect_pass "check-architecture-pack --approved tolerates legacy sealed git-tracked component plan without pack-hash" "$d" sh "$CI/check-architecture-pack.sh" --approved
 expect_fail "check-architecture-pack --approved KIT_STRICT_COMPONENT_PLAN=1 rejects sealed component plan with (Proposed)" "$d" env KIT_STRICT_COMPONENT_PLAN=1 sh "$CI/check-architecture-pack.sh" --approved
 printf '\n<!-- edit -->\n' >> "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack --approved rejects sealed component plan once edited on disk" "$d" sh "$CI/check-architecture-pack.sh" --approved
+(cd "$d" && git checkout -q -- docs/agents-v0/design/system/components/orders.md)
+phash_comp="$(cd "$d" && sh "$CI/check-architecture-pack.sh" --hash | cut -c1-12)"
+cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<EOF
+agent: design-reviewer
+pack-hash: $phash_comp
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Suggestion | name the retry budget | architecture.md | Resolved |
+EOF
+(cd "$d" && git add -A && git_commit "docs: add pack-hash to review")
+expect_fail "check-architecture-pack --approved rejects git-committed component plan with (Proposed) when review has pack-hash" "$d" sh "$CI/check-architecture-pack.sh" --approved
 
 printf '# Component plan: orders\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack rejects a component plan with no parent link" "$d" sh "$CI/check-architecture-pack.sh"
