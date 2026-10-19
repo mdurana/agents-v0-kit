@@ -182,6 +182,8 @@
               <suppressionFiles>
                 <suppressionFile>${kit.maven.dir}/dependency-check-suppressions.xml</suppressionFile>
               </suppressionFiles>
+              <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+              <!-- Optional NVD mirror via -DnvdDatafeedUrl=... or env NVD_DATAFEED_URL; NVD_API_KEY env for API key. -->
             </configuration>
             <executions>
               <execution>

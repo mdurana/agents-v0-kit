@@ -131,6 +131,33 @@ def ensure_cve_artifact(root_dir, cve_rel, pid):
                     deps.setdefault(mod, []).append({"name": str(finding.get("osv") or "?"), "severity": "HIGH"})
                 payload = {"dependencies": [{"fileName": k, "vulnerabilities": v} for k, v in sorted(deps.items())]}
         elif pid == "java" and os.path.isfile(os.path.join(root_dir, "pom.xml")):
+            # Double-run guard: do not start a second dependency-check if one is already running (H2 lock contention)
+            try:
+                ps_proc = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True)
+                if ps_proc.returncode == 0:
+                    my_pid = os.getpid()
+                    my_ppid = os.getppid()
+                    for line in ps_proc.stdout.splitlines():
+                        parts = line.strip().split(None, 1)
+                        if len(parts) == 2:
+                            pid_str, cmd_line = parts
+                            try:
+                                p_val = int(pid_str)
+                                if p_val in (my_pid, my_ppid):
+                                    continue
+                            except ValueError:
+                                continue
+                            argv = cmd_line.split()
+                            if not argv:
+                                continue
+                            exe = os.path.basename(argv[0])
+                            if (exe in ("java", "mvn", "mvnw") or argv[0].endswith("/mvnw")) and (
+                                "dependency-check" in cmd_line or "-Pci-security" in cmd_line
+                            ):
+                                print(f"FAIL: another dependency-check process ({pid_str}) is already running — wait for it to finish to prevent H2 lock contention", file=sys.stderr)
+                                return 0
+            except Exception:
+                pass
             mvn_cmd = None
             for cand in (os.path.join(root_dir, "mvnw"), os.path.join(os.getcwd(), "mvnw"), "mvn"):
                 if os.path.isfile(cand) and os.access(cand, os.X_OK):
@@ -140,8 +167,12 @@ def ensure_cve_artifact(root_dir, cve_rel, pid):
                     mvn_cmd = [cand]
                     break
             if mvn_cmd:
+                extra_args = []
+                datafeed = os.environ.get("NVD_DATAFEED_URL")
+                if datafeed:
+                    extra_args.append(f"-DnvdDatafeedUrl={datafeed}")
                 subprocess.run(
-                    mvn_cmd + ["-B", "verify", "-Pci-security", "-DskipTests"],
+                    mvn_cmd + ["-B", "verify", "-Pci-security", "-DskipTests"] + extra_args,
                     cwd=root_dir, capture_output=True, text=True, timeout=300,
                 )
                 target_json = os.path.join(root_dir, cve_rel)
