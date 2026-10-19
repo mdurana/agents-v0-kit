@@ -440,23 +440,33 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
 
 
 def _commit_paths_are_evidence(parts: List[str]) -> bool:
-    """A reports-only commit (build/ or verify/ docs, or state.json) does not ask again."""
+    """A reports-only commit (build/ or verify/ docs, state.json, phase-result.md, and companion artifact) does not ask again."""
     if "--" not in parts:
         return False
     paths = [p for p in parts[parts.index("--") + 1 :] if p != "--"]
     if not paths:
         return False
+    has_evidence = False
     for path in paths:
         norm = path.replace("\\", "/").lstrip("./")
-        if not (
+        if (
             norm.startswith("docs/agents-v0/build/")
             or norm.startswith("docs/agents-v0/verify/")
             or (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".state.json"))
+            or (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".phase-result.md"))
             or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("state.json"))
+            or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("phase-result.md"))
             or norm == "docs/agents-v0/onboarding/state.json"
         ):
+            has_evidence = True
+        elif (
+            (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".md"))
+            or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("/note.md"))
+        ):
+            continue
+        else:
             return False
-    return True
+    return has_evidence
 
 
 def _git_subcommand(parts: List[str]) -> str:
@@ -600,6 +610,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
         )
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
+        if norm.endswith(".phase-result.md"):
+            return "allow", ""
         return (
             "ask",
             "Delivery artifact edit — do not change Delivery approvals without explicit human gate approval.",

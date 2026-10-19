@@ -672,13 +672,15 @@ TARGET_DB_TEST_RE = re.compile(
     r"(testcontainers|@Testcontainers|PostgreSQLContainer|SqlServerContainer|MySQLContainer|"
     r"MariaDBContainer|OracleContainer|JdbcDatabaseContainer|DockerComposeContainer|ComposeContainer|"
     r"@ServiceConnection|tc:postgresql|jdbc:postgresql:|jdbc:sqlserver:|UseNpgsql|NpgsqlConnection|"
-    r"UseSqlServer|SqlConnection|psycopg|asyncpg|pgx|postgres://|postgresql://|sqlserver://)",
+    r"UseSqlServer|SqlConnection|psycopg|asyncpg|pgx|postgres://|postgresql://|sqlserver://|"
+    r"image:\s*['\"]?(?:[\w.\-]+/)?(?:library/)?(?:postgres|mysql|mariadb)[:\s'\"]|mcr\.microsoft\.com/mssql)",
     re.I,
 )
 TEST_SOURCE_RE = re.compile(
     r"(Test|Tests|IT)\.java$|(Test|Tests)\.cs$|\.(test|spec)\.[A-Za-z]+$|_test\.[A-Za-z]+$|(^|/)test_[^/]+\.py$",
     re.I,
 )
+COMPOSE_FILE_RE = re.compile(r"(^|/)(docker-)?compose[^/]*\.ya?ml$", re.I)
 
 
 def check_schema_target_db():
@@ -709,7 +711,7 @@ def check_schema_target_db():
                 or "/src/test/" in norm
                 or "/tests/" in norm
                 or "/__tests__/" in norm
-                or re.search(r"(^|/)(docker-)?compose[^/]*\.ya?ml$", norm, re.I)
+                or COMPOSE_FILE_RE.search(norm)
             ):
                 try:
                     with open(full, encoding="utf-8", errors="replace") as handle:
@@ -721,6 +723,50 @@ def check_schema_target_db():
                     break
         if has_target_db:
             break
+    if not has_target_db:
+        try:
+            git_top = subprocess.run(
+                ["git", "-C", root, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, OSError):
+            git_top = ""
+        if git_top:
+            cur = os.path.abspath(root)
+            top_abs = os.path.abspath(git_top)
+            compose_dirs = []
+            while True:
+                parent = os.path.dirname(cur)
+                if parent == cur or not parent.startswith(top_abs):
+                    break
+                compose_dirs.append(parent)
+                docker_sub = os.path.join(parent, "docker")
+                if os.path.isdir(docker_sub):
+                    compose_dirs.append(docker_sub)
+                if parent == top_abs:
+                    break
+                cur = parent
+            for cdir in compose_dirs:
+                try:
+                    entries = os.listdir(cdir)
+                except OSError:
+                    continue
+                for name in entries:
+                    if not COMPOSE_FILE_RE.search(name):
+                        continue
+                    full = os.path.join(cdir, name)
+                    if not os.path.isfile(full):
+                        continue
+                    try:
+                        with open(full, encoding="utf-8", errors="replace") as handle:
+                            text = handle.read()
+                    except OSError:
+                        continue
+                    if TARGET_DB_TEST_RE.search(text):
+                        has_target_db = True
+                        break
+                if has_target_db:
+                    break
     summary["schemaChangedFiles"] = schema_files
     summary["schemaTargetDbVerified"] = has_target_db
     if not has_target_db:

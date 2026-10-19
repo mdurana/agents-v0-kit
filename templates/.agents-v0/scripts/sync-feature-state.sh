@@ -192,7 +192,27 @@ else:
     active_phase = prev.get("activePhase") or ""
     active_status = prev.get("activeStatus") or ""
     blocked_reason = prev.get("blockedReason") or ""
-    if active_phase and active_phase == last_approved:
+    pr_path = (
+        os.path.join(os.path.dirname(art), "phase-result.md")
+        if (onboarding or maintain_note)
+        else os.path.splitext(art)[0] + ".phase-result.md"
+    )
+    pr_approved_last = False
+    if last_approved and os.path.isfile(pr_path):
+        try:
+            pr_txt = open(pr_path, encoding="utf-8").read()
+            mp = re.search(r"^\s*phase:\s*(\S+)", pr_txt, re.I | re.M)
+            ms = re.search(r"^\s*status:\s*(\S+)", pr_txt, re.I | re.M)
+            if (
+                mp
+                and ms
+                and mp.group(1).strip().lower() == last_approved
+                and ms.group(1).strip().lower() == "approved"
+            ):
+                pr_approved_last = True
+        except OSError:
+            pass
+    if active_phase and (active_phase == last_approved or pr_approved_last):
         active_phase = ""
         active_status = ""
         blocked_reason = ""

@@ -1879,6 +1879,124 @@ cat > "$dfe/app/frontend/cve-report.json" <<'EOF'
 EOF
 expect_pass "gate metrics: clean sibling app/frontend CVE report passes check-gate-metrics.sh app/backend" "$dfe" env REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
 
+(
+  cd "$dfe"
+  git init -q -b main
+  git config user.email "test@example.com"
+  git config user.name "Test"
+  git add -A && git_commit base
+  mkdir -p app/backend/src/main/resources/db/migration app/backend/src/test/resources
+  printf 'CREATE TABLE IF NOT EXISTS schema_marker (id INTEGER PRIMARY KEY);\n' > app/backend/src/main/resources/db/migration/V1__baseline.sql
+  printf 'spring:\n  datasource:\n    url: jdbc:h2:mem:app;MODE=PostgreSQL\n' > app/backend/src/test/resources/application-test.yml
+  git checkout -qb feature/p0-a
+  git add -A && git_commit add_baseline_sql
+)
+expect_fail "gate metrics: app/backend V1__baseline.sql with H2-only and no root Compose fails" "$dfe" env DIFF_BASE=main MIN_DIFF_LINE_PCT=0 REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
+cat > "$dfe/docker-compose.yml" <<'EOF'
+services:
+  db:
+    image: postgres:15-alpine
+EOF
+expect_pass "gate metrics: app/backend V1__baseline.sql with repo-root docker-compose.yml passes" "$dfe" env DIFF_BASE=main MIN_DIFF_LINE_PCT=0 REQUIRE_CVE_REPORT=1 sh "$CI/check-gate-metrics.sh" app/backend
+
+# --- Build approval / state / phase-result / stamped-commit consistency ------
+dp0="$tmp/p0-build-consistency"
+mkdir -p "$dp0/docs/agents-v0/requirements" "$dp0/docs/agents-v0/design/p0-a-platform-skeleton" "$dp0/docs/agents-v0/build/p0-a-platform-skeleton" "$dp0/src"
+cat > "$dp0/docs/agents-v0/design/p0-a-platform-skeleton/design.md" <<'EOF'
+# Design: P0-A
+EOF
+(cd "$dp0" && printf '2026-10-19 %s approved\n' "$(sh "$CI/check-design.sh" p0-a-platform-skeleton --hash)" > docs/agents-v0/design/p0-a-platform-skeleton/design.lock)
+cat > "$dp0/docs/agents-v0/requirements/p0-a-platform-skeleton.md" <<'EOF'
+# P0-A — Platform Skeleton
+Milestone: P0 — Platform Skeleton
+Story: P0-A
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| build | docs/agents-v0/build/p0-a-platform-skeleton/build-report.md | mdurana | Approved | 2026-10-19 |
+EOF
+(cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null 2>&1)
+expect_fail "check-feature-state rejects Approved build when intake and design rows are missing alongside design.lock" "$dp0" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md
+
+cat > "$dp0/docs/agents-v0/requirements/p0-a-platform-skeleton.md" <<'EOF'
+# P0-A — Platform Skeleton
+Milestone: P0 — Platform Skeleton
+Story: P0-A
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| intake | docs/agents-v0/requirements/p0-a-platform-skeleton.md | mdurana | Approved | 2026-10-19 |
+| design | N/A: no /api/v1 operation, docs/agents-v0/design/p0-a-platform-skeleton/design.md | mdurana | Approved | 2026-10-19 |
+| build | docs/agents-v0/build/p0-a-platform-skeleton/build-report.md | mdurana | Approved | 2026-10-19 |
+EOF
+cat > "$dp0/docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md" <<'EOF'
+phase: build
+status: approved
+EOF
+(cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md --active-phase verify --status in_progress >/dev/null 2>&1)
+expect_fail "check-feature-state rejects story in two phases at once (phase-result build/approved vs state verify/in_progress)" "$dp0" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md
+(cd "$dp0" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null 2>&1)
+expect_pass "check-feature-state passes when intake+design+build are approved and sync-feature-state clears activePhase" "$dp0" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md
+
+# Stamped commit in build-report.md must not record state.json as in_progress or omit the build approval row
+(
+  cd "$dp0"
+  git init -q -b main
+  git config user.email "test@example.com"
+  git config user.name "Test"
+  # Simulate committing code while state is in_progress and approvals table is empty
+  cat > docs/agents-v0/requirements/p0-a-platform-skeleton.md <<'EOF'
+# P0-A — Platform Skeleton
+Milestone: P0 — Platform Skeleton
+Story: P0-A
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+EOF
+  sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md --active-phase build --status in_progress >/dev/null 2>&1
+  printf 'class App {}\n' > src/App.java
+  git add -A && git_commit "feat: code with in_progress state"
+  bad_sha="$(git rev-parse HEAD)"
+  cat > docs/agents-v0/build/p0-a-platform-skeleton/build-report.md <<EOF
+commit: $bad_sha
+EOF
+  cat > docs/agents-v0/requirements/p0-a-platform-skeleton.md <<'EOF'
+# P0-A — Platform Skeleton
+Milestone: P0 — Platform Skeleton
+Story: P0-A
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| intake | docs/agents-v0/requirements/p0-a-platform-skeleton.md | mdurana | Approved | 2026-10-19 |
+| design | N/A: no /api/v1 operation, docs/agents-v0/design/p0-a-platform-skeleton/design.md | mdurana | Approved | 2026-10-19 |
+| build | docs/agents-v0/build/p0-a-platform-skeleton/build-report.md | mdurana | Approved | 2026-10-19 |
+EOF
+  sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md >/dev/null 2>&1
+  git add -A && git_commit "docs: add approval after stamped commit"
+)
+expect_fail "check-evidence rejects build-report whose stamped commit recorded state as build/in_progress and lacked the build row" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md build
+(
+  cd "$dp0"
+  # Now commit code with approved rows and cleared state first, then stamp build-report.md
+  printf 'class App { int x; }\n' > src/App.java
+  git add src/App.java docs/agents-v0/requirements/p0-a-platform-skeleton.md docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md docs/agents-v0/requirements/p0-a-platform-skeleton.state.json
+  git_commit "feat: code with approved build state"
+  good_sha="$(git rev-parse HEAD)"
+  cat > docs/agents-v0/build/p0-a-platform-skeleton/build-report.md <<EOF
+commit: $good_sha
+EOF
+  git add docs/agents-v0/build/p0-a-platform-skeleton/build-report.md && git_commit "docs: stamp build-report"
+)
+expect_pass "check-evidence passes when stamped commit contains approved build row and cleared state" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md build
+
 if [ "$status" -ne 0 ]; then
   echo "test-ci-checks: FAILED" >&2
   exit 1

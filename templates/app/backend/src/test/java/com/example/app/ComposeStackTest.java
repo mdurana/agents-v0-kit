@@ -1,13 +1,20 @@
 package com.example.app;
 
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.Duration;
 
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,7 +41,12 @@ class ComposeStackTest {
         }
         Path composeFile = repo.resolve("docker-compose.yml");
         assertTrue(Files.isRegularFile(composeFile), "docker-compose.yml must exist at repo root");
-        String compose = Files.readString(composeFile);
+        assertComposeContents(Files.readString(composeFile), hasFrontend);
+        verifyPostgresMigrationIfReachable();
+        verifyRunningOrSmoke(repo, hasFrontend);
+    }
+
+    private void assertComposeContents(String compose, boolean hasFrontend) {
         assertTrue(compose.contains("api:"), "docker-compose.yml must declare api service");
         assertTrue(compose.contains("context: ./app/backend"), "api service must build ./app/backend");
         assertTrue(compose.contains("DB_URL: jdbc:postgresql://db:5432/app"), "api service must wire PostgreSQL DB_URL");
@@ -45,7 +57,32 @@ class ComposeStackTest {
             assertTrue(compose.contains("ui:"), "docker-compose.yml must declare ui service");
             assertTrue(compose.contains("context: ./app/frontend"), "ui service must build ./app/frontend");
         }
-        verifyRunningOrSmoke(repo, hasFrontend);
+    }
+
+    private void verifyPostgresMigrationIfReachable() throws Exception {
+        int dbPort = Integer.parseInt(System.getenv().getOrDefault("DB_PORT", "5432"));
+        if (!isTcpOpen("localhost", dbPort)) {
+            return;
+        }
+        String url = System.getenv().getOrDefault("TEST_DB_URL", "jdbc:postgresql://localhost:" + dbPort + "/app");
+        String user = System.getenv().getOrDefault("DB_USER", "app");
+        String pass = System.getenv().getOrDefault("DB_PASSWORD", "app");
+        Flyway.configure().dataSource(url, user, pass).load().migrate();
+        try (Connection conn = DriverManager.getConnection(url, user, pass);
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'schema_marker'");
+             ResultSet rs = ps.executeQuery()) {
+            assertTrue(rs.next() && rs.getInt(1) == 1, "V1__baseline.sql must create schema_marker on PostgreSQL");
+        }
+    }
+
+    private boolean isTcpOpen(String host, int port) {
+        try (Socket sock = new Socket()) {
+            sock.connect(new InetSocketAddress(host, port), 500);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void verifyRunningOrSmoke(Path repo, boolean hasFrontend) throws Exception {

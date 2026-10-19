@@ -170,6 +170,26 @@ check_path() {
                 esac
                 missing=1
               fi
+              art_state="${art%.md}.state.json"
+              case "$art" in
+                docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) art_state="docs/agents-v0/onboarding/state.json" ;;
+                docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) art_state="$(dirname "$art")/state.json" ;;
+              esac
+              if git cat-file -e "${rep_commit}:${art_state}" 2>/dev/null; then
+                rep_state="$(git show "${rep_commit}:${art_state}" 2>/dev/null || true)"
+                if printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activePhase"[[:space:]]*:[[:space:]]*"'"$phase"'"' \
+                  && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activeStatus"[[:space:]]*:[[:space:]]*"(in_progress|awaiting_approval)"'; then
+                  printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$rep_commit" "$p" "$art_state" "$phase" >&2
+                  missing=1
+                fi
+                if [ "$phase" = "build" ] && [ "$is_p0_unapproved" = "0" ] && [ -z "$(printf '%s' "$section" | grep -i '|[[:space:]]*release[[:space:]]*|' || true)" ]; then
+                  rep_art="$(git show "${rep_commit}:${art}" 2>/dev/null || true)"
+                  if ! printf '%s\n' "$rep_art" | grep -Eqi '\|[[:space:]]*build[[:space:]]*\|.*\|[[:space:]]*(approved|approve|yes|pass)([^a-z]|$)'; then
+                    printf 'FAIL: commit: %s in %s does not contain the Approved build row in %s — record the Build approval before committing the stamped tree\n' "$rep_commit" "$p" "$art" >&2
+                    missing=1
+                  fi
+                fi
+              fi
             fi
           fi
         fi

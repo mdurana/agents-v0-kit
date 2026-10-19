@@ -305,6 +305,9 @@ feature_design_and_plan() {
   if [ -d "docs/agents-v0/design/$slug" ] && [ "${REQUIRE_DESIGN_LOCK:-1}" != "0" ]; then
     sh "$here/check-design.sh" "$slug" --verify-lock || exit 1
   fi
+  if [ -f "docs/agents-v0/requirements/${slug}.state.json" ]; then
+    sh "$here/check-feature-state.sh" "$1" || exit 1
+  fi
   if [ "${REQUIRE_BUILD_PLAN:-1}" != "0" ]; then
     sh "$here/check-build-plan.sh" "$slug" --complete || exit 1
   fi

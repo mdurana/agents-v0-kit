@@ -47,7 +47,9 @@ SHELL_CASES = [
     ("git commit -m x", "ask"),
     ("git commit -m x -- docs/agents-v0/build/orders/build-report.md", "allow"),
     ("git commit -m x -- docs/agents-v0/build/orders/build-report.md docs/agents-v0/requirements/orders.state.json", "allow"),
+    ("git commit -m x -- docs/agents-v0/build/p0-a-platform-skeleton docs/agents-v0/requirements/p0-a-platform-skeleton.md docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md docs/agents-v0/requirements/p0-a-platform-skeleton.state.json", "allow"),
     ("git commit -m x -- docs/agents-v0/verify/orders/test-report.md", "allow"),
+    ("git commit -m x -- docs/agents-v0/requirements/orders.md docs/agents-v0/verify/orders docs/agents-v0/requirements/orders.phase-result.md docs/agents-v0/requirements/orders.state.json", "allow"),
     ("git commit -m x -- docs/agents-v0/requirements/orders.md", "ask"),
     ("git commit -m x --", "ask"),
     ("git checkout -- src", "ask"),
@@ -225,6 +227,7 @@ PATH_CASES = [
     (".agents-v0/scripts/check-delivery-gate-local.sh", "block"),
     (".agents-v0/hooks/pre-push", "block"),
     ("docs/agents-v0/requirements/foo.md", "ask"),
+    ("docs/agents-v0/requirements/foo.phase-result.md", "allow"),
     ("docs/agents-v0/milestones/p0.md", "ask"),
     ("src/Main.java", "allow"),
 ]

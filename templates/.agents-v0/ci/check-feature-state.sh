@@ -155,6 +155,51 @@ if first_reopened and active in phases and phases.index(active) > phases.index(f
     )
     raise SystemExit(1)
 
+if not onboarding and not maintain_note and last in ("build", "verify", "release") and not first_reopened:
+    slug = os.path.splitext(os.path.basename(art))[0]
+    art_root = os.path.dirname(os.path.dirname(os.path.abspath(art)))
+    design_lock = os.path.join(art_root, "design", slug, "design.lock")
+    is_p0_a = bool(re.search(r"^\s*Story:\s*P0-A\b", text, re.I | re.M))
+    if os.path.isfile(design_lock) or is_p0_a:
+        for prior in phases[: phases.index(last)]:
+            if prior not in rows or not positive.match(rows[prior][3]):
+                print(
+                    f"FAIL: {last} is Approved in {art} while earlier phase '{prior}' has no Approved row in Delivery approvals",
+                    file=sys.stderr,
+                )
+                raise SystemExit(1)
+
+if onboarding or maintain_note:
+    phase_result_path = os.path.join(os.path.dirname(art), "phase-result.md")
+else:
+    phase_result_path = os.path.splitext(art)[0] + ".phase-result.md"
+if os.path.isfile(phase_result_path):
+    pr_text = open(phase_result_path, encoding="utf-8").read()
+    m_phase = re.search(r"^\s*phase:\s*(\S+)", pr_text, re.I | re.M)
+    m_status = re.search(r"^\s*status:\s*(\S+)", pr_text, re.I | re.M)
+    pr_phase = m_phase.group(1).strip().lower() if m_phase else ""
+    pr_status = m_status.group(1).strip().lower() if m_status else ""
+    if pr_status == "approved":
+        if pr_phase not in rows or not positive.match(rows[pr_phase][3]):
+            print(
+                f"FAIL: {phase_result_path} has status: approved for phase '{pr_phase}', but {art} has no Approved '{pr_phase}' row",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if pr_phase == last and active:
+            print(
+                f"FAIL: {phase_result_path} records phase '{pr_phase}' as approved while {state_path} has activePhase '{active}' ({status or '-'}) — story is in two phases at once; run scripts/sync-feature-state.sh {art} without --active-phase",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+    elif pr_status in ("in_progress", "awaiting_approval", "blocked") and pr_phase:
+        if active != pr_phase or status != pr_status:
+            print(
+                f"FAIL: {phase_result_path} ({pr_phase} / {pr_status}) disagrees with {state_path} ({active or '-'} / {status or '-'})",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+
 head_sha = resolve_git_head(os.environ.get("HOOK_BASE", ""))
 base_commit = (state.get("baseCommit") or "").strip()
 if base_commit and not re.match(r"^[0-9a-f]{7,40}$", base_commit, re.I):

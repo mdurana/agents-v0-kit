@@ -25,6 +25,8 @@ services:
       - "${UI_PORT:-8081}:8080"
   db:
     image: postgres:15-alpine
+    ports:
+      - "${DB_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: app
       POSTGRES_USER: ${DB_USER:-app}
