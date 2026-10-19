@@ -20,13 +20,14 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
    - Surface: `backend`, `bff`, `frontend`, or `vertical slice`.
    - Size: the number of acceptance criteria, `1`–`8`, including the negative or edge Intake will add. Seeded P0-A stays at `4`.
    - The user-story sentence states an outcome the approved roadmap already names. Foundational technical components mandated by the Architecture "Now" slice (e.g., local identity adapter, session store, persistence baseline) that support roadmap outcomes are authored as technical enabler stories in P1/P2 without adding unapproved product themes.
+   - Record security-review triggers (`security-baseline.mdc` §11: auth, upload, RBAC, public route) in `## Security review triggers` (`| Story ID | Trigger | Reason |` or `none`). Do not add trigger columns to the Stories table.
 5. Record `Roadmap:` and `Architecture: docs/agents-v0/architecture.md` on each manifest in scope. Omit both lines only when the plan's only story is seeded P0-A. Size every story: one surface and at most eight acceptance criteria, including that negative or edge. Split a larger story into rows here. Use `Vertical slice: yes` only when the user asked for one journey across surfaces. Do not split the seeded P0-A platform skeleton row. It is already one story. Surface `vertical slice` and Size `4`.
-6. Add an integration story for each pair of contexts that call each other. It depends on both sides, covers the contract and the failure modes, and is the place for consumer-driven contract tests.
+6. Add an integration story for each pair of contexts that call each other (in `context-map.md`, each row's `Integrations` cell should name called contexts by their Context-column name or unique 4+ char first-word alias). It depends on both sides, covers the contract and the failure modes, is the place for consumer-driven contract tests, and records coverage of the context pair (`context:<ContextA><-><ContextB>`) via an 8th `Covers` column or `## Traceability` table.
 7. Order the stories as a graph with no cycle. A story starts Build only after every story it names (including cross-milestone dependencies) has its Verify approval (`.agents-v0/ci/check-milestone.sh` enforces both the acyclic story graph and dependency verify approvals).
-8. Map each filled NFR/SLO row in `docs/agents-v0/design/system/nfr-slo.md` to a P4 hardening story (splitting across multiple P4 stories when needed so each story stays within Size ≤ 8), and split P5 release readiness across stories (e.g., `P5-A`, `P5-B`) so the 10-item checklist in `docs/agents-v0/design/system/ops-readiness.md` fits within Size ≤ 8 per story.
+8. Map each filled NFR/SLO row in `docs/agents-v0/design/system/nfr-slo.md` to a P4 hardening story (splitting across multiple P4 stories when needed so each story stays within Size ≤ 8), recording coverage (`nfr:<name>`). Split P5 release readiness across stories (e.g., `P5-A`, `P5-B`) so the 10-item checklist in `docs/agents-v0/design/system/ops-readiness.md` fits within Size ≤ 8 per story, recording covered items (`ops-1`..`ops-10`). Traceability is recorded in an optional 8th `Covers` column or in a `## Traceability` table.
 9. Write `docs/agents-v0/milestones/plan.md` from the manifests. Two parts only:
    - A table with columns `Milestone`, `Stories`, and `What they cover`. One row per milestone in the plan, from P0 when it is in scope. `Stories` lists the story ids in dependency order. `What they cover` is one line, not the user-story sentence.
-   - A `flowchart TD` of every story (or one `flowchart TD` per milestone when the backlog exceeds ~50 stories so each diagram stays within the ~50-node Mermaid cap in `architecture-and-diagrams.mdc`). The node id is the story id with the hyphen removed (`P2-F` → `P2F`). The label is the story id (`P2F[P2-F]`). One arrow per dependency, including edges that cross milestones. A story with no dependency is a node with no incoming arrow.
+   - Flowchart diagrams: a `flowchart TD` of every story (split into multiple `flowchart TD` blocks when the backlog or a milestone with cross-dependencies exceeds the ~50-node Mermaid cap in `architecture-and-diagrams.mdc`; cross-diagram dependencies are allowed as reference nodes). The node id is the story id with the hyphen removed (`P2-F` → `P2F`). The label is the story id (`P2F[P2-F]`). One arrow per dependency, including edges that cross milestones. A story with no dependency is a node with no incoming arrow.
 10. Present `docs/agents-v0/milestones/plan.md`. Wait for explicit approval. Then append the `plan` row to each manifest's `Delivery approvals` table:
 
    | Phase | Artifacts | Approver | Decision | Date |
@@ -34,10 +35,12 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
    | plan | docs/agents-v0/milestones/plan.md, docs/agents-v0/milestones/&lt;milestone&gt;.md, docs/agents-v0/design/system/context-map.md, the roadmap path | &lt;name&gt; | Approved | &lt;date&gt; |
 
 ## Rule-compliance checklist
-- [ ] `architecture-and-diagrams.mdc`: contexts, database per service, Mermaid conventions (≤ ~50 nodes per diagram; split `flowchart TD` per milestone when larger).
+- [ ] `architecture-and-diagrams.mdc`: contexts, database per service, Mermaid conventions (≤ ~50 nodes per diagram; split `flowchart TD` blocks when backlog or cross-dependencies exceed 50 nodes).
 - [ ] `project-delivery-core.mdc`: async/messaging/cache justified; target `Service roots` / `BFF root` recorded in `context-map.md` and component plans (leaving `project-profile.md` roots as `n/a` until scaffolded on disk in `/v0-build`).
 - [ ] Every story sentence is complete; every story fits the size budget (`1`–`8`), has a valid `Surface`, and names concrete story-ID dependencies (`.agents-v0/ci/check-milestone.sh <manifest> plan` passes).
-- [ ] Every cross-context call has an integration story with both sides as dependencies.
+- [ ] Every cross-context call has an integration story with both sides as dependencies and records `context:<A><-><B>` coverage.
+- [ ] Every filled NFR/SLO row has a P4 hardening story (`nfr:<name>`), and P5 stories cover all 10 ops-readiness checklist items (`ops-1`..`ops-10`).
+- [ ] Security-review triggers are recorded under `## Security review triggers` (`| Story ID | Trigger | Reason |` or `none`).
 - [ ] The dependency graph has no cycle and no duplicate story IDs across manifests.
-- [ ] `docs/agents-v0/milestones/plan.md` is the milestone table and the story flowchart.
+- [ ] `docs/agents-v0/milestones/plan.md` contains the milestone table and all story nodes and dependency arrows across its flowchart blocks.
 - [ ] `workflow-orchestration.mdc`: Plan gate met; stopped for approval.

@@ -29,16 +29,16 @@
 
 The P5 readiness stories (`P5-A`, `P5-B`, … in `docs/agents-v0/milestones/p5-release-readiness.md`, split so each story stays within the Size ≤ 8 cap) tick these boxes. A box stays open only with a named reason. A production deploy waits on that (`release-deploy`).
 
-- [ ] On-call rotation and escalation path are defined.
-- [ ] SLOs and error budgets are measurable (`slo-evidence.md`).
-- [ ] Dashboards and SLO-based alerts exist; each alert links its runbook.
-- [ ] Health checks (`/health`, `/ready`, `/live`) and graceful shutdown work.
-- [ ] Rollback and feature-flag strategy was exercised in a non-production environment.
-- [ ] Resilience patterns were validated by a dependency-kill test, not only unit tests.
-- [ ] Trace and correlation IDs cross every service and async boundary.
-- [ ] Capacity baseline exists for the critical paths.
-- [ ] Backup restore or failover was tested when `nfr-slo.md` sets an RPO or RTO.
-- [ ] Security scan and dependency audit passed in CI.
+- [ ] `ops-1` On-call rotation and escalation path are defined.
+- [ ] `ops-2` SLOs and error budgets are measurable (`slo-evidence.md`).
+- [ ] `ops-3` Dashboards and SLO-based alerts exist; each alert links its runbook.
+- [ ] `ops-4` Health checks (`/health`, `/ready`, `/live`) and graceful shutdown work.
+- [ ] `ops-5` Rollback and feature-flag strategy was exercised in a non-production environment.
+- [ ] `ops-6` Resilience patterns were validated by a dependency-kill test, not only unit tests.
+- [ ] `ops-7` Trace and correlation IDs cross every service and async boundary.
+- [ ] `ops-8` Capacity baseline exists for the critical paths.
+- [ ] `ops-9` Backup restore or failover was tested when `nfr-slo.md` sets an RPO or RTO.
+- [ ] `ops-10` Security scan and dependency audit passed in CI.
 
 ## Runbook template
 

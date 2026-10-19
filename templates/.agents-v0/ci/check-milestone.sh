@@ -137,8 +137,9 @@ check_story_order() {
     /---/ { next }
     /Story [Ii][Dd]/ { next }
     /^[[:space:]]*\|/ {
-      id = trim($2); story = trim($3); art = trim($4); status = trim($5); dep = trim($6); surf = trim($7); sz = trim($8)
-      if (id != "") printf "%s^%s^%s^%s^%s^%s^%s\n", id, art, dep, story, surf, sz, status
+      id = trim($2); story = trim($3); art = trim($4); status = trim($5); dep = trim($6); surf = trim($7); sz = trim($8); cov = trim($9)
+      extra = (NF > 10) ? 1 : 0
+      if (id != "") printf "%s^%s^%s^%s^%s^%s^%s^%s^%d\n", id, art, dep, story, surf, sz, status, cov, extra
     }')"
   ids="$(printf '%s\n' "$rows" | awk -F'^' '{ print $1 }')"
 
@@ -159,8 +160,8 @@ check_story_order() {
     /---/ { next }
     /Story [Ii][Dd]/ { next }
     /^[[:space:]]*\|/ {
-      id = trim($2); art = trim($4); dep = trim($6)
-      if (id != "") printf "%s^%s^%s^%s\n", id, art, dep, FILENAME
+      id = trim($2); art = trim($4); dep = trim($6); cov = trim($9)
+      if (id != "") printf "%s^%s^%s^%s^%s\n", id, art, dep, FILENAME, cov
     }
   ' $all_manifests 2>/dev/null || true)"
   all_ids="$(printf '%s\n' "$all_rows" | awk -F'^' '{ print $1 }')"
@@ -236,15 +237,31 @@ for u in sorted(all_ids):
     if color[u] == WHITE:
         dfs(u, [u])
 
+def get_section(text, title):
+    m = re.search(rf"(?mi)^#+\s*{re.escape(title)}\b[\s\S]*?(?=^#+\s|\Z)", text)
+    return m.group(0) if m else None
+
 if phase == "plan":
     valid_surfaces = {"backend", "bff", "frontend", "vertical slice"}
+    manifest_dir = os.path.dirname(os.path.abspath(manifest))
+
+    target_content = ""
+    if os.path.isfile(manifest):
+        try:
+            with open(manifest, "r", encoding="utf-8") as mf:
+                target_content = mf.read()
+        except Exception:
+            pass
+
     for line in target_lines:
         parts = line.split("^")
-        while len(parts) < 7:
+        while len(parts) < 9:
             parts.append("")
-        sid, art, dep, story, surf, sz, status = [p.strip() for p in parts[:7]]
+        sid, art, dep, story, surf, sz, status, cov, extra = [p.strip() for p in parts[:9]]
         if not sid:
             continue
+        if extra == "1":
+            errors.append(f"FAIL: story {sid} table has unexpected columns; record security review triggers in '## Security review triggers'")
         if re.search(r"<[^>]+>|\[[^\]]+\]", story):
             errors.append(f"FAIL: story {sid} user story still has placeholder tokens: {story}")
         elif not re.match(r"^As an?\s+\S.*,\s*I want\s+\S.*(?:,|\s+[—–-])\s*so that\s+\S+", story, re.I):
@@ -272,6 +289,347 @@ if phase == "plan":
                 errors.append(f"FAIL: story {sid} Size must be between 1 and 8 (got {sz_int})")
         except ValueError:
             errors.append(f"FAIL: story {sid} has invalid or missing Size '{sz}' (expected integer 1..8)")
+
+    # 1. Check ## Security review triggers
+    trig_sec = get_section(target_content, "Security review triggers")
+    if trig_sec:
+        trig_body = re.sub(r"^#+\s*Security review triggers[^\n]*\n", "", trig_sec, flags=re.I).strip()
+        trig_body_clean = re.sub(r"<!--[\s\S]*?-->", "", trig_body).strip()
+        if not re.match(r"(?i)^(none\b|n/a\b|not applicable\b|no triggers?\b)", trig_body_clean):
+            table_lines = [l.strip() for l in trig_body_clean.splitlines() if l.strip().startswith("|")]
+            data_rows = []
+            for tl in table_lines:
+                if re.search(r"^[|\s-]+$", tl) or re.search(r"Story\s*ID", tl, re.I):
+                    continue
+                data_rows.append(tl)
+            if not data_rows:
+                errors.append(f"FAIL: {manifest}: section 'Security review triggers' must be 'none' or contain a table with | Story ID | Trigger | Reason |")
+            for dr in data_rows:
+                cells = [c.strip() for c in dr.split("|")[1:-1]]
+                if len(cells) < 3:
+                    errors.append(f"FAIL: {manifest}: Security review trigger row must have | Story ID | Trigger | Reason |: {dr}")
+                    continue
+                tsid, ttrig, treason = cells[0], cells[1], cells[2]
+                if not tsid or tsid not in all_ids:
+                    errors.append(f"FAIL: {manifest}: Security review trigger references unknown story ID '{tsid}'")
+                if not ttrig or re.match(r"(?i)^(none|n/a|-|—)$", ttrig):
+                    errors.append(f"FAIL: {manifest}: story {tsid} has empty or invalid security review trigger '{ttrig}'")
+                if not treason or len(treason) < 4 or re.search(r"<[^>]+>|\[[^\]]+\]", treason):
+                    errors.append(f"FAIL: {manifest}: story {tsid} security review trigger needs a non-empty reason")
+
+    # 2. Check plan.md when present beside manifests
+    plan_file = os.path.join(manifest_dir, "plan.md")
+    if os.path.isfile(plan_file):
+        try:
+            with open(plan_file, "r", encoding="utf-8") as pf:
+                plan_content = pf.read()
+        except Exception as exc:
+            errors.append(f"FAIL: cannot read {plan_file}: {exc}")
+            plan_content = ""
+        if plan_content:
+            mermaid_blocks = re.findall(r"```mermaid\s*\n([\s\S]*?)```", plan_content)
+            if not mermaid_blocks:
+                errors.append(f"FAIL: {plan_file} has no ```mermaid flowchart block")
+            else:
+                all_mermaid_text = "\n".join(mermaid_blocks)
+                for line in target_lines:
+                    parts = line.split("^")
+                    sid = parts[0].strip()
+                    if not sid or sid.startswith("<"):
+                        continue
+                    sid_clean = sid.replace("-", "")
+                    if not re.search(rf"\b(?:{re.escape(sid_clean)}|{re.escape(sid)})\b", all_mermaid_text):
+                        errors.append(f"FAIL: {plan_file} missing story node {sid}")
+                    dep = parts[2].strip() if len(parts) > 2 else ""
+                    for d in [x.strip() for x in re.split(r'[,;\s]+', dep) if x.strip()]:
+                        if d in {"-", "—", "None", "none"}:
+                            continue
+                        if re.match(r"^[A-Za-z0-9]+-[A-Za-z0-9]+$", d):
+                            d_clean = d.replace("-", "")
+                            edge_found = False
+                            edge_pat = re.compile(
+                                rf"\b(?:{re.escape(d_clean)}|{re.escape(d)})\b\s*(?:\[[^\]]*\])?\s*"
+                                rf"(?:-->|-\.->|==>|-(?:-[.-]+)?-?>|--\s*\|[^|]*\|\s*->|-->\s*\|[^|]*\|\s*|--\s*[^-\n]+\s*-->)\s*"
+                                rf"(?:\[[^\]]*\])?\s*\b(?:{re.escape(sid_clean)}|{re.escape(sid)})\b"
+                            )
+                            for block in mermaid_blocks:
+                                if edge_pat.search(block):
+                                    edge_found = True
+                                    break
+                            if not edge_found:
+                                errors.append(f"FAIL: {plan_file} missing dependency edge {d} -> {sid}")
+
+    # 3. Check System Design Traceability (context-map, nfr-slo, ops-readiness)
+    is_p0a_only = (all_ids == {"P0-A"})
+    if not is_p0a_only:
+        candidate_dirs = [
+            os.path.join(manifest_dir, "..", "design", "system"),
+            os.path.join(os.path.dirname(os.path.dirname(manifest_dir)), "docs", "agents-v0", "design", "system"),
+            os.path.join("docs", "agents-v0", "design", "system"),
+        ]
+        system_dir = None
+        for cd in candidate_dirs:
+            if os.path.isdir(cd):
+                system_dir = os.path.abspath(cd)
+                break
+
+        # Extract coverage tokens from all manifests in manifest_dir
+        all_cov_tokens = set()
+        cov_by_story = {}
+        manifest_paths = []
+        if os.path.isdir(manifest_dir):
+            for fname in os.listdir(manifest_dir):
+                if fname.endswith(".md") and not fname.startswith("_") and fname != "plan.md":
+                    manifest_paths.append(os.path.join(manifest_dir, fname))
+        if not manifest_paths:
+            manifest_paths = [manifest]
+
+        for mp in manifest_paths:
+            try:
+                with open(mp, "r", encoding="utf-8") as mfh:
+                    m_text = mfh.read()
+            except Exception:
+                continue
+
+            sec = get_section(m_text, "Stories")
+            if sec:
+                for l in sec.splitlines():
+                    if l.strip().startswith("|") and not re.search(r"^[|\s-]+$", l) and not re.search(r"Story\s*ID", l, re.I):
+                        cells = [c.strip() for c in l.split("|")[1:-1]]
+                        if len(cells) >= 1:
+                            s_id = cells[0]
+                            if len(cells) >= 8 and cells[7]:
+                                toks = [t.strip() for t in re.split(r'[,;]+', cells[7]) if t.strip() and t.strip() not in {"-", "—"}]
+                                all_cov_tokens.update(toks)
+                                cov_by_story.setdefault(s_id, set()).update(toks)
+                            if len(cells) >= 2:
+                                m_cov = re.search(r"(?i)\bcovers\s*:\s*([^|)\n]+)", cells[1])
+                                if m_cov:
+                                    toks = [t.strip() for t in re.split(r'[,;]+', m_cov.group(1)) if t.strip() and t.strip() not in {"-", "—"}]
+                                    all_cov_tokens.update(toks)
+                                    cov_by_story.setdefault(s_id, set()).update(toks)
+
+            t_sec = get_section(m_text, "Traceability") or get_section(m_text, "Coverage")
+            if t_sec:
+                for l in t_sec.splitlines():
+                    if l.strip().startswith("|") and not re.search(r"^[|\s-]+$", l) and not re.search(r"Story\s*ID", l, re.I):
+                        cells = [c.strip() for c in l.split("|")[1:-1]]
+                        if len(cells) >= 2:
+                            s_id, c_cov = cells[0], cells[1]
+                            toks = [t.strip() for t in re.split(r'[,;]+', c_cov) if t.strip() and t.strip() not in {"-", "—"}]
+                            all_cov_tokens.update(toks)
+                            cov_by_story.setdefault(s_id, set()).update(toks)
+                    elif l.strip().startswith("-"):
+                        m_b = re.match(r"^\s*-\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$", l)
+                        if m_b:
+                            s_id, c_cov = m_b.group(1), m_b.group(2)
+                            toks = [t.strip() for t in re.split(r'[,;]+', c_cov) if t.strip() and t.strip() not in {"-", "—"}]
+                            all_cov_tokens.update(toks)
+                            cov_by_story.setdefault(s_id, set()).update(toks)
+
+        if system_dir:
+            # A. Context map check
+            cmap_path = os.path.join(system_dir, "context-map.md")
+            if os.path.isfile(cmap_path):
+                try:
+                    with open(cmap_path, "r", encoding="utf-8") as cmf:
+                        cmap_text = cmf.read()
+                except Exception:
+                    cmap_text = ""
+                ctx_sec = get_section(cmap_text, "Bounded contexts")
+                if ctx_sec:
+                    ctx_rows = [l.strip() for l in ctx_sec.splitlines() if l.strip().startswith("|")]
+                    contexts = {}
+                    for cr in ctx_rows:
+                        if re.search(r"^[|\s-]+$", cr) or re.search(r"^\s*\|\s*Context\s*\|", cr, re.I):
+                            continue
+                        cells = [c.strip() for c in cr.split("|")[1:-1]]
+                        if len(cells) >= 3:
+                            cname, cinteg = cells[0], cells[2]
+                            if not cname or cname in {"-", "—"} or re.search(r"<[^>]+>|\[[^\]]+\]", cname):
+                                continue
+                            contexts[cname] = cinteg
+                    if contexts:
+                        # Stopwords list for first-word alias eligibility
+                        STOPWORDS = {
+                            "a", "about", "above", "after", "again", "against", "all", "also", "am", "an", "and",
+                            "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
+                            "below", "between", "both", "but", "by", "can", "can't", "cannot", "could",
+                            "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down",
+                            "during", "each", "few", "for", "from", "further", "had", "hadn't", "has",
+                            "hasn't", "have", "haven't", "having", "he", "her", "here", "hers", "herself",
+                            "him", "himself", "his", "how", "i", "if", "in", "into", "is", "isn't", "it",
+                            "its", "itself", "more", "most", "must", "mustn't", "my", "myself", "no", "nor",
+                            "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours",
+                            "ourselves", "out", "over", "own", "same", "shan't", "she", "should", "shouldn't",
+                            "so", "some", "such", "than", "that", "the", "their", "theirs", "them",
+                            "themselves", "then", "there", "these", "they", "this", "those", "through",
+                            "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "were",
+                            "weren't", "what", "when", "where", "which", "while", "who", "whom", "why",
+                            "with", "won't", "would", "wouldn't", "you", "your", "yours", "yourself",
+                            "yourselves"
+                        }
+                        alias_by_context = {}
+                        candidates = {}
+                        for cname in contexts:
+                            words = cname.strip().split()
+                            if len(words) > 1:
+                                first_word = words[0]
+                                if len(first_word) >= 4 and first_word.lower() not in STOPWORDS:
+                                    candidates[cname] = first_word
+
+                        for cname, cand in candidates.items():
+                            cand_l = cand.lower()
+                            collides_full = any(cand_l == other.strip().lower() for other in contexts)
+                            cand_count = sum(1 for other_cand in candidates.values() if other_cand.lower() == cand_l)
+                            collides_word = any(
+                                other != cname and re.search(rf"\b{re.escape(cand)}\b", other, re.I)
+                                for other in contexts
+                            )
+                            if not collides_full and cand_count == 1 and not collides_word:
+                                alias_by_context[cname] = cand
+
+                        calling_pairs = set()
+                        for cname, cinteg in contexts.items():
+                            clean_integ = re.sub(r"`+[^`]*`+", " ", cinteg)
+
+                            search_terms = []
+                            for other in contexts:
+                                search_terms.append((other, other, True))
+                                if other in alias_by_context:
+                                    search_terms.append((alias_by_context[other], other, False))
+
+                            search_terms.sort(key=lambda x: (len(x[0]), 1 if x[2] else 0), reverse=True)
+
+                            remaining = clean_integ
+                            for term, target_ctx, _ in search_terms:
+                                pat = re.compile(rf"\b{re.escape(term)}\b", re.I)
+                                if pat.search(remaining):
+                                    if target_ctx != cname:
+                                        calling_pairs.add(tuple(sorted([cname, target_ctx])))
+                                    remaining = pat.sub(lambda m: " " * len(m.group(0)), remaining)
+
+                        def token_covers_pair(tok, names1, names2):
+                            t = re.sub(r'(?i)^context:\s*', '', tok).strip().lower()
+                            for sep in ["<->", "<>", ":"]:
+                                if sep in t:
+                                    parts = [p.strip() for p in t.split(sep, 1)]
+                                    if len(parts) == 2:
+                                        a, b = parts[0], parts[1]
+                                        if (a in names1 and b in names2) or (a in names2 and b in names1):
+                                            return True
+                            for n1 in names1:
+                                for n2 in names2:
+                                    pat = rf"^(?:{re.escape(n1)}\s*-\s*{re.escape(n2)}|{re.escape(n2)}\s*-\s*{re.escape(n1)})$"
+                                    if re.match(pat, t):
+                                        return True
+                            return False
+
+                        for p1, p2 in sorted(calling_pairs):
+                            p1_names = {p1.lower()}
+                            if p1 in alias_by_context:
+                                p1_names.add(alias_by_context[p1].lower())
+                            p2_names = {p2.lower()}
+                            if p2 in alias_by_context:
+                                p2_names.add(alias_by_context[p2].lower())
+
+                            covered = False
+                            for tok in all_cov_tokens:
+                                if token_covers_pair(tok, p1_names, p2_names):
+                                    covered = True
+                                    break
+                            if not covered:
+                                for sid, s_toks in cov_by_story.items():
+                                    s_toks_clean = {
+                                        re.sub(r'(?i)^context:\s*', '', t).strip().lower()
+                                        for t in s_toks
+                                    }
+                                    if (s_toks_clean & p1_names) and (s_toks_clean & p2_names):
+                                        covered = True
+                                        break
+                            if not covered:
+                                errors.append(f"FAIL: context-map integration pair '{p1} <-> {p2}' is not covered by any integration story")
+
+            # B. NFR / SLO check
+            nfr_path = os.path.join(system_dir, "nfr-slo.md")
+            if os.path.isfile(nfr_path):
+                try:
+                    with open(nfr_path, "r", encoding="utf-8") as nfrf:
+                        nfr_text = nfrf.read()
+                except Exception:
+                    nfr_text = ""
+                filled_nfr_rows = []
+                in_surface_table = False
+                for l in nfr_text.splitlines():
+                    l_str = l.strip()
+                    if not l_str.startswith("|"):
+                        in_surface_table = False
+                        continue
+                    if re.search(r"^[|\s-]+$", l_str):
+                        continue
+                    cells = [c.strip() for c in l_str.split("|")[1:-1]]
+                    if not cells:
+                        continue
+                    if cells[0].lower() == "surface":
+                        in_surface_table = True
+                        continue
+                    if not in_surface_table:
+                        continue
+                    if len(cells) >= 2:
+                        name = cells[0]
+                        if not name or name in {"-", "—"} or re.search(r"<[^>]+>|\[[^\]]+\]", name):
+                            continue
+                        rest = "".join(cells[1:]).strip()
+                        if rest and not re.search(r"<[^>]+>|\[[^\]]+\]", rest) and rest not in {"-", "—"}:
+                            filled_nfr_rows.append(name)
+
+                if filled_nfr_rows:
+                    cov_tokens_clean = {
+                        re.sub(r'(?i)^nfr:\s*', '', t).strip().lower()
+                        for t in all_cov_tokens
+                    }
+                    for nfr_name in filled_nfr_rows:
+                        if nfr_name.lower() not in cov_tokens_clean:
+                            errors.append(f"FAIL: filled NFR/SLO row '{nfr_name}' is not covered by any hardening story")
+
+            # C. Ops readiness check
+            ops_path = os.path.join(system_dir, "ops-readiness.md")
+            if os.path.isfile(ops_path):
+                try:
+                    with open(ops_path, "r", encoding="utf-8") as opsf:
+                        ops_text = opsf.read()
+                except Exception:
+                    ops_text = ""
+
+                is_substantive = False
+                m_team = re.search(r"\|\s*Owning team\s*\|\s*([^|\n]+)\|", ops_text, re.I)
+                if m_team and m_team.group(1).strip() and not m_team.group(1).strip().startswith("<"):
+                    is_substantive = True
+                else:
+                    eb_sec = get_section(ops_text, "Error budget policy")
+                    if eb_sec:
+                        eb_body = re.sub(r"<!--[\s\S]*?-->", "", eb_sec).strip()
+                        if len(eb_body.splitlines()) > 1:
+                            is_substantive = True
+
+                if is_substantive:
+                    chk_sec = get_section(ops_text, "Production readiness checklist")
+                    if chk_sec:
+                        chk_items = []
+                        item_idx = 1
+                        for l in chk_sec.splitlines():
+                            m_box = re.match(r"^\s*-\s*\[[ xX]\]\s*(.+)$", l)
+                            if m_box:
+                                body = m_box.group(1).strip()
+                                m_id = re.match(r"^`?(ops-[0-9]+)`?", body, re.I)
+                                item_id = m_id.group(1).lower() if m_id else f"ops-{item_idx}"
+                                chk_items.append((item_id, item_idx))
+                                item_idx += 1
+
+                        cov_tokens_clean = {t.lower().replace("ops:", "ops-").strip() for t in all_cov_tokens}
+                        for item_id, item_idx in chk_items:
+                            if item_id not in cov_tokens_clean and f"ops-{item_idx}" not in cov_tokens_clean and str(item_idx) not in cov_tokens_clean:
+                                errors.append(f"FAIL: ops-readiness checklist item '{item_id}' is not covered by any release-readiness story")
 
 if errors:
     for e in errors:

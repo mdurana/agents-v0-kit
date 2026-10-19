@@ -47,10 +47,29 @@
 >   build-approved story fails `.agents-v0/ci/check-milestone.sh` until each story it names has a
 >   `verify` approval. Bare milestone labels (`P1`) are rejected at `plan` time; use `—` when a
 >   story has no dependency. `/v0-plan` writes these rows (`program-planning` skill).
+> - Optional 8th column `Covers` or a `## Traceability` section maps stories to covered
+>   system items: context pairs (`context:<ContextA><-><ContextB>`), filled NFR/SLO rows
+>   (`nfr:<row>`), or ops-readiness checklist items (`ops-1`..`ops-10`).
+> - Security-review triggers (`security-baseline.mdc` §11) are recorded in `## Security review triggers`
+>   with columns `| Story ID | Trigger | Reason |`, or `none`. Do not add an ad-hoc triggers column to Stories.
 > - Rows with placeholder paths (`<...>`) or no path are skipped — a milestone go/no-go
 >   passes only when every story row has a concrete, approved artifact.
 > - Hardening/readiness milestones: run `/v0-verify` once more with this manifest's linked
 >   changes as the integrated scope before the milestone approval.
+
+## Security review triggers
+
+<!-- Security review triggers: auth, upload, RBAC, public route (security-baseline.mdc §11). Mark stories that hit a trigger (| Story ID | Trigger | Reason |), or "none". -->
+
+none
+
+## Traceability
+
+<!-- Optional when not using an 8th "Covers" column in Stories. Map stories to covered items: context pairs (context:A<->B), NFR rows (nfr:<row>), ops-readiness checklist boxes (ops-1..ops-10). -->
+
+| Story ID | Covers |
+|----------|--------|
+| <story-id> | — |
 
 ## Delivery approvals
 

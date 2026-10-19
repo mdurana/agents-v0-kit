@@ -544,8 +544,436 @@ cat > "$d/docs/agents-v0/milestones/cycle.md" <<'EOF'
 | C-A | As a user, I want c1, so that c2. | docs/agents-v0/requirements/ca.md | planned | C-B | backend | 2 |
 | C-B | As a user, I want c3, so that c4. | docs/agents-v0/requirements/cb.md | planned | C-A | backend | 2 |
 EOF
-expect_fail "check-milestone detects dependency cycle and fails" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/cycle.md plan
-rm -f "$d/docs/agents-v0/milestones/cycle.md"
+# Plan gate: plan.md validation
+d_plan="$tmp/plan-diagram"
+mkdir -p "$d_plan/docs/agents-v0/milestones" "$d_plan/docs/agents-v0/requirements"
+cat > "$d_plan/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 |
+| P2-B | As a user, I want c, so that d. | docs/agents-v0/requirements/p2-b.md | planned | P2-A | backend | 3 |
+EOF
+
+cat > "$d_plan/docs/agents-v0/milestones/plan.md" <<'EOF'
+# Plan
+
+```mermaid
+flowchart TD
+  P2A[P2-A] --> P2B[P2-B]
+```
+EOF
+expect_pass "plan gate accepts plan.md with matching nodes and arrows" "$d_plan" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Missing node in plan.md
+cat > "$d_plan/docs/agents-v0/milestones/plan.md" <<'EOF'
+# Plan
+
+```mermaid
+flowchart TD
+  P2A[P2-A]
+```
+EOF
+expect_fail "plan gate rejects plan.md missing story node P2-B" "$d_plan" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Missing arrow in plan.md
+cat > "$d_plan/docs/agents-v0/milestones/plan.md" <<'EOF'
+# Plan
+
+```mermaid
+flowchart TD
+  P2A[P2-A]
+  P2B[P2-B]
+```
+EOF
+expect_fail "plan gate rejects plan.md missing dependency edge P2-A -> P2-B" "$d_plan" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Multiple flowchart blocks in plan.md with cross-diagram reference nodes
+cat > "$d_plan/docs/agents-v0/milestones/plan.md" <<'EOF'
+# Plan
+
+```mermaid
+flowchart TD
+  P2A[P2-A]
+```
+
+```mermaid
+flowchart TD
+  P2A[P2-A] --> P2B[P2-B]
+```
+EOF
+expect_pass "plan gate accepts plan.md split across multiple flowchart blocks" "$d_plan" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Plan gate: Security review triggers
+d_sec="$tmp/plan-sec"
+mkdir -p "$d_sec/docs/agents-v0/milestones" "$d_sec/docs/agents-v0/requirements"
+cat > "$d_sec/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 |
+
+## Security review triggers
+
+none
+EOF
+expect_pass "plan gate accepts Security review triggers with none" "$d_sec" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+cat > "$d_sec/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 |
+
+## Security review triggers
+
+| Story ID | Trigger | Reason |
+|----------|---------|--------|
+| P2-A | auth | Authentication and session token issuance |
+EOF
+expect_pass "plan gate accepts valid Security review triggers table" "$d_sec" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Unknown story ID in Security review triggers
+cat > "$d_sec/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 |
+
+## Security review triggers
+
+| Story ID | Trigger | Reason |
+|----------|---------|--------|
+| P9-X | auth | Unknown story id |
+EOF
+expect_fail "plan gate rejects Security review triggers referencing unknown story ID" "$d_sec" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Empty or short reason in Security review triggers
+cat > "$d_sec/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 |
+
+## Security review triggers
+
+| Story ID | Trigger | Reason |
+|----------|---------|--------|
+| P2-A | auth | |
+EOF
+expect_fail "plan gate rejects Security review triggers with empty reason" "$d_sec" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Ad-hoc extra column in Stories table
+cat > "$d_sec/docs/agents-v0/milestones/p2.md" <<'EOF'
+# Milestone: P2
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Security Trigger | Notes |
+|----------|-----------|------------------|--------|------------|---------|------|------------------|-------|
+| P2-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p2-a.md | planned | — | backend | 2 | auth | user auth |
+EOF
+expect_fail "plan gate rejects unexpected extra columns in Stories table" "$d_sec" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p2.md plan
+
+# Plan gate: Traceability (context-map, nfr-slo, ops-readiness)
+d_trace="$tmp/plan-trace"
+mkdir -p "$d_trace/docs/agents-v0/milestones" "$d_trace/docs/agents-v0/requirements" "$d_trace/docs/agents-v0/design/system"
+
+# Base valid manifests
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | context:Orders<->Payments |
+EOF
+
+cat > "$d_trace/docs/agents-v0/milestones/p4.md" <<'EOF'
+# Milestone: P4
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P4-A | As an operator, I want latency within SLO, so that traffic passes. | docs/agents-v0/requirements/p4-a.md | planned | P1-A | backend | 4 | nfr:api |
+EOF
+
+cat > "$d_trace/docs/agents-v0/milestones/p5.md" <<'EOF'
+# Milestone: P5
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P5-A | As an operator, I want readiness verified, so that deploy is safe. | docs/agents-v0/requirements/p5-a.md | planned | P4-A | backend | 4 |
+
+## Traceability
+
+| Story ID | Covers |
+|----------|--------|
+| P5-A | ops-1, ops-2, ops-3, ops-4, ops-5, ops-6, ops-7, ops-8, ops-9, ops-10 |
+EOF
+
+# context-map with Orders calling Payments
+cat > "$d_trace/docs/agents-v0/design/system/context-map.md" <<'EOF'
+# Context map
+
+## Bounded contexts
+
+| Context | Responsibility | Integrations | Service root | Contract | Sequence diagram | Component plan | Status |
+|---------|----------------|--------------|--------------|----------|------------------|----------------|--------|
+| Orders | Orders management | Payments | . | openapi/orders.yaml | seq.md | comp.md | active |
+| Payments | Payment processing | — | . | openapi/payments.yaml | seq.md | comp.md | active |
+EOF
+
+# nfr-slo with filled row 'api'
+cat > "$d_trace/docs/agents-v0/design/system/nfr-slo.md" <<'EOF'
+# NFR / SLO budget
+
+| Surface | Latency (p95) | Availability | Notes |
+|---------|---------------|--------------|-------|
+| api | 200ms | 99.9% | critical |
+EOF
+
+# ops-readiness with filled ownership and 10 items
+cat > "$d_trace/docs/agents-v0/design/system/ops-readiness.md" <<'EOF'
+# Operations readiness
+
+## Build and run ownership
+
+| Item | Value |
+|------|-------|
+| Owning team | SRE Core |
+
+## Error budget policy
+
+Budget policy details.
+
+## Production readiness checklist
+
+- [ ] `ops-1` On-call rotation and escalation path are defined.
+- [ ] `ops-2` SLOs and error budgets are measurable.
+- [ ] `ops-3` Dashboards and SLO-based alerts exist.
+- [ ] `ops-4` Health checks work.
+- [ ] `ops-5` Rollback tested.
+- [ ] `ops-6` Resilience tested.
+- [ ] `ops-7` Trace IDs cross boundaries.
+- [ ] `ops-8` Capacity baseline.
+- [ ] `ops-9` Backup restore tested.
+- [ ] `ops-10` CI security scan.
+EOF
+
+expect_pass "plan gate passes when context pair, NFR row, and ops-readiness are covered" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+
+# Missing context pair coverage fails
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | — |
+EOF
+expect_fail "plan gate rejects missing integration story coverage for context pair Orders <-> Payments" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+# Restore p1.md
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | context:Orders<->Payments |
+EOF
+
+# Missing NFR coverage fails
+cat > "$d_trace/docs/agents-v0/milestones/p4.md" <<'EOF'
+# Milestone: P4
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P4-A | As an operator, I want latency within SLO, so that traffic passes. | docs/agents-v0/requirements/p4-a.md | planned | P1-A | backend | 4 | — |
+EOF
+expect_fail "plan gate rejects uncovered filled NFR row" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p4.md plan
+# Restore p4.md
+cat > "$d_trace/docs/agents-v0/milestones/p4.md" <<'EOF'
+# Milestone: P4
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P4-A | As an operator, I want latency within SLO, so that traffic passes. | docs/agents-v0/requirements/p4-a.md | planned | P1-A | backend | 4 | nfr:api |
+EOF
+
+# Missing ops-readiness item coverage fails
+cat > "$d_trace/docs/agents-v0/milestones/p5.md" <<'EOF'
+# Milestone: P5
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P5-A | As an operator, I want readiness verified, so that deploy is safe. | docs/agents-v0/requirements/p5-a.md | planned | P4-A | backend | 4 |
+
+## Traceability
+
+| Story ID | Covers |
+|----------|--------|
+| P5-A | ops-1, ops-2, ops-3, ops-4, ops-5, ops-6, ops-7, ops-8, ops-9 |
+EOF
+expect_fail "plan gate rejects uncovered ops-readiness checklist item ops-10" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p5.md plan
+# Restore p5.md
+cat > "$d_trace/docs/agents-v0/milestones/p5.md" <<'EOF'
+# Milestone: P5
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P5-A | As an operator, I want readiness verified, so that deploy is safe. | docs/agents-v0/requirements/p5-a.md | planned | P4-A | backend | 4 |
+
+## Traceability
+
+| Story ID | Covers |
+|----------|--------|
+| P5-A | ops-1, ops-2, ops-3, ops-4, ops-5, ops-6, ops-7, ops-8, ops-9, ops-10 |
+EOF
+
+# Multi-word context names detected via full name
+cat > "$d_trace/docs/agents-v0/design/system/context-map.md" <<'EOF'
+# Context map
+
+## Bounded contexts
+
+| Context | Responsibility | Integrations | Service root | Contract | Sequence diagram | Component plan | Status |
+|---------|----------------|--------------|--------------|----------|------------------|----------------|--------|
+| Order processing | Orders | Payment gateway | . | openapi/orders.yaml | seq.md | comp.md | active |
+| Payment gateway | Payments | — | . | openapi/payments.yaml | seq.md | comp.md | active |
+EOF
+
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | context:Order processing <-> Payment gateway |
+EOF
+expect_pass "plan gate detects multi-word context names and accepts full name coverage" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | — |
+EOF
+expect_fail "plan gate rejects uncovered multi-word context pair" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+
+# Alias detection for multi-word context names
+cat > "$d_trace/docs/agents-v0/design/system/context-map.md" <<'EOF'
+# Context map
+
+## Bounded contexts
+
+| Context | Responsibility | Integrations | Service root | Contract | Sequence diagram | Component plan | Status |
+|---------|----------------|--------------|--------------|----------|------------------|----------------|--------|
+| Order processing | Orders | Calls Payment for processing | . | openapi/orders.yaml | seq.md | comp.md | active |
+| Payment gateway | Payments | — | . | openapi/payments.yaml | seq.md | comp.md | active |
+EOF
+
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | context:Order <-> Payment |
+EOF
+expect_pass "plan gate detects target via first-word alias and accepts alias coverage" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+
+# Single-word context name appearing inside backtick code span is NOT a pair
+cat > "$d_trace/docs/agents-v0/design/system/context-map.md" <<'EOF'
+# Context map
+
+## Bounded contexts
+
+| Context | Responsibility | Integrations | Service root | Contract | Sequence diagram | Component plan | Status |
+|---------|----------------|--------------|--------------|----------|------------------|----------------|--------|
+| Orders | Orders | Uses database table `reference` and `reference_row` | . | openapi/orders.yaml | seq.md | comp.md | active |
+| reference | Reference | — | . | openapi/ref.yaml | seq.md | comp.md | active |
+EOF
+
+cat > "$d_trace/docs/agents-v0/milestones/p1.md" <<'EOF'
+# Milestone: P1
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size | Covers |
+|----------|-----------|------------------|--------|------------|---------|------|--------|
+| P1-A | As a user, I want a, so that b. | docs/agents-v0/requirements/p1-a.md | planned | — | backend | 2 | — |
+EOF
+expect_pass "plan gate ignores single-word context name inside backtick code spans" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p1.md plan
+
+# Tier / RPO table rows are NOT required as NFR coverage
+cat > "$d_trace/docs/agents-v0/design/system/nfr-slo.md" <<'EOF'
+# NFR / SLO budget
+
+| Surface | Latency (p95) | Availability | Notes |
+|---------|---------------|--------------|-------|
+| api | 200ms | 99.9% | critical |
+
+## RPO / RTO
+
+| Tier | RPO | RTO |
+|------|-----|-----|
+| Relational store, including the audit schema | 15 min | 4 h |
+| Object archive | 1 h | 4 h |
+| Session store | none | 30 min |
+EOF
+expect_pass "plan gate does not require Tier/RPO table rows as NFR coverage" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p4.md plan
+
+cat > "$d_trace/docs/agents-v0/design/system/nfr-slo.md" <<'EOF'
+# NFR / SLO budget
+
+| Surface | Latency (p95) | Availability | Notes |
+|---------|---------------|--------------|-------|
+| api | 200ms | 99.9% | critical |
+| batch | 1h | 99% | nightly |
+
+## RPO / RTO
+
+| Tier | RPO | RTO |
+|------|-----|-----|
+| Relational store, including the audit schema | 15 min | 4 h |
+EOF
+expect_fail "plan gate rejects uncovered row in Surface table" "$d_trace" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/p4.md plan
+
 
 # --- check-milestone.sh SLO waivers -----------------------------------------
 d="$tmp/slo"
