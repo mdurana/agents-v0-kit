@@ -39,7 +39,7 @@
 > - Each linked feature artifact records `Milestone: <Pn-name>`,
 >   `Milestone file: docs/agents-v0/milestones/<this-file>.md`, and `Story: <story-id>`
 >   under its title (`spec-intake` skill) for traceability.
-> - Status is prose (planned / in-flight / done); the machine check is evidence-based:
+> - Status is prose (planned / in-flight / done; local release leaves it unchanged, `/v0-release` sets `done` with the release row); the machine check is evidence-based:
 >   `.agents-v0/ci/check-milestone.sh <manifest> <phase>` requires every concrete story artifact to
 >   exist and record the phase approval — build/verify also require the recorded evidence
 >   paths to exist (`.agents-v0/ci/check-evidence.sh`).

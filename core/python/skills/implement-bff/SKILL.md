@@ -10,16 +10,16 @@ Build phase playbook for the `bff-engineer` when `Pack` is `python`. Do not add 
 
 ## Steps
 1. Read the Design artifacts and the existing BFF. Do not switch framework without an ADR.
-2. **Baseline:** run the full Backend verify command from `docs/agents-v0/project-profile.md` on the BFF root before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop.
+2. **Baseline:** run the full Backend verify command from `docs/agents-v0/project-profile.md` on the BFF root (or profile verify root when there is no BFF root) before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop.
 3. Wire pytest so the verify command writes `pytest-report.xml` and `coverage.xml`.
 4. When this BFF owns `docs/agents-v0/design/<feature>/openapi.yaml`, merge that approved draft into the org catalog before service edits (or immediately after `--record-red` when a plan row tests the catalog itself). Stop if that catalog is already modified by another feature.
 5. Write or continue `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`.
 6. Work **red–green (TDD where practical)** per plan row: failing test first, capture the red test report (`sh .agents-v0/ci/check-build-plan.sh <feature> --record-red` before the green run overwrites `pytest-report.xml`), then implement until green (`quality-and-testing.mdc`). Each loop run **must** use `Backend verify (fast, no OWASP)` from the profile. Append a command-result card. The next attempt must not read `build-output.txt`. Before each new attempt run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md`; exit 1 means the phase attempt budget is spent: record `blocked` and stop. The second red result writes `failure-brief.md`. Before attempt three run `sh .agents-v0/scripts/check-failure-brief.sh <feature>`.
-7. Keep the BFF thin: aggregation, UI DTOs, auth/session handoff, safe GET cache, rate limits, unified errors. Domain logic stays in backend services.
+7. Keep the BFF thin: aggregation, UI DTOs, auth/session handoff, safe GET cache, rate limits, unified errors. Domain logic stays in backend services. *Catalog-only / Contract-only stories:* When the approved design specifies that the story is catalog-only / contract-only and forbids handlers (e.g. publishing/merging the OpenAPI contract and schema conformance tests only), do not implement handlers, outbound clients, or session state. Contract tests live at the profile verify root when there is no BFF root and satisfy test requirements; record steps 7–10 as N/A.
 8. Outbound clients use a timeout, retry, and a breaker, and send `X-Correlation-ID` plus service auth.
 9. Authorize the caller before proxying an admin or `{id}` operation.
 10. A security `Depends()` on admin and mutation routes. Logout revokes the token and clears the server session. The access token stays in browser memory. The refresh token is an HttpOnly cookie.
-11. Run the full Backend verify command once, with **bounded fix attempts (≤ 3 per failure)**.
+11. Run the full Backend verify command (on the BFF root or profile verify root) once, with **bounded fix attempts (≤ 3 per failure)**.
 12. Persist `docs/agents-v0/build/<feature>/build-report.md` and `build-output.txt`.
 
 ## Rule-compliance checklist

@@ -19,4 +19,4 @@ Local checkpoint for the `release-manager` agent (`workflow-orchestration.mdc`, 
 ## Do not
 - Call `glab`, push, or write Decision `Approved` on the release row.
 - Merge or approve a merge request.
-- Treat this checkpoint as Release completion. Completion remains the human merge after `/v0-release`.
+- Treat this checkpoint as Release completion. Completion remains the human merge after `/v0-release` (the story's milestone manifest `Status` is not changed here; `/v0-release` sets it to `done`).
