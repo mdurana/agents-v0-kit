@@ -398,6 +398,15 @@ data["activePhase"] = "verify"
 json.dump(data, open(p, "w", encoding="utf-8"), indent=2)
 PY
 expect_fail "check-feature-state rejects activePhase verify when build is Re-opened" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md
+mkdir -p "$d/docs/agents-v0/build/x"
+cat > "$d/docs/agents-v0/requirements/dec-reopen.phase-result.md" <<'EOF'
+phase: build
+status: approved
+EOF
+printf '| Build | docs/agents-v0/build/x/build-report.md | @ada | Approved | 2026-01-04 |\n' >> "$d/docs/agents-v0/requirements/dec-reopen.md"
+(cd "$d" && sh "$SC/sync-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md >/dev/null 2>&1)
+if grep -Eq '"activePhase":\s*""' "$d/docs/agents-v0/requirements/dec-reopen.state.json"; then pass "sync-feature-state: re-approving Build clears activePhase"; else fail "sync-feature-state: re-approving Build clears activePhase"; fi
+expect_pass "check-feature-state accepts cleared activePhase after Build re-approval" "$d" sh "$CI/check-feature-state.sh" docs/agents-v0/requirements/dec-reopen.md
 expect_pass "check-approvals accepts the plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/milestones/m.md plan
 expect_fail "check-approvals rejects a missing plan row" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/a.md plan
 expect_fail "check-milestone fails a build-approved story whose dependency lacks verify" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/m.md intake
@@ -2456,7 +2465,25 @@ expect_fail "check-evidence rejects verify report when HEAD still records active
   git add docs/agents-v0/requirements/p0-a-platform-skeleton.state.json
   git_commit "docs: sync state after verify approval"
 )
-expect_pass "check-evidence passes for verify report stamped on test commit once HEAD clears activePhase" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
+expect_fail "check-evidence rejects verify report when non-doc code changed after build stamp" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
+(
+  cd "$dp0"
+  v_sha="$(grep -Ei '^commit:' docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//')"
+  cat > docs/agents-v0/build/p0-a-platform-skeleton/build-report.md <<EOF
+commit: $v_sha
+EOF
+  git add docs/agents-v0/build/p0-a-platform-skeleton/build-report.md
+  git_commit "docs: re-stamp build-report after re-opened build"
+)
+expect_pass "check-evidence passes for verify report once build-report is re-stamped on code commit" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
+(
+  cd "$dp0"
+  mkdir -p docs
+  printf 'Some docs update\n' >> docs/notes.md
+  git add docs/notes.md
+  git_commit "docs: doc-only update"
+)
+expect_pass "check-evidence passes when only doc files change after build/verify stamps" "$dp0" sh "$CI/check-evidence.sh" docs/agents-v0/requirements/p0-a-platform-skeleton.md verify
 
 cve_dir="$tmp/cve_test"
 mkdir -p "$cve_dir/docs/agents-v0/requirements" "$cve_dir/docs/agents-v0/verify"

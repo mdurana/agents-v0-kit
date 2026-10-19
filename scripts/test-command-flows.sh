@@ -326,6 +326,96 @@ expect_pass "verify: gate.sh verify --approved passes with committed verify repo
 git -C "$r" reset -q --hard HEAD~1
 git -C "$r" checkout -q -- "$ORD"
 
+# build gate: gate.sh build (draft) and gate.sh build --approved enforce plan and evidence
+mkdir -p "$r/docs/agents-v0/build/orders" "$r/docs/agents-v0/design/orders" "$r/src/test"
+cat > "$r/docs/agents-v0/design/orders/design.md" <<'EOF'
+# Design: Orders
+## Authorization
+N/A: no /api/v1 operation
+## Traceability
+AC-1: place the order
+AC-2: reject unsigned
+## Data model
+N/A: no-data-model
+## Failure modes
+AC-2: reject unsigned
+## Observability
+N/A: no-observability
+## Rollout
+N/A: no-rollout
+## Events
+N/A: no event contract
+ADR: N/A: no product decision
+EOF
+cat > "$r/src/test/OrderTest.java" <<'EOF'
+class OrderTest {
+  void testPlaceOrder() {}
+  void testRejectUnsigned() {}
+}
+EOF
+(cd "$r" && git add docs/agents-v0/design/orders/design.md src/test/OrderTest.java && commit "$r" "design and test fixtures")
+
+write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |
+| design | docs/agents-v0/design/orders/design.md | dev | Approved | 2026-01-01 |
+| build | docs/agents-v0/build/orders/build-report.md | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
+
+# (1) draft gate.sh build checks build plan completeness when plan.md exists
+cat > "$r/docs/agents-v0/build/orders/plan.md" <<'EOF'
+| AC | Status | Test |
+|---|---|---|
+| AC-1 | done | OrderTest#testPlaceOrder (no-red: test fixture) |
+EOF
+expect_fail "build: draft gate.sh build fails when plan.md is missing AC rows" "$r" sh .agents-v0/ci/gate.sh build "$ORD"
+
+cat > "$r/docs/agents-v0/build/orders/plan.md" <<'EOF'
+| AC | Status | Test |
+|---|---|---|
+| AC-1 | done | OrderTest#testPlaceOrder (no-red: test fixture) |
+| AC-2 | done | OrderTest#testRejectUnsigned (no-red: test fixture) |
+EOF
+printf 'commit: pending\n' > "$r/docs/agents-v0/build/orders/build-report.md"
+expect_pass "build: draft gate.sh build passes with complete plan and commit pending" "$r" sh .agents-v0/ci/gate.sh build "$ORD"
+
+b_head="$(git -C "$r" rev-parse HEAD)"
+printf 'commit: %s\n' "$b_head" > "$r/docs/agents-v0/build/orders/build-report.md"
+expect_fail "build: gate.sh build --approved fails with untracked build-report" "$r" sh .agents-v0/ci/gate.sh build --approved "$ORD"
+
+# (3) staged build-report.md -> passes
+(cd "$r" && git add docs/agents-v0/build/orders/build-report.md docs/agents-v0/build/orders/plan.md "$ORD")
+expect_pass "build: gate.sh build --approved passes with staged build-report" "$r" sh .agents-v0/ci/gate.sh build --approved "$ORD"
+(cd "$r" && commit "$r" "build complete")
+b_commit="$(git -C "$r" rev-parse HEAD)"
+
+# design draft: gate.sh design requires review.md when an OpenAPI contract draft exists
+touch "$r/docs/agents-v0/design/orders/openapi.yaml"
+expect_fail "design: draft gate.sh design fails when review.md is missing" "$r" sh .agents-v0/ci/gate.sh design "$ORD"
+rm -f "$r/docs/agents-v0/design/orders/openapi.yaml"
+
+# verify gate: non-doc change after build stamp causes gate.sh verify --approved to FAIL
+# Make a non-doc change after build commit
+printf 'public class OrderService {}\n' > "$r/OrderService.java"
+(cd "$r" && git add OrderService.java && commit "$r" "feat: code change after build stamp")
+code_after_sha="$(git -C "$r" rev-parse HEAD)"
+
+mkdir -p "$r/docs/agents-v0/verify/orders"
+printf 'commit: %s\nkit-version: test\nagent: test-engineer\n' "$code_after_sha" > "$r/docs/agents-v0/verify/orders/test-report.md"
+write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |
+| design | docs/agents-v0/design/orders/design.md | dev | Approved | 2026-01-01 |
+| build | docs/agents-v0/build/orders/build-report.md | dev | Approved | 2026-01-01 |
+| verify | docs/agents-v0/verify/orders/test-report.md | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
+expect_fail "verify: gate.sh verify --approved fails when non-doc files changed after build stamp" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
+# Reset non-doc change: doc-only change after build stamp passes
+git -C "$r" reset -q --hard "$b_commit"
+write_story "$r/$ORD" "| intake | $ORD | dev | Approved | 2026-01-01 |
+| design | docs/agents-v0/design/orders/design.md | dev | Approved | 2026-01-01 |
+| build | docs/agents-v0/build/orders/build-report.md | dev | Approved | 2026-01-01 |
+| verify | docs/agents-v0/verify/orders/test-report.md | dev | Approved | 2026-01-01 |" "HTTP 201 and the order row is stored with status PENDING"
+mkdir -p "$r/docs/agents-v0/verify/orders"
+printf 'commit: %s\nkit-version: test\nagent: test-engineer\n' "$b_commit" > "$r/docs/agents-v0/verify/orders/test-report.md"
+(cd "$r" && git add "$ORD" docs/agents-v0/verify/orders/test-report.md && commit "$r" "verify report matching build commit")
+expect_pass "verify: gate.sh verify --approved passes when non-doc files are unchanged since build stamp" "$r" sh .agents-v0/ci/gate.sh verify --approved "$ORD"
+
 # ---------------------------------------------------------------------------------------------
 # gate.sh itself
 # ---------------------------------------------------------------------------------------------

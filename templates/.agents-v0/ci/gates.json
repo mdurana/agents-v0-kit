@@ -175,7 +175,8 @@
         {
           "run": [
             "ci/check-design.sh",
-            "{feature}"
+            "{feature}",
+            "--require-review"
           ],
           "ifExists": "docs/agents-v0/design/{feature}/design.md"
         },
@@ -224,7 +225,8 @@
         {
           "run": [
             "ci/check-design.sh",
-            "{feature}"
+            "{feature}",
+            "--require-review"
           ]
         },
         {
@@ -286,8 +288,48 @@
       "approvalFile": [
         "docs/agents-v0/requirements/*.md"
       ],
-      "draft": [],
+      "draft": [
+        {
+          "run": [
+            "ci/check-build-plan.sh",
+            "{feature}",
+            "--complete"
+          ],
+          "ifExists": "docs/agents-v0/build/{feature}/plan.md"
+        },
+        {
+          "run": [
+            "ci/check-evidence.sh",
+            "--pre-approval",
+            "{artifact}",
+            "build"
+          ]
+        },
+        {
+          "run": [
+            "ci/check-design.sh",
+            "{feature}",
+            "--verify-lock"
+          ],
+          "ifExists": "docs/agents-v0/design/{feature}/design.lock"
+        }
+      ],
       "approved": [
+        {
+          "run": [
+            "ci/check-build-plan.sh",
+            "{feature}",
+            "--complete"
+          ],
+          "ifExists": "docs/agents-v0/build/{feature}/plan.md"
+        },
+        {
+          "run": [
+            "ci/check-evidence.sh",
+            "{artifact}",
+            "build"
+          ]
+        },
         {
           "run": [
             "ci/check-feature-state.sh",
@@ -300,7 +342,22 @@
       "approvalFile": [
         "docs/agents-v0/requirements/*.md"
       ],
-      "draft": [],
+      "draft": [
+        {
+          "run": [
+            "ci/check-cve-report.sh",
+            "{artifact}"
+          ]
+        },
+        {
+          "run": [
+            "ci/check-evidence.sh",
+            "--pre-approval",
+            "{artifact}",
+            "verify"
+          ]
+        }
+      ],
       "approved": [
         {
           "run": [

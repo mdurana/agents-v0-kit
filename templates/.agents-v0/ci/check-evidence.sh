@@ -18,10 +18,16 @@
 
 set -eu
 
+pre_approval=0
+if [ "${1:-}" = "--pre-approval" ]; then
+  pre_approval=1
+  shift
+fi
+
 art="${1:-}"
 phase="${2:-}"
 if [ -z "$art" ] || [ -z "$phase" ]; then
-  printf 'usage: %s <requirements-artifact> <phase> [<path>...]\n' "$0" >&2
+  printf 'usage: %s [--pre-approval] <requirements-artifact> <phase> [<path>...]\n' "$0" >&2
   exit 1
 fi
 case "$phase" in
@@ -57,7 +63,7 @@ if [ -z "$row" ]; then
         exit 1
         ;;
     esac
-  else
+  elif [ "$pre_approval" = "0" ]; then
     printf 'FAIL: no approval row for phase "%s" in %s\n' "$phase" "$art" >&2
     exit 1
   fi
@@ -68,12 +74,31 @@ if [ "$is_p0_unapproved" = "1" ]; then
     build) artifacts="docs/agents-v0/build/p0-a-platform-skeleton/build-report.md" ;;
     verify) artifacts="docs/agents-v0/verify/p0-a-platform-skeleton/test-report.md" ;;
   esac
+elif [ "$pre_approval" = "1" ] && [ -z "$row" ]; then
+  f_slug="$(basename "$art" .md)"
+  case "$phase" in
+    build)
+      artifacts="docs/agents-v0/build/${f_slug}/build-report.md"
+      ;;
+    verify)
+      artifacts="docs/agents-v0/verify/${f_slug}/test-report.md"
+      for extra in "vapt-checklist.md" "review-notes.md" "ux-report.md" "e2e-report.md"; do
+        if [ -f "docs/agents-v0/verify/${f_slug}/$extra" ]; then
+          artifacts="$artifacts docs/agents-v0/verify/${f_slug}/$extra"
+        fi
+      done
+      ;;
+    *)
+      artifacts=""
+      ;;
+  esac
 else
   artifacts="$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3}')"
 fi
 
 missing=0
 checked=0
+build_staleness_checked=0
 
 default_stale_base="${VERIFY_STALE_BASE:-HEAD}"
 if [ -z "${VERIFY_STALE_BASE:-}" ] && [ "${VERIFY_STALE:-1}" != "0" ] && command -v git >/dev/null 2>&1 && git cat-file -e "HEAD^{commit}" 2>/dev/null; then
@@ -131,7 +156,9 @@ check_path() {
       has_git_head=1
     fi
     if [ "$has_git_head" = "1" ]; then
-      if [ "${CHECK_EVIDENCE_STAGED:-}" = "staged" ]; then
+      if [ "$pre_approval" = "1" ]; then
+        : # In pre-approval mode, report does not need to be staged or committed yet
+      elif [ "${CHECK_EVIDENCE_STAGED:-}" = "staged" ]; then
         if ! git cat-file -e "${stale_base}:${p}" 2>/dev/null && ! git cat-file -e ":${p}" 2>/dev/null; then
           printf 'FAIL: recorded evidence %s is neither staged nor committed in %s (untracked on disk) — stage or commit the report without changing its commit: line\n' "$p" "$stale_base" >&2
           missing=1
@@ -151,65 +178,107 @@ check_path() {
     fi
     case "$p" in
       */build-report.md|*/test-report.md|*/vapt-checklist.md|*/review-notes.md|*/ux-report.md|*/e2e-report.md|docs/agents-v0/onboarding/report.md)
-        if ! grep -Eqi '^commit:[[:space:]]*[0-9a-f]{7,40}' "$p" 2>/dev/null; then
-          printf 'FAIL: report missing commit: line (workflow-orchestration.mdc): %s\n' "$p" >&2
-          missing=1
-        fi
-        if [ "$has_git_head" = "1" ]; then
-          rep_commit="$(grep -Ei '^commit:' "$p" 2>/dev/null | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//')"
-          if [ -n "$rep_commit" ]; then
-            if ! git cat-file -e "${rep_commit}^{commit}" 2>/dev/null; then
-              printf 'FAIL: commit: %s in %s is not a commit in git\n' "$rep_commit" "$p" >&2
-              missing=1
-            elif ! git merge-base --is-ancestor "$rep_commit" "$stale_base" 2>/dev/null; then
-              printf 'FAIL: commit: %s in %s is not an ancestor of %s\n' "$rep_commit" "$p" "$stale_base" >&2
-              missing=1
-            else
-              stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|\.(agents-v0|cursor|gitlab|github)/|\.(gitlab-ci\.yml|agents-kit-version)$|.*\.(md|mdc|txt|adoc)$)' || true)"
-              if [ -n "$stale" ]; then
-                case "$phase" in
-                  verify)
-                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-verify; set an Approved Verify row to Re-opened, then stamp %s on the new SHA\n' "$rep_commit" "$p" >&2
-                    ;;
-                  build)
-                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-build before using %s\n' "$rep_commit" "$p" >&2
-                    ;;
-                  *)
-                    printf 'FAIL: non-doc files changed since evidence commit %s — re-run that phase before using %s\n' "$rep_commit" "$p" >&2
-                    ;;
-                esac
+        if [ "$pre_approval" = "1" ] && [ "$phase" = "build" ]; then
+          : # pre-approval build accepts commit: pending or missing SHA; just require that build-report.md exists (-e checked above)
+        else
+          if ! grep -Eqi '^commit:[[:space:]]*[0-9a-f]{7,40}' "$p" 2>/dev/null; then
+            printf 'FAIL: report missing commit: line (workflow-orchestration.mdc): %s\n' "$p" >&2
+            missing=1
+          fi
+          if [ "$has_git_head" = "1" ]; then
+            rep_commit="$(grep -Ei '^commit:' "$p" 2>/dev/null | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//')"
+            if [ -n "$rep_commit" ]; then
+              if ! git cat-file -e "${rep_commit}^{commit}" 2>/dev/null; then
+                printf 'FAIL: commit: %s in %s is not a commit in git\n' "$rep_commit" "$p" >&2
                 missing=1
-              fi
-              art_state="${art%.md}.state.json"
-              case "$art" in
-                docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) art_state="docs/agents-v0/onboarding/state.json" ;;
-                docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) art_state="$(dirname "$art")/state.json" ;;
-              esac
-              state_check_ref="$stale_base"
-              if [ "$phase" = "build" ]; then
-                state_check_ref="$rep_commit"
-              fi
-              rep_state=""
-              if [ -n "${CHECK_EVIDENCE_STAGED:-}" ]; then
-                if [ -f "$art_state" ]; then
-                  rep_state="$(cat "$art_state" 2>/dev/null || true)"
-                elif git cat-file -e ":${art_state}" 2>/dev/null; then
-                  rep_state="$(git show ":${art_state}" 2>/dev/null || true)"
-                fi
-              elif git cat-file -e "${state_check_ref}:${art_state}" 2>/dev/null; then
-                rep_state="$(git show "${state_check_ref}:${art_state}" 2>/dev/null || true)"
-              fi
-              if [ -n "$rep_state" ]; then
-                if printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activePhase"[[:space:]]*:[[:space:]]*"'"$phase"'"' \
-                  && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activeStatus"[[:space:]]*:[[:space:]]*"(in_progress|awaiting_approval)"'; then
-                  printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$state_check_ref" "$p" "$art_state" "$phase" >&2
+              elif ! git merge-base --is-ancestor "$rep_commit" "$stale_base" 2>/dev/null; then
+                printf 'FAIL: commit: %s in %s is not an ancestor of %s\n' "$rep_commit" "$p" "$stale_base" >&2
+                missing=1
+              else
+                stale="$(git diff --name-only "$rep_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|\.(agents-v0|cursor|gitlab|github)/|\.(gitlab-ci\.yml|agents-kit-version)$|.*\.(md|mdc|txt|adoc)$)' || true)"
+                if [ -n "$stale" ]; then
+                  case "$phase" in
+                    verify)
+                      printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-verify; set an Approved Verify row to Re-opened, then stamp %s on the new SHA\n' "$rep_commit" "$p" >&2
+                      ;;
+                    build)
+                      printf 'FAIL: non-doc files changed since evidence commit %s — re-run /v0-build before using %s\n' "$rep_commit" "$p" >&2
+                      ;;
+                    *)
+                      printf 'FAIL: non-doc files changed since evidence commit %s — re-run that phase before using %s\n' "$rep_commit" "$p" >&2
+                      ;;
+                  esac
                   missing=1
                 fi
-                if [ "$phase" = "build" ] && [ "$is_p0_unapproved" = "0" ] && [ -z "$(printf '%s' "$section" | grep -i '|[[:space:]]*release[[:space:]]*|' || true)" ]; then
-                  rep_art="$(git show "${rep_commit}:${art}" 2>/dev/null || true)"
-                  if ! printf '%s\n' "$rep_art" | grep -Eqi '\|[[:space:]]*build[[:space:]]*\|.*\|[[:space:]]*(approved|approve|yes|pass)([^a-z]|$)'; then
-                    printf 'FAIL: commit: %s in %s does not contain the Approved build row in %s — record the Build approval before committing the stamped tree\n' "$rep_commit" "$p" "$art" >&2
+                if [ "$phase" = "verify" ] && [ "$build_staleness_checked" = "0" ]; then
+                  build_staleness_checked=1
+                  b_rep=""
+                  case "$art" in
+                    docs/agents-v0/requirements/*.md)
+                      f_slug="$(basename "$art" .md)"
+                      if [ "$f_slug" = "p0-a-platform-skeleton" ]; then
+                        b_rep="docs/agents-v0/build/p0-a-platform-skeleton/build-report.md"
+                      else
+                        b_row="$(printf '%s' "$section" | grep -i '|[[:space:]]*build[[:space:]]*|' | tail -n1 || true)"
+                        if [ -n "$b_row" ]; then
+                          b_arts="$(printf '%s' "$b_row" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3}')"
+                          for bp in $(printf '%s' "$b_arts" | tr -d '`' | tr ',;:' '\n\n\n'); do
+                            case "$bp" in
+                              */build-report.md) b_rep="$bp"; break ;;
+                            esac
+                          done
+                        fi
+                        if [ -z "$b_rep" ] || [ ! -f "$b_rep" ]; then
+                          b_rep="docs/agents-v0/build/${f_slug}/build-report.md"
+                        fi
+                      fi
+                      ;;
+                  esac
+                  if [ -n "$b_rep" ] && [ -f "$b_rep" ]; then
+                    b_commit="$(grep -Ei '^commit:' "$b_rep" 2>/dev/null | head -n1 | sed 's/^[^:]*:[[:space:]]*//;s/[[:space:]].*//' || true)"
+                    if [ -n "$b_commit" ] && git cat-file -e "${b_commit}^{commit}" 2>/dev/null; then
+                      b_stale="$(git diff --name-only "$b_commit".."$rep_commit" 2>/dev/null | grep -Ev '^(docs/|\.(agents-v0|cursor|gitlab|github)/|\.(gitlab-ci\.yml|agents-kit-version)$|.*\.(md|mdc|txt|adoc)$)' || true)"
+                      if [ -z "$b_stale" ]; then
+                        b_stale="$(git diff --name-only "$b_commit".."$stale_base" 2>/dev/null | grep -Ev '^(docs/|\.(agents-v0|cursor|gitlab|github)/|\.(gitlab-ci\.yml|agents-kit-version)$|.*\.(md|mdc|txt|adoc)$)' || true)"
+                      fi
+                      if [ -n "$b_stale" ]; then
+                        printf 'FAIL: non-doc files changed between build-report commit %s and verify commit %s — route code changes back to /v0-build (set Build to Re-opened)\n' "$b_commit" "$rep_commit" >&2
+                        missing=1
+                      fi
+                    fi
+                  fi
+                fi
+                art_state="${art%.md}.state.json"
+                case "$art" in
+                  docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) art_state="docs/agents-v0/onboarding/state.json" ;;
+                  docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) art_state="$(dirname "$art")/state.json" ;;
+                esac
+                state_check_ref="$stale_base"
+                if [ "$phase" = "build" ]; then
+                  state_check_ref="$rep_commit"
+                fi
+                rep_state=""
+                if [ -n "${CHECK_EVIDENCE_STAGED:-}" ]; then
+                  if [ -f "$art_state" ]; then
+                    rep_state="$(cat "$art_state" 2>/dev/null || true)"
+                  elif git cat-file -e ":${art_state}" 2>/dev/null; then
+                    rep_state="$(git show ":${art_state}" 2>/dev/null || true)"
+                  fi
+                elif git cat-file -e "${state_check_ref}:${art_state}" 2>/dev/null; then
+                  rep_state="$(git show "${state_check_ref}:${art_state}" 2>/dev/null || true)"
+                fi
+                if [ -n "$rep_state" ]; then
+                  if [ "$pre_approval" = "0" ] && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activePhase"[[:space:]]*:[[:space:]]*"'"$phase"'"' \
+                    && printf '%s' "$rep_state" | tr '\n' ' ' | grep -Eqi '"activeStatus"[[:space:]]*:[[:space:]]*"(in_progress|awaiting_approval)"'; then
+                    printf 'FAIL: commit: %s in %s records %s with activePhase=%s still in progress — record approval and sync state before committing the stamped tree\n' "$state_check_ref" "$p" "$art_state" "$phase" >&2
                     missing=1
+                  fi
+                  if [ "$phase" = "build" ] && [ "$is_p0_unapproved" = "0" ] && [ "$pre_approval" = "0" ] && [ -z "$(printf '%s' "$section" | grep -i '|[[:space:]]*release[[:space:]]*|' || true)" ]; then
+                    rep_art="$(git show "${rep_commit}:${art}" 2>/dev/null || true)"
+                    if ! printf '%s\n' "$rep_art" | grep -Eqi '\|[[:space:]]*build[[:space:]]*\|.*\|[[:space:]]*(approved|approve|yes|pass)([^a-z]|$)'; then
+                      printf 'FAIL: commit: %s in %s does not contain the Approved build row in %s — record the Build approval before committing the stamped tree\n' "$rep_commit" "$p" "$art" >&2
+                      missing=1
+                    fi
                   fi
                 fi
               fi
@@ -240,7 +309,7 @@ else
     esac
     check_path "$p"
   done
-  if [ "$is_p0_unapproved" = "0" ]; then
+  if [ "$is_p0_unapproved" = "0" ] && [ "$pre_approval" = "0" ]; then
     case "$phase" in
       verify)
         has_verify_rep=0

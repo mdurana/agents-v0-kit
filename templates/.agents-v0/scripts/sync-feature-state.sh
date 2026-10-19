@@ -198,21 +198,25 @@ else:
         else os.path.splitext(art)[0] + ".phase-result.md"
     )
     pr_approved_last = False
-    if last_approved and os.path.isfile(pr_path):
+    pr_approved_active = False
+    if os.path.isfile(pr_path):
         try:
             pr_txt = open(pr_path, encoding="utf-8").read()
             mp = re.search(r"^\s*phase:\s*(\S+)", pr_txt, re.I | re.M)
             ms = re.search(r"^\s*status:\s*(\S+)", pr_txt, re.I | re.M)
-            if (
-                mp
-                and ms
-                and mp.group(1).strip().lower() == last_approved
-                and ms.group(1).strip().lower() == "approved"
-            ):
-                pr_approved_last = True
+            if mp and ms and ms.group(1).strip().lower() == "approved":
+                if last_approved and mp.group(1).strip().lower() == last_approved:
+                    pr_approved_last = True
+                if (
+                    active_phase
+                    and mp.group(1).strip().lower() == active_phase
+                    and active_phase in rows
+                    and positive.match(rows[active_phase][3])
+                ):
+                    pr_approved_active = True
         except OSError:
             pass
-    if active_phase and (active_phase == last_approved or pr_approved_last):
+    if active_phase and (active_phase == last_approved or pr_approved_last or pr_approved_active):
         active_phase = ""
         active_status = ""
         blocked_reason = ""

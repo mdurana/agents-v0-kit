@@ -38,7 +38,7 @@ if [ -z "$feature" ]; then
   exit 1
 fi
 case "$action" in
-  check | --hash | --legacy-hash | --pin | --verify-lock) ;;
+  check | --hash | --legacy-hash | --status-only-hash | --pin | --verify-lock | --require-review) ;;
   *) printf 'FAIL: unknown option %s\n' "$action" >&2; exit 1 ;;
 esac
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
@@ -133,7 +133,7 @@ def require_accepted_adr():
 def file_bytes_for_hash(path, adr_path):
     if adr_path and os.path.abspath(path) == os.path.abspath(adr_path):
         text = read(path) or ""
-        lines = [ln for ln in text.splitlines(True) if not re.search(r"(?im)^(?:[-*]\s*)?(?:\*\*)?Status(?:\*\*)?\s*:", ln)]
+        lines = [ln for ln in text.splitlines(True) if not re.search(r"(?im)^(?:[-*]\s*)?(?:\*\*)?(?:Status|Deciders?)(?:\*\*)?\s*:", ln)]
         return "".join(lines).encode("utf-8")
     with open(path, "rb") as handle:
         return handle.read()
@@ -146,6 +146,23 @@ def current_hash():
     for path in design_files():
         digest.update(path.replace(os.sep, "/").encode() + b"\0")
         digest.update(file_bytes_for_hash(path, adr_path) + b"\0")
+    return digest.hexdigest()
+
+
+def status_only_hash():
+    """Hash used when only the ADR Status line was excluded."""
+    digest = hashlib.sha256()
+    adr = named_adr(read(os.path.join(base, "design.md")))
+    adr_path = adr if adr and os.path.isfile(adr) else None
+    for path in design_files():
+        digest.update(path.replace(os.sep, "/").encode() + b"\0")
+        if adr_path and os.path.abspath(path) == os.path.abspath(adr_path):
+            text = read(path) or ""
+            lines = [ln for ln in text.splitlines(True) if not re.search(r"(?im)^(?:[-*]\s*)?(?:\*\*)?Status(?:\*\*)?\s*:", ln)]
+            digest.update("".join(lines).encode("utf-8") + b"\0")
+        else:
+            with open(path, "rb") as handle:
+                digest.update(handle.read() + b"\0")
     return digest.hexdigest()
 
 
@@ -350,7 +367,7 @@ def verify_lock():
         return
     now = current_hash()
     last = lines[-1].split()
-    if len(last) < 2 or last[1] not in (now, legacy_hash()):
+    if len(last) < 2 or last[1] not in (now, status_only_hash(), legacy_hash()):
         fail(f"the design changed since the last pin ({last[1][:12] if len(last) > 1 else '?'} -> {now[:12]}): "
              f"run design-reviewer so {base}/review.md names {now[:12]} and has no open Critical, "
              f"add an Approved row in {base}/amendments.md, then pin")
@@ -365,6 +382,20 @@ def verify_lock():
             fail(f"pin {short} has no Approved row in {base}/amendments.md")
 
 
+def check_review():
+    review = read(os.path.join(base, "review.md"))
+    if review is None:
+        if not review_not_required(read(os.path.join(base, "design.md"))):
+            fail(f"{base}/review.md is missing: run design-reviewer before the design is approved")
+    else:
+        m = re.search(r"^design-hash:\s*([0-9a-f]{12})", review, re.M)
+        if not m or not (current_hash().startswith(m.group(1)) or status_only_hash().startswith(m.group(1)) or legacy_hash().startswith(m.group(1))):
+            fail(f"{base}/review.md reviewed a different version of the design (design-hash {m.group(1) if m else '?'}, now {current_hash()[:12]}): run design-reviewer again")
+        for line in review.splitlines():
+            if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
+                fail(f"{base}/review.md has an unresolved Critical finding: {line.strip()[:100]}")
+
+
 if not os.path.isdir(base):
     print(f"FAIL: {base} not found", file=sys.stderr)
     raise SystemExit(1)
@@ -375,23 +406,16 @@ if action == "--hash":
 if action == "--legacy-hash":
     print(legacy_hash())
     raise SystemExit(0)
+if action == "--status-only-hash":
+    print(status_only_hash())
+    raise SystemExit(0)
 if action == "--verify-lock":
     verify_lock()
     require_accepted_adr()
 elif action == "--pin":
     check()
     require_accepted_adr()
-    review = read(os.path.join(base, "review.md"))
-    if review is None:
-        if not review_not_required(read(os.path.join(base, "design.md"))):
-            fail(f"{base}/review.md is missing: run design-reviewer before the design is approved")
-    else:
-        m = re.search(r"^design-hash:\s*([0-9a-f]{12})", review, re.M)
-        if not m or not current_hash().startswith(m.group(1)):
-            fail(f"{base}/review.md reviewed a different version of the design (design-hash {m.group(1) if m else '?'}, now {current_hash()[:12]}): run design-reviewer again")
-        for line in review.splitlines():
-            if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
-                fail(f"{base}/review.md has an unresolved Critical finding: {line.strip()[:100]}")
+    check_review()
     if not failures:
         why = reason.strip() or ("approved" if not lock_lines() else "")
         if not why:
@@ -400,6 +424,9 @@ elif action == "--pin":
             with open(lock_path, "a", encoding="utf-8") as handle:
                 handle.write(f"{datetime.date.today().isoformat()} {current_hash()} {why}\n")
             print(f"pinned {current_hash()[:12]} in {lock_path}")
+elif action == "--require-review":
+    check()
+    check_review()
 else:
     check()
 

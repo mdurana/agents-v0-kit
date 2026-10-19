@@ -514,10 +514,17 @@ run pass "design: pinning succeeds after setting ADR to Accepted without re-revi
 rm -f "$d/docs/agents-v0/design/orders/design.lock"
 cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
 sedi 's/N\/A: no event contract/Channel orders.order-created in asyncapi.yaml./' "$d/docs/agents-v0/design/orders/design.md"
-ha="$(cd "$d" && sh "$CI/check-design.sh" orders --hash)"
-printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$ha" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
+soh="$(cd "$d" && sh "$CI/check-design.sh" orders --status-only-hash)"
+printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$soh" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
 run pass "design: a resolved review lets the pin through" "$d" sh "$CI/check-design.sh" orders --pin approved
 run pass "design: the lock matches the pinned design" "$d" sh "$CI/check-design.sh" orders --verify-lock
+printf -- "- **Deciders:** solution-architect, lead\n" >> "$d/docs/agents-v0/adr/01-orders.md"
+run pass "design: a design whose review.md names the status-only hash, and whose ADR then gets a Deciders edit, still passes require-review" "$d" sh "$CI/check-design.sh" orders --require-review
+run pass "design: updating ADR Deciders line preserves verify-lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
+soh_deciders="$(cd "$d" && sh "$CI/check-design.sh" orders --status-only-hash)"
+printf 'agent: design-reviewer\ndesign-hash: %s\n\n| # | Label | Finding | Evidence | Status |\n|---|---|---|---|---|\n| 1 | Critical | no ownership rule | design.md:20 | Resolved |\n' "$(printf '%s' "$soh_deciders" | cut -c1-12)" > "$d/docs/agents-v0/design/orders/review.md"
+run pass "design: a review naming status-only hash passes require-review" "$d" sh "$CI/check-design.sh" orders --require-review
+sedi '/Deciders:/d' "$d/docs/agents-v0/adr/01-orders.md"
 sedi 's/ORDER_CREATED/ORDER_PLACED/' "$d/docs/agents-v0/design/orders/asyncapi.yaml"
 run fail "design: modifying asyncapi.yaml after the pin fails the lock" "$d" sh "$CI/check-design.sh" orders --verify-lock
 cp "$o/async-ok.yaml" "$d/docs/agents-v0/design/orders/asyncapi.yaml"
