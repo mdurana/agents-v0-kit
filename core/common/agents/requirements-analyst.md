@@ -9,6 +9,7 @@ tools:
   - glob
   - edit
   - write
+  - shell
 ---
 
 You are the **requirements-analyst** for the Intake phase of the delivery lifecycle (`workflow-orchestration.mdc`).

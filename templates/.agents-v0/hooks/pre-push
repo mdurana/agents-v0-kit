@@ -1,5 +1,6 @@
 #!/bin/sh
-# Optional pre-push hook. It is not installed into .git/hooks automatically.
+# Pre-push hook. install.sh --git-hooks activates it (core.hooksPath=.agents-v0/hooks, together with
+# pre-commit). Without that flag it is not installed; to install it alone:
 #
 #   cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" \
 #     && chmod +x "$(git rev-parse --git-path hooks)/pre-push"

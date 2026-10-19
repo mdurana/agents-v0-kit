@@ -57,6 +57,7 @@ validate_target() {
     return 0
   fi
   [ -f "$t/.cursor/hooks.json" ] || err "target .cursor/hooks.json missing"
+  [ -f "$t/.cursor/cli.json" ] || err "target .cursor/cli.json missing"
   [ -f "$t/.cursor/rules/org/workflow-orchestration.mdc" ] || err "target .cursor/rules/org missing"
   [ -f "$t/.cursor/commands/v0-build.md" ] || err "target .cursor/commands missing (expected v0-* command files)"
   [ -f "$t/.cursor/agents/backend-engineer.md" ] || err "target .cursor/agents missing"
@@ -122,12 +123,21 @@ grep -Fq 'docs/agents-v0/build/' core/common/commands/v0-build.md || err "/v0-bu
 grep -Fq 'docs/agents-v0/verify/' core/common/commands/v0-verify.md || err "/v0-verify does not name persisted evidence paths"
 grep -Fqi 'exist on disk' core/common/commands/v0-deliver.md || err "/v0-deliver does not verify recorded evidence existence"
 
-# 4. Agents: name matches file, subagent mode, Cursor model field, referenced.
+# 4. Agents: closed frontmatter, name matches file, subagent mode, Cursor model field, shell tool on phase agents, referenced.
 for f in core/*/agents/*.md; do
   name="$(basename "$f" .md)"
+  head -n1 "$f" | grep -qx -- '---' || err "$f: missing opening ---"
+  awk 'NR<=20 && /^---$/ && NR>1 {found=1; exit} END{exit !found}' "$f" || err "$f: missing closing ---"
   grep -Eq "^name:[[:space:]]*$name$" "$f" || err "$f: frontmatter name must match filename"
   grep -Eq '^mode:[[:space:]]*subagent' "$f" || err "$f: missing mode: subagent"
   grep -Eq '^model:[[:space:]]*[a-z0-9.-]+(\[[^]]+\])?$' "$f" || err "$f: missing cursor model"
+  case "$name" in
+    explore-researcher|schema-author|docs-author) ;;
+    *)
+      awk 'NR==1 && /^---$/{fm=1;next} fm && /^---$/{exit} fm && /^[[:space:]]*-[[:space:]]*shell$/{found=1;exit} END{exit !found}' "$f" \
+        || err "$f: phase agent must declare '- shell' in tools frontmatter so it can run gate and check scripts"
+      ;;
+  esac
   if grep -Eq '^model_kilo:' "$f" || grep -Eq '^model_claude:' "$f"; then
     err "$f: must not carry model_kilo or model_claude (Cursor-only kit)"
   fi
@@ -210,6 +220,10 @@ for path in sorted(Path("core").glob("*/agents/*.md")):
 PY
 # 8. Adapter config exists and wires the right entry points.
 [ -f core/common/adapters/cursor/hooks.json ] || err "cursor hooks.json missing"
+[ -f core/common/adapters/cursor/cli.json ] || err "cursor cli.json missing"
+grep -Fq '"Shell(*)"' core/common/adapters/cursor/cli.json || err "cursor cli.json must allow Shell(*) so pre-shell.sh governs CLI shell execution"
+grep -Fq '\.cursor/cli\.json' core/common/hooks/hook-policy.py || err "hook-policy must protect .cursor/cli.json"
+grep -Fq '/.cursor/cli.json @' templates/.gitlab/CODEOWNERS || err "CODEOWNERS must cover /.cursor/cli.json"
 grep -Fq 'pre-shell.sh' core/common/adapters/cursor/hooks.json || err "cursor hooks.json does not wire pre-shell"
 grep -Fq '"version": 1' core/common/adapters/cursor/hooks.json || err "cursor hooks.json must declare version 1"
 [ ! -f core/common/adapters/claude/settings.json ] && [ ! -f core/common/adapters/kilo/kilo.json ] || err "remove legacy claude/kilo adapter files (Cursor-only kit)"
@@ -250,7 +264,8 @@ grep -Fq 'check-asyncapi.sh' templates/.agents-v0/ci/check-design-contracts.sh |
 grep -Fq 'export-audit-pack.sh' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack.sh must exist"
 grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pack.sh || err "export-audit-pack must emit schema agents-v0-audit-manifest"
 grep -Fq '.agents-v0/scripts/[^/]+\.sh$' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.sh (local gate, audit, state, and MR-body scripts)"
-grep -Fq '.agents-v0/hooks/pre-push' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/hooks/pre-push"
+grep -Fq '.agents-v0/hooks/' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/hooks/ git hook (pre-commit, pre-push)"
+grep -Fq 'gates\.json' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents-v0/ci/gates.json"
 grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX (Node 20 is end-of-life)"
 if grep -Eq 'node:20' templates/.gitlab-ci.yml templates/docker/Dockerfile.node templates/docker/Dockerfile.static-nginx templates/app/frontend/Dockerfile; then err "Node 20 is end-of-life: CI and Dockerfile starters must use Node 22"; fi
 # .gitlab-ci.yml must parse, and the kit scripts it names must resolve. Kit scripts install under
@@ -331,7 +346,64 @@ sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
 [ -f scripts/test-release.sh ] || err "scripts/test-release.sh missing"
 sh scripts/test-release.sh || err "scripts/test-release.sh failed"
+[ -f scripts/test-command-flows.sh ] || err "scripts/test-command-flows.sh missing"
+sh scripts/test-command-flows.sh || err "scripts/test-command-flows.sh failed"
 grep -Fq 'git status --porcelain' core/common/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
+
+# 9b. One phase gate manifest. gates.json is the only phase -> check list; every script it names
+# exists; every gated command calls gate.sh for its phase (draft and --approved); install seeds it.
+python3 - <<'PY' || err "phase gate manifest (templates/.agents-v0/ci/gates.json) is out of step with gate.sh, the scripts, or the commands"
+import json, os, re, sys
+bad = []
+manifest = json.load(open("templates/.agents-v0/ci/gates.json", encoding="utf-8"))["phases"]
+for phase, spec in manifest.items():
+    if not spec.get("approvalFile"):
+        bad.append(f"{phase}: no approvalFile")
+    for mode in ("draft", "approved"):
+        if mode not in spec:
+            bad.append(f"{phase}: no {mode} list")
+        for entry in spec.get(mode, []):
+            script = os.path.join("templates/.agents-v0", entry["run"][0])
+            if not os.path.isfile(script):
+                bad.append(f"{phase}/{mode}: {entry['run'][0]} does not exist")
+commands = {
+    "roadmap": "v0-roadmap.md", "architecture": "v0-architecture.md", "plan": "v0-plan.md",
+    "intake": "v0-intake.md", "design": "v0-design.md", "onboard": "v0-onboard.md",
+}
+for phase, cmd in commands.items():
+    if phase not in manifest:
+        bad.append(f"{phase}: missing from gates.json")
+    text = open(os.path.join("core/common/commands", cmd), encoding="utf-8").read()
+    if f"gate.sh {phase} " not in text:
+        bad.append(f"{cmd}: does not run 'gate.sh {phase} <artifact>'")
+    if f"gate.sh {phase} --approved" not in text:
+        bad.append(f"{cmd}: does not run 'gate.sh {phase} --approved <artifact>' after the approval row")
+    # The gate list must not be repeated by hand next to gate.sh: a direct "run check-X" for a check the
+    # manifest already runs is how the prose and the scripts drift apart.
+    for entry in manifest[phase].get("approved", []) + manifest[phase].get("draft", []):
+        name = os.path.basename(entry["run"][0])
+        for m in re.finditer(r"verify directly via[^.]*" + re.escape(name), text):
+            bad.append(f"{cmd}: lists {name} directly at the gate instead of gate.sh")
+install = open("scripts/install.sh", encoding="utf-8").read()
+for rel in (".agents-v0/ci/gate.sh", ".agents-v0/ci/gates.json", ".agents-v0/hooks/pre-commit"):
+    if install.count(rel) < 2:
+        bad.append(f"install.sh must seed and refresh {rel}")
+if "core.hooksPath" not in install or "--git-hooks" not in install:
+    bad.append("install.sh must offer --git-hooks (core.hooksPath=.agents-v0/hooks)")
+if "--allow-in-flight" not in install:
+    bad.append("install.sh --update must refuse an in-progress story unless --allow-in-flight")
+if "gate.sh --staged" not in open("templates/.agents-v0/hooks/pre-commit", encoding="utf-8").read():
+    bad.append("pre-commit must run gate.sh --staged")
+if "gate.sh" not in open("core/common/hooks/after-edit.sh", encoding="utf-8").read():
+    bad.append("after-edit must run gate.sh --for-path on delivery documents")
+if "ci/gate.sh <phase>" not in open("core/common/rules/workflow-orchestration.mdc", encoding="utf-8").read():
+    bad.append("workflow-orchestration.mdc must name the phase gate command")
+if "gates.json" not in open("templates/docs/agents-v0/agents-v0-kit.md", encoding="utf-8").read():
+    bad.append("agents-v0-kit.md must describe the phase gate (gates.json, gate.sh, git hooks)")
+for b in bad:
+    print(f"FAIL: {b}", file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
 # the kit and is seeded into target workspaces.

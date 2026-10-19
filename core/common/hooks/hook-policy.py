@@ -373,6 +373,24 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
 
     if bin0 == "git":
         sub = _git_subcommand(parts)
+        # The kit's git hooks (.agents-v0/hooks, gate.sh) are the deterministic fence against drift.
+        # An agent must not switch them off; a person can still do so in their own terminal.
+        sub_idx = parts.index(sub) if sub in parts else len(parts)
+        if any(p.startswith("core.hooksPath") or p.startswith("core.hookspath") for p in parts[1:sub_idx]):
+            return "block", "overriding core.hooksPath bypasses the delivery gate hooks; not allowed for an agent."
+        if sub == "config":
+            cfg_args = parts[sub_idx + 1 :]
+            keys = [i for i, p in enumerate(cfg_args) if p.lower().startswith("core.hookspath")]
+            if keys and (
+                any(a.startswith("--unset") or a in ("--add", "--replace-all") for a in cfg_args)
+                or any(i + 1 < len(cfg_args) for i in keys)
+                or any("=" in cfg_args[i] for i in keys)
+            ):
+                return "ask", "changing core.hooksPath turns the delivery gate hooks on or off; requires explicit user approval."
+        if sub in ("commit", "push", "merge", "rebase", "cherry-pick", "revert", "am"):
+            sub_args = parts[sub_idx + 1 :]
+            if "--no-verify" in sub_args or (sub == "commit" and any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", a) for a in sub_args)):
+                return "block", "--no-verify skips the delivery gate hooks; fix the failing gate instead (ai-agent-conduct.mdc)."
         if sub == "push":
             for tok in parts[parts.index(sub) + 1 :] if sub in parts else []:
                 if tok in ("--force", "-f", "--force-with-lease") or tok.startswith(
@@ -573,6 +591,7 @@ def may_print_secrets(cmd: str) -> bool:
 
 PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/hooks\.json$"),
+    re.compile(r"(^|/)\.cursor/cli\.json$"),
     re.compile(r"(^|/)\.cursor/hooks/"),
     re.compile(r"(^|/)\.cursor/rules/"),
     re.compile(r"(^|/)\.cursor/agents/"),
@@ -582,7 +601,9 @@ PROTECTED_PATH_PATTERNS = [
     # Every kit script: they write the state, the evidence, and the merge-request body that approvers
     # rely on, and one of them runs sudo. A new script is protected without editing this list.
     re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.sh$"),
-    re.compile(r"(^|/)\.agents-v0/hooks/pre-push$"),
+    # The phase gate manifest and every kit git hook: editing them switches a gate off.
+    re.compile(r"(^|/)\.agents-v0/ci/gates\.json$"),
+    re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),

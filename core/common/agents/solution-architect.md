@@ -9,6 +9,7 @@ tools:
   - glob
   - edit
   - write
+  - shell
 ---
 
 You are the **solution-architect** for program architecture and the Design phase (`workflow-orchestration.mdc`).

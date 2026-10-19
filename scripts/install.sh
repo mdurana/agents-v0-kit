@@ -13,13 +13,20 @@
 #       Pin the kit commit in docs/agents-v0/kit-pin and symlink .cursor and
 #       .agents-v0/ci into that checkout. Kit files are not copied into the project.
 #
-#   install.sh --update [--quick] <target-repo>
+#   install.sh --update [--quick] [--allow-in-flight] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
 #       commands, skills, hooks, CI scripts, reference docs). Target-owned
 #       templates are seeded only when missing. The full validation builds and
 #       tests the bundled app, which needs Maven and network access. --quick skips
 #       that one test (KIT_SKIP_APP_TEMPLATE_TEST=1) and keeps every other check,
-#       for an offline or air-gapped machine.
+#       for an offline or air-gapped machine. --update refuses while a story is in
+#       progress (a state.json with a non-empty activePhase); --allow-in-flight overrides.
+#
+#   --git-hooks (with a first install or --update)
+#       Sets core.hooksPath to .agents-v0/hooks in the target repo, so pre-commit runs
+#       .agents-v0/ci/gate.sh --staged (an Approved row that fails its phase gate cannot be
+#       committed) and pre-push runs the local delivery gate. Opt-in: it changes the
+#       target repo's git config.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -33,9 +40,11 @@ LINK_PATH=""
 LINK_COMMIT=""
 PACK=""
 TARGET=""
+GIT_HOOKS=0
+ALLOW_IN_FLIGHT=0
 
 usage() {
-  printf 'usage: %s [--pack <id>] [--with-starters] [--update [--quick]] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--update [--quick] [--allow-in-flight]] <target-repo>\n' "$(basename "$0")" >&2
   printf '       %s --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
@@ -163,6 +172,7 @@ install_cursor() {
   rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json"
   chmod +x "$t"/.cursor/hooks/*.sh "$t/.cursor/hooks/hook-policy.py"
   cp "$KIT/core/common/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
+  cp "$KIT/core/common/adapters/cursor/cli.json" "$t/.cursor/cli.json"
   if [ -f "$KIT/templates/.cursor/model-config.json" ] && [ ! -f "$t/.cursor/model-config.json" ]; then
     cp "$KIT/templates/.cursor/model-config.json" "$t/.cursor/model-config.json"
   fi
@@ -208,6 +218,8 @@ install_templates() {
 .agents-v0/ci/check-architecture-pack.sh
 .agents-v0/ci/check-intake.sh
 .agents-v0/ci/check-feature-state.sh
+.agents-v0/ci/gate.sh
+.agents-v0/ci/gates.json
 .agents-v0/scripts/generate-repo-map.sh
 .agents-v0/scripts/collect-dependency-graphs.sh
 .agents-v0/scripts/sync-feature-state.sh
@@ -229,6 +241,7 @@ install_templates() {
 .agents-v0/scripts/activate-stack-pack.sh
 .agents-v0/scripts/resolve-kit-root.sh
 .agents-v0/hooks/pre-push
+.agents-v0/hooks/pre-commit
 docs/agents-v0/model-routing-matrix.md
 docs/agents-v0/user-guide.md
 docs/agents-v0/agents-v0-kit.md
@@ -268,6 +281,9 @@ docs/agents-v0/brownfield-onboarding.md
 .gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .agents-v0/hooks/pre-push
+.agents-v0/hooks/pre-commit
+.agents-v0/ci/gate.sh
+.agents-v0/ci/gates.json
 "
   copy_template_file() {
     rel="$1"
@@ -291,7 +307,8 @@ docs/agents-v0/brownfield-onboarding.md
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
         .agents-v0/scripts/activate-stack-pack.sh .agents-v0/scripts/resolve-kit-root.sh \
-        .agents-v0/scripts/run-local-container.sh; do
+        .agents-v0/scripts/run-local-container.sh \
+         .agents-v0/ci/gate.sh .agents-v0/ci/gates.json .agents-v0/hooks/pre-commit .agents-v0/hooks/pre-push; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
@@ -397,6 +414,14 @@ while [ $# -gt 0 ]; do
       PACK="$2"
       shift 2
       ;;
+    --git-hooks)
+      GIT_HOOKS=1
+      shift
+      ;;
+    --allow-in-flight)
+      ALLOW_IN_FLIGHT=1
+      shift
+      ;;
     -h|--help)
       usage
       ;;
@@ -413,8 +438,36 @@ if [ -n "$PACK" ] && [ ! -f "$KIT/core/$PACK/pack.json" ]; then
   exit 1
 fi
 [ "$QUICK" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --quick applies to --update only\n' >&2; usage; }
+[ "$ALLOW_IN_FLIGHT" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --allow-in-flight applies to --update only\n' >&2; usage; }
 [ -d "$TARGET" ] || { printf 'error: target not found: %s\n' "$TARGET" >&2; exit 1; }
 TARGET_ABS="$(cd "$TARGET" && pwd)"
+
+# A kit update swaps rules and checks. Changing them while a story is mid-phase is how an approved
+# step starts failing a check it never had to pass, so refuse unless the person opts in.
+if [ "$UPDATE" = 1 ] && [ "$ALLOW_IN_FLIGHT" = 0 ] && [ "$TARGET_ABS" != "$KIT" ]; then
+  in_flight="$(python3 - "$TARGET_ABS" <<'PY'
+import glob, json, os, sys
+root = sys.argv[1]
+paths = sorted(glob.glob(os.path.join(root, "docs/agents-v0/requirements/*.state.json")))
+paths += sorted(glob.glob(os.path.join(root, "docs/agents-v0/maintain/*/state.json")))
+paths.append(os.path.join(root, "docs/agents-v0/onboarding/state.json"))
+for p in paths:
+    try:
+        data = json.load(open(p, encoding="utf-8"))
+    except (OSError, ValueError):
+        continue
+    phase = str(data.get("activePhase") or "").strip()
+    if phase:
+        print(f"{os.path.relpath(p, root)} (activePhase={phase}, activeStatus={data.get('activeStatus', '')})")
+PY
+)"
+  if [ -n "$in_flight" ]; then
+    printf 'error: a story is in progress in %s:\n' "$TARGET_ABS" >&2
+    printf '%s\n' "$in_flight" | sed 's/^/  /' >&2
+    printf 'Finish or pause it before updating the kit, or re-run with --allow-in-flight (new checks may then block that story).\n' >&2
+    exit 1
+  fi
+fi
 
 require_pyyaml() {
   python3 -c 'import yaml' >/dev/null 2>&1 || {
@@ -495,6 +548,22 @@ if [ "$WITH_STARTERS" = 1 ]; then
 fi
 install_cursor "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
+
+for hook in "$TARGET_ABS"/.agents-v0/hooks/*; do
+  if [ -f "$hook" ] && [ ! -L "$hook" ]; then chmod +x "$hook"; fi
+done
+if [ "$GIT_HOOKS" = 1 ]; then
+  if git -C "$TARGET_ABS" rev-parse --git-dir >/dev/null 2>&1; then
+    prev_hooks="$(git -C "$TARGET_ABS" config --get core.hooksPath 2>/dev/null || true)"
+    git -C "$TARGET_ABS" config core.hooksPath .agents-v0/hooks
+    if [ -n "$prev_hooks" ] && [ "$prev_hooks" != ".agents-v0/hooks" ]; then
+      printf 'WARN: core.hooksPath was %s; it is now .agents-v0/hooks. Move any hooks you still need into .agents-v0/hooks/.\n' "$prev_hooks" >&2
+    fi
+    printf 'Git hooks: core.hooksPath=.agents-v0/hooks (pre-commit runs gate.sh --staged; pre-push runs the local delivery gate).\n'
+  else
+    printf 'WARN: --git-hooks skipped: %s is not a git repository.\n' "$TARGET_ABS" >&2
+  fi
+fi
 
 if [ -f "$KIT/VERSION" ]; then
   kit_version="$(tr -d '\n' < "$KIT/VERSION")"

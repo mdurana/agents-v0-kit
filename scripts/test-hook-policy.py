@@ -26,6 +26,17 @@ def path(p: str) -> str:
 
 
 SHELL_CASES = [
+    # Bypassing the delivery gate git hooks
+    ("git commit --no-verify -m wip", "block"),
+    ("git commit -n -m wip", "block"),
+    ("git commit -anm wip", "block"),
+    ("git push --no-verify origin feature/x", "block"),
+    ("git -c core.hooksPath=/dev/null commit -m wip", "block"),
+    ("git config core.hooksPath /dev/null", "ask"),
+    ("git config --unset core.hooksPath", "ask"),
+    ("git config core.hooksPath", "allow"),
+    ("git config --get core.hooksPath", "allow"),
+    ("git commit -m 'no verify needed' -- docs/agents-v0/build/x/build-report.md", "allow"),
     # Force-push and history rewrites
     ("git push origin main --force", "block"),
     ("git push -f", "block"),
@@ -91,9 +102,11 @@ SHELL_CASES = [
     ("touch .env", "allow"),
     # Protected paths via shell
     ("echo x > .cursor/hooks.json", "block"),
+    ("echo x > .cursor/cli.json", "block"),
     ("sed -i s/a/b/ .cursor/hooks/pre-shell.sh", "block"),
     ("cp evil.sh .cursor/hooks/pre-shell.sh", "block"),
     ("rm .cursor/hooks.json", "block"),
+    ("rm .cursor/cli.json", "block"),
     ("cp /tmp/x.sh .agents-v0/ci/check-gate-metrics.sh", "block"),
     ("echo skip > .cursor/skills/quality-gate/SKILL.md", "block"),
     ("rm .cursor/commands/v0-build.md", "block"),
@@ -101,6 +114,7 @@ SHELL_CASES = [
     ("python3 -c \"open('.cursor/hooks.json','w').write('{}')\"", "block"),
     ("echo tamper > .agents-v0/hooks/pre-push", "block"),
     ("cat .cursor/hooks.json", "allow"),
+    ("cat .cursor/cli.json", "allow"),
     # Publish / deploy
     ("npm publish", "ask"),
     ("docker push img", "ask"),
@@ -199,6 +213,7 @@ SHELL_CASES = [
 
 PATH_CASES = [
     (".cursor/hooks.json", "block"),
+    (".cursor/cli.json", "block"),
     (".cursor/agents/foo.md", "block"),
     (".cursor/rules/org/x.mdc", "block"),
     (".github/workflows/ci.yml", "allow"),
@@ -209,6 +224,10 @@ PATH_CASES = [
     (".agents-v0/ci/check-gate-metrics.sh", "block"),
     (".agents-v0/ci/check-event-schemas.sh", "block"),
     (".agents-v0/ci/resolve-layout.sh", "block"),
+    (".agents-v0/ci/gate.sh", "block"),
+    (".agents-v0/ci/gates.json", "block"),
+    (".agents-v0/hooks/pre-commit", "block"),
+    (".agents-v0/hooks/pre-push", "block"),
     ("templates/.agents-v0/ci/check-gate-metrics.sh", "block"),
     (".agents-v0/scripts/check-attempt-budget.sh", "block"),
     (".agents-v0/scripts/check-onboarding-docs.sh", "block"),

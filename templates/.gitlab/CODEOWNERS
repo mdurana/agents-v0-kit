@@ -19,6 +19,7 @@
 /.gitlab-ci.yml @your-team
 /.gitlab/ @your-team
 /.cursor/hooks.json @your-team
+/.cursor/cli.json @your-team
 /.cursor/hooks/ @your-team
 /.cursor/rules/ @your-team
 /.cursor/agents/ @your-team

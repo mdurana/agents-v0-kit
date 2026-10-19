@@ -9,6 +9,7 @@ tools:
   - glob
   - edit
   - write
+  - shell
 ---
 
 You are the **program-planner** for program planning (`workflow-orchestration.mdc` Program planning).

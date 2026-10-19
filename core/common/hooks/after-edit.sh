@@ -25,13 +25,39 @@ $line"
   fi
 }
 
+# Delivery documents: run the phase gate the file belongs to (.agents-v0/ci/gate.sh --for-path) and
+# hand any failure to the agent right away. Advisory only — pre-commit blocks an Approved row that
+# fails the gate (install.sh --git-hooks), and CI repeats the checks.
+GATE_CTX=""
+case "$path" in
+  *docs/agents-v0/*)
+    hook_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    if [ -f "$hook_root/.agents-v0/ci/gate.sh" ]; then
+      if ! gate_out="$(sh "$hook_root/.agents-v0/ci/gate.sh" --for-path "$path" 2>&1)"; then
+        GATE_CTX="Kit hook (after-edit): the phase gate for $path is failing. Fix it before presenting the gate or recording an Approved row (pre-commit blocks a failing approval):
+$(printf '%s\n' "$gate_out" | head -n 60)"
+      fi
+    fi
+    ;;
+esac
+
+join_ctx() {
+  if [ -n "$1" ] && [ -n "$2" ]; then
+    printf '%s\n\n%s' "$1" "$2"
+  else
+    printf '%s%s' "$1" "$2"
+  fi
+}
+
 # Delivery artifacts: approvals must reflect a real human decision (CI binds the
 # Approver column to a GitLab MR approval via ci/check-approver-gitlab.sh).
 case "$path" in
   *docs/agents-v0/requirements/*.md|*docs/agents-v0/milestones/*.md)
+    approval_ctx=""
     if grep -Eqi '^\|[^|]*\|[^|]*\|[^|]*\|[[:space:]]*(approved|approve|yes|pass)' "$path"; then
-      hook_emit_additional_context "Kit hook (after-edit): $path records gate approvals. Only record an Approved row after the user explicitly approved in chat, and name that person in the Approver column — CI requires a matching GitLab merge request approval."
+      approval_ctx="Kit hook (after-edit): $path records gate approvals. Only record an Approved row after the user explicitly approved in chat, and name that person in the Approver column — CI requires a matching GitLab merge request approval."
     fi
+    hook_emit_additional_context "$(join_ctx "$approval_ctx" "$GATE_CTX")"
     exit 0
     ;;
 esac
@@ -39,7 +65,10 @@ esac
 # Only scan text files
 case "$path" in
   *.yml|*.yaml|*.java|*.cs|*.py|*.go|*.ts|*.tsx|*.svelte|*.js|*.json|*.properties) ;;
-  *) exit 0 ;;
+  *)
+    hook_emit_additional_context "$GATE_CTX"
+    exit 0
+    ;;
 esac
 
 # permit-all / MethodSecurityBypass in non-local config (vapt.mdc F4, security-baseline §1)
@@ -85,9 +114,11 @@ if [ -f "$pack_scan" ]; then
   hook_pack_scan "$path"
 fi
 
+vapt_ctx=""
 if [ -n "$WARN_LINES" ]; then
-  hook_emit_additional_context "Kit hook (after-edit) — address or confirm in Verify:
+  vapt_ctx="Kit hook (after-edit) — address or confirm in Verify:
 $WARN_LINES"
 fi
+hook_emit_additional_context "$(join_ctx "$vapt_ctx" "$GATE_CTX")"
 
 exit 0

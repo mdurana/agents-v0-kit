@@ -134,6 +134,9 @@ link_children(os.path.join(root, "core", "common", "hooks"), os.path.join(projec
 hooks_json = os.path.join(root, "core", "common", "adapters", "cursor", "hooks.json")
 if os.path.isfile(hooks_json):
     link(hooks_json, os.path.join(project, ".cursor", "hooks.json"))
+cli_json = os.path.join(root, "core", "common", "adapters", "cursor", "cli.json")
+if os.path.isfile(cli_json):
+    link(cli_json, os.path.join(project, ".cursor", "cli.json"))
 link_children(os.path.join(root, "templates", ".agents-v0", "ci"), os.path.join(project, ".agents-v0", "ci"))
 link_children(os.path.join(root, "templates", ".agents-v0", "scripts"), os.path.join(project, ".agents-v0", "scripts"))
 

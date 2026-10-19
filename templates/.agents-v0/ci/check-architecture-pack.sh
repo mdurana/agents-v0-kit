@@ -142,7 +142,7 @@ def current_pack_hash():
     arc_opts = split_sections(arc_t, 2).get("options", "")
     for adr_p in sorted(set(re.findall(r"docs/agents-v0/adr/[A-Za-z0-9_.-]+\.md", arc_opts))):
         adr_t = read(adr_p) or ""
-        adr_norm = re.sub(r"(?im)^([ \t]*[-*]?[ \t]*\*?\*?Status\*?\*?[ \t]*:).*$", r"\1", adr_t).rstrip()
+        adr_norm = re.sub(r"\n{2,}", "\n\n", re.sub(r"(?im)^[ \t]*[-*]?[ \t]*\*?\*?(?:Status|Deciders?|Date)\*?\*?[ \t]*:.*$\n?", "", adr_t)).strip()
         feed(f"adr:{adr_p}", adr_norm)
 
     cmap_t = read(os.path.join(system, "context-map.md")) or ""

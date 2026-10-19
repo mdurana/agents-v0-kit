@@ -1575,6 +1575,8 @@ sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
 expect_fail "check-architecture-pack --approved rejects review judgment still calling ADR Proposed" "$d" sh "$CI/check-architecture-pack.sh" --approved
 sedi 's/ADR 0001 is Proposed/ADR 0001 is Accepted/' "$d/docs/agents-v0/design/system/architecture-review.md"
 expect_pass "check-architecture-pack --approved accepts review judgment updated to Accepted (and pack-hash survives ADR approval flip)" "$d" sh "$CI/check-architecture-pack.sh" --approved
+printf '\n- **Deciders:** approver-name\n' >> "$d/docs/agents-v0/adr/01-pattern.md"
+expect_pass "check-architecture-pack --approved accepts ADR Deciders update without invalidating pack-hash" "$d" sh "$CI/check-architecture-pack.sh" --approved
 
 d="$tmp/pack-fitness"
 write_pack "$d"

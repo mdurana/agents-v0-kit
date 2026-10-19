@@ -139,6 +139,8 @@ A phase is **not complete** until its gate passes. Stop where that phase command
 
 **Approval recording:** record gate decision, approver, date, evidence paths, and N/A reasons in the handoff artifact's `Delivery approvals` table (`| Phase | Artifacts | Approver | Decision | Date |`). Never infer approval. Decision must be an explicit positive token (`Approved`; CI accepts `approved` / `yes` / `pass`). Include `commit: <sha>` in Build/Verify artifact columns.
 
+**Gate:** `sh .agents-v0/ci/gate.sh <phase> [--approved] <artifact>`; never `--no-verify`.
+
 **Batch approval.** Only Intake and Design gates may be approved for several stories in one message when the user names every story (`Approved: Design for P2-A, P2-B`). Each named story must be Standard tier with no security-review trigger, no open question, and no `Vertical slice: yes`; any other story is approved alone. Each story's artifact still gets its own row (`orchestrator` holds the steps). Build, Verify, and Release are always per story.
 
 **Brownfield baseline:** if `docs/agents-v0/project-profile.md` documents `known_failures` or a ratchet plan, Build may proceed only when the profile allows it and new failures are not introduced.

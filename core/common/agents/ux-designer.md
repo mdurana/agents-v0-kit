@@ -9,6 +9,8 @@ tools:
   - glob
   - edit
   - write
+  - shell
+---
 
 You are the **ux-designer** for the Design phase of the delivery lifecycle (`workflow-orchestration.mdc`).
 
