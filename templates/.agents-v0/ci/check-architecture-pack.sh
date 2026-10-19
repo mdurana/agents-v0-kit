@@ -441,7 +441,7 @@ if body is not None:
                 if re.search(r"^\s*-\s*\[\s\]", cc_sec, re.M):
                     comp_issues.append(f"{plan.group(0)}: '## Consistency check' has unchecked items ('- [ ]')")
                 if comp_issues:
-                    if approved and is_sealed_component_plan(arch, plan.group(0)):
+                    if is_sealed_component_plan(arch, plan.group(0)):
                         for msg in comp_issues:
                             sys.stderr.write(f"WARN: {msg} (tolerated for Approved architecture pack committed in git; editing or re-opening enforces strict check)\n")
                     else:
@@ -465,8 +465,48 @@ if not without_review:
                 fail(
                     f"{path}: pack-hash mismatch (review recorded {recorded_hash}, current pack is {actual_hash[:12]}; re-run design-reviewer)"
                 )
-        elif os.environ.get("KIT_STRICT_ARCH_REVIEW") == "1":
-            fail(f"{path}: missing 'pack-hash: <sha256>' header (compute via 'sh .agents-v0/ci/check-architecture-pack.sh --hash')")
+        else:
+            def pack_hash_required():
+                if os.environ.get("KIT_STRICT_ARCH_REVIEW") == "1":
+                    return True, False
+                arch_txt = read(arch) or ""
+                m_rows = re.findall(r"(?im)^\s*\|\s*architecture\s*\|[^|]*\|[^|]*\|\s*([^|]+?)\s*\|", arch_txt)
+                if m_rows and not re.match(r"^(approved|approve|yes|pass)(\b|[^a-z])", m_rows[-1].strip(), re.I):
+                    return True, False
+                import subprocess
+                try:
+                    if subprocess.run(["git", "ls-files", "--error-unmatch", "--", arch], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                        return False, False
+                except Exception:
+                    return False, False
+                arc_t = read(os.path.join(system, "arc-record.md")) or ""
+                arc_opts = split_sections(arc_t, 2).get("options", "")
+                adr_ps = sorted(set(re.findall(r"docs/agents-v0/adr/[A-Za-z0-9_.-]+\.md", arc_opts)))
+                cmap_t = read(os.path.join(system, "context-map.md")) or ""
+                comp_ps = sorted(set(re.findall(r"docs/agents-v0/design/system/components/[A-Za-z0-9_.-]+\.md", cmap_t)))
+                candidates = (
+                    [arch, os.path.join(base, "network.md"), path]
+                    + [os.path.join(system, n) for n in ("nfr-slo.md", "threat-model.md", "ops-readiness.md", "arc-record.md", "context-map.md")]
+                    + adr_ps
+                    + comp_ps
+                )
+                for p in candidates:
+                    if not os.path.isfile(p):
+                        continue
+                    if subprocess.run(["git", "ls-files", "--error-unmatch", "--", p], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                        return True, False
+                    st = subprocess.run(["git", "status", "--porcelain", "--", p], capture_output=True, text=True)
+                    if st.returncode != 0 or st.stdout.strip():
+                        return True, False
+                return False, bool(m_rows)
+
+            req_hash, warn_sealed = pack_hash_required()
+            if req_hash:
+                fail(f"{path}: missing 'pack-hash: <sha256>' header (compute via 'sh .agents-v0/ci/check-architecture-pack.sh --hash')")
+            elif warn_sealed:
+                sys.stderr.write(
+                    f"WARN: {path}: missing 'pack-hash: <sha256>' header (tolerated for Approved architecture pack committed in git; editing or re-opening enforces strict check)\n"
+                )
         for line in strip_comments(body).splitlines():
             if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
                 fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")

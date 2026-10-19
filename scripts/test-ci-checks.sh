@@ -1631,10 +1631,17 @@ EOF
   git add -A && git_commit "docs: sealed approved architecture and component plan"
 )
 expect_pass "check-architecture-pack --approved tolerates legacy sealed git-tracked component plan without pack-hash" "$d" sh "$CI/check-architecture-pack.sh" --approved
+expect_pass "check-architecture-pack tolerates legacy sealed git-tracked component plan without --approved" "$d" sh "$CI/check-architecture-pack.sh"
 expect_fail "check-architecture-pack --approved KIT_STRICT_COMPONENT_PLAN=1 rejects sealed component plan with (Proposed)" "$d" env KIT_STRICT_COMPONENT_PLAN=1 sh "$CI/check-architecture-pack.sh" --approved
 printf '\n<!-- edit -->\n' >> "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack --approved rejects sealed component plan once edited on disk" "$d" sh "$CI/check-architecture-pack.sh" --approved
 (cd "$d" && git checkout -q -- docs/agents-v0/design/system/components/orders.md)
+printf '\n<!-- arch edit -->\n' >> "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack requires pack-hash when git-tracked architecture.md is edited on disk" "$d" sh "$CI/check-architecture-pack.sh"
+(cd "$d" && git checkout -q -- docs/agents-v0/architecture.md)
+printf '| architecture | docs/agents-v0/architecture.md | dev | Re-opened | 2026-01-02 |\n' >> "$d/docs/agents-v0/architecture.md"
+expect_fail "check-architecture-pack requires pack-hash when architecture row is Re-opened" "$d" sh "$CI/check-architecture-pack.sh"
+(cd "$d" && git checkout -q -- docs/agents-v0/architecture.md)
 phash_comp="$(cd "$d" && sh "$CI/check-architecture-pack.sh" --hash | cut -c1-12)"
 cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<EOF
 agent: design-reviewer
