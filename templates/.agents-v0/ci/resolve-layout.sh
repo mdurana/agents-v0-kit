@@ -27,7 +27,7 @@ is_placeholder() {
 
 is_na() {
   case "$1" in
-    '' | n/a | N/A | na | NA | '-' | '—') return 0 ;;
+    '' | n/a | N/A | na | NA | '-' | '—' | '–') return 0 ;;
   esac
   return 1
 }

@@ -44,10 +44,22 @@ command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2
 here="$(cd "$(dirname "$0")" && pwd)"
 
 roadmap="$(sed -n 's/^[[:space:]]*Roadmap:[[:space:]]*//p' "$manifest" | head -n 1 | sed 's/[[:space:]]*$//')"
+if grep -Eq '^[[:space:]]*Roadmap:' "$manifest"; then
+  if [ -z "$roadmap" ] || case "$roadmap" in *'<'*|*'>'*|*'['*|*']'*) true ;; *) false ;; esac; then
+    printf 'FAIL: %s has empty or placeholder Roadmap: line\n' "$manifest" >&2
+    exit 1
+  fi
+fi
 if [ -n "$roadmap" ]; then
   sh "$here/check-approvals.sh" "$roadmap" roadmap || exit 1
 fi
 arch="$(sed -n 's/^[[:space:]]*Architecture:[[:space:]]*//p' "$manifest" | head -n 1 | sed 's/[[:space:]]*$//')"
+if grep -Eq '^[[:space:]]*Architecture:' "$manifest"; then
+  if [ -z "$arch" ] || case "$arch" in *'<'*|*'>'*|*'['*|*']'*) true ;; *) false ;; esac; then
+    printf 'FAIL: %s has empty or placeholder Architecture: line\n' "$manifest" >&2
+    exit 1
+  fi
+fi
 if [ -n "$arch" ]; then
   sh "$here/check-approvals.sh" "$arch" architecture || exit 1
   sh "$here/check-architecture-pack.sh" --approved "$arch" || exit 1
@@ -77,6 +89,24 @@ artifacts="$(printf '%s\n' "$section" | awk -F'|' '
 missing=0
 checked=0
 if [ "$phase" = "plan" ]; then
+  non_p0="$(printf '%s\n' "$section" | awk -F'|' '
+    /---/ { next }
+    /Story [Ii][Dd]/ { next }
+    /^[[:space:]]*\|/ {
+      id = $2
+      gsub(/^[ \t]+|[ \t]+$/, "", id)
+      if (id != "" && id != "P0-A") print id
+    }')"
+  if [ -n "$non_p0" ] && { [ -f "docs/agents-v0/architecture.md" ] || [ "${REQUIRE_PLAN_PREREQS:-0}" = "1" ]; }; then
+    if [ -z "$roadmap" ]; then
+      printf 'FAIL: %s must record "Roadmap: <path>" for non-P0 plan\n' "$manifest" >&2
+      missing=1
+    fi
+    if [ -z "$arch" ]; then
+      printf 'FAIL: %s must record "Architecture: docs/agents-v0/architecture.md" for non-P0 plan\n' "$manifest" >&2
+      missing=1
+    fi
+  fi
   for a in $artifacts; do
     case "$a" in
       *'<'*|*'>'*|*'['*|*']'*)
@@ -253,7 +283,7 @@ if phase == "plan":
             errors.append(f"FAIL: story {sid} has an empty Dependency cell (use — when there is no dependency)")
         else:
             for d in [x.strip() for x in re.split(r'[,;\s]+', dep) if x.strip()]:
-                if d in {"-", "—", "None", "none"}:
+                if d in {"-", "—", "–", "None", "none"}:
                     continue
                 if re.match(r"^P[0-9]+$", d):
                     errors.append(f"FAIL: story {sid} still has milestone-level dependency stub '{d}' (replace with concrete story IDs or —)")
@@ -297,7 +327,7 @@ PY
 
     for dep in $(printf '%s' "$sdep" | tr ',;' '  '); do
       case "$dep" in
-        ''|'-'|'—'|'None'|'none') continue ;;
+        ''|'-'|'—'|'–'|'None'|'none') continue ;;
         P[0-9]|P[0-9][0-9]) continue ;;
         *.md)
           if [ ! -f "$dep" ] || ! has_approval "$dep" milestone; then

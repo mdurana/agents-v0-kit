@@ -561,6 +561,44 @@ EOF
 expect_fail "check-milestone detects dependency cycle and fails" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/cycle.md plan
 rm -f "$d/docs/agents-v0/milestones/cycle.md"
 
+cat > "$d/docs/agents-v0/milestones/endash.md" <<'EOF'
+# Milestone: EnDash
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| E-A | As a user, I want dash, so that endash. | docs/agents-v0/requirements/ea.md | planned | – | backend | 2 |
+EOF
+expect_pass "check-milestone accepts en dash as empty dependency token" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/endash.md plan
+rm -f "$d/docs/agents-v0/milestones/endash.md"
+
+cat > "$d/docs/agents-v0/milestones/placeholder-hdr.md" <<'EOF'
+# Milestone: Placeholder
+
+Roadmap: <path-to-roadmap>
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P-A | As a user, I want p, so that q. | docs/agents-v0/requirements/pa.md | planned | — | backend | 2 |
+EOF
+expect_fail "check-milestone rejects placeholder Roadmap header" "$d" sh "$CI/check-milestone.sh" docs/agents-v0/milestones/placeholder-hdr.md plan
+rm -f "$d/docs/agents-v0/milestones/placeholder-hdr.md"
+
+cat > "$d/docs/agents-v0/milestones/no-roadmap.md" <<'EOF'
+# Milestone: NoRoadmap
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| NR-A | As a user, I want r, so that s. | docs/agents-v0/requirements/nra.md | planned | — | backend | 2 |
+EOF
+expect_fail "check-milestone requires roadmap when REQUIRE_PLAN_PREREQS=1" "$d" env REQUIRE_PLAN_PREREQS=1 sh "$CI/check-milestone.sh" docs/agents-v0/milestones/no-roadmap.md plan
+rm -f "$d/docs/agents-v0/milestones/no-roadmap.md"
+
 # --- check-milestone.sh SLO waivers -----------------------------------------
 d="$tmp/slo"
 mkdir -p "$d/docs/agents-v0/milestones" "$d/docs/agents-v0/requirements" "$d/docs/agents-v0/design/system" "$d/docs/agents-v0/verify/s"
