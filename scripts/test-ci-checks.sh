@@ -346,6 +346,13 @@ mkdir_dec dec-pending '| Design | docs/agents-v0/design/x/design.md | @ada | App
 expect_fail "check-approvals: a pending approval is not an approval" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-pending.md design
 mkdir_dec dec-plain '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-01 |'
 expect_pass "check-approvals: a plain Approved row still passes" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-plain.md design
+mkdir_dec dec-comment-only \
+  '<!-- Append the Approved row only after explicit user approval:' \
+  '| Design | docs/agents-v0/design/x/design.md | @ada | Approved | 2026-01-01 |' \
+  '-->'
+expect_fail "check-approvals: an Approved row inside an HTML comment is ignored" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-comment-only.md design
+mkdir_dec dec-placeholder '| Design | docs/agents-v0/design/x/design.md | <name> | Approved | <date> |'
+expect_fail "check-approvals: an approval row with placeholders is rejected" "$d" sh "$CI/check-approvals.sh" docs/agents-v0/requirements/dec-placeholder.md design
 mkdir_dec dec-evidence \
   '| Build | docs/agents-v0/build/missing/build-report.md | @ada | Approved | 2026-01-01 |' \
   '| Build | docs/agents-v0/build/dec/build-report.md | @ada | Approved | 2026-01-02 |'
@@ -1243,6 +1250,132 @@ Discovery: docs/product/claims-discovery.md (sha256: 000000000000000000000000000
 | roadmap | docs/agents-v0/roadmap/claims-hash-mismatch.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
 EOF
 expect_fail "check-roadmap rejects hash mismatch when discovery document changed" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-hash-mismatch.md
+
+cat > "$d/docs/agents-v0/roadmap/claims-missing-oos.md" <<EOF
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: $disc_hash)
+
+## Problem
+Slow batch claim adjudication.
+
+## Success metric
+Adjudication time under 15 minutes.
+
+## Chosen option
+Option A.
+
+## Now
+- Batch file ingestion
+- **Ingestion Modes:**
+  - Scheduled CSV batch import
+
+## Next
+- Adjudication rules engine
+- **Ingestion Modes:**
+  - Real-time webhook ingestion
+
+## Later
+- Create and validate configuration tickets
+- Audit trail for configuration changes
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims-missing-oos.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_fail "check-roadmap rejects roadmap missing Out of scope section" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-missing-oos.md
+
+cat > "$d/docs/product/timing-discovery.md" <<'EOF'
+# Timing Discovery
+## Problem
+Problem description.
+## Success metric
+Metric description.
+## Options
+Option 1.
+## Chosen option
+Option 1.
+## In scope
+- Immediate core feature
+- **Later Onboarding:** Additional use cases added later
+## Out of scope
+- Out of scope feature
+EOF
+timing_hash="$(python3 -c 'import hashlib, sys; sys.stdout.write(hashlib.sha256(open("'$d'/docs/product/timing-discovery.md", "rb").read()).hexdigest())')"
+
+cat > "$d/docs/agents-v0/roadmap/timing-misplaced.md" <<EOF
+# Roadmap: timing
+
+Discovery: docs/product/timing-discovery.md (sha256: $timing_hash)
+
+## Problem
+Problem description.
+
+## Success metric
+Metric description.
+
+## Chosen option
+Option 1.
+
+## Now
+- Immediate core feature
+- **Later Onboarding:** Additional use cases added later
+
+## Next
+
+## Later
+
+## Out of scope
+- Out of scope feature
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/timing-misplaced.md, docs/product/timing-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_fail "check-roadmap rejects later item placed in Now" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/timing-misplaced.md
+
+cat > "$d/docs/agents-v0/roadmap/claims-placeholder.md" <<EOF
+# Roadmap: claims
+
+Discovery: docs/product/claims-discovery.md (sha256: $disc_hash)
+
+## Problem
+<copied from the discovery file>
+
+## Success metric
+Adjudication time under 15 minutes.
+
+## Chosen option
+Option A.
+
+## Now
+- Batch file ingestion
+- **Ingestion Modes:**
+  - Scheduled CSV batch import
+
+## Next
+- Adjudication rules engine
+- **Ingestion Modes:**
+  - Real-time webhook ingestion
+
+## Later
+- Create and validate configuration tickets
+- Audit trail for configuration changes
+
+## Out of scope
+- Real-time mobile push notifications
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| roadmap | docs/agents-v0/roadmap/claims-placeholder.md, docs/product/claims-discovery.md | dev | Approved | 2026-01-01 |
+EOF
+expect_fail "check-roadmap rejects unresolved placeholder in roadmap section" "$d" sh "$CI/check-roadmap.sh" docs/agents-v0/roadmap/claims-placeholder.md
 
 # Pre-sha256 sealed roadmap committed in git passes with warning; editing or re-opening enforces strict check
 d_legacy_rm="$tmp/roadmap-legacy-git"

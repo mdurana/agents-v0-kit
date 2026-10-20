@@ -36,12 +36,40 @@ esac
 
 [ -f "$art" ] || { printf 'FAIL: requirements artifact not found: %s\n' "$art" >&2; exit 1; }
 
-# Extract the "Delivery approvals" section (heading to next heading).
+# Extract the "Delivery approvals" section (heading to next heading), stripping HTML comments.
 section="$(awk '
   /^#+[[:space:]]*[Dd]elivery [Aa]pprovals/ { in_section = 1; next }
   /^#+[[:space:]]/ { in_section = 0 }
   in_section
-' "$art")"
+' "$art" | awk '
+  BEGIN { in_c = 0 }
+  {
+    s = $0
+    out = ""
+    while (length(s) > 0) {
+      if (!in_c) {
+        p = index(s, "<!--")
+        if (p == 0) {
+          out = out s
+          s = ""
+        } else {
+          out = out substr(s, 1, p - 1)
+          s = substr(s, p + 4)
+          in_c = 1
+        }
+      } else {
+        p = index(s, "-->")
+        if (p == 0) {
+          s = ""
+        } else {
+          s = substr(s, p + 3)
+          in_c = 0
+        }
+      }
+    }
+    if (!in_c && out ~ /[^ \t]/) print out
+  }
+')"
 
 [ -n "$section" ] || { printf 'FAIL: %s has no "Delivery approvals" section\n' "$art" >&2; exit 1; }
 
@@ -50,6 +78,12 @@ section="$(awk '
 # current decision: an earlier Approved row does not outlive a later Re-opened row.
 row="$(printf '%s' "$section" | grep -i "|[[:space:]]*${phase}[[:space:]]*|" | tail -n1 || true)"
 [ -n "$row" ] || { printf 'FAIL: no approval row for phase "%s" in %s\n' "$phase" "$art" >&2; exit 1; }
+
+# Reject template placeholders in the approval row (<...>, [...], TBD, TODO, FIXME, etc.)
+if printf '%s' "$row" | grep -Eq '(<[^>]+>|\[\.\.\.\]|\b(TBD|TODO|FIXME|XXX?)\b|__+|[?]{2,})'; then
+  printf 'FAIL: phase "%s" in %s contains unresolved placeholders\n' "$phase" "$art" >&2
+  exit 1
+fi
 
 # The Decision column is the 4th table field (awk fields: 1 empty, 2 Phase,
 # 3 Artifacts, 4 Approver, 5 Decision). Require a leading positive token so

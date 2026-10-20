@@ -170,22 +170,33 @@ def parse_bullet_tree(section_text):
             continue
         if fenced or not stripped:
             continue
-        if re.match(r"^#{1,6}\s+", stripped):
-            stack = []
+        m_head = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        m_bold_para = re.match(r"^\s*(\*\*[^*]+\*\*)\s*$", raw_line)
+        if m_head:
+            clean = re.sub(r"\s+", " ", m_head.group(2).strip())
+            node = {"text": clean, "indent": -1, "children": []}
+            roots.append(node)
+            stack = [node]
+            continue
+        elif m_bold_para:
+            clean = re.sub(r"\s+", " ", raw_line.strip())
+            node = {"text": clean, "indent": -1, "children": []}
+            roots.append(node)
+            stack = [node]
             continue
         m = re.match(r"^(\s*)(?:[-*+]|\d+\.)\s+(.+)$", raw_line)
         if m:
             indent = len(m.group(1).expandtabs(2))
             clean = re.sub(r"\s+", " ", m.group(2).strip())
             node = {"text": clean, "indent": indent, "children": []}
-            while stack and stack[-1]["indent"] >= indent:
+            while stack and stack[-1]["indent"] >= 0 and stack[-1]["indent"] >= indent:
                 stack.pop()
             if stack:
                 stack[-1]["children"].append(node)
             else:
                 roots.append(node)
             stack.append(node)
-        elif stack:
+        elif stack and stack[-1]["indent"] >= 0:
             indent = len(raw_line) - len(stripped)
             if indent > stack[-1]["indent"]:
                 stack[-1]["text"] = re.sub(
@@ -400,6 +411,49 @@ if mode == "roadmap":
             report_roadmap(
                 f"out-of-scope item '{item}' appears in roadmap horizon '{horizon}'"
             )
+
+    # 5. Out of scope completeness in roadmap: all out-of-scope items from discovery must be recorded in roadmap Out of scope
+    disc_oos_leaves = tree_leaf_texts(out_of_scope_tree)
+    if disc_oos_leaves:
+        roadmap_oos_raw = roadmap_sections.get("out of scope", "")
+        if not roadmap_oos_raw:
+            report_roadmap("roadmap is missing required 'Out of scope' section")
+        else:
+            roadmap_oos_tree = parse_bullet_tree(roadmap_oos_raw)
+            roadmap_oos_set = set(tree_all_texts(roadmap_oos_tree))
+            for oos_leaf in disc_oos_leaves:
+                if oos_leaf not in roadmap_oos_set:
+                    report_roadmap(
+                        f"out-of-scope item '{oos_leaf}' from discovery is missing from roadmap Out of scope section"
+                    )
+
+    # 6. Timing consistency: items with explicit horizon/timing indicators must not contradict their horizon
+    for horizon, item in all_roadmap_nodes:
+        lower_item = item.lower()
+        if horizon == "Now":
+            if re.search(r"\b(?:added\s+later|deferred|future\s+phase|planned\s+for\s+later)\b", lower_item) or re.match(r"^\*?\*?\s*later\b", lower_item):
+                report_roadmap(
+                    f"item '{item}' denotes later timing but is placed in horizon 'Now'"
+                )
+            elif re.search(r"\b(?:the\s+next\s+integration|next\s+phase)\b", lower_item):
+                report_roadmap(
+                    f"item '{item}' denotes next integration/phase but is placed in horizon 'Now'"
+                )
+        elif horizon == "Later":
+            if re.search(r"\b(?:current\s+delivery|immediate\s+delivery)\b", lower_item):
+                report_roadmap(
+                    f"item '{item}' denotes current delivery but is placed in horizon 'Later'"
+                )
+
+    # 7. No leftover placeholders in roadmap content sections
+    for sec_name in ["problem", "success metric", "chosen option", "now", "next", "later", "out of scope"]:
+        sec_body = roadmap_sections.get(sec_name, "")
+        if sec_body:
+            ph = PLACEHOLDER.search(sec_body)
+            if ph:
+                report_roadmap(
+                    f"roadmap section '{sec_name}' contains unresolved placeholder: '{ph.group(0)}'"
+                )
 
     if issues:
         print(

@@ -36,8 +36,8 @@ Discovery: <repo-relative path the user passed to /v0-roadmap> (sha256: <sha256-
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-<!-- Append the Approved row only after explicit user approval:
-| roadmap | <this file, the discovery path> | <name> | Approved | <YYYY-MM-DD> |
+<!-- Append the Approved row only after explicit user approval, e.g.:
+roadmap | <this file, the discovery path> | <name> | Approved | <YYYY-MM-DD>
 -->
 
 > The `roadmap` row covers the sequence. The discovery file has no kit approval row.

@@ -36,6 +36,8 @@ CI_DIR = os.path.dirname(SELF)
 AGENTS_DIR = os.path.dirname(CI_DIR)
 MANIFEST = os.path.join(CI_DIR, "gates.json")
 APPROVED_RE = re.compile(r"(approved|approve|yes|pass)[\s.!]*", re.I)
+COMMENT = re.compile(r"<!--.*?-->", re.S)
+PLACEHOLDER_RE = re.compile(r"(<[^>\n]+>|\[\.\.\.\]|\b(TBD|TODO|FIXME|XXX?)\b|__+|[?]{2,})", re.I)
 
 
 def usage(code=2):
@@ -86,7 +88,8 @@ def approval_rows(text, phase):
     """Decisions of every Delivery approvals row for <phase>, in file order."""
     out = []
     in_section = False
-    for line in (text or "").splitlines():
+    clean_text = COMMENT.sub("", text or "")
+    for line in clean_text.splitlines():
         if re.match(r"^#+\s*delivery approvals", line, re.I):
             in_section = True
             continue
@@ -101,7 +104,12 @@ def approval_rows(text, phase):
 
 
 def is_approved(rows):
-    return bool(rows) and bool(APPROVED_RE.fullmatch(rows[-1][0].strip()))
+    if not rows:
+        return False
+    decision, line = rows[-1]
+    if PLACEHOLDER_RE.search(line):
+        return False
+    return bool(APPROVED_RE.fullmatch(decision.strip()))
 
 
 def expand(token, artifact):
