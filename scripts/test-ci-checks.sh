@@ -203,6 +203,13 @@ EOF
 - **Status:** Proposed
 
 Pack: java
+
+## Patterns considered
+
+| Pattern | Fit | Trade-offs | Rejected because |
+|---------|-----|------------|------------------|
+| Modular monolith | Single team | Single failure domain | Selected |
+| Microservices | Independent scaling | High operational complexity | Team too small |
 EOF
   cat > "$p/docs/agents-v0/design/system/arc-record.md" <<'EOF'
 # ARC record
@@ -1791,6 +1798,83 @@ expect_fail "check-architecture-pack --approved rejects git-committed component 
 
 printf '# Component plan: orders\n' > "$d/docs/agents-v0/design/system/components/orders.md"
 expect_fail "check-architecture-pack rejects a component plan with no parent link" "$d" sh "$CI/check-architecture-pack.sh"
+
+# Findings table parsing tests
+d="$tmp/pack-review-findings"
+write_pack "$d"
+cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<'EOF'
+agent: design-reviewer
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Critical | model is not Resolved yet | architecture.md:1 | Open |
+EOF
+expect_fail "check-architecture-pack rejects Critical finding with Status Open even when text contains Resolved" "$d" sh "$CI/check-architecture-pack.sh"
+
+cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<'EOF'
+agent: design-reviewer
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Critical | risk accepted by committee | architecture.md:1 | Accepted |
+EOF
+expect_pass "check-architecture-pack accepts Critical finding with Status Accepted" "$d" sh "$CI/check-architecture-pack.sh"
+
+cat > "$d/docs/agents-v0/design/system/architecture-review.md" <<'EOF'
+agent: design-reviewer
+
+| # | Label | Finding | Evidence | Status |
+|---|-------|---------|----------|--------|
+| 1 | Suggestion | consider caching | architecture.md:1 | |
+EOF
+expect_fail "check-architecture-pack rejects Suggestion with blank Status" "$d" sh "$CI/check-architecture-pack.sh"
+
+# C4 prose allows English verb 'go' and 'go-live'
+d="$tmp/pack-go-prose"
+write_pack "$d"
+sedi 's/OrderApp\[Order application\]/OrderApp[Order application]\n  %% Operators go to the portal. go-live is later./' "$d/docs/agents-v0/architecture.md"
+sedi '1s/^/Operators go to the portal. go-live is later.\n\n/' "$d/docs/agents-v0/architecture.md"
+expect_pass "check-architecture-pack allows English verb go and go-live in prose" "$d" sh "$CI/check-architecture-pack.sh"
+
+# Patterns considered table validation
+d="$tmp/pack-patterns-missing"
+write_pack "$d"
+sedi '/## Patterns considered/,+6d' "$d/docs/agents-v0/adr/01-pattern.md"
+expect_fail "check-architecture-pack rejects pattern ADR missing Patterns considered" "$d" sh "$CI/check-architecture-pack.sh"
+
+# Sequence diagram validation
+d="$tmp/pack-seq-missing"
+write_pack "$d"
+sedi 's|N/A: none yet|docs/agents-v0/diagrams/sequences/missing.md|' "$d/docs/agents-v0/design/system/context-map.md"
+expect_fail "check-architecture-pack rejects missing sequence diagram in context-map" "$d" sh "$CI/check-architecture-pack.sh"
+
+# Component plan ADR variant Proposed
+d="$tmp/pack-comp-proposed-variant"
+write_pack "$d"
+sedi 's/Proposed/Accepted/' "$d/docs/agents-v0/adr/01-pattern.md"
+cat > "$d/docs/agents-v0/design/system/components/orders.md" <<'EOF'
+# Component plan: orders
+
+Parent: docs/agents-v0/architecture.md
+- ADR 01, Proposed)
+
+## Consistency check
+- [x] verified
+EOF
+sedi 's|N/A: single service in this release|docs/agents-v0/design/system/components/orders.md|' "$d/docs/agents-v0/design/system/context-map.md"
+expect_fail "check-architecture-pack --approved rejects component plan with ADR variant Proposed" "$d" sh "$CI/check-architecture-pack.sh" --approved
+
+# Second Data flow mermaid block with ghost node
+d="$tmp/pack-flow-ghost"
+write_pack "$d"
+python3 -c '
+from pathlib import Path
+p = Path("'"$d"'/docs/agents-v0/architecture.md")
+t = p.read_text()
+sub = "```mermaid\nflowchart TB\n  ghostNode[Ghost node]\n```\n\n## Data models"
+p.write_text(t.replace("## Data models", sub))
+'
+expect_fail "check-architecture-pack rejects ghost node in second Data flow mermaid block" "$d" sh "$CI/check-architecture-pack.sh"
 
 d="$tmp/pack-milestone"
 write_pack "$d"

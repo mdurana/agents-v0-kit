@@ -148,7 +148,7 @@ def current_pack_hash():
     cmap_t = read(os.path.join(system, "context-map.md")) or ""
     for comp_p in sorted(set(re.findall(r"docs/agents-v0/design/system/components/[A-Za-z0-9_.-]+\.md", cmap_t))):
         comp_t = read(comp_p) or ""
-        comp_norm = re.sub(r"\(\s*(?:Proposed|Accepted)\s*\)", "(ADR-Status)", comp_t, flags=re.I).rstrip()
+        comp_norm = re.sub(r"([(\[,]\s*)(?:Proposed|Accepted)(\s*[)\]])", r"\1ADR-Status\2", comp_t, flags=re.I).rstrip()
         feed(f"component:{comp_p}", comp_norm)
 
     return h.hexdigest()
@@ -229,6 +229,27 @@ PACK_LINE = re.compile(r"^Pack:\s*(\S+)\s*$", re.M)
 text = read(arch)
 h2 = split_sections(text, 2)
 
+def is_tech_match(line, m, in_mermaid):
+    word = m.group(0)
+    if word.lower() != "go":
+        return True
+    start, end = m.start(), m.end()
+    if line[end:].startswith("-") or line[:start].endswith("-"):
+        return False
+    rest_after = line[end:]
+    if re.match(r"^\s+(?:to|through|into|via|from|ahead|back|off|away|down|up|over)\b", rest_after, re.I):
+        return False
+    if in_mermaid:
+        return True
+    if re.match(r"^\s+(?:service|app|application|worker|daemon|module|backend|server|container|code|runtime|binary|sdk|api|microservice|lang|language)\b", rest_after, re.I):
+        return True
+    if re.search(r"\b(?:in|using|with)\s+$", line[:start], re.I) and word == "Go":
+        return True
+    if word == "go":
+        return False
+    return True
+
+
 # --- C4: present, drawn, technology-agnostic ---------------------------------
 for name in ("c4 context", "c4 container"):
     body = h2.get(name)
@@ -237,10 +258,18 @@ for name in ("c4 context", "c4 container"):
         continue
     if not mermaid_blocks(body):
         fail(f"{arch}: section '{name}' has no Mermaid diagram")
+    in_mermaid = False
     for n, line in enumerate(strip_comments(body).splitlines()):
-        m = TECH.search(line)
-        if m:
-            fail(f"{arch}: section '{name}' names a product technology ('{m.group(0)}'); C4 stays technology-agnostic: {line.strip()[:80]}")
+        if line.lstrip().startswith("```"):
+            in_mermaid = not in_mermaid
+            continue
+        found_tech = None
+        for m in TECH.finditer(line):
+            if is_tech_match(line, m, in_mermaid):
+                found_tech = m.group(0)
+                break
+        if found_tech:
+            fail(f"{arch}: section '{name}' names a product technology ('{found_tech}'); C4 stays technology-agnostic: {line.strip()[:80]}")
             break
 
 
@@ -261,12 +290,15 @@ def required(heading, diagram=None, allow_na=True, source=None, where=None):
     return body
 
 
-flow = required("data flow", diagram=["flowchart", "graph"])
+c4_c_blocks = mermaid_blocks(h2.get("c4 container", ""))
+c4_has_multiple_containers = bool(c4_c_blocks and len(set().union(*(node_ids(blk) for blk in c4_c_blocks))) > 1)
+flow = required("data flow", diagram=["flowchart", "graph"], allow_na=not c4_has_multiple_containers)
 container = h2.get("c4 container")
 if flow and container and not is_na(flow):
-    flow_blocks, c4_blocks = mermaid_blocks(flow), mermaid_blocks(container)
-    if flow_blocks and c4_blocks:
-        a, b = node_ids(c4_blocks[0]), node_ids(flow_blocks[0])
+    flow_blocks = mermaid_blocks(flow)
+    if flow_blocks and c4_c_blocks:
+        a = set().union(*(node_ids(blk) for blk in c4_c_blocks))
+        b = set().union(*(node_ids(blk) for blk in flow_blocks))
         if a != b:
             fail(f"{arch}: Data flow nodes differ from C4 Container (only in Data flow: {sorted(b - a)}; only in C4 Container: {sorted(a - b)}); reuse the same node IDs and relabel the edges")
 
@@ -280,10 +312,13 @@ else:
 
 required("state machine", diagram=["stateDiagram-v2", "stateDiagram"])
 failure = required("failure domains and degradation")
-if failure and not is_na(failure):
-    _, rows = table_rows(failure)
-    if not filled_rows(rows, 4):
-        fail(f"{arch}: 'failure domains and degradation' needs at least one dependency row with failure, blast radius, and degraded behaviour filled")
+if failure:
+    f_hdr, rows = table_rows(failure)
+    if f_hdr is not None:
+        if not filled_rows(rows, 4):
+            fail(f"{arch}: 'failure domains and degradation' needs at least one dependency row with failure, blast radius, and degraded behaviour filled")
+    elif not is_na(failure):
+        fail(f"{arch}: 'failure domains and degradation' needs a dependency table or 'N/A: <reason>'")
 required("mvp and future state", allow_na=False)
 
 # --- network: target topology ------------------------------------------------
@@ -347,6 +382,12 @@ if body is not None:
         packs = PACK_LINE.findall(adr_text)
         if not packs:
             fail(f"{adr}: pattern ADR must record Pack: <id>")
+        patterns_sec = split_sections(adr_text, 2).get("patterns considered", "")
+        p_hdr, p_rows = table_rows(patterns_sec)
+        if not p_hdr:
+            fail(f"{adr}: missing '## Patterns considered' table (Pattern | Fit | Trade-offs | Rejected because)")
+        elif len(filled_rows(p_rows, 3)) < 2:
+            fail(f"{adr}: '## Patterns considered' needs at least two filled pattern rows comparing alternatives")
         for pack in packs:
             data = packlib.load(pack)
             problems = [] if data is None else packlib.errors_of(data, "backend")
@@ -393,10 +434,24 @@ if body is not None:
         fail(f"{path}: Bounded contexts table needs the Context and Component plan columns (see the context-map template)")
     else:
         ci, pi = cols.index("context"), cols.index("component plan")
+        si = cols.index("sequence diagram") if "sequence diagram" in cols else None
         contexts = [r for r in rows if len(r) > max(ci, pi) and r[ci] and not r[ci].startswith("<")]
         if not contexts:
             fail(f"{path} has no bounded context row")
         for r in contexts:
+            if si is not None and len(r) > si:
+                seq_cell = r[si].strip()
+                if seq_cell and not is_na(seq_cell) and not re.match(r"N/A:\s*\S{3,}", seq_cell, re.I):
+                    seq_match = re.search(r"docs/agents-v0/diagrams/sequences/[A-Za-z0-9_.-]+\.md", seq_cell)
+                    if not seq_match:
+                        fail(f"{path}: context '{r[ci]}' has invalid sequence diagram path '{seq_cell}' (expected docs/agents-v0/diagrams/sequences/<name>.md or 'N/A: <reason>')")
+                    else:
+                        seq_path = seq_match.group(0)
+                        seq_text = read(seq_path)
+                        if seq_text is None:
+                            fail(f"{path}: sequence diagram missing for '{r[ci]}': {seq_path}")
+                        elif not has_block(seq_text, ["sequenceDiagram"]):
+                            fail(f"{seq_path}: needs a Mermaid sequenceDiagram block (or 'N/A: <reason>' in context map)")
             cell = r[pi]
             if re.match(r"N/A:\s*\S{3,}", cell):
                 continue
@@ -435,7 +490,7 @@ if body is not None:
                     return True
 
                 comp_issues = []
-                if approved and re.search(r"\(\s*Proposed\s*\)", plan_text, re.I):
+                if approved and re.search(r"(?:\(|,\s*|:\s*|\[|\bADR\s+\d+[^.\n]*?\b)Proposed\b", plan_text, re.I):
                     comp_issues.append(f"{plan.group(0)}: still labels an ADR '(Proposed)' after architecture approval (update to Accepted)")
                 cc_sec = split_sections(plan_text, 2).get("consistency check", "")
                 if re.search(r"^\s*-\s*\[\s\]", cc_sec, re.M):
@@ -507,17 +562,42 @@ if not without_review:
                 sys.stderr.write(
                     f"WARN: {path}: missing 'pack-hash: <sha256>' header (tolerated for Approved architecture pack committed in git; editing or re-opening enforces strict check)\n"
                 )
-        for line in strip_comments(body).splitlines():
-            if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\bResolved\b", line, re.I):
-                fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")
-            elif re.search(r"\|\s*(?:Suggestion|Nice\s+to\s+have)\s*\|", line, re.I):
-                if re.search(r"\|\s*Open\s*\|", line, re.I) or not re.search(
-                    r"\b(?:Resolved|Accepted|Deferred|Won'?t\s+fix|N/A)\b", line, re.I
-                ):
-                    fail(
-                        f"{path} has an open finding (mark Resolved, Deferred, or Accepted before approval): {line.strip()[:100]}"
-                    )
-            elif approved and not line.lstrip().startswith("|"):
+        f_sec = split_sections(body, 2).get("findings", body)
+        f_header, f_rows = table_rows(f_sec)
+        if f_header and f_rows:
+            col_map = {h.lower(): i for i, h in enumerate(f_header)}
+            status_col = col_map.get("status")
+            label_col = col_map.get("label")
+            if status_col is not None and label_col is not None:
+                for row in f_rows:
+                    if len(row) <= max(status_col, label_col):
+                        continue
+                    lbl = row[label_col].strip()
+                    st = row[status_col].strip()
+                    is_open = not st or bool(re.search(r"\bOpen\b", st, re.I))
+                    is_dispositioned = bool(re.search(r"\b(?:Resolved|Accepted|Deferred|Won'?t\s+fix|N/A)\b", st, re.I))
+
+                    if re.search(r"\bCritical\b", lbl, re.I):
+                        if is_open or not re.search(r"\b(?:Resolved|Accepted)\b", st, re.I):
+                            fail(f"{path} has an unresolved Critical finding: | {' | '.join(row)} |")
+                    elif re.search(r"\b(?:Suggestion|Nice\s+to\s+have)\b", lbl, re.I):
+                        if is_open or not is_dispositioned:
+                            fail(f"{path} has an open finding (mark Resolved, Deferred, or Accepted before approval): | {' | '.join(row)} |")
+        elif not f_header:
+            for line in strip_comments(body).splitlines():
+                if re.search(r"\|\s*Critical\s*\|", line, re.I) and not re.search(r"\b(?:Resolved|Accepted)\b", line, re.I):
+                    fail(f"{path} has an unresolved Critical finding: {line.strip()[:100]}")
+                elif re.search(r"\|\s*(?:Suggestion|Nice\s+to\s+have)\s*\|", line, re.I):
+                    if re.search(r"\|\s*Open\s*\|", line, re.I) or not re.search(
+                        r"\b(?:Resolved|Accepted|Deferred|Won'?t\s+fix|N/A)\b", line, re.I
+                    ):
+                        fail(
+                            f"{path} has an open finding (mark Resolved, Deferred, or Accepted before approval): {line.strip()[:100]}"
+                        )
+        if approved:
+            for line in strip_comments(body).splitlines():
+                if line.lstrip().startswith("|") or line.lstrip().startswith("```"):
+                    continue
                 if re.search(r"\b(?:ADR|Status)\b[^\n]*\bProposed\b|\bProposed\b[^\n]*\bADR\b", line, re.I) and not re.search(
                     r"\bAccepted\b", line, re.I
                 ):
