@@ -14,7 +14,7 @@ Verify phase playbook for the `security-reviewer` agent (`workflow-orchestration
    - Web app (React / existing SvelteKit) → `vapt-webapp.mdc` (always-on F4, F8; regression F1, F2, F3, F5, F6, F7). Mark F9 and F10 N/A only when no API or BFF in the diff validates tokens or writes audit events, and record that reason.
    - PR-level → `vapt-pr-review.mdc`.
 3. For each finding, record: finding ID, pass/fail, evidence (file:line), retest step.
-4. Mark N/A only for an unaffected surface and record the reason. An applicable miss on F4, F8, F9, or F10 is **Critical**. An applicable HIGH or MEDIUM regression finding (F1, F2, F3) blocks merge. A LOW regression finding (F5, F6, F7) blocks merge only when the diff makes it exploitable. N/A is not a security exception for an applicable item.
+4. Mark N/A only for an unaffected surface and record the reason. An applicable miss on F4, F8, F9, or F10 is **Critical**. An applicable HIGH or MEDIUM regression finding (F1, F2, F3) blocks merge and is recorded as **Critical**. A LOW regression finding (F5, F6, F7) blocks merge, and is recorded as **Critical**, only when the diff makes it exploitable. N/A is not a security exception for an applicable item.
 5. Persist the checklist results to `docs/agents-v0/verify/<feature>/vapt-checklist.md` (finding ID, pass/fail/N/A + reason, evidence file:line, retest step); report findings to the orchestrator; on Critical, route back to the responsible Build/Maintain agent.
 
 ## Rule-compliance checklist

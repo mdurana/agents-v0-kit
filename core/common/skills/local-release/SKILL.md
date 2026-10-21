@@ -1,22 +1,23 @@
 ---
 name: local-release
-description: Local release checkpoint after Verify. Fast-forward the integration branch, record Decision Local, and stop so the next story can start. Does not open a merge request.
+description: Primary local release after Verify. Re-run the native verify command, merge with --no-ff, and record the release approved. Does not open a merge request.
 ---
 
 # local-release
 
-Local checkpoint for the `release-manager` agent (`workflow-orchestration.mdc`, `/v0-local-release`). This is not `/v0-release`.
+Primary local completion for the `release-manager` agent (`workflow-orchestration.mdc`, `/v0-local-release`). `/v0-release` is optional when the user wants to push or open a remote merge request.
 
 ## Steps
-1. Confirm Verify passed (`verifyPassed: true` in `docs/agents-v0/requirements/<feature>.state.json` or `docs/agents-v0/maintain/<id>/state.json`) with no Critical findings.
+1. Confirm `"verifyPassed": true` and `"verify"` is in `approvedPhases` (or for `P0-A`, `verifyPassed` is `true` and the user is approving the single P0-A release gate now). A maintenance note with `tier: "emergency"` may proceed when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. If Verify has not passed and neither exception applies, stop and run `/v0-verify` first.
 2. Ensure verify reports, test evidence, and the artifact (`docs/agents-v0/requirements/<feature>.md` or `docs/agents-v0/maintain/<id>/note.md`) are tracked on disk. Only when non-doc files changed after `verifyPassed: true` does the change go back through Verify (`sh .agents-v0/scripts/sync-feature-state.sh --reopen verify --verify-passed false <artifact>`).
-3. Resolve the base with `sh .agents-v0/scripts/resolve-integration-branch.sh`.
-4. Stop for explicit user approval. Do not infer it.
-5. On that approval, write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `maintain/<id>/phase-result.md`) with `phase` `release`, `status` `local`, the branch and SHA, and no GitLab blocker, and optionally append the `release` row with Decision `Local` (not `Approved`). When the user authorizes a commit, commit the feature code, reports, and phase result together.
-6. Check the current branch (`git symbolic-ref --quiet --short HEAD`). When the current branch is already the resolved ref (for example, both are `main`), skip `git merge --ff-only` because the commit in step 5 already advanced that branch. When the current branch is a separate feature branch and the resolved ref is a local branch name with no slash that is an ancestor of `HEAD`, fast-forward the integration branch to `HEAD` (`git checkout <that-ref> && git merge --ff-only <checkpoint-sha>`, its own authorization); if it is not a fast-forward, stop with `blocked` and reason `integration branch is not a fast-forward`. When the ref is `HEAD` or contains a slash, skip the fast-forward and tell the user to set `Integration branch` in `docs/agents-v0/project-profile.md` to a local branch name.
-7. After the merge succeeds (or is skipped because already on the integration branch), run `sh .agents-v0/scripts/sync-feature-state.sh --approve release --clear-active <artifact>` (which also backfills earlier phases and sets `verifyPassed: true` for `Story: P0-A`) and commit the updated state file on user confirmation. The next story may start at `/v0-intake`. This story's next command is `/v0-release`.
+3. Sync `README.md` or sequence diagrams when the feature changed user-facing setup or flows. Update `CHANGELOG.md` via `sh .agents-v0/scripts/release-notes.sh <artifact> --include-unreleased --insert CHANGELOG.md` when the profile uses a changelog.
+4. Resolve the final verify command with `sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"` and/or `"Frontend verify"`, then execute the printed command. The script only prints. If it prints nothing, use the layout default. Stop when the tree is not green, and do not mark the work released.
+5. Resolve the integration branch with `sh .agents-v0/scripts/resolve-integration-branch.sh`.
+6. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `docs/agents-v0/maintain/<id>/phase-result.md`) with `phase: release`, `status: awaiting_approval`, then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval <artifact>`. Stop for explicit user approval. Do not infer it.
+7. After that approval, commit any pending delivery evidence or changelog files when the user authorizes the commit. When the current branch is a feature branch separate from the integration branch, merge with `git merge --no-ff <feature-branch>` on user confirmation. If the merge fails or conflicts, stop and do not mark the work released.
+8. Once the merge succeeds (or when already on the integration branch), run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>`, update that phase-result file to `status: approved`, and commit the updated state file on user confirmation. `--approve release` records the earlier phases. The next story may start at `/v0-intake`. `/v0-release` is optional.
 
 ## Do not
-- Call `glab`, push, or write Decision `Approved` on the release row.
+- Call `glab` or push unless the user explicitly asks to push or run `/v0-release`.
 - Merge or approve a merge request.
-- Treat this checkpoint as Release completion. Completion remains the human merge after `/v0-release`.
+- Treat `/v0-release` as required for this local completion.
