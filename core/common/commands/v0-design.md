@@ -7,7 +7,7 @@ description: Design phase. Produce the contract draft, event schemas, design.md 
 You are entering the **Design** phase of the delivery lifecycle (`workflow-orchestration.mdc`).
 
 ## Prerequisite & Resume
-1. Read `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/requirements/<feature>.phase-result.md` when present.
+1. Read `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/requirements/<feature>.phase-result.md` when present. If `release` is in `approvedPhases`, stop. Do not reopen the story. A fix or a small change starts at `/v0-maintain`. A new feature starts at `/v0-intake` with a new slug.
 2. When the story is `Story: P0-A` (`Milestone: P0`), skip `/v0-design` and proceed directly to `/v0-build`. `/v0-build` creates `docs/agents-v0/requirements/<feature>.md` and sets `in_progress`.
 3. Otherwise verify that `intake` is in `approvedPhases` in `docs/agents-v0/requirements/<feature>.state.json` (or `Delivery approvals` has an `Approved` `intake` row). If missing, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status blocked --reason "Intake not approved" docs/agents-v0/requirements/<feature>.md` and stop.
 4. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/<feature>.md` and continue from existing files under `docs/agents-v0/design/<feature>/`.

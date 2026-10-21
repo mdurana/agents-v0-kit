@@ -8,7 +8,7 @@ Run **one story** through **Intake → Design → Build → Verify → Local Rel
 
 ## Start or resume
 1. Name the feature (the slug of `docs/agents-v0/requirements/<feature>.md`) and, for a new one, the source spec (Jira, Confluence, or a description). Ask when either is missing. Do not guess the feature from the newest state file.
-2. If `docs/agents-v0/requirements/<feature>.state.json` exists, read it as `/v0-status` does:
+2. If `docs/agents-v0/requirements/<feature>.state.json` exists, read it as `/v0-status` does. If `release` is in `approvedPhases`, stop. Do not reopen the story. A fix or a small change starts at `/v0-maintain`. A new feature starts at `/v0-intake` with a new slug. Otherwise:
    - `activeStatus` is `in_progress` or `blocked`: run `activePhase` again.
    - `activeStatus` is `awaiting_approval`: ask for approval of `activePhase` and stop.
    - No active phase: run the command after `lastApprovedPhase` (empty → `/v0-intake`, or `/v0-build` when `Story: P0-A`; `intake` → `/v0-design`; `design` → `/v0-build`; `build` → `/v0-verify`; `verify` → `/v0-local-release` by default, or `/v0-release` when requested).
