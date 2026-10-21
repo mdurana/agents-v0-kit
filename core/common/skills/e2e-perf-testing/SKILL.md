@@ -5,7 +5,7 @@ description: Verify phase playbook. Playwright end-to-end journeys, consumer-dri
 
 # e2e-perf-testing
 
-Verify phase playbook for the `test-engineer` agent, used with `quality-gate` (`workflow-orchestration.mdc`). Run it when the story is an integration story, a vertical slice, a P2 journey, or a P4 hardening story. A story with no such scope records N/A and the reason in `docs/agents-v0/verify/<feature>/test-report.md`.
+Verify phase playbook for the `test-engineer` agent, used with `quality-gate` (`workflow-orchestration.mdc`). Run it when the story is an integration story, a vertical slice, a P2 journey, or a P4 hardening story. A story with no such scope records N/A and the reason in `docs/agents-v0/verify/<feature>/quality-gate.md`.
 
 ## Steps
 1. **Journeys (Playwright).** Write one test per primary journey in the requirements artifact, in `frontend/e2e/` (or the root named by the profile). Start the app through the `webServer` block of `playwright.config.*` so CI needs no extra step. Assert user-visible outcomes and run the axe-core check on each route the journey visits. Use role and label selectors, not CSS paths.

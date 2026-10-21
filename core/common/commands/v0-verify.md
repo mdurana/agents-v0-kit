@@ -16,8 +16,8 @@ Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if ano
 
 ## Instructions
 1. **Quality Gate (`test-engineer`, skill: `quality-gate`):**
-   - Resolve layout roots via `eval "$(sh .agents-v0/scripts/resolve-layout.sh)"` and run the bound pack's native verify command (`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"`, `"Service verify"`, and/or `"Frontend verify"`).
-   - Verify that every `AC-*` in `docs/agents-v0/requirements/<feature>.md` (including negative and edge ACs) has a passing test, changed-line coverage meets `docs/agents-v0/quality-gates.md` (default $\ge 80\%$ backend / $\ge 70\%$ frontend), and no unsuppressed HIGH/CRITICAL dependency vulnerabilities remain.
+   - Resolve layout roots via `eval "$(sh .agents-v0/scripts/resolve-layout.sh)"`. Resolve the verify command with `sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"`, `"Service verify"`, and/or `"Frontend verify"`, then execute the printed command. The script only prints. If it prints nothing, use the layout default.
+   - Verify that every `AC-*` in `docs/agents-v0/requirements/<feature>.md` (or Acceptance in `docs/agents-v0/maintain/<id>/note.md` for a maintenance note), including negative and edge ACs, has a passing test, changed-line coverage meets `docs/agents-v0/quality-gates.md` (default $\ge 80\%$ backend / $\ge 70\%$ frontend), and no unsuppressed HIGH/CRITICAL dependency vulnerabilities remain.
    - For UI changes, verify automated accessibility checks (axe-core) and UX acceptance criteria from `docs/agents-v0/design/<feature>/ux-spec.md`, writing `docs/agents-v0/verify/<feature>/ux-report.md`.
    - For integration stories, vertical slices, P2 journeys, or P4 stories, follow `e2e-perf-testing` (`docs/agents-v0/verify/<feature>/e2e-report.md`) and `slo-evidence` (`docs/agents-v0/design/system/slo-evidence.md`) when applicable.
    - Write `docs/agents-v0/verify/<feature>/quality-gate.md` summarizing test execution, coverage, and AC traceability.
@@ -26,7 +26,7 @@ Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if ano
    - When the story is `P0-A` or a maintenance note with `tier: "trivial"`, skip step 3 (`security-reviewer` and `code-reviewer`) once `test-engineer` and the native verify command pass.
    - A maintenance note with `tier: "emergency"` is full Verify, owed by the note's `Follow-up verify due` date, and is not this shortcut.
 3. **Role-Separated Security & Code Review (`security-reviewer` + `code-reviewer`):**
-   - Launch `security-reviewer` (skill: `vapt-review`) and `code-reviewer` (skill: `pr-review`) against `git diff <baseCommit>...HEAD` (using `baseCommit` from `.state.json`), `requirements/<feature>.md`, and `design/<feature>/`. (In single-agent IDEs, execute `vapt-review` and `pr-review` sequentially.)
+   - Launch `security-reviewer` (skill: `vapt-review`) and `code-reviewer` (skill: `pr-review`) against `git diff <baseCommit>...HEAD` (using `baseCommit` from `.state.json`), `docs/agents-v0/requirements/<feature>.md` (or `docs/agents-v0/maintain/<id>/note.md` for a maintenance note), and `design/<feature>/` when that directory exists. A maintenance note may have no design directory; that absence is not a failed Verify. (In single-agent IDEs, execute `vapt-review` and `pr-review` sequentially.)
    - `security-reviewer` checks always-on VAPT controls (`F4` access control, `F8` same-role `{id}` access → 403 or 404, `F9` JWT `alg`/`iss`/`aud`/`exp` with a fail-closed blacklist, `F10` audit events without a token) plus surface-specific findings and writes `docs/agents-v0/verify/<feature>/vapt-checklist.md`.
    - `code-reviewer` checks `code-review.mdc` and stack pack rules, labeling findings `Critical`, `Suggestion`, or `Nice to have`, and writes `docs/agents-v0/verify/<feature>/code-review.md`.
 4. **Evaluate Verdict:**
