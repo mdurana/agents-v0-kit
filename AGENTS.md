@@ -41,6 +41,16 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 
 If project files contradict a rule, **the repository wins**. Kit org rules live in `core/common/rules/*.mdc` plus the selected pack under `core/<pack>/rules/` (installed to `.cursor/rules/org/`). Document approved per-repo exceptions in `docs/agents-v0/project-profile.md` and ADRs; port deliberate kit-wide changes back into this repository.
 
+## Cursor Cloud specific instructions
+
+The default image already provides JDK 21, Node 22 (npm on the login-shell PATH), Python 3, PyYAML, git, and ripgrep. `install` adds shellcheck and Ubuntu PostgreSQL 16, runs `npm ci` in `templates/app/frontend`, and packages the API with `templates/app/backend/mvnw -B -DskipTests package`. `start` brings up PostgreSQL, the API jar on port 8080, and Vite on port 5173. The local database is user `app`, password `app`, database `app` on `127.0.0.1:5432` (the compose file still names `postgres:15`; this image's server is 16, and the baseline migration applies on it).
+
+- Kit check: `sh scripts/validate-kit.sh` (the command in `.gitlab-ci.yml`). It runs shellcheck when that binary is present and `scripts/test-app-template.sh`.
+- `/bin/sh` is dash. `templates/.gitlab-ci.yml` uses `set -o pipefail`, and `scripts/test-ci-checks.sh` executes that build script with `sh`, so that one assertion fails here. The same script exits 0 under bash and writes `ci-artifacts/gate/services/orders/`.
+- API: `curl -s http://127.0.0.1:8080/health` (`/ready` and `/live` too). UI: `http://127.0.0.1:5173/` shows "Platform skeleton is running."
+- Frontend, from `templates/app/frontend`: `npm test` and `npm run build`.
+- `./mvnw -B clean verify -Pci-security` calls the NVD API. Set `NVD_API_KEY` before relying on that profile.
+
 ## Reference
 
 - `templates/docs/agents-v0/model-routing-matrix.md` — Cursor model IDs for each role (Plan, Build, Review, Explore, Debug, Schemas, Docs, Documenter, Orchestrator, UX Designer). Build (critical) uses the Plan model.
