@@ -8,18 +8,18 @@ You are entering the **Remote Release** phase (`workflow-orchestration.mdc`). Te
 
 ## Prerequisite & Resume
 1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json` for a maintenance change).
-2. Confirm `"verifyPassed": true` and `"verify"` is in `approvedPhases` (unless `tier` is `emergency` with human confirmation). If missing, stop and run `/v0-verify` first.
+2. Confirm `"verifyPassed": true` and `"verify"` is in `approvedPhases` (or for `P0-A`, `verifyPassed` is `true` and the user is approving the single P0-A release gate now). A maintenance note with `tier: "emergency"` may proceed when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. Full `/v0-verify` stays owed by that date. If Verify has not passed and neither exception applies, stop and run `/v0-verify` first.
 3. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress <artifact>`.
 
 ## Instructions
 1. Launch the `release-manager` subagent (skill: `release-pr`).
 2. Sync `README.md`, sequence diagrams, and `CHANGELOG.md` (`sh .agents-v0/scripts/release-notes.sh <artifact> --include-unreleased --insert CHANGELOG.md` when configured).
-3. Render the merge-request description using `sh .agents-v0/scripts/render-mr-body.sh` (pass `--note docs/agents-v0/maintain/<id>/note.md` for a maintenance change).
-4. Verify `git remote get-url origin` and `glab` availability. If no remote or `glab` is configured, recommend `/v0-local-release` instead, mark `--status blocked --reason "no origin or glab"`, and stop.
+3. Render the merge-request description with `sh .agents-v0/scripts/render-mr-body.sh <feature> --base origin/<default-branch>` for a feature story, or `sh .agents-v0/scripts/render-mr-body.sh --note docs/agents-v0/maintain/<id>/note.md --base origin/<default-branch>` for a maintenance note.
+4. Verify `git remote get-url origin` and that `glab` is on `PATH`. If the remote lookup fails or `glab` is missing, recommend `/v0-local-release`, mark `--status blocked --reason "no origin or glab"`, and stop.
 5. Ask for explicit user authorization before committing, pushing (`git push`), or creating the merge request (`glab mr create`). Never run `glab mr merge` or `glab mr approve` (permanently blocked by `pre-shell.sh`).
-6. **CI fix loop (at most 3 rounds):** If remote CI reports a failure, route the fix to the responsible engineer agent, re-verify locally via `/v0-verify`, and push only with explicit user authorization. After 3 failed rounds, set `--status blocked --reason "CI fix loop exhausted"` and escalate to the user.
-7. Write `<feature>.phase-result.md` (`phase: release`, `status: awaiting_approval`) and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval <artifact>`.
-8. **Stop** and present merge-request readiness and the MR URL to the user. After explicit user approval, run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>`.
+6. **CI fix loop (at most 3 rounds, prompt-only):** If remote CI reports a failure, route the fix to the responsible engineer agent, re-verify locally via `/v0-verify`, and push only with explicit user authorization. After 3 failed rounds, set `--status blocked --reason "CI fix loop exhausted"` and escalate to the user.
+7. When the merge request is open and CI is green, write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `docs/agents-v0/maintain/<id>/phase-result.md`) with `phase: release`, `status: awaiting_approval`, and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval <artifact>`.
+8. **Stop** and present merge-request readiness and the MR URL. Do not run `--approve release` yet. After the human merge has succeeded and the user confirms release completion, run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>`, then update that phase-result file to `status: approved`.
 9. When `docs/agents-v0/project-profile.md` defines a **Deploy** table, follow `release-deploy` after the human merge, requiring explicit authorization, smoke check, and rollback readiness per environment.
 
 ## Rules
