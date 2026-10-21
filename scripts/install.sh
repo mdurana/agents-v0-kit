@@ -11,11 +11,11 @@
 #
 #   install.sh --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>
 #       Pin the kit commit in docs/agents-v0/kit-pin and symlink .cursor and
-#       .agents-v0/ci into that checkout. Kit files are not copied into the project.
+#       .agents-v0/scripts into that checkout. Kit files are not copied into the project.
 #
 #   install.sh --update [--quick] [--allow-in-flight] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
-#       commands, skills, hooks, CI scripts, reference docs). Target-owned
+#       commands, skills, hooks, scripts, reference docs). Target-owned
 #       templates are seeded only when missing. The full validation builds and
 #       tests the bundled app, which needs Maven and network access. --quick skips
 #       that one test (KIT_SKIP_APP_TEMPLATE_TEST=1) and keeps every other check,
@@ -23,10 +23,9 @@
 #       progress (a state.json with a non-empty activePhase); --allow-in-flight overrides.
 #
 #   --git-hooks (with a first install or --update)
-#       Sets core.hooksPath to .agents-v0/hooks in the target repo, so pre-commit runs
-#       .agents-v0/ci/gate.sh --staged (an Approved row that fails its phase gate cannot be
-#       committed) and pre-push runs the local delivery gate. Opt-in: it changes the
-#       target repo's git config.
+#       Sets core.hooksPath to .agents-v0/hooks in the target repo, so pre-commit
+#       guards secrets and state files and pre-push verifies the branch's state.json
+#       before pushing. Opt-in: it changes the target repo's git config.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -415,6 +414,7 @@ root = sys.argv[1]
 paths = sorted(glob.glob(os.path.join(root, "docs/agents-v0/requirements/*.state.json")))
 paths += sorted(glob.glob(os.path.join(root, "docs/agents-v0/maintain/*/state.json")))
 paths.append(os.path.join(root, "docs/agents-v0/onboarding/state.json"))
+paths.append(os.path.join(root, "docs/agents-v0/program.state.json"))
 for p in paths:
     try:
         data = json.load(open(p, encoding="utf-8"))

@@ -222,7 +222,7 @@ Tests finish first. The security checklist and the code review are prepared toge
 | VAPT sign-off  | Security checklist in the merge request description.                                                       |
 
 
-"Ready" is not "released": the AI reports readiness and waits for an authorized human merge. On GitLab, after a person approves the merge request, engineering runs the manual **delivery-approval** job. Release is complete only after the merge and green CI are confirmed. Approving a phase does not by itself authorize committing, pushing, or opening a merge request; explicitly request those actions when needed.
+"Ready" is not "released": the AI reports readiness and waits for an authorized human merge. Release is complete only after the merge and green CI are confirmed. Approving a phase does not by itself authorize committing, pushing, or opening a merge request; explicitly request those actions when needed.
 
 **You might say:**  
 

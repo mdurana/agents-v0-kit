@@ -1,7 +1,8 @@
 #!/bin/sh
 # Pre-push hook. install.sh --git-hooks activates it (core.hooksPath=.agents-v0/hooks).
-# When the branch name's last segment matches docs/agents-v0/requirements/<feature>.state.json,
-# verifies that the feature state has verifyPassed=true or lastApprovedPhase in (verify, release).
+# When the branch name's last segment matches docs/agents-v0/requirements/<feature>.state.json
+# or docs/agents-v0/maintain/<id>/state.json, verifies that the state has verifyPassed=true
+# or lastApprovedPhase in (verify, release).
 set -eu
 
 root="$(git rev-parse --show-toplevel)"
@@ -19,6 +20,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   branch="${local_ref#refs/heads/}"
   feature="${branch##*/}"
   state_file="docs/agents-v0/requirements/${feature}.state.json"
+  if [ ! -f "$state_file" ]; then
+    state_file="docs/agents-v0/maintain/${feature}/state.json"
+  fi
   if [ ! -f "$state_file" ]; then
     continue
   fi

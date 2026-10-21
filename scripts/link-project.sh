@@ -6,7 +6,7 @@
 #
 # Writes docs/agents-v0/kit-pin. --url checks out that commit as a git submodule
 # at kit/. --path records a local kit checkout and does not register a submodule.
-# .cursor and .agents-v0/ci are symlinks into the kit checkout. The project's
+# .cursor and .agents-v0/scripts are symlinks into the kit checkout. The project's
 # .agents-v0/packs/<id>/ stack pack is not touched. A later kit commit does not
 # change the project until the pin moves. A project commit does not change the kit.
 

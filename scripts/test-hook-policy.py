@@ -113,6 +113,7 @@ SHELL_CASES = [
     ("echo exit 0 > .agents-v0/ci/check-event-schemas.sh", "block"),
     ("python3 -c \"open('.cursor/hooks.json','w').write('{}')\"", "block"),
     ("echo tamper > .agents-v0/hooks/pre-push", "block"),
+    ("echo '{}' > docs/agents-v0/requirements/orders.state.json", "block"),
     ("cat .cursor/hooks.json", "allow"),
     ("cat .cursor/cli.json", "allow"),
     # Publish / deploy
@@ -247,6 +248,10 @@ PATH_CASES = [
     (".agents-v0/hooks/pre-push", "block"),
     ("docs/agents-v0/requirements/foo.md", "ask"),
     ("docs/agents-v0/requirements/foo.phase-result.md", "allow"),
+    ("docs/agents-v0/requirements/foo.state.json", "block"),
+    ("docs/agents-v0/maintain/inc-1/state.json", "block"),
+    ("docs/agents-v0/onboarding/state.json", "block"),
+    ("docs/agents-v0/program.state.json", "block"),
     ("docs/agents-v0/milestones/p0.md", "ask"),
     ("src/Main.java", "allow"),
 ]

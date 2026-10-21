@@ -117,6 +117,7 @@ HOOK_APPROVE_PHASE="$approve_phase" \
 HOOK_REOPEN_PHASE="$reopen_phase" \
 HOOK_VERIFY_PASSED="$verify_passed" \
 python3 - <<'PY'
+import fcntl
 import hashlib
 import json
 import os
@@ -124,6 +125,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import time
 
 art = os.environ["HOOK_ART"]
@@ -155,12 +157,18 @@ clean_text = re.sub(r"<!--.*?-->", "", raw_text, flags=re.S)
 tier_m = re.search(r"^\s*tier:\s*(\S+)", clean_text, re.I | re.M)
 tier = tier_m.group(1).lower() if tier_m else "standard"
 
+os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+lock_fd = open(out + ".lock", "w", encoding="utf-8")
+fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
 prev = {}
 if os.path.isfile(out):
     try:
-        prev = json.load(open(out, encoding="utf-8"))
-    except ValueError:
-        prev = {}
+        with open(out, encoding="utf-8") as f:
+            prev = json.load(f)
+    except ValueError as exc:
+        print(f"FAIL: corrupt JSON in {out}: {exc}", file=sys.stderr)
+        raise SystemExit(1)
 
 rows, inside = {}, False
 reopen_rows = 0
@@ -189,22 +197,31 @@ if prev_last in phases and prev_last not in approved_list:
 today_iso = time.strftime("%Y-%m-%d", time.gmtime())
 phase_dates = {k.lower(): v for k, v in (prev.get("phaseDates") or {}).items() if k.lower() in phases and isinstance(v, str)}
 
-# Sync with Markdown table if present
+# Merge Markdown table rows with state.json approvals (union positive rows; withdraw on Re-opened or non-positive row)
 first_reopened = ""
 if rows:
-    md_approved = []
-    for phase in phases:
-        if phase in rows:
-            if reopened_re.match(rows[phase][3]):
-                first_reopened = phase
-                break
-            if positive.match(rows[phase][3]):
-                md_approved.append(phase)
-                d_cell = rows[phase][4][:10] if len(rows[phase]) >= 5 else ""
-                if re.match(r"^\d{4}-\d{2}-\d{2}$", d_cell):
-                    phase_dates[phase] = d_cell
-    if md_approved or first_reopened:
-        approved_list = md_approved
+    cut_idx = None
+    for idx, phase in enumerate(phases):
+        if phase not in rows:
+            continue
+        decision = rows[phase][3]
+        if reopened_re.match(decision):
+            first_reopened = phase
+            cut_idx = idx
+            break
+        if positive.match(decision):
+            if phase not in approved_list:
+                approved_list.append(phase)
+            d_cell = rows[phase][4][:10] if len(rows[phase]) >= 5 else ""
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", d_cell):
+                phase_dates[phase] = d_cell
+        else:
+            cut_idx = idx
+            break
+    approved_list = [p for p in phases if p in approved_list]
+    if cut_idx is not None:
+        approved_list = [p for p in approved_list if phases.index(p) < cut_idx]
+        phase_dates = {k: v for k, v in phase_dates.items() if k in approved_list}
 
 cli_approve = os.environ.get("HOOK_APPROVE_PHASE", "").strip().lower()
 if cli_approve:
@@ -535,10 +552,19 @@ data = {
         "verify": verify_ev,
     },
 }
-os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-with open(out, "w", encoding="utf-8") as handle:
-    json.dump(data, handle, indent=2)
-    handle.write("\n")
+tmp_fd, tmp_path = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
+try:
+    with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp_path, out)
+finally:
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    lock_fd.close()
 print(
     f"Wrote {out} (lastApproved={last_approved or '-'} "
     f"active={active_phase or '-'} status={active_status or '-'} tier={tier})"

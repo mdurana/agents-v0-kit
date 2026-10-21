@@ -643,6 +643,10 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)CODEOWNERS$"),
     re.compile(r"(^|/)core/(common|[a-z]+)/hooks/"),
     re.compile(r"(^|/)AGENTS\.md$"),
+    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$"),
 ]
 
 

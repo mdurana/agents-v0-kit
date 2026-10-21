@@ -113,7 +113,7 @@ def collect_tree(base_dir):
     for dirpath, dirnames, filenames in os.walk(base_dir):
         dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", "target")]
         for name in filenames:
-            if name in SECRET_NAMES or name.startswith(".env"):
+            if name in SECRET_NAMES or name.startswith(".env") or name.endswith(".lock"):
                 continue
             rel = os.path.relpath(os.path.join(dirpath, name), root)
             found.append(rel.replace("\\", "/"))

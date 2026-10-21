@@ -16,7 +16,7 @@
     ],
     "preToolUse": [
       {
-        "matcher": "Write|Delete",
+        "matcher": "Edit|Write|Delete",
         "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-edit.sh",
         "failClosed": true,
         "timeout": 15
