@@ -10,10 +10,11 @@ You are entering the **Intake** phase of the delivery lifecycle (`workflow-orche
 - Brownfield: if `docs/agents-v0/onboarding/report.md` exists, `docs/agents-v0/onboarding/state.json` must record `lastApprovedPhase: "onboard"`.
 - Milestone story: `plan` must be in `approvedPhases` in `docs/agents-v0/program.state.json`, or the manifest `docs/agents-v0/milestones/<milestone>.md` must have an `Approved` `plan` row. A single ticket with no milestone has no plan to check. Dependency `verify` approvals are required before `/v0-build`, not before Intake.
 - P0-A skeleton: skip `/v0-intake` and proceed directly to `/v0-build`.
-- If `docs/agents-v0/requirements/<feature>.md` is absent, create it with a title line for `<feature>`. Then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/<feature>.md` and continue from existing files on disk.
+- Classify **change tier** before any requirements file exists (`workflow-orchestration.mdc`): **Trivial** → stop and route to `/v0-triage`; **Emergency** → stop and route to `/v0-maintain`. Do not create `docs/agents-v0/requirements/<feature>.md` or its state file for those tiers.
+- For **Major** or **Standard**, if `docs/agents-v0/requirements/<feature>.md` is absent, create it with a title line for `<feature>`. Then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/<feature>.md` and continue from existing files on disk.
 
 ## Instructions
-1. Classify **change tier** (`workflow-orchestration.mdc`): **Trivial** → route to `/v0-triage`; **Emergency** → route to `/v0-maintain`; **Major** / **Standard** → continue here.
+1. **Major** / **Standard** continue here. Trivial and Emergency were routed before this file was created.
 2. Launch the `requirements-analyst` subagent (skill: `spec-intake`) with the source specification.
 3. **Helpers:** If `docs/agents-v0/requirements/<feature>.helper-brief.md` exists, run `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/<feature>.md` to verify no duplicate brief loop, launch `explore-researcher`, pass the findings back to `requirements-analyst`, and delete the brief.
 4. Produce `docs/agents-v0/requirements/<feature>.md` following `spec-intake`:

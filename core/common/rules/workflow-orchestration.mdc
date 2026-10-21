@@ -71,8 +71,8 @@ Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `d
 
 Phase subagents do not spawn subagents directly. When a phase agent needs codebase exploration, root-cause debugging, schema authoring, or doc drafting:
 1. Write the helper brief (`docs/agents-v0/<phase-dir>/<slug>.helper-brief.md`) with `helper:`, `outputs:`, `return:`, and `ask:`.
-2. Run `sh .agents-v0/scripts/sync-feature-state.sh <artifact>` to record the `ask:` digest in `helperBriefHashes` (exits 2 if the identical `ask:` was already run).
-3. Return to the main session, which runs the helper once, re-launches the phase agent, and deletes the brief upon completion.
+2. Return. The main session runs `sh .agents-v0/scripts/sync-feature-state.sh <artifact>` to record the `ask:` digest in `helperBriefHashes` (exits 2 if the identical `ask:` was already run). Verify is the exception: `test-engineer` and `quality-gate` run that sync before they return, and the main session does not sync the same brief again.
+3. The main session runs the helper once, re-launches the phase agent, and deletes the brief upon completion.
 
 ## Phase Attempt & Bounce Budgets
 
@@ -83,7 +83,7 @@ Phase subagents do not spawn subagents directly. When a phase agent needs codeba
 
 Every phase follows **Reconnaissance → Plan → Execute → Verify → Report** and is guided by its phase skill (`SKILL.md`):
 
-- **Onboard (`/v0-onboard`, `onboard-discovery`):** Brownfield only. Documents the repo as-is (baseline, inventories, module notes, architecture, network, context map) and stops for approval before roadmap, plan, intake, or maintain. A greenfield repo skips this.
+- **Onboard (`/v0-onboard`, `onboard-discovery`):** Brownfield only. Documents the repo as-is (baseline, inventories, module notes, architecture, network, context map) and stops for approval before roadmap, architecture, plan, or intake. A greenfield repo skips this.
 - **Roadmap (`/v0-roadmap`, `program-roadmap`):** Sequences discovery items into Now / Next / Later without inventing themes.
 - **Architecture (`/v0-architecture`, `program-architecture`):** Writes C4, data flows, ER models, `network.md`, pattern ADR (`Pack: <id>`), `context-map.md`, `nfr-slo.md`, `threat-model.md`, `ops-readiness.md`, `arc-record.md`, and passes `design-reviewer` (`architecture-review.md` with zero `Open` findings). Approval runs `.agents-v0/scripts/activate-stack-pack.sh`.
 - **Plan (`/v0-plan`, `program-planning`):** Writes `docs/agents-v0/milestones/plan.md` and `<milestone>.md` with `Surface` and `Size` on each story and acyclic dependencies.

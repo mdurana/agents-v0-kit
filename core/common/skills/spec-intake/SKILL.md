@@ -39,7 +39,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Do not write `## Proposed split` for the seeded P0-A row. This skill does not write that story; `/v0-build` copies it.
 6. Resolve open questions with the user. Write `none` under Open questions.
 7. Verify that `docs/agents-v0/requirements/<feature>.md` satisfies every item in the checklist below. P0-A does not run this skill; `/v0-build` copies that milestone story and AC-1 through AC-4.
-8. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (`phase: intake`, `status: awaiting_approval`) and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/<feature>.md`. Present the Intake gate result and wait. The main session appends the `Intake` row and runs `--approve intake` after the user approves. Do not start Design.
+8. Do not write the phase-result file. Present the Intake gate result and return. The main session writes `docs/agents-v0/requirements/<feature>.phase-result.md` (`phase: intake`, `status: awaiting_approval`) and runs `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/<feature>.md`. After the user approves, the main session appends the `Intake` row and runs `--approve intake`. Do not start Design.
 
 Scenario shape:
 

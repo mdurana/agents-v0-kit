@@ -10,7 +10,7 @@ Trigger: <issue, alert, or incident link>
 Follow-up verify due: <YYYY-MM-DD; Tier emergency only, delete the line otherwise>
 
 Tier rules (`workflow-orchestration.mdc` Change Tiers):
-- **trivial** — docs only, or version numbers only in build files and lockfiles; no security surface, schema, major bump, or delivery artifact. Needs "Tier confirmed by". Verify is the abbreviated Verify.
+- **trivial** — docs only, or a 1-for-1 patch version bump in build files and lockfiles; no security surface, schema, major bump, or delivery artifact. Needs "Tier confirmed by". Verify is the abbreviated Verify.
 - **standard** — any other fix or upgrade within `MAINTAIN_MAX_LINES` source lines (default 800). Full Verify. A larger change is a feature: use `/v0-intake`.
 - **emergency** — a production incident. Needs "Tier confirmed by", a rollback below, and "Follow-up verify due". The change may merge before Verify; Verify is owed by that date.
 
@@ -38,5 +38,3 @@ Tier rules (`workflow-orchestration.mdc` Change Tiers):
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| maintain | docs/agents-v0/maintain/&lt;id&gt;/note.md, docs/agents-v0/build/&lt;id&gt;/build-report.md | | | |
-| verify | docs/agents-v0/verify/&lt;id&gt;/test-report.md | | | |

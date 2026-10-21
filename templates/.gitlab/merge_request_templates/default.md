@@ -109,7 +109,7 @@
 
 **Result:** Pass / Fail / N/A — reason and evidence: _______________
 
-> Attach or link the persisted evidence — Build: `docs/agents-v0/build/<feature>/build-report.md`; Verify: `docs/agents-v0/verify/<feature>/test-report.md`, `vapt-checklist.md`, `review-notes.md`.
+> Attach or link the persisted evidence — Build: `docs/agents-v0/build/<feature>/build-report.md`; Verify: `docs/agents-v0/verify/<feature>/quality-gate.md`, `vapt-checklist.md`, `code-review.md`.
 
 ## Delivery approvals
 

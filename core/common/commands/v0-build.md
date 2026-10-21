@@ -35,7 +35,7 @@ Before editing shared files or source code, check `git status` (`workflow-orches
    - Every endpoint has explicit authentication/authorization (or the pack's intentional public marker on public routes).
    - DTOs are used at API boundaries, migrations follow `migration-safety`, and no secrets or unsanitized log values exist.
    - Record the final verify command output summary and per-AC `file:line` citations in `docs/agents-v0/build/<feature>/build-report.md`, and the raw verify output in `docs/agents-v0/build/<feature>/build-output.txt`. Do not read `build-output.txt` on the next attempt. The full-verify fix cap is ≤ 3 attempts per failure (prompt-only).
-7. **P0-A deferred gate:** When `/v0-deliver` runs `P0-A`, proceed directly to `/v0-verify` and skip steps 8 and 9. Do not run `--approve build`. The single human approval is at Release, and `--approve release` records the earlier phases.
+7. **P0-A deferred gate:** When the story is `P0-A`, proceed directly to `/v0-verify` and skip steps 8 and 9. Do not run `--approve build`. The single human approval is at Release, and `--approve release` records the earlier phases.
 8. **Standard Build gate stop:** Write `docs/agents-v0/requirements/<feature>.phase-result.md` (`phase: build`, `status: awaiting_approval`) and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/<feature>.md`.
 9. **Stop** and present the Build report and `file:line` citations to the user. After explicit user approval:
    - Update `<feature>.phase-result.md` to `status: approved`.

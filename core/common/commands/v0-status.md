@@ -12,7 +12,7 @@ Use the feature, maintenance id, program, or onboarding workstream the user name
 
 Do not assume the newest state file is the one the user means (`workflow-orchestration.mdc` Parallel Features).
 
-Read the selected `.state.json` file and its primary artifact (`artifact` field). Also read the phase-result file when it exists: `docs/agents-v0/requirements/<feature>.phase-result.md`, `docs/agents-v0/maintain/<id>/phase-result.md`, or `docs/agents-v0/onboarding/phase-result.md`. Do not advance a phase or infer approval.
+Read the selected `.state.json` file and its primary artifact (`artifact` field). Also read the phase-result file when it exists: `docs/agents-v0/requirements/<feature>.phase-result.md`, `docs/agents-v0/maintain/<id>/phase-result.md`, or `docs/agents-v0/onboarding/phase-result.md`. For a program, also read `docs/agents-v0/roadmap/<program>.phase-result.md`, `docs/agents-v0/architecture.phase-result.md`, and `docs/agents-v0/milestones/plan.phase-result.md`. Do not advance a phase or infer approval.
 
 1. **Change tier & state summary:** Report `feature`, `tier`, `lastApprovedPhase`, `approvedPhases`, `phaseDates`, `activePhase`, `activeStatus`, `verifyPassed`, `reopenCount`, `baseCommit`, and the `artifacts` map. For a milestone, list each story as passed or blocked from its own state file.
 2. **Next command resolution:**

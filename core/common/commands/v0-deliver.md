@@ -11,12 +11,13 @@ Run **one story** through **Intake → Design → Build → Verify → Local Rel
 2. If `docs/agents-v0/requirements/<feature>.state.json` exists, read it as `/v0-status` does:
    - `activeStatus` is `in_progress` or `blocked`: run `activePhase` again.
    - `activeStatus` is `awaiting_approval`: ask for approval of `activePhase` and stop.
-   - No active phase: run the command after `lastApprovedPhase` (empty → `/v0-intake`; `intake` → `/v0-design`; `design` → `/v0-build`; `build` → `/v0-verify`; `verify` → `/v0-local-release` by default, or `/v0-release` when requested).
+   - No active phase: run the command after `lastApprovedPhase` (empty → `/v0-intake`, or `/v0-build` when `Story: P0-A`; `intake` → `/v0-design`; `design` → `/v0-build`; `build` → `/v0-verify`; `verify` → `/v0-local-release` by default, or `/v0-release` when requested).
    - With no artifact yet, start `/v0-build` when the story is P0-A; otherwise start `/v0-intake`.
 3. Before the first phase, verify prerequisites: a brownfield repo has `onboard` approved in `docs/agents-v0/onboarding/state.json` (`/v0-onboard`); a story from a milestone manifest has every dependency story Verify-approved in its `.state.json`; no other feature's code or shared-file edit is in the working tree. Report the first unmet prerequisite and stop.
 
 ## Tier routing
 - **Trivial** — use `/v0-triage`, then `/v0-maintain` with the abbreviated Verify.
+- **Emergency** — use `/v0-maintain` with a rollback plan and `Follow-up verify due`, then release. Full `/v0-verify` is owed by that date.
 - **Major** — the full pipeline; Design includes `system-design`, threat-model notes, and the ARC pack when `Material: yes`.
 - **Standard** — the pipeline below.
 

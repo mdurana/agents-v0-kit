@@ -75,7 +75,7 @@ Do **not** document weaker VAPT or auth controls — escalate to Security instea
 1. Prefer upgrading dependencies (`/v0-maintain`, skill `dependency-upgrade`).
 2. If a CVE must be suppressed in pack `java`, add an entry to `maven/dependency-check-suppressions.xml`
    (starter: kit `core/java/starters/maven/dependency-check-suppressions.xml`). Other packs record CVE suppressions in the format expected by their CVE scanner (see the pack's `pack.json`).
-3. Record the exception in the Verify test report (`docs/agents-v0/verify/<feature>/test-report.md`)
+3. Record the exception in the Verify report (`docs/agents-v0/verify/<feature>/quality-gate.md`)
    per `quality-and-testing.mdc`.
 
 ## 5. Ongoing maintenance

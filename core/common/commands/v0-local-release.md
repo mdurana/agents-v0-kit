@@ -24,7 +24,7 @@ Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if ano
 4. **Stop** and ask for explicit user approval to complete the local release (committing any release notes/state updates and merging into the target integration branch resolved by `sh .agents-v0/scripts/resolve-integration-branch.sh`).
 5. **After explicit user approval:**
    - Commit any pending delivery evidence/changelog files (`git commit` requires your confirmation in the IDE prompt).
-   - If working on a feature branch separate from the integration branch (`sh .agents-v0/scripts/resolve-integration-branch.sh`), merge into the integration branch (`git merge --no-ff <feature-branch>`) upon user confirmation. If the merge fails or conflicts, stop and do not mark the feature released.
+   - If working on a feature branch separate from the integration branch, check out the ref printed by `sh .agents-v0/scripts/resolve-integration-branch.sh` (`git checkout <ref>`), then merge the feature branch (`git merge --no-ff <feature-branch>`) upon user confirmation. If the merge fails or conflicts, stop and do not mark the feature released.
    - Once the merge succeeds (or when already on the integration branch), run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>`, update that phase-result file to `status: approved`, and commit the updated release state on user confirmation.
    - When `docs/agents-v0/project-profile.md` has a **Deploy** table, follow `release-deploy`: one explicit authorization per environment, a smoke check, and a rollback command. Until the last smoke check is recorded, the story is not complete.
    - Do not call `glab` or push to a remote unless the user explicitly asks to push or run `/v0-release`.

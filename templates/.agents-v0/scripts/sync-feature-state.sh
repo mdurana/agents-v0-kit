@@ -242,6 +242,7 @@ if cli_approve:
     # and do not treat that release as verifyPassed. P0-A is a feature story.
     emergency_skip_verify = (
         maintain_note and tier == "emergency" and "verify" not in approved_list
+        and cli_approve != "verify"
     )
     for p in phases[: phases.index(cli_approve) + 1]:
         if emergency_skip_verify and p == "verify":
@@ -251,6 +252,7 @@ if cli_approve:
         if p not in phase_dates:
             phase_dates[p] = today_iso
     phase_dates[cli_approve] = today_iso
+    approved_list = [p for p in phases if p in approved_list]
     first_reopened = ""
 
 cli_reopen = os.environ.get("HOOK_REOPEN_PHASE", "").strip().lower()

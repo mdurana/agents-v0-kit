@@ -8,7 +8,7 @@ description: Maintain phase playbook. Reproduce with a failing test, find root c
 Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestration.mdc`, `/v0-maintain`). The record is the maintenance note `docs/agents-v0/maintain/<id>/note.md`.
 
 ## Steps
-1. **Baseline.** Run the full verify command before the first edit (`/v0-maintain` step 3). A red baseline outside this bug's area needs a `known_failures` allowance; otherwise stop.
+1. **Baseline.** Run the full verify command before the first edit (`/v0-maintain` step 2). A red baseline outside this bug's area needs a `known_failures` allowance; otherwise stop.
 2. **Acceptance.** In the note, write expected versus actual behavior and the steps that show it.
 3. **Reproduce with a test.** Write the test that reproduces the bug. Run it and record the failing card (Command, Exit, Attempt, Failing test, Location) in `docs/agents-v0/build/<id>/build-report.md`. A bug with no reproducing test is `UNVERIFIED`: say so in the note instead of guessing.
 4. Write `docs/agents-v0/maintain/<id>/helper-brief.md` (`helper: explore-researcher`, `outputs:`, `return:`, `ask:`) to locate the responsible code. Do not launch the helper (`workflow-orchestration.mdc` Helper Subagents).
