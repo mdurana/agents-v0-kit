@@ -54,8 +54,10 @@
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
+<!-- Append these rows only after explicit approval:
 | plan | docs/agents-v0/milestones/plan.md, <this manifest, docs/agents-v0/design/system/context-map.md> | <name> | Approved | <date> |
 | milestone | <this manifest, story artifacts> | <name> | Approved | <date> |
+-->
 
 > The `plan` row is the `/v0-plan` approval (also recorded in `docs/agents-v0/program.state.json`).
 > The `milestone` row is the go/no-go decision after all story artifacts have completed Verify.
