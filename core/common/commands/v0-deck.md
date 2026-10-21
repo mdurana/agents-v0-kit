@@ -13,7 +13,7 @@ The user names the kind and the decision the meeting must answer, in the user's 
 - `/v0-deck product <audience> <decision>`
 - `/v0-deck delivery <audience> <decision>`
 
-A run missing a required argument stops and asks. Do not interview for a problem statement. Do not invent a mission statement.
+A run missing the audience (`Technical`, `Non-technical`, or `Mixed`) or the decision stops and asks for those arguments. Do not write the deck. Do not interview for a problem statement. Do not invent a mission statement.
 
 ## Instructions
 1. Follow `leadership-deck`.

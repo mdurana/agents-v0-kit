@@ -327,6 +327,24 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
     if active_phase not in active_phases:
         print(f"FAIL: active phase must be one of {', '.join(active_phases)}", file=sys.stderr)
         raise SystemExit(1)
+    if active_phase in approved_list and not cli_reopen:
+        nxt = {
+            "onboard": "/v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain",
+            "roadmap": "/v0-architecture",
+            "architecture": "/v0-plan",
+            "plan": "/v0-intake, or /v0-build when the first story is P0-A",
+            "intake": "/v0-design",
+            "design": "/v0-build",
+            "build": "/v0-verify",
+            "verify": "/v0-local-release",
+            "maintain": "a new maintenance id",
+            "release": "/v0-maintain for a fix, /v0-triage for a docs-only edit or patch bump, or /v0-intake with a new slug",
+        }.get(active_phase, "/v0-status")
+        print(
+            f"FAIL: {active_phase} is already approved. Do not open it again. Next: {nxt}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
     if active_status not in statuses:
         print(f"FAIL: status must be one of {', '.join(sorted(statuses))}", file=sys.stderr)
         raise SystemExit(1)

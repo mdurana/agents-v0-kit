@@ -4,13 +4,13 @@ description: Program planning. Decompose an approved roadmap and architecture pa
 
 # /v0-plan
 
-You are entering **program planning** (`workflow-orchestration.mdc`). Use it when the goal is larger than one story. A single named ticket goes straight to `/v0-intake`; the seeded P0-A story goes to `/v0-build`. Maintain, Trivial, and a milestone that already has an `Approved` `plan` row skip this command.
+You are entering **program planning** (`workflow-orchestration.mdc`). Use it when the goal is larger than one story.
 
 ## Prerequisite
-Read `docs/agents-v0/project-profile.md` and `docs/agents-v0/repo-map.md`. On a brownfield repo, `docs/agents-v0/onboarding/state.json` must show `lastApprovedPhase: "onboard"`. Except for a P0-A-only plan, `docs/agents-v0/program.state.json` must record both `roadmap` and `architecture` in `approvedPhases` (or `Approved` rows in `roadmap/<program>.md` and `architecture.md`), and the profile `Pack` cell must be bound to a complete pack.
+Read `docs/agents-v0/project-profile.md` and `docs/agents-v0/repo-map.md`. If `docs/agents-v0/onboarding/state.json` exists and `onboard` is not approved, stop and suggest `/v0-onboard`. Except for a P0-A-only plan, if `roadmap` is missing from `approvedPhases`, stop and suggest `/v0-roadmap`. If `architecture` is missing, stop and suggest `/v0-architecture`. Do not set `in_progress`. A single named ticket stops and suggests `/v0-intake`. The seeded P0-A story stops and suggests `/v0-build`. A docs-only edit or a 1-for-1 patch bump stops and suggests `/v0-triage`. Any other fix stops and suggests `/v0-maintain`. If `plan` is already in `approvedPhases`, stop. Suggest `/v0-intake` for the first story, or `/v0-build` when that story is P0-A. The profile `Pack` cell must be bound to a complete pack before a non-P0-A plan starts.
 
 ## Resume
-When `docs/agents-v0/milestones/plan.md` is absent, create it with a title line. Then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status in_progress docs/agents-v0/milestones/plan.md`. Continue from the milestone manifests already on disk: preserve approved or seeded `P0-A` rows, replace template stubs, and author concrete stories adhering to the story-size budget and roadmap horizons.
+Only after the prerequisite passes, when `docs/agents-v0/milestones/plan.md` is absent, create it with a title line. Then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status in_progress docs/agents-v0/milestones/plan.md`. Continue from the milestone manifests already on disk: preserve approved or seeded `P0-A` rows, replace template stubs, and author concrete stories adhering to the story-size budget and roadmap horizons.
 
 ## Collision
 This command writes `docs/agents-v0/milestones/`. Stop before editing if `git status` shows uncommitted changes to those files from a feature in flight.

@@ -7,9 +7,9 @@ description: Primary local release workflow after Verify. Re-verify the clean tr
 You are entering the **Local Release** phase (`workflow-orchestration.mdc`). This is the primary local completion path after `/v0-verify` for both feature stories (`docs/agents-v0/requirements/<feature>.md`) and maintenance notes (`docs/agents-v0/maintain/<id>/note.md`).
 
 ## Prerequisite & Resume
-1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json`).
+1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json`). If `release` is already in `approvedPhases`, stop. Do not set `in_progress`. A feature story suggests `/v0-triage` for a docs-only edit or a 1-for-1 patch bump, `/v0-maintain` for any other fix, or `/v0-intake` with a new slug for a new feature. A maintenance note suggests a new `<id>`. An emergency note that still owes Verify (`verify` is not in `approvedPhases`) suggests `/v0-verify <id>`.
 2. Confirm `"verifyPassed": true` and `"verify"` is in `approvedPhases` (or for `P0-A`, `verifyPassed` is `true` and the user is approving the single P0-A release gate now). A maintenance note with `tier: "emergency"` may proceed when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. If Verify has not passed and neither exception applies, stop and run `/v0-verify` first.
-3. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress <artifact>`.
+3. Only after the checks above pass, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress <artifact>`.
 
 ## Collision
 Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if another feature's uncommitted changes are in the working tree.

@@ -7,10 +7,10 @@ description: Program architecture before any backlog. C4 through operations, the
 You are entering **program architecture** (`workflow-orchestration.mdc`). This command runs after an approved roadmap and before `/v0-plan`. It does not write stories or a feature OpenAPI draft.
 
 ## Prerequisite
-`docs/agents-v0/program.state.json` must record `roadmap` in `approvedPhases` (or an `Approved` `roadmap` row in `docs/agents-v0/roadmap/<program>.md`). On a brownfield repo, `onboard` must also be approved. Maintain, Trivial, an existing milestone, P0-A alone, and a single named ticket skip this command. A Major story with no roadmap does not run this command; Design follows `system-design`.
+If `roadmap` is not in `approvedPhases` in `docs/agents-v0/program.state.json` and `docs/agents-v0/roadmap/<program>.md` has no `Approved` `roadmap` row, stop and suggest `/v0-roadmap`. Do not set `in_progress`. If `docs/agents-v0/onboarding/state.json` exists and `onboard` is not approved, stop and suggest `/v0-onboard`. A Major story with no roadmap stops and suggests `/v0-design` (`system-design`). A single named ticket stops and suggests `/v0-intake`. P0-A stops and suggests `/v0-build`. A docs-only edit or a 1-for-1 patch bump stops and suggests `/v0-triage`. Any other fix stops and suggests `/v0-maintain`. If `architecture` is already in `approvedPhases`, stop and suggest `/v0-plan`. Do not set `in_progress`.
 
 ## Resume
-Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status in_progress docs/agents-v0/architecture.md`. Continue from the architecture files already on disk. Do not recreate filled sections. Do not rewrite an `Accepted` ADR; supersede it with a new ADR when a decision changes.
+Only after the prerequisite passes, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status in_progress docs/agents-v0/architecture.md`. Continue from the architecture files already on disk. Do not recreate filled sections. Do not rewrite an `Accepted` ADR; supersede it with a new ADR when a decision changes.
 
 ## Collision
 This command writes shared files (`docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`, `docs/agents-v0/adr/`). Stop before editing if `git status` shows uncommitted changes from a feature in flight.
