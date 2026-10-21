@@ -5,7 +5,7 @@ description: Roadmap playbook. Turn one discovery file, at a path the user names
 
 # program-roadmap
 
-Roadmap playbook for the `program-planner` agent (`workflow-orchestration.mdc` Roadmap).
+Roadmap playbook for the `program-planner` agent (`workflow-orchestration.mdc` Phase Gates Summary).
 
 ## Steps
 1. Take the discovery path from the user. Refuse to guess a file. Refuse a path that is absolute, contains `..`, or points outside the repository.

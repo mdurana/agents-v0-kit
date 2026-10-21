@@ -86,16 +86,26 @@ if [ "$set_active" = 1 ]; then
 fi
 
 slug="$(basename "$art" .md)"
-state="docs/agents-v0/requirements/${slug}.state.json"
 case "$art" in
-  docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*)
+  *.phase-result.md | *.helper-brief.md)
+    printf 'FAIL: artifact must be a primary artifact, not %s\n' "$art" >&2
+    exit 1
+    ;;
+  docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
+    state="docs/agents-v0/requirements/${slug}.state.json"
+    ;;
+  docs/agents-v0/onboarding/*.md | */docs/agents-v0/onboarding/*.md)
     state="docs/agents-v0/onboarding/state.json"
     ;;
-  docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*)
+  docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
     state="$(dirname "$art")/state.json"
     ;;
-  docs/agents-v0/roadmap/* | */docs/agents-v0/roadmap/* | docs/agents-v0/architecture.md | */docs/agents-v0/architecture.md | docs/agents-v0/milestones/* | */docs/agents-v0/milestones/*)
+  docs/agents-v0/roadmap/*.md | */docs/agents-v0/roadmap/*.md | docs/agents-v0/architecture.md | */docs/agents-v0/architecture.md | docs/agents-v0/milestones/*.md | */docs/agents-v0/milestones/*.md)
     state="docs/agents-v0/program.state.json"
+    ;;
+  *)
+    printf 'FAIL: artifact must be a requirements file, maintain/<id>/note.md, onboarding file, or program artifact (%s)\n' "$art" >&2
+    exit 1
     ;;
 esac
 
@@ -249,9 +259,7 @@ if cli_reopen:
         approved_list = [p for p in approved_list if phases.index(p) < idx]
         phase_dates = {k: v for k, v in phase_dates.items() if k in approved_list}
 
-if reopen_count > 3:
-    print(f"FAIL: exceeded max Re-opened bounce budget ({reopen_count} > 3). Stop and escalate to user.", file=sys.stderr)
-    raise SystemExit(2)
+reopen_exceeded = reopen_count > 3
 
 last_approved = approved_list[-1] if approved_list else ""
 
@@ -267,14 +275,24 @@ if os.environ.get("HOOK_CLEAR_ACTIVE") == "1":
     active_phase = ""
     active_status = ""
     blocked_reason = ""
+    if reopen_count > 3:
+        reopen_count = 3
+        reopen_exceeded = False
 elif cli_reopen:
     active_phase = cli_reopen
-    active_status = "in_progress"
-    blocked_reason = ""
+    if reopen_exceeded:
+        active_status = "blocked"
+        blocked_reason = f"Exceeded max Re-opened bounce budget ({reopen_count} > 3)"
+    else:
+        active_status = "in_progress"
+        blocked_reason = ""
 elif cli_approve:
     active_phase = ""
     active_status = ""
     blocked_reason = ""
+    if reopen_count > 3:
+        reopen_count = 3
+        reopen_exceeded = False
 elif os.environ.get("HOOK_SET_ACTIVE") == "1":
     active_phase = os.environ.get("HOOK_ACTIVE_PHASE", "")
     active_status = os.environ.get("HOOK_ACTIVE_STATUS", "")
@@ -290,6 +308,9 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
         raise SystemExit(1)
     if active_status != "blocked":
         blocked_reason = ""
+    if reopen_exceeded:
+        active_status = "blocked"
+        blocked_reason = blocked_reason or f"Exceeded max Re-opened bounce budget ({reopen_count} > 3)"
     if (
         first_reopened
         and active_status == "blocked"
@@ -426,7 +447,8 @@ base_commit = prev_bc or rep_parent or head_bc
 
 # Helper brief deduplication
 prior_hashes = list(prev.get("helperBriefHashes") or [])
-if Path("docs/agents-v0").is_dir():
+skip_brief_dedup = bool(cli_approve) or os.environ.get("HOOK_CLEAR_ACTIVE") == "1"
+if Path("docs/agents-v0").is_dir() and not skip_brief_dedup:
     extra_briefs = set()
     if onboarding and Path("docs/agents-v0/onboarding").is_dir():
         extra_briefs |= set(Path("docs/agents-v0/onboarding").glob("*.helper-brief.md"))
@@ -443,7 +465,7 @@ if Path("docs/agents-v0").is_dir():
         except OSError:
             continue
         m_helper = re.search(r"^helper:\s*(.+)$", b_text, re.M)
-        m_ask = re.search(r"^(?:ask|outputs|return):\s*(.+)$", b_text, re.M)
+        m_ask = re.search(r"^ask:\s*(.+)$", b_text, re.M) or re.search(r"^(?:outputs|return):\s*(.+)$", b_text, re.M)
         if m_helper and m_ask:
             digest = hashlib.sha256(
                 f"{brief.name}:{brief.parent.name}:{m_helper.group(1).strip()}:{m_ask.group(1).strip()}".encode("utf-8")
@@ -526,6 +548,8 @@ if vp_raw in ("true", "1", "yes"):
     verify_passed = True
 elif vp_raw in ("false", "0", "no"):
     verify_passed = False
+elif cli_reopen and "verify" not in approved_list:
+    verify_passed = False
 elif last_approved in ("verify", "release"):
     verify_passed = True
 else:
@@ -565,6 +589,9 @@ finally:
         os.unlink(tmp_path)
     fcntl.flock(lock_fd, fcntl.LOCK_UN)
     lock_fd.close()
+if reopen_exceeded:
+    print(f"FAIL: exceeded max Re-opened bounce budget ({reopen_count} > 3). Stop and escalate to user.", file=sys.stderr)
+    raise SystemExit(2)
 print(
     f"Wrote {out} (lastApproved={last_approved or '-'} "
     f"active={active_phase or '-'} status={active_status or '-'} tier={tier})"

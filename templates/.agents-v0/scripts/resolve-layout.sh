@@ -70,12 +70,16 @@ cell() {
   ' "$profile_file"
 }
 
+sq() {
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+}
+
 emit() {
-  printf "LAYOUT_PROFILE='%s'\n" "$1"
-  printf "BACKEND_ROOT='%s'\n" "$2"
-  printf "FRONTEND_ROOT='%s'\n" "$3"
-  printf "BFF_ROOT='%s'\n" "$4"
-  printf "SERVICE_ROOTS='%s'\n" "${5:-}"
+  printf "LAYOUT_PROFILE='%s'\n" "$(sq "$1")"
+  printf "BACKEND_ROOT='%s'\n" "$(sq "$2")"
+  printf "FRONTEND_ROOT='%s'\n" "$(sq "$3")"
+  printf "BFF_ROOT='%s'\n" "$(sq "$4")"
+  printf "SERVICE_ROOTS='%s'\n" "$(sq "${5:-}")"
 }
 
 # Comma-separated list of relative roots, printed space-separated.

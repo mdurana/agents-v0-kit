@@ -20,19 +20,24 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   branch="${local_ref#refs/heads/}"
   feature="${branch##*/}"
   state_file="docs/agents-v0/requirements/${feature}.state.json"
-  if [ ! -f "$state_file" ]; then
+  if ! git cat-file -e "$local_sha:$state_file" 2>/dev/null && [ ! -f "$state_file" ]; then
     state_file="docs/agents-v0/maintain/${feature}/state.json"
   fi
-  if [ ! -f "$state_file" ]; then
+  if ! git cat-file -e "$local_sha:$state_file" 2>/dev/null && [ ! -f "$state_file" ]; then
     continue
   fi
-  python3 - "$state_file" <<'PY'
+  python3 - "$local_sha" "$state_file" <<'PY'
 import json
+import subprocess
 import sys
 
-path = sys.argv[1]
+sha, path = sys.argv[1], sys.argv[2]
 try:
-    data = json.load(open(path, encoding="utf-8"))
+    proc = subprocess.run(["git", "show", f"{sha}:{path}"], capture_output=True, text=True, check=False)
+    if proc.returncode == 0:
+        data = json.loads(proc.stdout)
+    else:
+        data = json.load(open(path, encoding="utf-8"))
 except Exception as exc:
     print(f"pre-push: invalid JSON in {path}: {exc}", file=sys.stderr)
     sys.exit(1)

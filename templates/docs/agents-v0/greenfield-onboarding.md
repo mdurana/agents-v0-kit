@@ -104,7 +104,7 @@ Record approvals in `<feature>.state.json` via `sh .agents-v0/scripts/sync-featu
 
 ## 5. Advance milestones
 
-After P0 go/no-go, a program of more than one story starts with `/v0-roadmap` and the path of the discovery document. That file may live anywhere in the repository. `/v0-architecture` then writes the C4-through-operations pack and the ARC record, `design-reviewer` reviews it, and it stops for one approval before any story. Plan reads that pack and fills Surface and Size on each story row. It does not rewrite the pack. A story that adds a service, a datastore, a security boundary, or a breaking API is `Material: yes`. Design cites `docs/agents-v0/design/system/arc-record.md` when the program recommendation already covers it. An `arc` row is written only when the story amends that recommendation. Who skips `/v0-architecture`: `workflow-orchestration.mdc` Architecture.
+After P0 go/no-go, a program of more than one story starts with `/v0-roadmap` and the path of the discovery document. That file may live anywhere in the repository. `/v0-architecture` then writes the C4-through-operations pack and the ARC record, `design-reviewer` reviews it, and it stops for one approval before any story. Plan reads that pack and fills Surface and Size on each story row. It does not rewrite the pack. A story that adds a service, a datastore, a security boundary, or a breaking API is `Material: yes`. Design cites `docs/agents-v0/design/system/arc-record.md` when the program recommendation already covers it. An `arc` row is written only when the story amends that recommendation. Who skips `/v0-architecture`: `workflow-orchestration.mdc` Lifecycle.
 
 `/v0-export` and `/v0-deck` are optional. They do not gate a merge.
 

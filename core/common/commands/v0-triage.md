@@ -7,7 +7,7 @@ description: Trivial lane — a docs-only or 1-for-1 patch version bump confirme
 Use `/v0-triage` for changes that qualify for the **Trivial** tier (`workflow-orchestration.mdc` Change tiers).
 
 ## What qualifies
-- Documentation-only edits, or 1-for-1 patch/minor version bumps in dependency manifests/lockfiles.
+- Documentation-only edits, or 1-for-1 patch version bumps in dependency manifests/lockfiles.
 - Zero changes to security surfaces (controllers, authentication, authorization, sessions, uploads, CORS, security/deployment config), database schemas/migrations, or API/event contracts.
 - Small scope ($\le 10$ files and $\le 200$ changed lines).
 

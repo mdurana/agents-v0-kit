@@ -33,10 +33,13 @@ if [ ! -f "$report" ]; then
   exit 0
 fi
 
-# Count failed cards per failing-test cell (column 5 when headers are Command|Exit|Attempt|Failing test|Location).
-eval "$(REPORT="$report" TEST_FILTER="$test_name" python3 - <<'PY'
+# Count failed cards per failing-test cell (column 5 when headers are Command|Exit|Attempt|Failing test|Location)
+# and verify the failure brief in Python so spaces, commas, and shell characters in test names are safe.
+REPORT="$report" BRIEF="$brief" TEST_FILTER="$test_name" python3 - <<'PY'
 import os, re, sys
+
 path = os.environ["REPORT"]
+brief_path = os.environ["BRIEF"]
 want = os.environ.get("TEST_FILTER", "").strip()
 text = open(path, encoding="utf-8", errors="replace").read()
 counts = {}
@@ -61,54 +64,35 @@ for line in text.splitlines():
     if not failing or failing in ("—", "-", "n/a", "N/A"):
         failing = "(unnamed)"
     counts[failing] = counts.get(failing, 0) + 1
-need = []
-for name, n in counts.items():
-    if n >= 2 and (not want or want == name or want in name):
-        need.append(name)
-print("NEED_COUNT=%d" % len(need))
-print("NEED_TESTS=%s" % ",".join(need))
+
+need = [name for name, n in counts.items() if n >= 2 and (not want or want == name or want in name)]
+if not need:
+    print(f"OK: no second-red failure requiring a brief ({path})")
+    raise SystemExit(0)
+
+joined = ",".join(need)
+if not os.path.isfile(brief_path):
+    print(f"FAIL: {brief_path} missing after a second red for: {joined}", file=sys.stderr)
+    print("Write the brief, launch debug-investigator, then attempt three. Do not read build-output.txt.", file=sys.stderr)
+    raise SystemExit(1)
+
+brief_text = open(brief_path, encoding="utf-8", errors="replace").read()
+has_file_line = bool(re.search(r"[A-Za-z0-9_./-]+:[0-9]+", brief_text))
+missing = []
+for t in need:
+    if t in brief_text:
+        continue
+    if t == "(unnamed)" and has_file_line:
+        continue
+    missing.append(t)
+
+if missing:
+    print(f"FAIL: {brief_path} does not name the failing test(s): {' '.join(missing)}", file=sys.stderr)
+    raise SystemExit(1)
+
+if not has_file_line:
+    print(f"FAIL: {brief_path} must cite at least one file:line", file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"OK: failure-brief present for second-red ({joined})")
 PY
-)"
-
-if [ "${NEED_COUNT:-0}" -eq 0 ]; then
-  printf 'OK: no second-red failure requiring a brief (%s)\n' "$report"
-  exit 0
-fi
-
-if [ ! -f "$brief" ]; then
-  printf 'FAIL: %s missing after a second red for: %s\n' "$brief" "$NEED_TESTS" >&2
-  printf 'Write the brief, launch debug-investigator, then attempt three. Do not read build-output.txt.\n' >&2
-  exit 1
-fi
-
-brief_text="$(cat "$brief")"
-missing=""
-old_ifs=$IFS
-IFS=,
-for t in $NEED_TESTS; do
-  IFS=$old_ifs
-  case "$brief_text" in
-    *"$t"*) ;;
-    *)
-      # Allow unnamed when brief has file:line evidence
-      if [ "$t" = "(unnamed)" ] && printf '%s' "$brief_text" | grep -Eq '[A-Za-z0-9_./-]+:[0-9]+'; then
-        :
-      else
-        missing="${missing} ${t}"
-      fi
-      ;;
-  esac
-done
-IFS=$old_ifs
-
-if [ -n "$missing" ]; then
-  printf 'FAIL: %s does not name the failing test(s):%s\n' "$brief" "$missing" >&2
-  exit 1
-fi
-
-if ! printf '%s' "$brief_text" | grep -Eq '[A-Za-z0-9_./-]+:[0-9]+'; then
-  printf 'FAIL: %s must cite at least one file:line\n' "$brief" >&2
-  exit 1
-fi
-
-printf 'OK: failure-brief present for second-red (%s)\n' "$NEED_TESTS"

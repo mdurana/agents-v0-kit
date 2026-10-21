@@ -470,7 +470,7 @@ if [ "$LINK" = 1 ]; then
   sh "$KIT/scripts/link-project.sh" "$@" "$TARGET_ABS"
   install_templates "$TARGET_ABS"
   if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
-    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml. Scope GITLAB_TOKEN to the delivery-approval environment (read_api, masked), or that token is visible to every job.\n' >&2
+    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml.\n' >&2
   fi
   printf 'Linked agents-v0 into %s (kit files stay in the pinned checkout).\n' "$TARGET_ABS"
   exit 0

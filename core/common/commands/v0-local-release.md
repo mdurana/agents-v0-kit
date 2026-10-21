@@ -23,9 +23,9 @@ Check `git status` (`workflow-orchestration.mdc` Parallel features). Stop if ano
 3. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `maintain/<id>/phase-result.md`) with `phase: release`, `status: awaiting_approval`, and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval <artifact>`.
 4. **Stop** and ask for explicit user approval to complete the local release (committing any release notes/state updates and merging into the target integration branch resolved by `sh .agents-v0/scripts/resolve-integration-branch.sh`).
 5. **After explicit user approval:**
-   - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>` and update `phase-result.md` to `status: approved`.
-   - Commit any pending delivery state/evidence files (`git commit` requires your confirmation in the IDE prompt).
-   - If working on a feature branch separate from the integration branch (`sh .agents-v0/scripts/resolve-integration-branch.sh`), merge into the integration branch (`git merge --no-ff <feature-branch>`) upon user confirmation.
+   - Commit any pending delivery evidence/changelog files (`git commit` requires your confirmation in the IDE prompt).
+   - If working on a feature branch separate from the integration branch (`sh .agents-v0/scripts/resolve-integration-branch.sh`), merge into the integration branch (`git merge --no-ff <feature-branch>`) upon user confirmation. If the merge fails or conflicts, stop and do not mark the feature released.
+   - Once the merge succeeds (or when already on the integration branch), run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>`, update `phase-result.md` to `status: approved`, and commit the updated release state on user confirmation.
    - Do not call `glab` or push to a remote unless the user explicitly asks to push or run `/v0-release`.
 
 ## Rules

@@ -5,7 +5,7 @@ description: Program architecture playbook. C4 through operations and the ARC pa
 
 # program-architecture
 
-Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orchestration.mdc` Architecture).
+Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orchestration.mdc` Phase Gates Summary).
 
 ## Steps
 1. Read the problem source. For a program, that is the approved roadmap and the discovery file at its `Discovery:` path. For a Major story with no roadmap, that is `docs/agents-v0/requirements/<feature>.md`. Do not invent a roadmap for that story. Read `docs/agents-v0/project-profile.md` and, on a brownfield repo, the as-is `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, and onboard module notes. Do not delete as-is citations.

@@ -9,7 +9,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 
 ## Steps
 1. Identify what changed: behavior (API/events/auth) or topology (services/ports/dependencies).
-2. Write `docs/agents-v0/maintain/<feature>/helper-brief.md` (`helper: docs-author`) to draft doc updates from the diff. Do not launch the helper (`workflow-orchestration.mdc` Helper agents). Review the draft the main session brings back.
+2. Write `docs/agents-v0/maintain/<feature>/helper-brief.md` (`helper: docs-author`) to draft doc updates from the diff. Do not launch the helper (`workflow-orchestration.mdc` Helper Subagents). Review the draft the main session brings back.
 3. Update, from the commit being documented, not from plan-time wishes:
    - `README.md` — build/run/test/CI commands.
    - `docs/agents-v0/network.md` — ports and dependencies. Set Status to `built` and add a file citation only for a process the commit shows. Leave `planned` rows as planned.

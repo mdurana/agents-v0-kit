@@ -112,8 +112,10 @@ SHELL_CASES = [
     ("rm .cursor/commands/v0-build.md", "block"),
     ("echo exit 0 > .agents-v0/ci/check-event-schemas.sh", "block"),
     ("python3 -c \"open('.cursor/hooks.json','w').write('{}')\"", "block"),
+    ("python3 - <<EOF\nopen('docs/agents-v0/requirements/orders.state.json','w').write('{}')\nEOF", "block"),
     ("echo tamper > .agents-v0/hooks/pre-push", "block"),
     ("echo '{}' > docs/agents-v0/requirements/orders.state.json", "block"),
+    ("sh .agents-v0/scripts/activate-stack-pack.sh node --force", "ask"),
     ("cat .cursor/hooks.json", "allow"),
     ("cat .cursor/cli.json", "allow"),
     # Publish / deploy
@@ -214,6 +216,7 @@ SHELL_CASES = [
 
 PATH_CASES = [
     (".cursor/hooks.json", "block"),
+    (".cursor/./rules/org/x.mdc", "block"),
     (".cursor/cli.json", "block"),
     (".cursor/agents/foo.md", "block"),
     (".cursor/rules/org/x.mdc", "block"),

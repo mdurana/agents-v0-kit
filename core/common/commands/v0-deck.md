@@ -4,7 +4,7 @@ description: Write a markdown deck from an approved Intake artifact, or from app
 
 # /v0-deck
 
-Documentation command (`workflow-orchestration.mdc` Documentation). Not a delivery phase. `/v0-deliver` does not run it. A missing deck does not block Build or Release. `/v0-status` does not report it.
+Documentation command (`workflow-orchestration.mdc` Lifecycle). Not a delivery phase. `/v0-deliver` does not run it. A missing deck does not block Build or Release. `/v0-status` does not report it.
 
 ## Prerequisite
 The user names the kind and the decision the meeting must answer, in the user's words. Audience is `Technical`, `Non-technical`, or `Mixed`.

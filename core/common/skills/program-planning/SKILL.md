@@ -5,7 +5,7 @@ description: Plan phase playbook. Turn a large goal into milestone manifests, or
 
 # program-planning
 
-Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc` Program planning).
+Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc` Phase Gates Summary).
 
 ## Steps
 1. Read the approved roadmap (`Discovery:` is the only product source), the approved architecture pack, and the repo context (`docs/agents-v0/project-profile.md`, `docs/agents-v0/repo-map.md`). When `repo-map.md` is still a generator stub on a greenfield repo, the approved architecture pack (`architecture.md`, `context-map.md`, `components/*.md`) is the source — do not write an `explore-researcher` brief. A plan whose only story is seeded P0-A may skip the roadmap and the architecture pack. Any other plan stops until the `roadmap` row and the `architecture` row are `Approved` and the profile `Pack` cell names a complete pack (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). Do not rewrite the context map, network, SLO budget, threat model, or ARC record. Do not edit `BFF root` or `Service roots` in `docs/agents-v0/project-profile.md` for directories that do not exist on disk yet (`resolve-layout.sh` emits them immediately; keep them `n/a` until the story that scaffolds those directories runs in `/v0-build`). Stories follow that pack's service skill.

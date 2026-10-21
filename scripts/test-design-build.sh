@@ -89,12 +89,23 @@ run pass "reopen 3: allowed" "$d" sh .agents-v0/scripts/sync-feature-state.sh do
 run pass "reopen 3: trigger" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --reopen build
 has "reopen 3: reopenCount is 3" "$ST" '"reopenCount": 3'
 run fail "reopen 4: exceeds cap of 3 and exits non-zero" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --reopen build
+has "reopen 4: persists reopenCount 4" "$ST" '"reopenCount": 4'
+has "reopen 4: persists blocked status" "$ST" '"activeStatus": "blocked"'
+run fail "reopen 4: build in_progress cannot clear blocked reopen budget" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --active-phase build --status in_progress
+has "reopen 4: stays blocked after build in_progress attempt" "$ST" '"activeStatus": "blocked"'
+run pass "reopen 4: clear-active unblocks after human escalation" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --clear-active
+run fail "non-primary artifact path is rejected" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/design/orders/design.md --approve design
 
 # --- Helper brief duplicate ask detection ------------------------------------
-printf 'helper: explore-researcher\nask: find all callers of OrderService.create\nscope: src/\n' > "$d/docs/agents-v0/build/orders/helper-brief.md"
+printf 'helper: explore-researcher\noutputs: docs/agents-v0/build/orders/notes.md\nask: find all callers of OrderService.create\nscope: src/\n' > "$d/docs/agents-v0/build/orders/helper-brief.md"
 run pass "helper brief: first ask is recorded" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --active-phase build --status in_progress
 run fail "helper brief: identical ask is blocked on next sync" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --active-phase build --status in_progress
+run pass "helper brief: approve is not blocked by brief on disk" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --approve verify
+has "state: verifyPassed is true after verify approval" "$ST" '"verifyPassed": true'
 rm -f "$d/docs/agents-v0/build/orders/helper-brief.md"
+sed -i.bak 's/"reopenCount": 3/"reopenCount": 1/' "$ST" && rm -f "$ST.bak"
+run pass "reopen clears verifyPassed when verify is withdrawn" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --reopen build
+has "state: verifyPassed is false after reopen build" "$ST" '"verifyPassed": false'
 
 # --- check-failure-brief.sh --------------------------------------------------
 cat > "$d/docs/agents-v0/build/orders/build-report.md" <<'EOF'
@@ -112,6 +123,16 @@ cat > "$d/docs/agents-v0/build/orders/failure-brief.md" <<'EOF'
 - **Smallest fix:** Throw `OrderNotFoundException` at `OrderService.java:42`
 EOF
 run pass "failure brief: valid failure-brief.md with file:line citation passes" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
+
+cat > "$d/docs/agents-v0/build/orders/build-report.md" <<'EOF'
+# Build report
+| Command | Exit | Attempt | Failing test | Location |
+|---------|------|---------|--------------|----------|
+| dotnet test | 1 | 1 | returns 404, when missing; echo pwned | OrderControllerTests.cs:15 |
+| dotnet test | 1 | 2 | returns 404, when missing; echo pwned | OrderControllerTests.cs:15 |
+EOF
+rm -f "$d/docs/agents-v0/build/orders/failure-brief.md"
+run fail "failure brief: test name with spaces, commas, and semicolons fails safely" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
 
 if [ "$status" -ne 0 ]; then
   echo "test-design-build: FAILED" >&2

@@ -362,6 +362,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
         return "ask", "artifact deploy/publish requires explicit user approval."
     if re.search(r"^(?:(?:sh|bash|dash)\s+)?\S*feature-worktree\.sh\b", low):
         return "ask", "creating a feature branch and worktree requires explicit user authorization."
+    if re.search(r"^(?:(?:sh|bash|dash|zsh)\s+)?\S*activate-stack-pack\.sh\b", low) and "--force" in low:
+        return "ask", "replacing the bound stack pack rewrites rules and skills; requires explicit user approval."
 
     try:
         parts = shlex.split(seg, posix=True)
@@ -541,7 +543,21 @@ def _git_subcommand(parts: List[str]) -> str:
     return ""
 
 
+def _heredoc_writes_protected(cmd: str) -> Optional[str]:
+    if not re.search(r"\b(?:python3?|node|perl|ruby)\b[^\n|;&]*(?:\s-\s*)?<<-?\s*['\"]?\w+", cmd):
+        return None
+    if not SCRIPT_WRITE_HINT.search(cmd):
+        return None
+    for lit in re.findall(r"['\"]([^'\"\n]+)['\"]", cmd):
+        if is_protected_path(lit):
+            return lit
+    return None
+
+
 def classify_command(cmd: str) -> Tuple[Action, str]:
+    hp = _heredoc_writes_protected(cmd)
+    if hp:
+        return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
     segments = split_segments(cmd)
     if not segments:
         return "allow", ""
@@ -653,10 +669,12 @@ PROTECTED_PATH_PATTERNS = [
 def is_protected_path(path: str) -> bool:
     if not path:
         return False
-    norm = path.replace("\\", "/")
-    for pat in PROTECTED_PATH_PATTERNS:
-        if pat.search(norm):
-            return True
+    raw = path.replace("\\", "/").strip().strip("'\"")
+    norm = posixpath.normpath(raw) if raw else raw
+    for candidate in (raw, norm):
+        for pat in PROTECTED_PATH_PATTERNS:
+            if pat.search(candidate):
+                return True
     return False
 
 

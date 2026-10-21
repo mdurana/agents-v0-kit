@@ -81,6 +81,9 @@ build:
         cd "$repo/$BACKEND_ROOT"
         if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
         "$MVN" -B clean verify 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
+      else
+        echo "backend: no verify command resolved for pack '${pack_id:-?}' (set 'Backend verify' in docs/agents-v0/project-profile.md)" >&2
+        exit 1
       fi
   artifacts:
     when: always

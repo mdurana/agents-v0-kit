@@ -5,7 +5,7 @@ description: Brownfield safety. Capture current behavior with characterization t
 
 # characterization-tests
 
-Use before structural refactors on brownfield code (`workflow-orchestration.mdc` Maintain/Major paths).
+Use before structural refactors on brownfield code (`workflow-orchestration.mdc` Change Tiers).
 
 ## Steps
 1. Identify the smallest surface to change (class, module, endpoint).

@@ -11,6 +11,7 @@ cmd="$(hook_extract_command "$payload")"
 block() {
   hook_audit_log "shell" "$cmd" "block" "$1"
   printf 'BLOCK: %s\n' "$1" >&2
+  HOOK_DENY_MSG="$1" python3 -c 'import json,os; m=os.environ.get("HOOK_DENY_MSG",""); print(json.dumps({"permission":"deny","user_message":m,"agent_message":"BLOCKED by kit policy: "+m}))' 2>/dev/null || true
   exit 2
 }
 

@@ -13,12 +13,12 @@ try:
     d=json.loads(raw)
 except json.JSONDecodeError:
     raise SystemExit(0)
-for k in ("file_path","path","filePath"):
+for k in ("file_path","path","filePath","target_file"):
     if isinstance(d.get(k),str):
         print(d[k]); raise SystemExit(0)
 ti=d.get("tool_input") or d.get("input") or {}
 if isinstance(ti,dict):
-    for k in ("file_path","path","filePath"):
+    for k in ("file_path","path","filePath","target_file"):
         if isinstance(ti.get(k),str):
             print(ti[k]); raise SystemExit(0)
 ' 2>/dev/null || true)"

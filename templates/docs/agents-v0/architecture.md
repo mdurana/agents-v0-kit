@@ -85,4 +85,4 @@ flowchart TB
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
 
-> `/v0-architecture` appends the `architecture` row after one explicit approval. The Artifacts cell names `docs/agents-v0/design/system/arc-record.md`. An `arc` row is only for a later story that amends the recommendation. `/v0-plan` waits for the `architecture` row. Who skips this command: `workflow-orchestration.mdc` Architecture.
+> `/v0-architecture` appends the `architecture` row after one explicit approval. The Artifacts cell names `docs/agents-v0/design/system/arc-record.md`. An `arc` row is only for a later story that amends the recommendation. `/v0-plan` waits for the `architecture` row. Who skips this command: `workflow-orchestration.mdc` Lifecycle.
