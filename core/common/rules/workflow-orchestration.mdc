@@ -38,7 +38,7 @@ Workflow state, approved phases, `baseCommit`, and on-disk artifact pointers liv
 | `lastApprovedPhase` | Most recent approved phase (`intake`, `design`, `build`, `verify`, `release`, etc.). |
 | `approvedPhases` | Ordered array of approved phases for this work item. |
 | `phaseDates` | Map of approved phase → `YYYY-MM-DD` approval date (`intake`, `design`, `build`, etc.). |
-| `activePhase` | Phase currently in flight (`onboard`, `intake`, `design`, `build`, `verify`, `release`, `maintain`). |
+| `activePhase` | Phase currently in flight (`onboard`, `roadmap`, `architecture`, `plan`, `intake`, `design`, `build`, `verify`, `release`, `maintain`). |
 | `activeStatus` | `in_progress`, `awaiting_approval`, or `blocked`. |
 | `blockedReason` | One-line reason when `activeStatus` is `blocked`. |
 | `verifyPassed` | `true` when `/v0-verify` passes with zero Critical findings. |
