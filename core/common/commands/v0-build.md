@@ -12,6 +12,7 @@ You are entering the **Build** phase of the delivery lifecycle (`workflow-orches
 3. Read `docs/agents-v0/requirements/<feature>.state.json` (and `<feature>.phase-result.md` when present):
    - For `Story: P0-A` (`Milestone: P0`), if `docs/agents-v0/requirements/p0-a-platform-skeleton.md` does not exist yet, create it from `docs/agents-v0/milestones/p0-platform-skeleton.md` (`AC-1` through `AC-4`) along with a minimal `N/A` `docs/agents-v0/design/p0-a-platform-skeleton/design.md`.
    - For all other stories, confirm `design` is in `approvedPhases` in `<feature>.state.json` (or `Delivery approvals` records an `Approved` Design row). If missing, mark `--active-phase build --status blocked --reason "Design not approved"` and stop.
+   - Milestone story: every story ID in this story's Dependency column in `docs/agents-v0/milestones/<milestone>.md` must have `verify` in `approvedPhases` and `verifyPassed: true`. If one does not, mark `--active-phase build --status blocked --reason "Dependency <id> not verified"` and stop.
 4. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/<feature>.md`. Continue from existing files on disk (`docs/agents-v0/build/<feature>/plan.md` and `build-report.md`). If Build was re-opened from Verify, read the Critical findings in `docs/agents-v0/requirements/<feature>.phase-result.md` and `docs/agents-v0/verify/<feature>/`, reset affected `AC-*` rows in `plan.md` to `pending`, and write failing reproduction/assertion tests before applying the fix.
 
 ## Collision
