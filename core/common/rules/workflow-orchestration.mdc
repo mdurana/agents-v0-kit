@@ -50,11 +50,12 @@ Workflow state, approved phases, `baseCommit`, and on-disk artifact pointers liv
 - **Stopping at a Gate:** Write `<feature>.phase-result.md`, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status awaiting_approval <artifact>`, and stop your turn. Never self-approve or infer approval.
 - **Recording Human Approval:** Only after the user explicitly approves in chat (or records an `Approved` row in `Delivery approvals`), run `sh .agents-v0/scripts/sync-feature-state.sh --approve <phase> <artifact>`.
 
-`/v0-status` is read-only: it inspects the state file(s) and names the next command to run. When multiple features have state files and none is named by the user, list them and ask; never guess the newest `*.state.json`.
+`/v0-status` is read-only: it inspects the state file(s) and names the next command to run, including the feature slug or maintenance id. Naming when the user omitted that name is the Parallel Features rule below.
 
 ## Parallel Features
 
 Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `design/<feature>/`, `build/<feature>/`, and `verify/<feature>/`.
+- **Naming:** When a command needs a feature slug or a maintenance id and the user did not give one, use the one matching open state file when exactly one exists. When none or more than one exist, list them and ask. Do not pick the newest file. Do not create `docs/agents-v0/requirements/<feature>.md` or `docs/agents-v0/maintain/<id>/note.md` until the user has named that slug or id. A new story or note always requires a name, even when another story is already open. The next command includes that name (`/v0-<phase> <feature>` or `/v0-<phase> <id>`).
 - **Worktree per feature (preferred):** After Intake is approved, `/v0-intake` runs `sh .agents-v0/scripts/feature-worktree.sh <feature>` (requires user confirmation). The branch is `feature/<feature>`. A reopened Intake reuses that branch. P0-A does not get one. A standard or emergency maintenance note uses `sh .agents-v0/scripts/feature-worktree.sh --maintain <id>` and branch `maintain/<id>`. A trivial note stays on the integration branch. A branch already contained in the integration ref is not checked out again.
 - **Shared checkout safety:** Stop before editing shared files (`project-profile.md`, `openapi/`, `architecture.md`, `network.md`, `milestones/plan.md`, build/dependency manifests) if `git status` shows uncommitted changes from another feature.
 

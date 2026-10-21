@@ -67,10 +67,10 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
 | `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
 | `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
-| `/v0-status`   | Name the feature. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
+| `/v0-status`   | Name the feature when more than one is open. One open story can omit the name. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
 
 
-You can also write in normal language, for example: *“Run intake on PROJ-1234”* or *“We’re only doing design for the notifications feature.”* Using the slash commands is clearer for the workflow. When more than one feature is open, name it: `/v0-status tax-statement`.
+You can also write in normal language, for example: *“Run intake on PROJ-1234”* or *“We’re only doing design for the notifications feature.”* Using the slash commands is clearer for the workflow. When one story is open, the phase command can omit the name. When more than one is open, name it: `/v0-status tax-statement`. A new story or fix needs a new name.
 
 ---
 
@@ -336,7 +336,7 @@ Make the portal better.
 
 ```text
 1. Open Cursor chat in the project.
-2. New program: /v0-roadmap <path to the discovery file>, then /v0-architecture, then /v0-plan. One ticket: /v0-deliver or /v0-intake. Name the feature if more than one is open.
+2. New program: /v0-roadmap <path to the discovery file>, then /v0-architecture, then /v0-plan. One ticket: /v0-deliver or /v0-intake. One open story can omit the name. Name it when more than one is open. A new story or fix needs a new name.
 3. Answer questions when asked.
 4. At each gate that applies: read summary → Approved OR list changes. The platform skeleton asks once, at Release.
 5. If the chat stopped mid-phase: /v0-status <feature> → run the same phase command again.

@@ -7,6 +7,7 @@ description: Intake phase. Turn a Jira/Confluence/user spec into the requirement
 You are entering the **Intake** phase of the delivery lifecycle (`workflow-orchestration.mdc`).
 
 ## Prerequisite & Resume
+- If `<feature>` was not given, follow the naming rule in `workflow-orchestration.mdc` Parallel Features. Do not set `in_progress`, and do not create `docs/agents-v0/requirements/<feature>.md`, until the slug is named.
 - Brownfield: if `docs/agents-v0/onboarding/report.md` exists, `docs/agents-v0/onboarding/state.json` must record `lastApprovedPhase: "onboard"`.
 - Milestone story: `plan` must be in `approvedPhases` in `docs/agents-v0/program.state.json`, or the manifest `docs/agents-v0/milestones/<milestone>.md` must have an `Approved` `plan` row. A single ticket with no milestone has no plan to check. Dependency `verify` approvals are required before `/v0-build`, not before Intake.
 - P0-A skeleton: skip `/v0-intake` and proceed directly to `/v0-build`.

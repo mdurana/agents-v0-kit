@@ -7,7 +7,7 @@ description: Regenerate a Jira CSV from the approved plan index and approved Int
 Documentation command (`workflow-orchestration.mdc` Lifecycle). Not a delivery phase. `/v0-deliver` does not run it. A missing CSV does not block Build or Release. `/v0-status` does not report it.
 
 ## Prerequisite
-If `plan` is not approved in `docs/agents-v0/program.state.json` (`approvedPhases`) and the milestone manifest being exported has no `Approved` `plan` row, stop and suggest `/v0-plan`. Do not write the CSV. Otherwise `plan` is approved. Stories with `intake` approved in `docs/agents-v0/requirements/<feature>.state.json` (or an `Approved` Intake row) export their Gherkin. Stories that only have a sentence in the manifest export that sentence. Do not read Jira. Do not edit requirements, design, approvals, or the discovery file.
+This command writes every approved milestone manifest under `docs/agents-v0/milestones/`. It does not take a manifest argument. If `plan` is not approved in `docs/agents-v0/program.state.json` (`approvedPhases`) and no manifest there has an `Approved` `plan` row, stop and suggest `/v0-plan`. Do not write the CSV. Stories with `intake` approved in `docs/agents-v0/requirements/<feature>.state.json` (or an `Approved` Intake row) export their Gherkin. Stories that only have a sentence in the manifest export that sentence. Do not read Jira. Do not edit requirements, design, approvals, or the discovery file.
 
 ## Instructions
 1. Follow `jira-export`.
