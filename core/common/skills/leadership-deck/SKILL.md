@@ -19,7 +19,7 @@ Documentation playbook for `/v0-deck`. It does not record a delivery approval. I
    - `docs/agents-v0/design/system/context-map.md`, admitted when `plan` or `architecture` is in `program.state.json` (`approvedPhases`) or cited by an `Approved` `plan` row.
    - `docs/agents-v0/design/system/arc-record.md` when it exists. `architecture` in `program.state.json` (`approvedPhases`), an `Approved` `arc` row on that file, or an `Approved` `architecture` row in `docs/agents-v0/architecture.md` whose Artifacts cell names that file admits it.
    - every `docs/agents-v0/requirements/*.md` that has `intake` in `<feature>.state.json` (`approvedPhases`) or an `Approved` `intake` row. Skip a requirements file that does not. Do not fail the deck because some stories are not through Intake yet.
-4. **Delivery** sources are the product sources plus the milestone manifests and the release evidence for stories with `release` in `<feature>.state.json` (`approvedPhases`) or named on `Approved` `release` rows. Skip a release report that is not approved.
+4. **Delivery** sources are the product sources plus the milestone manifests and the release evidence for stories with `release` in `<feature>.state.json` (`approvedPhases`) or named on `Approved` `release` rows. That evidence is `artifacts.verify`, `artifacts.buildReport`, and `docs/agents-v0/requirements/<feature>.phase-result.md`. There is no `artifacts.release` key. Skip a story whose release is not approved.
 5. Refuse a source that lacks approval in `.state.json` and lacks an `Approved` row. The discovery file is one exception: the roadmap approval admits it. The ARC record is the other: an approved `architecture` phase (in `program.state.json` or an `Approved` `architecture` row that names the file) admits it.
 6. Write the deck as markdown. Every figure, date, and metric is copied from a source. When a number is not in the sources, omit it. Scenario text is copied from the requirements artifact. Do not invent a problem statement.
 7. Use the outline for the kind. For `Non-technical`, an in-scope line is the scenario name only (`### AC-n — <name>`). For `Technical` and `Mixed`, also copy `Kind:` and the `Then` line.
@@ -41,8 +41,11 @@ File: `docs/agents-v0/presentations/<roadmap-stem>.md` for product, and `docs/ag
 1. Decision, in the user's words.
 2. Problem and success metric, copied from the discovery file.
 3. Now, Next, and Later, copied from the roadmap.
-4. Stories: one block per approved requirements artifact (`intake` in `<feature>.state.json` `approvedPhases` or an `Approved` `intake` row), using the intake outline's items 2 through 5. When no requirements artifact has `intake` approved in `.state.json` or an `Approved` `intake` row, write that no approved Intake artifact is on disk.
-5. Delivery only: the release evidence for stories with `release` approved in `<feature>.state.json` (`approvedPhases` / `artifacts`) or named on `Approved` `release` rows, copied. Omit a figure the evidence does not contain.
+4. Context, copied from `docs/agents-v0/design/system/context-map.md` when it is a source.
+5. ARC record, copied from `docs/agents-v0/design/system/arc-record.md` when that file exists.
+6. Stories: one block per approved requirements artifact (`intake` in `<feature>.state.json` `approvedPhases` or an `Approved` `intake` row), using the intake outline's items 2 through 5. When no requirements artifact has `intake` approved in `.state.json` or an `Approved` `intake` row, write that no approved Intake artifact is on disk.
+7. Delivery only: milestone manifests, copied.
+8. Delivery only: release evidence for stories with `release` in `<feature>.state.json` (`approvedPhases`) or named on `Approved` `release` rows. Copy `artifacts.verify`, `artifacts.buildReport`, and `docs/agents-v0/requirements/<feature>.phase-result.md`. Omit a figure those files do not contain.
 
 ## Rule-compliance checklist
 - [ ] Audience and decision were supplied by the user. Intake also names the feature.

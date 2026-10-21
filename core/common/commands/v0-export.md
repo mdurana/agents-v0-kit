@@ -12,7 +12,7 @@ Documentation command (`workflow-orchestration.mdc` Lifecycle). Not a delivery p
 ## Instructions
 1. Follow `jira-export`.
 2. Ask for the export fields when `docs/agents-v0/backlog/export-params.md` has an empty Project key or Issue type. Write the CSV only after the user confirms those fields (`yes` or an explicit override list).
-3. Regenerate the whole of `docs/agents-v0/backlog/tickets.csv` and stamp `docs/agents-v0/backlog/tickets-sources.md` with each source path and the date from its `.state.json` (`phaseDates.<phase>` or `updatedAt`) or `Approved` row.
+3. Write `docs/agents-v0/backlog/tickets-sources.md` first. One line per source path and the date from its `.state.json` (`phaseDates.<phase>` or `updatedAt`) or `Approved` row. Include `docs/agents-v0/backlog/export-params.md` with the date the user confirmed the fields, and record `Project key` there. Then regenerate the whole of `docs/agents-v0/backlog/tickets.csv`. The `Issue Type` column is the confirmed Issue type. `Project key` is not a CSV column.
 4. Stop. Do not add an `Approved` row. Tell the user the CSV is a copy for a manual Jira import. An edit in Jira is made again by editing the requirements file or the manifest, then running this command again.
 
 ## Rules
