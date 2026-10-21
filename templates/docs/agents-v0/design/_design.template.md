@@ -1,6 +1,6 @@
 # Design: <feature>
 
-> Copy to `docs/agents-v0/design/<feature>/design.md`. `sh .agents-v0/ci/check-design.sh <feature>` checks Traceability, Data model, Authorization, Failure modes, Observability, and Rollout: each must say something, or say `N/A: <reason>`. It also checks that every `AC-n` of the requirements artifact appears in Traceability, every `operationId` of `openapi.yaml` appears in Authorization, and the ADR line names a real ADR with at least two alternatives and Status `Proposed` or `Accepted`. A pin requires `Accepted`. A later decision supersedes that file. When there is no event contract, the Events section must contain `N/A: no event contract`. That phrase fails the check when `asyncapi.yaml` or `events/` is present. Delete each `TEMPLATE:` line when you replace it.
+> Copy to `docs/agents-v0/design/<feature>/design.md`. Traceability, Data model, Authorization, Failure modes, Observability, and Rollout must each say something, or say `N/A: <reason>`. Every `AC-n` of the requirements artifact must appear in Traceability, every `operationId` of `openapi.yaml` must appear in Authorization, and the ADR line must name a real ADR with at least two alternatives and Status `Proposed` or `Accepted` (`Accepted` on approval). A later decision supersedes that file. When there is no event contract, the Events section must contain `N/A: no event contract`. Delete each `TEMPLATE:` line when you replace it.
 
 ADR: <!-- TEMPLATE: docs/agents-v0/adr/NN-slug.md, or "N/A: <reason>" -->
 

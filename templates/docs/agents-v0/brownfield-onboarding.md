@@ -29,7 +29,7 @@ codebase as it is today, with every statement cited to code or marked `UNVERIFIE
 | Inventories: endpoints with authorization annotation, entities, migrations, messaging, scheduled work, outbound clients, configuration **key names**, frontend routes, CI and deploy files, tests | `docs/agents-v0/discovery/*.txt` |
 | Baseline numbers and proposed `known_failures` / `coverage_ratchet` rows | `docs/agents-v0/discovery/baseline.md` |
 | Security baseline snapshot (triage list; nothing is fixed) | `docs/agents-v0/discovery/security-baseline.md` |
-| Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `.agents-v0/ci/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
+| Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `.agents-v0/scripts/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
 | As-is architecture, network, context map, inherited decisions, flows you name | `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/adr/0000-inherited-decisions.md`, `docs/agents-v0/diagrams/sequences/` |
 
 When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. No marker asks the person to name the pack id and to write its `pack.json`. Two markers stop so a person can choose. A `Pack` cell that already names an id stays, including an id that is not a kit example. A later roadmap or architecture does not replace that pack. Set `CI_PACK_IMAGE` to that pack's `ciImage`.
@@ -62,7 +62,7 @@ document a stabilization plan before feature work.
 
 ## 3. Phased quality thresholds
 
-Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend). A `coverage_ratchet` row is a dated waiver record. It does not relax Pack `java` verify: JaCoCo stays at 0.80 in `core/java/starters/maven/quality-plugins.xml`. The GitLab `coverage-ratchet` job does not pass `LINE_COVERAGE_PCT`, so `.agents-v0/ci/check-coverage-ratchet.sh` checks the approver and the removal date, and compares a measured number only when that variable or `JACOCO_LINE_PCT` is set. Changed lines stay at 80% when `DIFF_BASE` is set. When the repo cannot yet meet the report target:
+Org report targets are in `quality-and-testing.mdc` (80% backend / 70% frontend, and 80% changed lines). A `coverage_ratchet` row is a dated waiver record verified during `/v0-verify`. When the repo cannot yet meet the report target:
 
 1. Get Security + architecture sign-off on a **ratchet plan** (target dates, quarterly bumps).
 2. Record interim thresholds and removal dates in `docs/agents-v0/project-profile.md` (`coverage_ratchet`, `known_failures` table).

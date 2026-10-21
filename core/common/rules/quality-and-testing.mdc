@@ -10,17 +10,17 @@ alwaysApply: false
 
 ## Integration and contract testing
 
-- **Testcontainers:** API + DB + messaging integration tests against the target engine; when a diff adds or changes migrations or SQL (`db/migration`, `migrations`, `alembic`, `*.sql`), `.agents-v0/ci/check-gate-metrics.sh` fails if tests rely only on H2/in-memory substitutes without target-DB verification.
+- **Testcontainers:** API + DB + messaging integration tests against the target engine; when a diff adds or changes migrations or SQL (`db/migration`, `migrations`, `alembic`, `*.sql`), verify against the target database engine rather than relying only on H2/in-memory substitutes.
 - **Consumer–provider contracts:** **Pact** (or org-standard tool) for BFF ↔ service HTTP contracts; publish/verify in CI.
 - **Architecture tests (optional):** the pack's layer check (Pack `java`: **ArchUnit**) when drift is recurring.
 
 ## Workflow
 
-1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`). Capture the failing red test report before green overwrites it (`sh .agents-v0/ci/check-build-plan.sh <feature> --record-red`).
-2. Before merge: the profile Backend verify command (the `java` example is **`./mvnw -B clean verify -Pci-security`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `pack.json`. The fast loop does not replace this gate. The coverage table below applies to every pack.
+1. Red–green-refactor for non-trivial logic; TDD where practical. The red–green loop uses the profile's fast verify command when that cell is a real command (`workflow-orchestration.mdc`). Record the failing red test before green in `build-report.md`.
+2. Before merge: the profile Backend verify command (`sh .agents-v0/scripts/run-backend-verify.sh`; the `java` example is **`./mvnw -B clean verify -Pci-security`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `pack.json`. The fast loop does not replace this gate. The coverage table below applies to every pack.
 3. Coverage gaps: the report named in the pack `pack.json`. The `java` example is `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without a documented exception. The report is the pack `cve.path` (Pack `java`: OWASP Dependency-Check).
-5. Lockfiles are committed. GitLab secret detection runs on the merge request; a committed secret fails the pipeline. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
+5. Lockfiles are committed. Secret detection runs on merge requests; a committed secret fails verification. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
 
 ## Tooling
 
@@ -34,9 +34,9 @@ Wire the coverage, test, and CVE reports named in the bound pack's `pack.json` b
 | Backend branches | the pack coverage report (Pack `java`: JaCoCo / Sonar) | |
 | Frontend | **70%** | raise if CI gate exists |
 
-**What CI fails.** On a merge request, changed-line coverage under 80% (or the Changed lines threshold in `docs/agents-v0/quality-gates.md`) fails for every pack when `DIFF_BASE` is set (`.agents-v0/ci/check-gate-metrics.sh`, `MIN_DIFF_LINE_PCT`). Backend 80% and frontend 70% are the report check the agent confirms. Whole-module line coverage fails in CI when the pack wires it, when a Whole-module lines row in `docs/agents-v0/quality-gates.md` sets the bundle minimum, or when `MIN_LINE_PCT` is set. `MIN_LINE_PCT` overrides that row. Pack `java` wires a fixed JaCoCo bundle minimum of 0.80 in `core/java/starters/maven/quality-plugins.xml`. A `coverage_ratchet` row does not change that minimum.
+**What Verify checks.** Changed-line coverage under 80% (or the Changed lines threshold in `docs/agents-v0/quality-gates.md`) and whole-module line coverage (Backend 80%, Frontend 70%, or the Whole-module lines row in `docs/agents-v0/quality-gates.md`) are checked by the stack's native coverage tool and `test-engineer` (`quality-gate` skill). Pack `java` wires a fixed JaCoCo bundle minimum of 0.80 in `core/java/starters/maven/quality-plugins.xml`.
 
-**Brownfield ratchet:** a `coverage_ratchet` row in `docs/agents-v0/project-profile.md` (interim minimum, Security + architecture approver, removal date) is a dated waiver record. `.agents-v0/ci/check-coverage-ratchet.sh` fails the pipeline when a row is expired or unapproved. The GitLab `coverage-ratchet` job does not pass `LINE_COVERAGE_PCT`, so that job only checks the approver and the removal date. The script compares a measured whole-module number with the interim minimum only when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set. Changed lines stay at 80% when `DIFF_BASE` is set. The ratchet does not lower `MIN_DIFF_LINE_PCT` and does not relax Pack `java` verify. The ratchet never relaxes VAPT, auth, or CVE requirements. When `mutation_ratchet` (or `MIN_MUTATION_PCT`) is configured, `.agents-v0/ci/check-gate-metrics.sh` also checks Pitest/Stryker/mutmut mutation reports against the configured floor.
+**Brownfield ratchet:** a `coverage_ratchet` row in `docs/agents-v0/project-profile.md` (interim minimum, Security + architecture approver, removal date) is a dated waiver record verified during `/v0-verify`. Changed lines stay at 80%. The ratchet never relaxes VAPT, auth, or CVE requirements. When `mutation_ratchet` is configured, `test-engineer` also checks Pitest/Stryker/mutmut mutation reports against the configured floor.
 
 ## Complexity and size
 

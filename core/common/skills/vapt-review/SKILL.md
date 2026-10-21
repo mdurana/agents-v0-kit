@@ -8,7 +8,7 @@ description: Verify phase playbook. Run always-on VAPT findings F4, F8, F9, and 
 Verify phase playbook for the `security-reviewer` agent (`workflow-orchestration.mdc`).
 
 ## Steps
-1. Read the changed files (diff or branch changes). Do not treat `after-edit.sh` VAPT-WARN lines as pass/fail evidence — they are edit-time heuristics only.
+1. Read the changed files (diff or branch changes).
 2. Select the surface:
    - API or BFF → `vapt.mdc` (always-on F4, F8, F9, F10; regression F1, F3, F5, F6).
    - Web app (React / existing SvelteKit) → `vapt-webapp.mdc` (always-on F4, F8; regression F1, F2, F3, F5, F6, F7). Mark F9 and F10 N/A only when no API or BFF in the diff validates tokens or writes audit events, and record that reason.

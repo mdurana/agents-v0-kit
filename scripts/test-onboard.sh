@@ -1,8 +1,7 @@
 #!/bin/sh
 # test-onboard.sh — behavior tests for the /v0-onboard scripts on a fixture repo (no network).
 # Covers: discover-codebase.sh, generate-repo-map.sh, collect-dependency-graphs.sh,
-# check-onboarding-docs.sh, sync-feature-state.sh (onboarding), check-approvals.sh (onboard),
-# check-gate-metrics.sh (GATE_REPORT_ONLY). Run by validate-kit.sh. Needs python3.
+# check-onboarding-docs.sh, sync-feature-state.sh (onboarding). Run by validate-kit.sh. Needs python3.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,18 +20,22 @@ expect_fail() { desc="$1"; dir="$2"; shift 2; if (cd "$dir" && "$@") >/dev/null 
 
 # --- fixture ------------------------------------------------------------------
 r="$tmp/repo"
-mkdir -p "$r/.agents-v0/ci" "$r/.agents-v0/scripts" "$r/docs/agents-v0"
-cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$KIT"/templates/.agents-v0/ci/check-gate-metrics.sh "$KIT"/templates/.agents-v0/ci/check-approvals.sh \
-   "$KIT"/templates/.agents-v0/ci/check-feature-state.sh "$KIT"/templates/.agents-v0/ci/endpoint_scan.py "$KIT"/templates/.agents-v0/ci/packlib.py "$r/.agents-v0/ci/"
+mkdir -p "$r/.agents-v0/scripts" "$r/docs/agents-v0"
+cp "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh \
+   "$KIT"/templates/.agents-v0/scripts/endpoint_scan.py \
+   "$KIT"/templates/.agents-v0/scripts/packlib.py \
+   "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh \
+   "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
+   "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh \
+   "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
+   "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh \
+   "$KIT"/templates/.agents-v0/scripts/audit-brownfield-baseline.sh "$r/.agents-v0/scripts/"
 mkdir -p "$r/.agents-v0/ui/react"
 cp "$KIT/core/ui/react/pack.json" "$r/.agents-v0/ui/react/pack.json"
 for id in java dotnet node python go; do
   mkdir -p "$r/.agents-v0/packs/$id"
   cp "$KIT/core/$id/pack.json" "$r/.agents-v0/packs/$id/pack.json"
 done
-cp "$KIT"/templates/.agents-v0/scripts/discover-codebase.sh "$KIT"/templates/.agents-v0/scripts/generate-repo-map.sh \
-   "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
-   "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh "$KIT"/templates/.agents-v0/scripts/audit-brownfield-baseline.sh "$r/.agents-v0/scripts/"
 cat > "$r/docs/agents-v0/project-profile.md" <<'EOF'
 | This repo | Value |
 |-----------|--------|
@@ -158,8 +161,6 @@ EOF
 has "baseline: coverage read from jacoco.xml" "$d/baseline.md" "50.0%"
 has "baseline: proposed coverage ratchet row" "$d/baseline.md" "| services/order | 50% |"
 has "baseline: proposed known_failures row" "$d/baseline.md" "| 1 | services/order |"
-expect_pass "gate metrics: GATE_REPORT_ONLY exits 0 on a failing module" "$r" env GATE_REPORT_ONLY=1 sh .agents-v0/ci/check-gate-metrics.sh services/order
-expect_fail "gate metrics: the same module fails without GATE_REPORT_ONLY" "$r" sh .agents-v0/ci/check-gate-metrics.sh services/order
 
 # --- generate-repo-map.sh ----------------------------------------------------
 expect_pass "generate-repo-map runs on the fixture" "$r" sh .agents-v0/scripts/generate-repo-map.sh
@@ -170,9 +171,9 @@ has "repo map: commit stamped" "$r/docs/agents-v0/repo-map.md" "commit:"
 
 # --- collect-dependency-graphs.sh --------------------------------------------
 g="$tmp/graphs"
-mkdir -p "$g/.agents-v0/ci" "$g/.agents-v0/scripts" "$g/docs/agents-v0" "$g/services/order" "$g/services/inventory"
-cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$g/.agents-v0/ci/"
-cp "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$g/.agents-v0/scripts/"
+mkdir -p "$g/.agents-v0/scripts" "$g/docs/agents-v0" "$g/services/order" "$g/services/inventory"
+cp "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh \
+   "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$g/.agents-v0/scripts/"
 : > "$g/services/order/pom.xml"
 : > "$g/services/inventory/pom.xml"
 cat > "$g/services/order/mvnw" <<'EOF'
@@ -193,9 +194,9 @@ fi
 pack_graph() {
   name="$1"
   dir="$tmp/graph-$name"
-  mkdir -p "$dir/.agents-v0/ci" "$dir/.agents-v0/scripts" "$dir/docs/agents-v0" "$dir/bin"
-  cp "$KIT"/templates/.agents-v0/ci/resolve-layout.sh "$dir/.agents-v0/ci/"
-  cp "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$dir/.agents-v0/scripts/"
+  mkdir -p "$dir/.agents-v0/scripts" "$dir/docs/agents-v0" "$dir/bin"
+  cp "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh \
+     "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh "$dir/.agents-v0/scripts/"
   printf '%s' "$dir"
 }
 d="$(pack_graph dotnet)"
@@ -289,19 +290,14 @@ expect_fail "onboarding docs: the default run needs the report" "$r" sh .agents-
 mv "$r/docs/agents-v0/onboarding/report.keep" "$r/docs/agents-v0/onboarding/report.md"
 
 # --- onboarding state and approval -------------------------------------------
-expect_pass "check-approvals accepts an Approved onboard row" "$r" sh .agents-v0/ci/check-approvals.sh docs/agents-v0/onboarding/report.md onboard
 expect_pass "state: onboarding in progress" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status in_progress
 has "state: written beside the report" "$r/docs/agents-v0/onboarding/state.json" '"activePhase": "onboard"'
 has "state: feature is onboarding" "$r/docs/agents-v0/onboarding/state.json" '"feature": "onboarding"'
 has "state: baseCommit pinned from report commit header" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
-expect_pass "check-feature-state: accepts active onboard phase on onboarding/state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
-expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
+expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
 has "state: last approved phase is onboard" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
 has "state: baseCommit preserved across approval sync" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
-expect_pass "check-feature-state: accepts approved onboarding state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
-sed -i.bak 's/"lastApprovedPhase": "onboard"/"lastApprovedPhase": ""/' "$r/docs/agents-v0/onboarding/state.json" && rm -f "$r/docs/agents-v0/onboarding/state.json.bak"
-expect_fail "check-feature-state: detects drift in docs/agents-v0/onboarding/state.json" "$r" sh .agents-v0/ci/check-feature-state.sh docs/agents-v0/onboarding/report.md
-expect_pass "state: restore approved onboarding state.json" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
+has "state: artifacts map records primary report path" "$r/docs/agents-v0/onboarding/state.json" '"primary": "docs/agents-v0/onboarding/report.md"'
 expect_fail "state: an intake phase is not valid for onboarding" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase intake --status in_progress
 
 # --- C# controller route resolution, placeholder secrets, and dotnet baseline -

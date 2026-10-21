@@ -1,25 +1,32 @@
 ---
-description: Local release checkpoint after Verify. Fast-forward the integration branch, record Decision Local, and stop so the next story can start. GitLab release stays /v0-release.
+description: Primary local release workflow after Verify. Re-verify the clean tree with the stack's native build/test command, merge into the integration branch on user confirmation, and mark the work released in state.json.
 ---
 
 # /v0-local-release
 
-You are entering the **local release** checkpoint (`workflow-orchestration.mdc`). It is optional. After Verify, `/v0-release` may run without it. It does not open a merge request and it does not complete Release.
+You are entering the **Local Release** phase (`workflow-orchestration.mdc`). This is the primary local completion path after `/v0-verify` for both feature stories (`docs/agents-v0/requirements/<feature>.md`) and maintenance notes (`docs/agents-v0/maintain/<id>/note.md`).
 
-## Prerequisite
-Before launching the release manager, read `docs/agents-v0/requirements/<feature>.phase-result.md` when it exists. The feature artifact needs an `Approved` verify row, and non-doc files are unchanged since the verify reports' `commit:` lines (or `commit:` equals `HEAD`; matching `.agents-v0/ci/check-evidence.sh`). A report's `commit:` header names the verified code/test commit, not the subsequent doc commit that records the report or approval row. For `Story: P0-A` with `Milestone: P0`, `docs/agents-v0/verify/<feature>/test-report.md` with no non-doc changes since `commit:` is enough; Intake, Design, Build, and Verify rows are written at the approval below. A maintenance note does not use this command: run `/v0-release`. If the feature evidence is missing, run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase release --status blocked --reason "<one line>"` when the artifact exists, then stop.
-
-## Resume
-Run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase release --status in_progress`. If this checkpoint is already `in_progress` or `blocked`, continue from files on disk. On a blocker, re-run with `--status blocked --reason "<one line>"` and stop. For a story with existing Approved Intake, Design, Build, and Verify rows, ensure the verify reports and the Intake artifact (`<artifact>`) are committed in `HEAD` (`git cat-file -e "HEAD:<path>"` and `git diff --quiet HEAD -- <path>`; if untracked or uncommitted on disk with no non-doc changes since `commit:`, commit them without changing `commit:`), then run the local gate; when the local gate has passed, re-run with `--status awaiting_approval` and stop. For P0-A when any of `intake`, `design`, `build`, or `verify` is still missing from `Delivery approvals`, stop for explicit approval first, backfill each missing row among `intake`, `design`, `build`, and `verify` with Decision `Approved` in canonical order (`intake`, `design`, `build`, `verify`, `release`) while keeping any row already set to `Approved`, append `release` with Decision `Local`, write the phase result and cleared state, commit the reports, artifact, phase result, and state together, and run the gate. Do not write the `Local` row until the user approves. If the release row's Decision is already `Local`, check if the checkpoint is complete (`--clear-active` has run, `docs/agents-v0/requirements/<feature>.phase-result.md` records `phase: release`, `status: local`, and both are committed in `HEAD`): if complete, stop and name `/v0-release` for this story; if incomplete, resume the remaining commit, fast-forward, phase-result, and `--clear-active` steps. The next story starts with `/v0-intake` from the integration branch. If the release row is `Approved`, stop: this story is past the checkpoint.
+## Prerequisite & Resume
+1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json`).
+2. Confirm `"verifyPassed": true` and `"verify"` is in `approvedPhases` (or for `P0-A`, `verifyPassed` is `true` and the user is approving the single P0-A release gate now). If Verify has not passed, stop and run `/v0-verify` first.
+3. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress <artifact>`.
 
 ## Collision
-Before the first edit, follow `workflow-orchestration.mdc` Parallel features. If `git status` shows another feature's code or a shared-file edit that is not this feature's approved diff, run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --active-phase release --status blocked --reason "<paths>"` and stop.
+Check `git status` (`workflow-orchestration.mdc` Parallel features). Stop if another feature's uncommitted changes are in the working tree.
 
 ## Instructions
-1. Launch the `release-manager` subagent (skill: `local-release`).
-2. Follow that skill. The base ref is `sh .agents-v0/scripts/resolve-integration-branch.sh`. The gate is `sh .agents-v0/scripts/check-delivery-gate-local.sh <feature> --base <that-ref>` (which resolves the pre-story commit when `merge-base(<that-ref>, HEAD)` equals `HEAD` and verifies that the artifact and reports are committed in `HEAD`).
-3. Stop for explicit user approval of this checkpoint. Record Decision `Local`, write the phase result, run `sh .agents-v0/scripts/sync-feature-state.sh <artifact> --clear-active`, and commit them. Fast-forward the integration branch only when on a separate feature branch (when the current branch is already the resolved integration branch, that commit already advanced it).
-4. Do not call `glab`. Do not write Decision `Approved`. Do not push. The next command for this story, when the user wants the merge request, is `/v0-release`.
+1. Launch the `release-manager` subagent (skill: `local-release`) or execute `local-release` directly in single-agent IDEs:
+   - Sync `README.md` or sequence diagrams if the feature changed user-facing setup or flows.
+   - Update `CHANGELOG.md` via `sh .agents-v0/scripts/release-notes.sh <artifact> --include-unreleased --insert CHANGELOG.md` when the profile uses a changelog.
+2. **Final Native Stack Check:**
+   - Run the bound pack's native verify command (`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"` and/or `"Frontend verify"`) to ensure the tree is green before merging.
+3. Write `docs/agents-v0/requirements/<feature>.phase-result.md` (or `maintain/<id>/phase-result.md`) with `phase: release`, `status: awaiting_approval`, and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval <artifact>`.
+4. **Stop** and ask for explicit user approval to complete the local release (committing any release notes/state updates and merging into the target integration branch resolved by `sh .agents-v0/scripts/resolve-integration-branch.sh`).
+5. **After explicit user approval:**
+   - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve release <artifact>` and update `phase-result.md` to `status: approved`.
+   - Commit any pending delivery state/evidence files (`git commit` requires your confirmation in the IDE prompt).
+   - If working on a feature branch separate from the integration branch (`sh .agents-v0/scripts/resolve-integration-branch.sh`), merge into the integration branch (`git merge --no-ff <feature-branch>`) upon user confirmation.
+   - Do not call `glab` or push to a remote unless the user explicitly asks to push or run `/v0-release`.
 
 ## Rules
 `workflow-orchestration.mdc`, `ai-agent-conduct.mdc`, `project-delivery-core.mdc`.

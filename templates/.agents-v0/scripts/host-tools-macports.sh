@@ -90,10 +90,10 @@ yaml_mode=""
 HOST_CHECKS="java21 node npm"
 HOST_PORTS="openjdk21 nodejs22 npm11"
 HOST_IMAGE=""
-if [ -f docs/agents-v0/project-profile.md ] && [ -f .agents-v0/ci/packlib.py ]; then
+if [ -f docs/agents-v0/project-profile.md ] && [ -f .agents-v0/scripts/packlib.py ]; then
   eval "$(python3 - <<'PY'
 import os, sys
-sys.path.insert(0, ".agents-v0/ci")
+sys.path.insert(0, ".agents-v0/scripts")
 import packlib
 pack_id = packlib.profile_pack()
 data = packlib.load(pack_id) if pack_id else None

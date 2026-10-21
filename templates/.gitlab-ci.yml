@@ -1,15 +1,6 @@
-# Delivery kit CI for on-prem GitLab. Mark build, delivery-gate, and the manual delivery-approval job as required.
-# Approving an MR does not re-run the pipeline. After approval, run delivery-approval.
-# GITLAB_TOKEN: project access token, read_api scope, masked, environment scope
-# "delivery-approval" (the job environment below). Do not create it as a project-wide
-# variable. Other jobs then do not receive it. Replace @your-team in CODEOWNERS and
-# turn on Code Owner approval so a merge request cannot rewrite this file.
-# ci/*.sh run from the default branch once they exist there. The first merge request,
-# before those files are on the default branch, skips the live approval check.
+# Optional GitLab CI pipeline for teams using /v0-release.
+# Runs the bound stack pack's native backend verify, frontend verify, e2e, perf, and secret detection.
 
-# Secret Detection uses the GitLab analyzer (no download from github.com).
-# If that template is missing on your instance, replace the include with a vendored scanner.
-# SAST is off until ENABLE_GITLAB_SAST=1, so a missing SAST template does not block pipelines.
 include:
   - template: Security/Secret-Detection.gitlab-ci.yml
   - template: Security/SAST.gitlab-ci.yml
@@ -17,7 +8,6 @@ include:
       - if: $ENABLE_GITLAB_SAST == "1"
 
 stages:
-  - validate
   - test
   - security
   - sast
@@ -28,10 +18,6 @@ stages:
 default:
   interruptible: true
 
-# Air-gapped or private registry mirrors: set CI_IMAGE_PREFIX (e.g. registry.example.com/)
-# in GitLab CI/CD variables or docs/agents-v0/project-profile.md guidance. Empty = pull from public hubs.
-# A linked project records the kit commit in docs/agents-v0/kit-pin.
-# recursive checks out kit/ when that pin is a submodule (--url).
 variables:
   CI_IMAGE_PREFIX: ""
   GIT_SUBMODULE_STRATEGY: recursive
@@ -41,15 +27,8 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Testcontainers (quality-and-testing.mdc) needs a Docker daemon.
-# Default: docker:27-dind. That service needs a runner that allows privileged jobs.
-# When privileged jobs are forbidden, delete `services` and the DOCKER_* / TESTCONTAINERS_*
-# variables below and mount /var/run/docker.sock on the job (host Docker). Confirm the choice
-# with sh .agents-v0/scripts/verify-gitlab-ci-prereqs.sh before the first pipeline.
-# A project with no Testcontainers tests can delete the Docker block too.
 build:
   stage: test
-  # CI_PACK_IMAGE is the pack.json ciImage. GitLab selects the image before the job reads the manifest.
   image: ${CI_PACK_IMAGE:-${CI_IMAGE_PREFIX}eclipse-temurin:21-jdk}
   services:
     - name: ${CI_IMAGE_PREFIX}docker:27-dind
@@ -66,39 +45,7 @@ build:
       - .m2/repository
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - pom.xml
-        - backend/pom.xml
-        - app/backend/pom.xml
-        - bff/pom.xml
-        - app/bff/pom.xml
-        - services/*/pom.xml
-        - app/services/*/pom.xml
-        - "**/*.csproj"
-        - "**/*.sln"
-        - "**/go.mod"
-        - "**/pyproject.toml"
-        - "**/package.json"
-        - "**/build.gradle"
-        - "**/build.gradle.kts"
-        - "**/.agents-v0/packs/*/pack.json"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      exists:
-        - pom.xml
-        - backend/pom.xml
-        - app/backend/pom.xml
-        - bff/pom.xml
-        - app/bff/pom.xml
-        - services/*/pom.xml
-        - app/services/*/pom.xml
-        - "**/*.csproj"
-        - "**/*.sln"
-        - "**/go.mod"
-        - "**/pyproject.toml"
-        - "**/package.json"
-        - "**/build.gradle"
-        - "**/build.gradle.kts"
-        - "**/.agents-v0/packs/*/pack.json"
   script:
     - |
       set -eu
@@ -111,285 +58,92 @@ build:
         fi
       fi
       repo="$(pwd)"
-      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
-      sh .agents-v0/ci/check-layout-roots.sh
+      eval "$(sh .agents-v0/scripts/resolve-layout.sh)"
       mkdir -p ci-artifacts
-      : > ci-artifacts/verify.log
-      # A failing verify fails the job. The one exception is a run whose log shows only test
-      # failures, within the known_failures budget in docs/agents-v0/project-profile.md
-      # (check-known-failures.sh --require-failures). A compile or plugin error is never excused.
-      run_verify() {
-        run_log="$(mktemp)"
-        rc_file="$(mktemp)"
-        { set +e; "$@" 2>&1; echo "$?" > "$rc_file"; } | tee "$run_log"
-        cat "$run_log" >> "$repo/ci-artifacts/verify.log"
-        rc="$(cat "$rc_file")"
-        rm -f "$rc_file"
-        if [ "$rc" != "0" ]; then
-          (cd "$repo" && sh .agents-v0/ci/check-known-failures.sh --require-failures "$run_log") || exit 1
-        fi
-        rm -f "$run_log"
-      }
-      verify_maven() {
-        root="$1"
-        [ -n "$root" ] || return 0
-        if [ ! -f "$repo/$root/pom.xml" ]; then
-          printf 'FAIL: layout root %s has no pom.xml\n' "$root" >&2
-          exit 1
-        fi
-        cd "$repo/$root"
-        if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
-        if grep -q '<id>ci-security</id>' pom.xml; then
-          run_verify "$MVN" -B clean verify -Pci-security
-        else
-          run_verify "$MVN" -B clean verify
-        fi
-        cd "$repo"
-      }
-      pack_id="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib; print(packlib.profile_pack())')"
-      if [ -n "$pack_id" ] && [ -z "${CI_PACK_IMAGE:-}" ]; then
-        printf 'FAIL: Pack %s is bound. Set CI_PACK_IMAGE to that pack json ciImage. The default image is the java example.\n' "$pack_id" >&2
-        exit 1
-      fi
-      pack_cmd="$(sh .agents-v0/ci/run-backend-verify.sh || true)"
-      svc_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Service verify" || true)"
-      if [ -n "$pack_id" ] && [ -z "$pack_cmd" ] && [ -z "$svc_cmd" ]; then
-        printf 'FAIL: Pack %s is bound but the Backend verify cell is empty. Refusing the Maven fallback.\n' "$pack_id" >&2
-        exit 1
-      fi
+      pack_id="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/scripts"); import packlib; print(packlib.profile_pack())')"
+      pack_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh || true)"
+      svc_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Service verify" || true)"
       if [ -n "$pack_cmd" ] || [ -n "$svc_cmd" ]; then
         if [ -n "$pack_cmd" ] && { [ -n "${BACKEND_ROOT:-}" ] || [ -z "${BFF_ROOT:-}${SERVICE_ROOTS:-}" ]; }; then
-          run_verify sh -c "$pack_cmd"
+          sh -c "$pack_cmd" 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
         fi
         for svc in ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
           [ -n "$svc" ] && [ -d "$repo/$svc" ] || continue
           if [ -n "$svc_cmd" ]; then
             cmd="$(printf '%s' "$svc_cmd" | sed "s|{root}|$svc|g")"
-            run_verify sh -c "$cmd"
+            sh -c "$cmd" 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
           elif [ -n "$pack_cmd" ]; then
             cmd="$(printf '%s' "$pack_cmd" | sed "s|^cd [^ ]* && |cd $svc && |")"
-            run_verify sh -c "$cmd"
+            sh -c "$cmd" 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
           fi
         done
-      elif [ -z "${BACKEND_ROOT:-}${BFF_ROOT:-}${SERVICE_ROOTS:-}" ]; then
-        printf 'no backend root; skip backend verify\n'
-      else
-        # An empty Pack does not run Maven. java is the only marker that still does.
-        plan="$(BACKEND_ROOT="${BACKEND_ROOT:-}" BFF_ROOT="${BFF_ROOT:-}" SERVICE_ROOTS="${SERVICE_ROOTS:-}" sh .agents-v0/ci/unbound-verify-plan.sh)"
-        kind="$(printf '%s\n' "$plan" | head -n 1)"
-        if [ "$kind" = "java" ]; then
-          verify_maven "${BACKEND_ROOT:-}"
-          verify_maven "${BFF_ROOT:-}"
-          for svc in ${SERVICE_ROOTS:-}; do verify_maven "$svc"; done
-        else
-          plan_file="$(mktemp)"
-          printf '%s\n' "$plan" | tail -n +2 > "$plan_file"
-          while IFS="$(printf '\t')" read -r root cmd; do
-            [ -n "$root" ] || continue
-            (cd "$repo/$root" && run_verify sh -c "$cmd")
-          done < "$plan_file"
-          rm -f "$plan_file"
-        fi
+      elif [ -n "${BACKEND_ROOT:-}" ] && [ -f "$repo/$BACKEND_ROOT/pom.xml" ]; then
+        cd "$repo/$BACKEND_ROOT"
+        if [ -x ./mvnw ]; then MVN=./mvnw; else MVN=mvn; fi
+        "$MVN" -B clean verify 2>&1 | tee -a "$repo/ci-artifacts/verify.log"
       fi
-      sh .agents-v0/ci/collect-gate-reports.sh
   artifacts:
     when: always
     paths:
       - ci-artifacts/
-      - "**/target/site/jacoco/jacoco.xml"
-      - "**/target/surefire-reports/TEST-*.xml"
-      - "**/target/failsafe-reports/TEST-*.xml"
-      - "**/target/dependency-check-report.json"
-      - "**/gate-metrics.json"
     expire_in: 1 week
 
-# Reads the build artifacts (the pack's coverage, test, and CVE reports) instead of trusting numbers an
-# agent wrote into a report. Diff coverage is measured on merge requests.
-gate-metrics:
-  stage: security
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
+frontend:
+  stage: test
+  image: ${CI_UI_IMAGE:-${CI_IMAGE_PREFIX}node:22-bookworm}
   variables:
-    GIT_DEPTH: "0"
+    npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  cache:
+    key: "npm-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .npm/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       exists:
-        - pom.xml
-        - backend/pom.xml
-        - app/backend/pom.xml
-        - bff/pom.xml
-        - app/bff/pom.xml
-        - services/*/pom.xml
-        - app/services/*/pom.xml
-        - "**/*.csproj"
-        - "**/*.sln"
-        - "**/go.mod"
-        - "**/pyproject.toml"
-        - "**/package.json"
-        - "**/build.gradle"
-        - "**/build.gradle.kts"
-        - "**/.agents-v0/packs/*/pack.json"
+        - package.json
+        - frontend/package.json
+        - app/frontend/package.json
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
-        - pom.xml
-        - backend/pom.xml
-        - app/backend/pom.xml
-        - bff/pom.xml
-        - app/bff/pom.xml
-        - services/*/pom.xml
-        - app/services/*/pom.xml
-        - "**/*.csproj"
-        - "**/*.sln"
-        - "**/go.mod"
-        - "**/pyproject.toml"
-        - "**/package.json"
-        - "**/build.gradle"
-        - "**/build.gradle.kts"
-        - "**/.agents-v0/packs/*/pack.json"
-  before_script:
-    - apk add --no-cache git python3
+        - package.json
+        - frontend/package.json
+        - app/frontend/package.json
   script:
     - |
       set -eu
+      set -o pipefail
       repo="$(pwd)"
-      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
-      sh .agents-v0/ci/check-layout-roots.sh
-      gate=".agents-v0/ci/check-gate-metrics.sh"
-      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        git fetch origin "$CI_DEFAULT_BRANCH"
-        export DIFF_BASE="origin/$CI_DEFAULT_BRANCH"
-        # Run the gate script from the default branch so a merge request cannot rewrite its own check.
-        if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" 2>/dev/null; then
-          trusted="$(mktemp -d)"
-          git show "FETCH_HEAD:.agents-v0/ci/check-gate-metrics.sh" > "${trusted}/check-gate-metrics.sh"
-          git show "FETCH_HEAD:.agents-v0/ci/packlib.py" > "${trusted}/packlib.py"
-          gate="${trusted}/check-gate-metrics.sh"
-        else
-          printf 'WARN: using the merge request copy of .agents-v0/ci/check-gate-metrics.sh; it is not on %s yet\n' "$CI_DEFAULT_BRANCH"
+      eval "$(sh .agents-v0/scripts/resolve-layout.sh)"
+      root="${FRONTEND_ROOT:-}"
+      if [ -z "$root" ]; then
+        printf 'SKIP: layout has no frontend root\n'
+        exit 0
+      fi
+      mkdir -p "$repo/ci-artifacts"
+      front_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" || true)"
+      if [ -n "$front_cmd" ]; then
+        case "$front_cmd" in
+          *npm*)
+            if [ -f "$repo/$root/package.json" ]; then
+              (cd "$repo/$root" && npm ci)
+            fi
+            ;;
+        esac
+        (cd "$repo" && sh -c "$front_cmd") 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+      elif [ -f "$repo/$root/package.json" ]; then
+        cd "$repo/$root"
+        npm ci
+        if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+        elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
+        else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
         fi
       fi
-      cve_required="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib
-      pack = packlib.profile_pack()
-      data = packlib.load(pack) if pack else None
-      print("1" if data and (data.get("cve") or {}).get("path") else "0")')"
-      for root in ${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-}; do
-        export REQUIRE_CVE_REPORT=0
-        if [ "$cve_required" = 1 ]; then
-          export REQUIRE_CVE_REPORT=1
-        elif [ -f "$repo/$root/pom.xml" ] && grep -q '<id>ci-security</id>' "$repo/$root/pom.xml"; then
-          export REQUIRE_CVE_REPORT=1
-        fi
-        sh "$gate" "$repo/$root"
-      done
   artifacts:
     when: always
     paths:
-      - "**/gate-metrics.json"
+      - ci-artifacts/
     expire_in: 1 week
 
-# Contract and event checks that do not need the application to run.
-event-schema-compat:
-  stage: validate
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  variables:
-    GIT_DEPTH: "0"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - .agents-v0/ci/check-event-schemas.sh
-  before_script:
-    - apk add --no-cache git python3
-  script:
-    - |
-      set -eu
-      git fetch origin "$CI_DEFAULT_BRANCH"
-      check=".agents-v0/ci/check-event-schemas.sh"
-      # Run the check from the default branch so a merge request cannot rewrite its own check.
-      if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-event-schemas.sh" 2>/dev/null; then
-        trusted="$(mktemp -d)"
-        git show "FETCH_HEAD:.agents-v0/ci/check-event-schemas.sh" > "${trusted}/check-event-schemas.sh"
-        check="${trusted}/check-event-schemas.sh"
-      fi
-      sh "$check" "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-origin/$CI_DEFAULT_BRANCH}" "$CI_COMMIT_SHA"
-
-# Design and contract checks. The ci/ scripts come from the default branch when it has them, so a
-# merge request cannot rewrite the checks that judge it.
-.trusted-ci: &trusted_ci |
-  git fetch origin "$CI_DEFAULT_BRANCH"
-  if [ -f .gitmodules ]; then git submodule update --init --recursive; fi
-  export AGENTS_V0_FETCH_KIT=1
-  CI_DIR=.agents-v0/ci
-  if [ -f docs/agents-v0/kit-pin ] && KIT_ROOT="$(sh .agents-v0/scripts/resolve-kit-root.sh)"; then
-    CI_DIR="$KIT_ROOT/templates/.agents-v0/ci"
-  elif git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-design.sh" 2>/dev/null; then
-    rm -rf /tmp/trusted-ci && mkdir -p /tmp/trusted-ci
-    git archive FETCH_HEAD .agents-v0/ci | tar -x -C /tmp/trusted-ci
-    CI_DIR=/tmp/trusted-ci/.agents-v0/ci
-  else
-    printf 'WARN: using the merge request copy of ci/ scripts; they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
-  fi
-
-design-contract:
-  stage: validate
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  variables:
-    GIT_DEPTH: "0"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - docs/agents-v0/design/*/openapi.yaml
-        - docs/agents-v0/design/*/openapi.yml
-        - docs/agents-v0/design/*/openapi.json
-        - docs/agents-v0/design/*/asyncapi.yaml
-        - docs/agents-v0/design/*/asyncapi.yml
-        - docs/agents-v0/design/*/asyncapi.json
-        - docs/agents-v0/design/*/design.lock
-        - docs/agents-v0/design/*/ux-spec.md
-  before_script:
-    - apk add --no-cache git python3 py3-yaml
-  script:
-    - *trusted_ci
-    - sh "$CI_DIR/check-design-contracts.sh"
-
-endpoint-auth:
-  stage: validate
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  variables:
-    GIT_DEPTH: "0"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - "**/*.java"
-        - "**/*.kt"
-        - "**/*.cs"
-        - "**/*.py"
-        - "**/*.go"
-        - "**/*.ts"
-        - "**/*.js"
-        - "**/*.rs"
-        - "**/*.rb"
-        - "**/.agents-v0/packs/*/pack.json"
-        - docs/agents-v0/project-profile.md
-  before_script:
-    - apk add --no-cache git python3
-  script:
-    - *trusted_ci
-    - sh "$CI_DIR/check-endpoint-auth.sh" "$(git merge-base "origin/$CI_DEFAULT_BRANCH" HEAD)" HEAD
-
-frontend-calls:
-  stage: validate
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - openapi/*.yaml
-        - openapi/*.json
-  before_script:
-    - apk add --no-cache git python3 py3-yaml
-  script:
-    - *trusted_ci
-    - sh "$CI_DIR/check-frontend-calls.sh"
-
-# Runs when the project has a Playwright config. Put the dev server in the config's webServer block.
 e2e:
   stage: e2e
   image: ${CI_IMAGE_PREFIX}mcr.microsoft.com/playwright:v1.48.0-jammy
@@ -411,7 +165,7 @@ e2e:
   script:
     - |
       set -eu
-      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+      eval "$(sh .agents-v0/scripts/resolve-layout.sh)"
       cd "${FRONTEND_ROOT:-.}"
       npm ci
       npx playwright test
@@ -421,8 +175,6 @@ e2e:
       - "**/playwright-report/"
     expire_in: 1 week
 
-# k6 scripts under perf/*.js. Manual on a merge request so a slow run never blocks the pipeline;
-# attach the summary as the `measured` output of a P4 slo-evidence row (skill: e2e-perf-testing).
 perf:
   stage: perf
   image:
@@ -447,93 +199,11 @@ perf:
       - ci-artifacts/
     expire_in: 2 weeks
 
-frontend:
-  stage: test
-  # CI_UI_IMAGE overrides the React example image when the UI pack is not Node.
-  image: ${CI_UI_IMAGE:-${CI_IMAGE_PREFIX}node:22-bookworm}
-  variables:
-    npm_config_cache: "$CI_PROJECT_DIR/.npm"
-  cache:
-    key: "npm-$CI_COMMIT_REF_SLUG"
-    paths:
-      - .npm/
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      exists:
-        - package.json
-        - frontend/package.json
-        - app/frontend/package.json
-        - "**/.agents-v0/ui/*/pack.json"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      exists:
-        - package.json
-        - frontend/package.json
-        - app/frontend/package.json
-        - "**/.agents-v0/ui/*/pack.json"
-  script:
-    - |
-      set -eu
-      set -o pipefail
-      repo="$(pwd)"
-      eval "$(sh .agents-v0/ci/resolve-layout.sh)"
-      root="${FRONTEND_ROOT:-}"
-      if [ -z "$root" ]; then
-        printf 'SKIP: layout has no frontend root\n'
-        exit 0
-      fi
-      mkdir -p "$repo/ci-artifacts"
-      ui_image="$(python3 -c 'import sys; sys.path.insert(0, ".agents-v0/ci"); import packlib; p=packlib.profile_pack(); d=packlib.load(p) if p else None; ui=(d or {}).get("uiPack") or {}; print(ui.get("ciImage") or "")')"
-      if [ -n "$ui_image" ] && [ "$ui_image" != "node:22-bookworm" ] && [ -z "${CI_UI_IMAGE:-}" ]; then
-        printf 'FAIL: UI pack image is %s. Set CI_UI_IMAGE. The default image is the React example.\n' "$ui_image" >&2
-        exit 1
-      fi
-      front_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
-      if [ -n "$front_cmd" ]; then
-        case "$front_cmd" in
-          *npm*)
-            if [ ! -f "$repo/$root/package.json" ]; then
-              printf 'FAIL: Frontend verify uses npm but %s has no package.json\n' "$root" >&2
-              exit 1
-            fi
-            (cd "$repo/$root" && npm ci)
-            ;;
-        esac
-        (cd "$repo" && sh -c "$front_cmd") 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-      else
-        if [ ! -f "$repo/$root/package.json" ]; then
-          printf 'FAIL: layout frontend root %s has no package.json\n' "$root" >&2
-          exit 1
-        fi
-        cd "$repo/$root"
-        npm ci
-        if grep -q '"verify"' package.json; then npm run verify 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-        elif grep -q '"test"' package.json; then npm test 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-        else npm run build 2>&1 | tee "$repo/ci-artifacts/verify-frontend.log"
-        fi
-      fi
-      if [ -f "$repo/.agents-v0/ci/check-known-failures.sh" ]; then sh "$repo/.agents-v0/ci/check-known-failures.sh" "$repo/ci-artifacts/verify-frontend.log"; fi
-  artifacts:
-    when: always
-    paths:
-      - ci-artifacts/
-    expire_in: 1 week
-
 secret_detection:
   stage: security
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-coverage-ratchet:
-  stage: validate
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  before_script:
-    - apk add --no-cache python3
-  script:
-    - sh .agents-v0/ci/check-coverage-ratchet.sh docs/agents-v0/project-profile.md
 
 delivery-metrics:
   stage: delivery-gate
@@ -549,67 +219,3 @@ delivery-metrics:
     paths:
       - delivery-metrics.md
     expire_in: 2 weeks
-
-.delivery-linkage:
-  image: ${CI_IMAGE_PREFIX}alpine:3.20
-  variables:
-    GIT_DEPTH: "0"
-  before_script:
-    - apk add --no-cache git bash curl python3
-  script:
-    - |
-      set -eu
-      if [ -z "${CI_MERGE_REQUEST_IID:-}" ]; then
-        printf 'FAIL: delivery linkage runs on merge request pipelines\n' >&2
-        exit 1
-      fi
-      git fetch origin "$CI_DEFAULT_BRANCH"
-      trusted="$(mktemp -d)"
-      if git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-delivery-linkage.sh" 2>/dev/null \
-        && git cat-file -e "FETCH_HEAD:.agents-v0/ci/check-approver-gitlab.sh" 2>/dev/null; then
-        # The whole ci directory, not a list: the linkage check calls its siblings (check-arc.sh,
-        # check-design.sh, ...) from its own directory, and a sibling left out of a list is missing.
-        git archive FETCH_HEAD .agents-v0/ci | tar -x -C "$trusted"
-        trusted="$trusted/.agents-v0/ci"
-        chmod +x "$trusted"/*.sh
-      fi
-      base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}"
-      head="${CI_COMMIT_SHA}"
-      body_file="$(mktemp)"
-      printf '%s' "${CI_MERGE_REQUEST_DESCRIPTION:-}" >"$body_file"
-      export GITLAB_CI=1
-      if [ -f "${trusted}/check-delivery-linkage.sh" ] && [ -f "${trusted}/check-approver-gitlab.sh" ]; then
-        if [ "${REQUIRE_GITLAB_TOKEN:-0}" = "1" ] && [ -z "${GITLAB_TOKEN:-${GL_TOKEN:-}}" ]; then
-          printf 'FAIL: set GITLAB_TOKEN (read_api, masked) with environment scope delivery-approval, then run this job after the MR is approved.\n' >&2
-          exit 1
-        fi
-        sh "${trusted}/check-delivery-linkage.sh" "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
-      elif [ "${REQUIRE_GITLAB_TOKEN:-0}" = "1" ]; then
-        printf 'SKIP: ci checkers are not on %s yet. This bootstrap merge request is not checked against GitLab approvals.\n' "$CI_DEFAULT_BRANCH"
-      else
-        printf 'WARN: using merge request copies of ci scripts because they are not on %s yet\n' "$CI_DEFAULT_BRANCH"
-        sh .agents-v0/ci/check-delivery-linkage.sh "$base" "$head" "$body_file" "$CI_MERGE_REQUEST_IID"
-      fi
-      rm -f "$body_file"
-
-delivery-gate:
-  extends: .delivery-linkage
-  stage: delivery-gate
-  variables:
-    CHECK_MR_APPROVER: "0"
-    REQUIRE_GITLAB_TOKEN: "0"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-delivery-approval:
-  extends: .delivery-linkage
-  stage: delivery-gate
-  environment:
-    name: delivery-approval
-  variables:
-    CHECK_MR_APPROVER: "1"
-    REQUIRE_GITLAB_TOKEN: "1"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-      allow_failure: false

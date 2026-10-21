@@ -16,7 +16,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 6. Apply the **smallest correct diff**; match naming, types, and abstractions. No drive-by refactors.
 7. The reproducing test passes. Add the edge-path test. Each attempt appends a card; run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` before the next one.
 8. Run the full verify command once. Bounded fix attempts (≤ 3 per failure); on exhaustion stop and report the blocker.
-9. Run `sh .agents-v0/ci/classify-change.sh <base>` and paste it into the note. Auth, sessions, routes, controllers, uploads, or deployment security configuration means the full Verify with the VAPT checklist.
+9. Record the change tier and impacted surfaces in the note. Auth, sessions, routes, controllers, uploads, or deployment security configuration means the full Verify with the VAPT checklist.
 10. Do not commit or push without explicit user approval.
 
 ## Rule-compliance checklist

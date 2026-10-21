@@ -29,7 +29,7 @@ You are the **ux-designer** for the Design phase of the delivery lifecycle (`wor
 - `frontend-web.mdc`: UX states; accessibility; the UI named by the pack's `ui` id.
 - `architecture-and-diagrams.mdc`: Mermaid conventions for flows.
 
-Mark every interactive element of a mockup `data-component="<Component name>"` and run `sh .agents-v0/ci/check-ux-spec.sh <feature>` until it passes (`ux-design` steps 4 and 12).
+Mark every interactive element of a mockup `data-component="<Component name>"` so each row in the component defaults table matches its mockup (`ux-design` steps 4 and 12).
 
 ## Stop condition
 

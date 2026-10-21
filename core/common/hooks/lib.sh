@@ -79,7 +79,8 @@ def redact(s):
     if not s:
         return s
     s = re.sub(r"(?i)(authorization|bearer|token|password|api[_-]?key)\s*[=:]\s*[^\s\"]+", r"\1=***", s)
-    s = re.sub(r"(?i)(ghp_[a-zA-Z0-9]{20,})", "ghp_***", s)
+    s = re.sub(r"(?i)(ghp_[a-zA-Z0-9]{20,}|glpat-[a-zA-Z0-9_\-]{20,})", "***_TOKEN", s)
+    s = re.sub(r"://[^/@\s]+:[^/@\s]+@", "://***:***@", s)
     return s[:500]
 
 print(json.dumps({

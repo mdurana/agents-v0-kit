@@ -1,7 +1,7 @@
 #!/bin/sh
 # resolve-layout.sh — print directory-profile variables for eval.
 #
-# Usage: eval "$(sh .agents-v0/ci/resolve-layout.sh [docs/agents-v0/project-profile.md])"
+# Usage: eval "$(sh .agents-v0/scripts/resolve-layout.sh [docs/agents-v0/project-profile.md])"
 #
 # Reads the two-column "This repo" rows under ## Layout. When Profile is
 # service, ui, or app, those rows win. Otherwise detect a pack marker

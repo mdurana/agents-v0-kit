@@ -5,7 +5,7 @@ Production readiness: docs, runbooks, CI/CD, release checklist, milestone go/no-
 
 ## Readiness checklist
 
-The P5 readiness stories (`P5-A`, `P5-B`, …) tick the 10 boxes in `docs/agents-v0/design/system/ops-readiness.md` while keeping each story within the Size ≤ 8 acceptance-criteria cap. A box stays open only with a named reason in that file. `.agents-v0/ci/check-architecture-pack.sh` checks that the sections exist. It does not check the boxes.
+The P5 readiness stories (`P5-A`, `P5-B`, …) tick the 10 boxes in `docs/agents-v0/design/system/ops-readiness.md` while keeping each story within the Size ≤ 8 acceptance-criteria cap. A box stays open only with a named reason in that file.
 
 ## Stories
 

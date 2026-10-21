@@ -1,6 +1,6 @@
 ---
-description: VAPT PR review checklist. The vapt-review skill applies this at Verify and Release. Globs attach it when those surfaces are edited.
-globs: "**/*.java,**/*.cs,**/*.py,**/*.go,**/*.ts,**/*.tsx,**/*.svelte,**/application*.yml,**/application*.yaml,**/routes/**/+page.server.ts,**/routes/**/+layout.server.ts,**/routes/**/+server.ts,**/hooks.server.ts,**/hooks.server.tsx"
+description: VAPT PR review checklist. The vapt-review skill applies this at Verify and Release.
+globs: "docs/agents-v0/verify/**,docs/agents-v0/maintain/**/note.md"
 alwaysApply: false
 ---
 

@@ -3,7 +3,7 @@
 <!-- One-line description of the change. -->
 
 **Feature-Artifact:** docs/agents-v0/requirements/<feature>.md
-<!-- Required when this MR changes application code (.agents-v0/ci/check-delivery-linkage.sh). A bug fix, CVE patch, dependency bump, or hotfix replaces the line above with: **Maintain-Note:** docs/agents-v0/maintain/<id>/note.md -->
+<!-- Required when this MR changes application code. A bug fix, CVE patch, dependency bump, or hotfix replaces the line above with: **Maintain-Note:** docs/agents-v0/maintain/<id>/note.md -->
 <!-- Do not give both. A fix does not borrow a feature artifact's approvals. -->
 
 ## Changed files
@@ -113,11 +113,11 @@
 
 ## Delivery approvals
 
-> Per `workflow-orchestration.mdc`: each phase approval must be recorded in the delivery artifact's `Delivery approvals` section using the canonical table (required by the CI approval check `.agents-v0/ci/check-approvals.sh`; `.agents-v0/ci/check-evidence.sh` verifies that the recorded evidence paths exist on disk):
+> Per `workflow-orchestration.mdc`: each phase approval is recorded in `docs/agents-v0/requirements/<feature>.state.json` (`sync-feature-state.sh --approve <phase>`) and optionally in the delivery artifact's `Delivery approvals` section:
 >
 > | Phase | Artifacts | Approver | Decision | Date |
 > |-------|-----------|----------|----------|------|
 >
-> Put evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`. An approval must be a real user decision — never inferred. Record the Decision cell as an explicit positive token (canonically `Approved`); `.agents-v0/ci/check-approvals.sh` accepts `approved` / `approve` / `yes` / `pass`.
+> Put evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`. An approval must be a real user decision — never inferred.
 
 - [ ] Approvals for all completed phases are recorded in the delivery artifact in the canonical table format, with evidence paths that exist on disk

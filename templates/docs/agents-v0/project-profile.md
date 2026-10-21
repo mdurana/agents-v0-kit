@@ -30,7 +30,7 @@
 
 ## Layout
 
-Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that directory is the only service module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `.agents-v0/ci/resolve-layout.sh` reads the two-column rows below.
+Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or `app/bff/` when that directory is the only service module), `ui` (`app/frontend/`), `app` (`app/backend/` + `app/frontend/`, optional `app/bff/`). The repo root has no application `src/`. A repo that still uses `backend/` or `frontend/` at the root keeps those paths in the rows below. **This repo** wins when Profile is `service`, `ui`, or `app`. `/v0-onboard` records a legacy tree (including `.`) and does not move it. `.agents-v0/scripts/resolve-layout.sh` reads the two-column rows below.
 
 | Profile | When | Code roots |
 |---------|------|------------|
@@ -74,21 +74,21 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 
 ## Brownfield exceptions
 
-### known_failures (optional budget for .agents-v0/ci/check-known-failures.sh)
+### known_failures (optional budget)
 
-A person approves each row, and CODEOWNERS makes this file a code-owner change, so a merge request cannot approve its own exception. CI excuses test failures up to the first Allowed failure count (the build job after a failed verify, and `check-gate-metrics.sh`). A compile or plugin error is never excused. Leave `0` for no allowance.
+A person approves each row so a merge request cannot approve its own exception. Test failures up to the first Allowed failure count may be excused for legacy suites. A compile or plugin error is never excused. Leave `0` for no allowance.
 
 | Allowed failure count | Scope / test IDs | Owner | Remove by |
 |----------------------|------------------|-------|-----------|
 | 0 | | | |
 
-### coverage_ratchet (optional; read by .agents-v0/ci/check-coverage-ratchet.sh)
+### coverage_ratchet (optional)
 
 | Scope | Interim minimum | Approver (Security + architecture) | Remove by |
 |-------|-----------------|------------------------------------|-----------|
 | | | | |
 
-### mutation_ratchet (optional; read by .agents-v0/ci/check-gate-metrics.sh)
+### mutation_ratchet (optional)
 
 | Scope | Minimum mutation score | Report path |
 |-------|------------------------|-------------|

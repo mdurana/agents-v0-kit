@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import shlex
 import sys
@@ -169,15 +170,31 @@ def _expand_wrapper(seg: str) -> List[str]:
     if not parts:
         return [seg]
     bin0 = parts[0].split("/")[-1]
-    if len(parts) >= 3 and parts[1] in ("-c", "-lc") and bin0 in (
-        "sh",
-        "bash",
-        "zsh",
-        "dash",
-        "ksh",
-    ):
-        body = " ".join(parts[2:])
-        return split_segments(body)
+    if bin0 in ("sh", "bash", "zsh", "dash", "ksh") and len(parts) >= 3:
+        i = 1
+        saw_c = False
+        while i < len(parts) and parts[i].startswith("-"):
+            flag = parts[i]
+            if flag in ("-c", "-lc") or (len(flag) > 2 and "c" in flag[1:] and not flag.startswith("--")):
+                saw_c = True
+                i += 1
+                break
+            if flag in ("-o", "+o") and i + 1 < len(parts):
+                i += 2
+            else:
+                i += 1
+        if saw_c and i < len(parts):
+            body = " ".join(parts[i:])
+            return split_segments(body)
+    if bin0 == "timeout" and len(parts) >= 3:
+        i = 1
+        while i < len(parts) and parts[i].startswith("-"):
+            if parts[i] in ("-k", "-s", "--kill-after", "--signal") and i + 1 < len(parts):
+                i += 2
+            else:
+                i += 1
+        if i + 1 < len(parts):
+            return split_segments(" ".join(parts[i + 1 :]))
     if bin0 == "env" and len(parts) >= 2:
         i = 1
         while i < len(parts):
@@ -190,8 +207,17 @@ def _expand_wrapper(seg: str) -> List[str]:
                 continue
             return split_segments(" ".join(parts[i:]))
         return [seg]
-    if bin0 in ("sudo", "command", "nohup", "time") and len(parts) >= 2:
-        return split_segments(" ".join(parts[1:]))
+    if bin0 in ("sudo", "command", "nohup", "time", "nice", "stdbuf", "exec", "builtin") and len(parts) >= 2:
+        i = 1
+        while i < len(parts) and parts[i].startswith("-"):
+            if bin0 == "sudo" and parts[i] in ("-u", "-g", "-C", "-D", "-R", "-T") and i + 1 < len(parts):
+                i += 2
+            elif bin0 == "nice" and parts[i] == "-n" and i + 1 < len(parts):
+                i += 2
+            else:
+                i += 1
+        if i < len(parts):
+            return split_segments(" ".join(parts[i:]))
     if bin0 == "xargs" and len(parts) >= 2:
         for i, p in enumerate(parts[1:], 1):
             if p in ("-I", "--replace", "-i") and i + 1 < len(parts):
@@ -461,12 +487,23 @@ def _commit_paths_are_evidence(parts: List[str]) -> bool:
     """A reports-only commit (build/ or verify/ docs, state.json, phase-result.md, and companion artifact) does not ask again."""
     if "--" not in parts:
         return False
-    paths = [p for p in parts[parts.index("--") + 1 :] if p != "--"]
+    sep_idx = parts.index("--")
+    for tok in parts[2:sep_idx]:
+        if tok in ("-a", "--all", "-i", "--include", "--amend") or (
+            tok.startswith("-") and not tok.startswith("--") and ("a" in tok[1:] or "i" in tok[1:])
+        ):
+            return False
+    paths = [p for p in parts[sep_idx + 1 :] if p != "--"]
     if not paths:
         return False
     has_evidence = False
     for path in paths:
-        norm = path.replace("\\", "/").lstrip("./")
+        raw = path.replace("\\", "/").strip()
+        if raw.startswith("/") or raw.startswith("-"):
+            return False
+        norm = posixpath.normpath(raw).lstrip("./")
+        if norm.startswith(".."):
+            return False
         if (
             norm.startswith("docs/agents-v0/build/")
             or norm.startswith("docs/agents-v0/verify/")
@@ -474,7 +511,7 @@ def _commit_paths_are_evidence(parts: List[str]) -> bool:
             or (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".phase-result.md"))
             or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("state.json"))
             or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("phase-result.md"))
-            or norm == "docs/agents-v0/onboarding/state.json"
+            or norm in ("docs/agents-v0/onboarding/state.json", "docs/agents-v0/program.state.json")
         ):
             has_evidence = True
         elif (
@@ -596,13 +633,9 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.cursor/rules/"),
     re.compile(r"(^|/)\.cursor/agents/"),
     re.compile(r"(^|/)\.cursor/(commands|skills)/"),
-    # Every CI gate script: a new check is protected without editing this list.
-    re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.sh$"),
-    # Every kit script: they write the state, the evidence, and the merge-request body that approvers
-    # rely on, and one of them runs sudo. A new script is protected without editing this list.
-    re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.sh$"),
-    # The phase gate manifest and every kit git hook: editing them switches a gate off.
-    re.compile(r"(^|/)\.agents-v0/ci/gates\.json$"),
+    re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.(sh|py|json)$"),
+    re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.(sh|py)$"),
+    re.compile(r"(^|/)\.agents-v0/packs/.+\.(json|sh|py)$"),
     re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),

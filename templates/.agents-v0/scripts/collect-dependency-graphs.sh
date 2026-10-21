@@ -20,8 +20,8 @@ repo="$(pwd)"
 status=0
 
 ROOTS=""
-if [ -f "$here/../ci/resolve-layout.sh" ]; then
-  eval "$(sh "$here/../ci/resolve-layout.sh")"
+if [ -f "$here/resolve-layout.sh" ]; then
+  eval "$(sh "$here/resolve-layout.sh")"
   ROOTS="${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-} ${FRONTEND_ROOT:-}"
 fi
 ROOTS="$(printf '%s' "$ROOTS" | tr -s ' ' | sed 's/^ //;s/ $//')"

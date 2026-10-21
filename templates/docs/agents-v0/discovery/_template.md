@@ -1,7 +1,7 @@
 # Discovery: <program>
 
 > Input document for `/v0-roadmap <path>`. May live anywhere in the repository (for example `docs/product/<program>-discovery.md`).
-> Preflight (`sh .agents-v0/ci/check-roadmap.sh --preflight <path>`) checks that all six canonical `##` headings below are present, non-empty, and free of placeholder tokens (`<...>`, `[...]`, `TBD`, `TODO`, `FIXME`, `XX`/`XXX`, `__`, `???`).
+> All six canonical `##` headings below must be present, non-empty, and free of placeholder tokens (`<...>`, `[...]`, `TBD`, `TODO`, `FIXME`, `XX`/`XXX`, `__`, `???`).
 
 <!-- Optional: delete if no stack preference is set yet. Does not activate a pack until /v0-architecture. -->
 Stack preference: <pack-id>

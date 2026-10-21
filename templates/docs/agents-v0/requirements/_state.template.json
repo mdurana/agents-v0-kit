@@ -2,14 +2,22 @@
   "feature": "<feature-slug>",
   "tier": "standard",
   "lastApprovedPhase": "",
+  "approvedPhases": [],
+  "reopenedPhases": [],
+  "reopenCount": 0,
+  "verifyPassed": false,
   "activePhase": "",
   "activeStatus": "",
   "blockedReason": "",
   "artifact": "docs/agents-v0/requirements/<feature>.md",
   "baseCommit": "",
   "updatedAt": "",
+  "artifacts": {
+    "primary": "docs/agents-v0/requirements/<feature>.md"
+  },
   "evidence": {
     "build": [],
     "verify": []
-  }
+  },
+  "helperBriefHashes": []
 }

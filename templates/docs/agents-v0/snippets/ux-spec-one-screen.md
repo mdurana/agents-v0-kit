@@ -1,6 +1,6 @@
 # UX Spec — <feature>
 
-> One primary screen. Copy from `docs/agents-v0/snippets/ux-spec-one-screen.md`. Add mockups under `docs/agents-v0/design/<feature>/mockups/`. Run `sh .agents-v0/ci/check-ux-spec.sh <feature>`.
+> One primary screen. Copy from `docs/agents-v0/snippets/ux-spec-one-screen.md`. Add mockups under `docs/agents-v0/design/<feature>/mockups/`.
 
 ## UX requirements (from Intake)
 

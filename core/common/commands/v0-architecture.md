@@ -4,32 +4,31 @@ description: Program architecture before any backlog. C4 through operations, the
 
 # /v0-architecture
 
-You are entering **program architecture** (`workflow-orchestration.mdc` Architecture). This command runs after an approved roadmap and before `/v0-plan`. It does not write stories or a feature OpenAPI draft.
+You are entering **program architecture** (`workflow-orchestration.mdc`). This command runs after an approved roadmap and before `/v0-plan`. It does not write stories or a feature OpenAPI draft.
 
 ## Prerequisite
-An `Approved` `roadmap` row on `docs/agents-v0/roadmap/<program>.md`. When that row is missing, stop and ask for `/v0-roadmap <discovery-path>`. Read the discovery file only at the `Discovery:` path on that roadmap. On a brownfield repo, `docs/agents-v0/onboarding/report.md` must have an `Approved` `onboard` row. As-is text already in `docs/agents-v0/architecture.md` and `docs/agents-v0/network.md` stays. Add the target sections beside it.
-
-P0-A alone and a single named ticket skip this command. Maintain and Trivial never open it.
+`docs/agents-v0/program.state.json` must record `roadmap` in `approvedPhases` (or an `Approved` `roadmap` row in `docs/agents-v0/roadmap/<program>.md`). On a brownfield repo, `onboard` must also be approved. P0-A alone and single named tickets skip this command.
 
 ## Resume
-Continue from the architecture files already on disk. Do not recreate a section that is already filled. Do not rewrite an Accepted ADR; supersede it (`sh .agents-v0/ci/check-adr.sh`). A program has no per-feature state file.
+Continue from the architecture files already on disk. Do not recreate filled sections. Do not rewrite an `Accepted` ADR; supersede it with a new ADR when a decision changes.
 
 ## Collision
-This command writes shared files: `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`, and `docs/agents-v0/adr/`. Stop before editing one that `git status` already shows modified by a feature in flight.
+This command writes shared files (`docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/`, `docs/agents-v0/adr/`). Stop before editing if `git status` shows uncommitted changes from a feature in flight.
 
 ## Instructions
-1. Launch the `solution-architect` subagent. It follows `program-architecture`. Phase agents do not launch other agents, so this command launches the reviewer in step 3.
-2. Write the pack in this order. A narrower request may stop after the named step. C4 stays technology-agnostic. The pattern ADR chooses the technology, with at least two options.
-   - C4 Context and Container in `docs/agents-v0/architecture.md`.
-   - Pattern ADR under `docs/agents-v0/adr/`, with a filled `Patterns considered` table and a `Pack:` line. The id is the stack the user named (when scaffolded from an existing skeleton, the pattern ADR ratifies that pack). A discovery `Stack preference:` is an input, not the binding. Write a complete pack under `.agents-v0/packs/<id>/` (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`). When `ui` names an id, write that UI manifest (`.agents-v0/ui/<ui>/pack.json`, or inline it). Omit `ui` for a backend-only pack. An incomplete pack stops before `/v0-plan`. Bind it in step 5, after the `architecture` row is approved.
-   - Platform topology in `docs/agents-v0/network.md`, including a `Target topology` diagram.
-   - Services: `docs/agents-v0/design/system/context-map.md` (also the service map), then in `architecture.md` the data flow, the conceptual, logical, and physical data models, the state machine, failure domains and degradation, and MVP and future state. Sequence diagrams. A component plan per context under `docs/agents-v0/design/system/components/`, or `N/A: <reason>`.
-   - Contracts: catalog shape and the deprecation rule. No feature `openapi.yaml`.
-   - Operations: `docs/agents-v0/design/system/nfr-slo.md`, `docs/agents-v0/design/system/threat-model.md`, and `docs/agents-v0/design/system/ops-readiness.md`. SLO numbers live only in `nfr-slo.md`.
-   - ARC: `docs/agents-v0/design/system/arc-record.md`. Name the discovery file and the pattern ADR. Do not copy them. Point SLO targets at `nfr-slo.md` and fill the structural fitness function table.
-3. Run `sh .agents-v0/ci/check-architecture-pack.sh --without-review`, then launch the `design-reviewer` subagent on the pack. It writes `docs/agents-v0/design/system/architecture-review.md` with `pack-hash: <first 12 characters of sh .agents-v0/ci/check-architecture-pack.sh --hash>`. Route open findings (`Critical` and `Suggestion`) back to the `solution-architect` to fix or disposition (`Resolved`, `Deferred`, or `Accepted`), then run the reviewer again so `pack-hash` and finding statuses match the revised pack.
-4. Check the **Architecture gate**: every step above has a filled section or `N/A: <reason>`, C4 names no product technology, the Data flow diagram uses the C4 Container nodes, the ADR has two real options and a Status of Proposed or Accepted, and the ARC record has a recommendation plus a structural fitness function row. `sh .agents-v0/ci/gate.sh architecture docs/agents-v0/architecture.md` passes (it runs `check-architecture-pack.sh` and `check-adr.sh`), and `architecture-review.md` has a matching `pack-hash` and no `Open` finding. An Accepted ADR is superseded, not rewritten, when the decision changes.
-5. **Stop** and present the pack. After one explicit approval, set the pattern ADR's Status to `Accepted` when it is still `Proposed`, record Deciders with the approver(s), update any `(Proposed)` ADR label in `docs/agents-v0/design/system/components/*.md` and any narrative sentence in `docs/agents-v0/design/system/architecture-review.md` that still calls the ADR `Proposed` to `Accepted`, and record the `architecture` row on `docs/agents-v0/architecture.md`. Its Artifacts cell lists every file in the pack, including `docs/agents-v0/design/system/arc-record.md` and `docs/agents-v0/design/system/architecture-review.md`. Do not add an `arc` row. Then run `sh .agents-v0/scripts/activate-stack-pack.sh <pack>` with the ADR's `Pack:` value. Exit 2 means the profile already names another pack: stop. Do not start `/v0-plan` without the `architecture` row and a profile `Pack` cell that matches the ADR. At this gate, verify via `sh .agents-v0/ci/gate.sh architecture --approved docs/agents-v0/architecture.md` (`check-adr.sh`, `check-architecture-pack.sh --approved`, `check-approvals.sh ... architecture`; pre-commit runs it again when git hooks are installed). Later, CI runs `.agents-v0/ci/check-architecture-pack.sh --approved` automatically through `.agents-v0/ci/check-milestone.sh` once milestone manifests exist.
+1. Launch the `solution-architect` subagent (skill: `program-architecture`).
+2. Author the architecture pack in order:
+   - **C4 Context and Container** in `docs/agents-v0/architecture.md` (technology-agnostic C4 labels).
+   - **Pattern ADR** under `docs/agents-v0/adr/` comparing at least two candidate architectures across cost, security, reliability, and operability, and recording `Pack: <id>` (`java`, `dotnet`, `node`, `python`, `go`, etc.). Ensure `.agents-v0/packs/<id>/` is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, plus UI manifest when `ui` is set).
+   - **Platform topology** in `docs/agents-v0/network.md` with zones, protocol-labelled edges, and security boundaries.
+   - **Services & Data:** `docs/agents-v0/design/system/context-map.md` and per-context `components/<service>.md`, plus data flow, conceptual/logical/physical `erDiagram` models, state machine, failure domains, and MVP vs. future state in `architecture.md`.
+   - **Operations & Governance:** `docs/agents-v0/design/system/nfr-slo.md`, `threat-model.md`, `ops-readiness.md`, and `arc-record.md` (with structural fitness functions).
+3. Launch the `design-reviewer` subagent on the architecture pack to write `docs/agents-v0/design/system/architecture-review.md`. Route any `Critical` findings back to `solution-architect` to resolve, and re-run `design-reviewer` until zero `Open` Critical findings remain (max 3 review cycles before escalating to the user).
+4. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status awaiting_approval docs/agents-v0/architecture.md`.
+5. **Stop** and present the architecture pack and `architecture-review.md` to the user. After explicit user approval:
+   - Set the pattern ADR `Status` to `Accepted`.
+   - Run `sh .agents-v0/scripts/activate-stack-pack.sh <pack>` with the ADR's `Pack:` id to bind the stack pack into `docs/agents-v0/project-profile.md` and `.cursor/`.
+   - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md`.
 
 ## Rules
 `workflow-orchestration.mdc`, `architecture-and-diagrams.mdc`, `project-delivery-core.mdc`, `security-baseline.mdc` §11.

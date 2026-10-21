@@ -24,7 +24,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - **Open questions** — resolve them with the user. Before the gate the section is the single word `none`.
    - **Milestone file** — when `Milestone:` is set, also record `Milestone file: docs/agents-v0/milestones/<milestone>.md` and `Story: <story-id>`. The manifest must name that story id.
    - **Milestone/Story links** — `Milestone: <Pn-name>` and `Story: <story-id>` under the title when the story belongs to a milestone program (`docs/agents-v0/milestones/<milestone>.md`).
-   - **Delivery approvals** — record only actual user decisions, in this canonical table format (required by the CI checks `.agents-v0/ci/check-approvals.sh` and `.agents-v0/ci/check-evidence.sh`):
+   - **Delivery approvals** — record only actual user decisions, in this canonical table format:
 
      | Phase | Artifacts | Approver | Decision | Date |
      |-------|-----------|----------|----------|------|
@@ -35,10 +35,10 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
 5. Apply the **story-size budget** before the gate (`workflow-orchestration.mdc`):
    - Record `Surfaces:` as `backend`, `bff`, or `frontend`. When `docs/agents-v0/project-profile.md` lists `Service roots`, also record `Service root: <root>` for a backend or BFF story. A story that needs two service roots is two stories.
    - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
-   - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. The required negative counts toward the eight. Write `## Proposed split` with a **table** of extra milestone rows (story sentence, surface, dependency) and stop until the user approves the split (`check-intake.sh` fails while that section is open or the table is missing). After approval, this artifact keeps the first slice and drops `## Proposed split`; each other row is its own feature.
+   - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. The required negative counts toward the eight. Write `## Proposed split` with a **table** of extra milestone rows (story sentence, surface, dependency) and stop until the user approves the split. After approval, this artifact keeps the first slice and drops `## Proposed split`; each other row is its own feature.
    - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Do not write `## Proposed split` for the seeded P0-A row. This skill does not write that story; `/v0-build` copies it.
 6. Resolve open questions with the user. Write `none` under Open questions.
-7. Run `sh .agents-v0/ci/check-intake.sh docs/agents-v0/requirements/<feature>.md` and fix until it exits 0. Do not present the gate while it fails. P0-A does not run this skill or this check. `/v0-build` copies that milestone story and AC-1 through AC-4.
+7. Verify that `docs/agents-v0/requirements/<feature>.md` satisfies every item in the checklist below. P0-A does not run this skill; `/v0-build` copies that milestone story and AC-1 through AC-4.
 8. Present the Intake gate result and wait for approval before Design.
 
 Scenario shape:
@@ -69,6 +69,5 @@ Then HTTP 404 and no order row is written
 - [ ] One scenario is `Kind: negative` or `Kind: edge`, or `Negatives: N/A: <reason>` when no security-review trigger applies.
 - [ ] A security-review trigger has a `Kind: negative` whose `Then` is a refusal. `Negatives: N/A` is absent in that case.
 - [ ] `Material:` is `yes` or `no`.
-- [ ] `sh .agents-v0/ci/check-intake.sh` exits 0.
 - [ ] Story size: one surface unless `Vertical slice: yes`; at most `AC-8`. Oversized stories stop on `## Proposed split`.
 - [ ] `workflow-orchestration.mdc`: Intake gate criteria met; stopped for approval; approvals table format used.

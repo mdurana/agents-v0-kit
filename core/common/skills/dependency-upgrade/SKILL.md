@@ -18,7 +18,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 8. Re-run the pack CVE check. Pack `java` re-runs OWASP Dependency-Check. Other packs refresh the file named by `cve.path`. Confirm the target CVEs are gone and there are no new unsuppressed HIGH or CRITICAL CVEs. Document any exception. For a license-restricted program, check the new dependencies' licenses.
 9. Produce or refresh a CycloneDX or SPDX SBOM for the service.
 10. If the upgrade changes behavior or topology, sync docs (`doc-sync` skill).
-11. Run `sh .agents-v0/ci/classify-change.sh <base>` and paste it into the note. A version-only change is Trivial-eligible; anything else is `standard`.
+11. Record the change tier in the note. A version-only patch/minor change is Trivial-eligible; anything else is `standard`.
 12. Do not commit or push without explicit user approval.
 
 ## Rule-compliance checklist

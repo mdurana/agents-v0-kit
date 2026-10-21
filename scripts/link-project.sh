@@ -137,8 +137,10 @@ if os.path.isfile(hooks_json):
 cli_json = os.path.join(root, "core", "common", "adapters", "cursor", "cli.json")
 if os.path.isfile(cli_json):
     link(cli_json, os.path.join(project, ".cursor", "cli.json"))
-link_children(os.path.join(root, "templates", ".agents-v0", "ci"), os.path.join(project, ".agents-v0", "ci"))
 link_children(os.path.join(root, "templates", ".agents-v0", "scripts"), os.path.join(project, ".agents-v0", "scripts"))
+agents_md = os.path.join(root, "AGENTS.md")
+if os.path.isfile(agents_md):
+    link(agents_md, os.path.join(project, "AGENTS.md"))
 
 model_src = os.path.join(root, "templates", ".cursor", "model-config.json")
 model_dest = os.path.join(project, ".cursor", "model-config.json")

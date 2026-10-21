@@ -1,8 +1,8 @@
 # Kit reference
 
-Engineer's map of the agents-v0 delivery kit: the workflow, the records, and what is actually checked. Approvers use [user-guide.md](user-guide.md). This file describes the kit as installed; each phase command (`core/common/commands/`) is the procedure, and this page is how the pieces fit.
+Engineer's map of the `agents-v0` delivery kit: the workflow, the records, and how quality and human gates are enforced. Approvers use [user-guide.md](user-guide.md). This file describes the kit as installed; each phase command (`core/common/commands/`) and skill (`core/common/skills/*/SKILL.md`) is the procedure, and this page shows how the pieces fit together.
 
-The kit targets **Cursor**. `scripts/install.sh` copies the core into `.cursor/`. `scripts/install.sh --link` writes `docs/agents-v0/kit-pin` and symlinks `.cursor` and `.agents-v0/ci` to that kit commit instead. Gates, approvals, and CI checks are documented here. Git hosting is on-prem GitLab (`glab`, `.gitlab-ci.yml`).
+The kit is **local-first and IDE-portable** (Cursor, Claude Code, Antigravity, Windsurf, and VS Code Copilot). `scripts/install.sh` installs `AGENTS.md`, commands, skills, agents, and rules into the workspace. Phase quality is enforced by **phase skills, isolated reviewer subagents, and the bound stack pack's native build/test command** rather than brittle Markdown regex scripts.
 
 ## Workflow
 
@@ -14,23 +14,22 @@ flowchart TD
   plan["/v0-plan program"]
   intake["/v0-intake"]
   design["/v0-design"]
-  dreview["design review and pin"]
+  dreview["design-reviewer"]
   build["/v0-build"]
   p0["P0-A"]
   verify["/v0-verify"]
-  localrel["/v0-local-release"]
-  release["/v0-release readiness"]
-  merge["human merge"]
+  localrel["/v0-local-release (primary)"]
+  release["/v0-release (optional MR)"]
   deploy["deploy, when the profile has a Deploy table"]
   triage["/v0-triage"]
   maintain["/v0-maintain"]
 
-  onboard -.->|onboard row| roadmap
-  onboard -.->|onboard row| plan
-  onboard -.->|onboard row| intake
-  roadmap -->|roadmap row| arch
-  arch -->|architecture row| plan
-  plan -->|plan row| intake
+  onboard -.->|approved| roadmap
+  onboard -.->|approved| plan
+  onboard -.->|approved| intake
+  roadmap -->|approved| arch
+  arch -->|approved| plan
+  plan -->|approved| intake
   intake -->|gate| design
   design --> dreview
   dreview -->|gate| build
@@ -38,272 +37,211 @@ flowchart TD
   p0 -->|start| build
   build -->|gate| verify
   verify -->|Critical, Re-opened| build
-  verify -->|gate| release
-  verify -.->|optional| localrel
-  localrel --> release
-  release --> merge
-  merge --> deploy
+  verify -->|gate| localrel
+  verify -.->|optional remote MR| release
+  localrel --> deploy
+  release --> deploy
   triage --> maintain
   maintain -->|trivial or standard| verify
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story is the solid path: Intake, Design, Build, Verify, Release, then a person merges. Optional `/v0-local-release` may sit after Verify. After that checkpoint the next story may start, and `/v0-release` still ships this story later. Verify may also go straight to `/v0-release`. A new program of more than one story runs Roadmap, Architecture, and Plan before that path. `/v0-deliver` runs one story by following each phase command and stopping at every gate that applies. It does not run `/v0-export` or `/v0-deck`. It holds no phase steps of its own. P0-A skips Intake and Design: Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. One approval at Release writes the five rows after the test report and the merge-request URL exist. Optional `/v0-local-release` may write Intake, Design, Build, and Verify first; Release then writes only the Release row. A later story stops at Design when it has an OpenAPI draft, an AsyncAPI or `events/` contract, a UX spec, a public route other than `/health`, `/ready`, or `/live`, or `Material: yes`. Otherwise it pins and continues, and the Build approval writes the Design row.
+A standard story follows the solid path: **Intake → Design → Build → Verify → Local Release** (or optional `/v0-release` when publishing a remote merge request). A new multi-story program runs **Roadmap → Architecture → Plan** before entering the story path.
+
+`/v0-deliver` runs one story end-to-end by following each phase command and stopping at every human gate that applies. It does not run `/v0-export` or `/v0-deck`.
+- **P0-A (platform skeleton):** Skips Intake and Design. Build copies the milestone story and `AC-1` through `AC-4`, writes the minimal `N/A` design, and runs through Verify to a single human approval gate at Release (`/v0-local-release` or `/v0-release`).
+- **Contract-free stories (`Contract: None`):** A story with no OpenAPI draft, no AsyncAPI or `events/` contract, no UX spec, no new public route, and `Material: no` records `No contract` in `design.md` and continues directly into Build without a separate Design approval stop.
 
 | Edge | What it means |
 |------|----------------|
-| Onboard, dotted | An existing repo is documented as it is before any feature work. A new repo skips this. |
-| Roadmap | A new program of more than one story. The person points `/v0-roadmap` at a discovery file anywhere in the repo. The kit sequences it and does not rediscover the problem. A named ticket, a milestone that already has a `plan` row, Maintain, and Trivial skip this. |
-| Architecture | After the roadmap and before any story. C4 through operations, then the ARC pack, checked by `.agents-v0/ci/check-architecture-pack.sh` and reviewed by `design-reviewer`. The pattern ADR records `Pack: <id>` for the stack the user names; a discovery `Stack preference:` is an input that the ADR may accept or reject. Any id is valid once that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). Approval of the `architecture` row runs `.agents-v0/scripts/activate-stack-pack.sh`, which fills the profile and installs that pack's rules and skills. One approval records the `architecture` row, sets the pattern ADR to `Accepted`, and names the ARC file. An `arc` row is a later amendment that supersedes that ADR. Who skips this command: `workflow-orchestration.mdc` Architecture. |
-| Plan, dotted into the story path | The approved roadmap and architecture pack become milestones and an ordered backlog index (Surface and Size on each story). Plan does not rewrite the pack. One story skips Plan. P0-A does not require a roadmap or an architecture pack. |
-| Design review and pin | `design-reviewer` writes `review.md` when the story has an OpenAPI draft, an AsyncAPI or `events/` contract, a UI, or a public route other than `/health`, `/ready`, or `/live`. That design is hashed into `design.lock` after the Design approval: `design.md`, the OpenAPI draft, `asyncapi.yaml`, `events/`, the UX spec, mockups, and the cited ADR. The pin requires the ADR's Status to be `Accepted`. A design with none of those, and without `Material: yes`, is pinned without `review.md` and without a Design stop; the Design row is written with the Build approval. `Material: yes` still stops at Design. It cites the program ARC file when the `architecture` row already names it. An `arc` row is added only when the story changes that recommendation, and that change supersedes the pattern ADR. |
-| P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive into `app/backend` and `app/frontend` for that example. Any other pack follows its scaffold and does not extract that archive. An empty Pack does not select the archive. The skeleton does not run Intake or Design. Build copies the milestone story and AC-1 through AC-4, writes the N/A design, and pins it. Release writes the five rows. Optional `/v0-local-release` may write the first four. |
-| Local release, dotted | Optional after Verify. Decision `Local` is not `Approved`. The next story may start. `/v0-release` does not require this edge. |
-| Verify back to Build | A Critical finding sets that phase's approval to `Re-opened`. It is open until the user approves the re-run. When the verified commit has moved, `/v0-verify` also sets the Verify row to `Re-opened` and stamps the new SHA. |
-| Maintain into Verify | A fix, patch, upgrade, or hotfix has its own note and then Verify. Trivial uses the abbreviated Verify. |
-| Verify back to Maintain | A Critical finding on a fix re-opens Maintain, not the original feature's Build. |
-| Triage | Docs-only or version-only, and only when `.agents-v0/ci/classify-change.sh` says so and a person confirms. |
-| Deploy | Optional, after the merge, one environment at a time. The smoke check may include an SLO probe against `nfr-slo.md`. A failed smoke check or probe runs the recorded rollback and stops. Records go in a later docs-only merge request. |
+| Onboard, dotted | An existing repo is documented as-is before feature work. A greenfield repo skips this. |
+| Roadmap | A new program of more than one story. Pass the discovery file path to `/v0-roadmap`. Single tickets, existing milestones, Maintain, and Triage skip this. |
+| Architecture | Runs after Roadmap and before story work. Produces C4 through operations and the ARC pack, reviewed by `design-reviewer`. The pattern ADR records `Pack: <id>` (`java`, `dotnet`, `node`, `python`, `go`, plus optional `ui`). Approving Architecture runs `.agents-v0/scripts/activate-stack-pack.sh`, populating `docs/agents-v0/project-profile.md` and activating the stack pack's rules and skills. |
+| Plan | Turns the approved roadmap and architecture pack into milestones (`docs/agents-v0/milestones/plan.md` and `<milestone>.md`) with ordered stories (`Surface` and `Size` on each story). Single-story work skips Plan. |
+| Design review | `design-reviewer` writes `review.md` whenever the story includes an OpenAPI draft, AsyncAPI or `events/` contract, UX spec, public route (other than `/health`, `/ready`, `/live`), or `Material: yes`. Design cannot advance until `review.md` has zero open Critical findings and the cited ADR is `Accepted`. |
+| P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive when `Pack: java`, or follows the bound pack's scaffold skill. Skips Intake and Design; stops once for human approval at Release. |
+| Local release (primary) | Runs after Verify is approved. Re-verifies the working tree with the stack pack's native verify command, merges the feature branch into the target branch locally (`git merge --no-ff`) upon explicit user confirmation, and marks the story `released` in `<feature>.state.json`. |
+| Remote release (optional) | Used when the team ships via remote GitLab merge requests instead of local merge. Renders the MR body and opens the MR upon user confirmation. |
+| Verify back to Build / Maintain | Any `Critical` finding from `test-engineer`, `security-reviewer`, or `code-reviewer` sets `activeStatus: "in_progress"` and `activePhase: "build"` (or `"maintain"`) in the state file and increments `reopenCount` (capped at 3 bounces before mandatory user escalation). |
+| Triage | Docs-only or 1-for-1 patch version bump confirmed by the user; uses abbreviated Verify (native build/test + CVE check, skipping reviewer subagents). |
 
-`/v0-status` does not move the work. It reads the state file and names the next command. For a program it also reports the `roadmap`, `architecture`, and `plan` rows, and the `arc` row when that story added one. `docs/agents-v0/design/system/arc-record.md` is written by architecture and is not that approval. An approved roadmap with no `architecture` row names `/v0-architecture`. It does not treat the Jira CSV or a deck as the next step.
+`/v0-status` is read-only: it inspects the active `state.json` file(s) and names the exact command to run next.
 
 ## Commands
 
 | Command | When | Record |
 |---------|------|--------|
-| `/v0-onboard` | An existing repo, once | `docs/agents-v0/onboarding/report.md` |
-| `/v0-roadmap` | A new program. Pass the discovery file path | `docs/agents-v0/roadmap/<program>.md` |
-| `/v0-architecture` | After the roadmap, before any story | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
-| `/v0-plan` | More than one story, after architecture | `docs/agents-v0/milestones/plan.md`, `docs/agents-v0/milestones/<milestone>.md` |
-| `/v0-intake` | One story's requirements, Gherkin `AC-*` with a failure case, or `Negatives: N/A` when no security trigger applies | `docs/agents-v0/requirements/<feature>.md` |
-| `/v0-design` | Contract and design before code. ARC when `Material: yes` | `docs/agents-v0/design/<feature>/`, and `docs/agents-v0/design/system/arc-record.md` when material |
-| `/v0-export` | When someone asks for a Jira copy | `docs/agents-v0/backlog/tickets.csv` |
-| `/v0-deck` | When someone asks for a briefing from an approved story, or from the approved program | `docs/agents-v0/presentations/<name>.md` |
-| `/v0-build` | Implement against the approved design | `docs/agents-v0/build/<feature>/` |
-| `/v0-verify` | Tests, security, review | `docs/agents-v0/verify/<feature>/` |
-| `/v0-local-release` | Optional, after Verify. Decision `Local`. The next story may start. Skip it to run `/v0-release` | `release` row with Decision `Local` |
-| `/v0-release` | After Verify, or after Decision `Local`. Merge request, then a human merge | `Approved` `release` row, then the merge |
-| `/v0-maintain` | Fix, CVE, upgrade, refactor, doc drift | `docs/agents-v0/maintain/<id>/note.md` |
-| `/v0-triage` | A change the classifier calls trivial | the same note, `Tier: trivial` |
-| `/v0-deliver` | One story. Stops at every gate that applies. P0-A stops once, at Release. `/v0-local-release` is optional | the feature's state file |
-| `/v0-status` | Where the work is, and what to run next | read only |
+| `/v0-onboard` | Existing brownfield repo, once | `docs/agents-v0/onboarding/report.md`, `docs/agents-v0/onboarding/state.json` |
+| `/v0-roadmap` | New multi-story program | `docs/agents-v0/roadmap/<program>.md`, `docs/agents-v0/program.state.json` |
+| `/v0-architecture` | After roadmap, before stories | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
+| `/v0-plan` | Multi-story backlog planning | `docs/agents-v0/milestones/plan.md`, `docs/agents-v0/milestones/<milestone>.md` |
+| `/v0-intake` | One story's Gherkin `AC-*` and NFRs | `docs/agents-v0/requirements/<feature>.md`, `<feature>.state.json` |
+| `/v0-design` | Contracts, ADR, and UX before code | `docs/agents-v0/design/<feature>/` |
+| `/v0-build` | Red-to-green implementation per unit | `docs/agents-v0/build/<feature>/plan.md`, `build-report.md` |
+| `/v0-verify` | Native test/coverage run + security & code review | `docs/agents-v0/verify/<feature>/quality-gate.md`, `vapt-checklist.md`, `code-review.md` |
+| `/v0-local-release` | Merge verified feature branch locally | Updates `<feature>.state.json` (`lastApprovedPhase: "release"`) + local merge commit |
+| `/v0-release` | Optional remote MR workflow | Merge request ready for human merge |
+| `/v0-maintain` | Bugfix, CVE, upgrade, refactor, doc sync | `docs/agents-v0/maintain/<id>/note.md`, `docs/agents-v0/maintain/<id>/state.json` |
+| `/v0-triage` | User-confirmed trivial doc/version fix | `docs/agents-v0/maintain/<id>/note.md` (`tier: "trivial"` in `state.json`) |
+| `/v0-deliver` | Orchestrates one story across phases, stopping at each gate | Updates `<feature>.state.json` and `<feature>.phase-result.md` |
+| `/v0-export` | On-demand Jira CSV export | `docs/agents-v0/backlog/tickets.csv` |
+| `/v0-deck` | On-demand executive briefing deck | `docs/agents-v0/presentations/<name>.md` |
+| `/v0-status` | Inspect current phase and next action | Read-only status summary |
 
-Resume is the same in every phase. `.agents-v0/scripts/sync-feature-state.sh` writes the state file. `lastApprovedPhase` comes only from an `Approved` row. `activeStatus` is `in_progress`, `awaiting_approval`, or `blocked`. Re-entering a command continues from the files on disk. It does not recreate them and it does not approve anything. A second `/v0-design` with `design.md` already on disk and no Approved Design row runs the mechanical checks and the design-review step. `design-reviewer` runs when the story has a draft, an event contract, a UX spec, or a public route other than `/health`, `/ready`, or `/live`. The architect or UX designer is launched only for an open Critical. A `design.lock` is an amendment: the reviewer names the current hash, the user approves the row, then the design is pinned. A second `/v0-verify` whose reports already name `HEAD`, with no code or test change, keeps the test report and writes only a missing reviewer report. When the commit has moved, Verify runs again and stamps the new SHA. An Approved Verify row is set to `Re-opened` until the user approves the re-run. Two features in one checkout stop when they would edit the same shared file. The usual fix is `.agents-v0/scripts/feature-worktree.sh <feature>`, which needs one explicit authorization.
+## State and Approvals (`state.json`)
 
-## Records
+Workflow state, artifact pointers, and human approvals live in structured JSON state files managed by `.agents-v0/scripts/sync-feature-state.sh`:
 
-| Work | State file | Approval lives in |
-|------|------------|-------------------|
-| Feature | `docs/agents-v0/requirements/<feature>.state.json` | the requirements artifact, one row per phase |
-| Onboarding | `docs/agents-v0/onboarding/state.json` | `docs/agents-v0/onboarding/report.md`, phase `onboard` |
-| Maintenance | `docs/agents-v0/maintain/<id>/state.json` | the note, phases `maintain` and `verify` |
-| Program | none | a `roadmap` row, then an `architecture` row on `docs/agents-v0/architecture.md`, then a `plan` row on each milestone manifest. The picture they approve is `docs/agents-v0/milestones/plan.md` |
-| ARC | none | an `arc` row on `docs/agents-v0/design/system/arc-record.md`, only when a material story amends the recommendation |
-| Milestone go/no-go | none | a `milestone` row on the manifest |
+| Work Stream | State File | Phases Tracked |
+|-------------|------------|----------------|
+| Feature story | `docs/agents-v0/requirements/<feature>.state.json` | `intake`, `design`, `build`, `verify`, `release` |
+| Maintenance / Triage | `docs/agents-v0/maintain/<id>/state.json` | `maintain`, `verify`, `release` |
+| Brownfield Onboard | `docs/agents-v0/onboarding/state.json` | `onboard` |
+| Program (Roadmap / Arch / Plan) | `docs/agents-v0/program.state.json` | `roadmap`, `architecture`, `plan` |
 
-The approvals table is five columns: Phase, Artifacts, Approver, Decision, Date. CI accepts `Approved`, `approved`, `yes`, or `pass` as the decision, and rejects `Not approved` and `Re-opened`. The Approver cell is the person's GitLab username (`@ada`), because the final job matches it to the real merge-request approval. Build and Verify evidence paths in that row must exist on disk and start with a `commit:` line for the tree that was tested. A later code change makes the line stale, and CI rejects it until the phase is re-run on the new commit. `/v0-verify` sets an Approved Verify row to `Re-opened` before that re-run.
+### Canonical `<feature>.state.json` Structure
 
-`docs/agents-v0/requirements/<feature>.phase-result.md` is the handoff the next phase reads. It names the phase, the status (`awaiting_approval` or `blocked` when stopping; `approved` or `local` after approval), the artifacts, and one blocker per line. An Intake result also copies the user story, the acceptance-criterion count, the failure-scenario count, the regulations, and the open questions.
+```json
+{
+  "feature": "order-cancellation",
+  "tier": "standard",
+  "lastApprovedPhase": "build",
+  "approvedPhases": ["intake", "design", "build"],
+  "activePhase": "verify",
+  "activeStatus": "awaiting_approval",
+  "blockedReason": "",
+  "verifyPassed": true,
+  "reopenCount": 0,
+  "helperBriefHashes": [],
+  "artifact": "docs/agents-v0/requirements/order-cancellation.md",
+  "baseCommit": "a1b2c3d4e5f6...",
+  "updatedAt": "2026-10-21T08:30:00Z",
+  "artifacts": {
+    "intake": "docs/agents-v0/requirements/order-cancellation.md",
+    "design": "docs/agents-v0/design/order-cancellation/design.md",
+    "openapi": "docs/agents-v0/design/order-cancellation/openapi.yaml",
+    "buildPlan": "docs/agents-v0/build/order-cancellation/plan.md",
+    "buildReport": "docs/agents-v0/build/order-cancellation/build-report.md",
+    "verify": [
+      "docs/agents-v0/verify/order-cancellation/quality-gate.md",
+      "docs/agents-v0/verify/order-cancellation/vapt-checklist.md",
+      "docs/agents-v0/verify/order-cancellation/code-review.md"
+    ]
+  }
+}
+```
 
-## Change tiers
-
-| Tier | Fits when | Path |
-|------|-----------|------|
-| Trivial | `.agents-v0/ci/classify-change.sh` says eligible: docs only, or a version bump that replaces lines one for one. No security surface, schema, major bump, or delivery artifact. A person confirms. | `/v0-triage`, then abbreviated Verify |
-| Standard | A feature, or a fix within 800 changed source lines | Full chain, or `/v0-maintain` then full Verify |
-| Major | A new service, an auth model, or a cross-cutting change | Standard, plus system design and threat-model notes |
-| Emergency | A production incident. A person confirms. Rollback and a follow-up date are required. | May merge on the `maintain` row. Full Verify is owed by that date |
-
-The classifier reads the diff. An agent does not get to call a code change trivial. CI runs the classifier again on the merge request.
+- **How gates work:** At the end of a phase, the agent writes `<feature>.phase-result.md`, runs `sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status awaiting_approval <artifact>`, and stops its turn.
+- **How approval works:** Nothing advances until the user explicitly approves in chat (or records an `Approved` row). Upon user approval, the orchestrator runs `sh .agents-v0/scripts/sync-feature-state.sh --approve <phase> <artifact>`, which appends the phase to `approvedPhases`, updates `lastApprovedPhase`, clears `activePhase`, and indexes all created phase artifacts on disk.
+- **Resuming work:** Re-entering any `/v0-*` command reads `<feature>.state.json` (`artifacts` map and `baseCommit`) and continues from existing files on disk without recreating approved artifacts.
+- **Parallel feature isolation:** Two active features in one checkout stop if they touch overlapping files; use `.agents-v0/scripts/feature-worktree.sh <feature>` to isolate branches in separate git worktrees.
 
 ## Design
 
-Design writes, and does not touch the org catalog:
+`/v0-design` produces contract-first specifications guided by the `contract-first-design` and `ux-design` skills:
 
 | File | Contents |
 |------|----------|
-| `docs/agents-v0/design/<feature>/openapi.yaml` | Only when the story adds a `/api/v1` operation. OpenAPI 3.0, unique `operationId`s, security, `Idempotency-Key` on POST, one error envelope. Otherwise `design.md` records `N/A: no /api/v1 operation` and this file is absent |
-| `docs/agents-v0/design/<feature>/asyncapi.yaml` | Optional when the story publishes or consumes messages. AsyncAPI 2.x/3.x; channels align with `events/` |
-| `docs/agents-v0/design/<feature>/events/` | Event schemas with `eventVersion`. Changes are additive |
-| `docs/agents-v0/design/<feature>/design.md` | Every AC traced, data model, one authorization row per operation, failure modes, observability, rollout. No messages means the Events section is `N/A: no event contract` |
-| `docs/agents-v0/adr/<NN>-<slug>.md` | A decision with at least two alternatives and Status `Proposed` or `Accepted`. A later decision supersedes it (`Superseded by ADR <NN>`) instead of rewriting it. `ADR: N/A: no product decision` when the reviewer is skipped |
-| `docs/agents-v0/design/<feature>/ux-spec.md` and `mockups/` | UI only. Every control has `data-component` and a row. Mockups do not call the API |
-| `docs/agents-v0/design/<feature>/review.md` | `design-reviewer` when there is an OpenAPI draft, an AsyncAPI or `events/` contract, a UX spec, or a public route other than `/health`, `/ready`, or `/live`. No open Critical, and the hash matches this design. Absent when none of those files or routes exist |
-| `docs/agents-v0/design/<feature>/design.lock` | Date, hash, and reason. The hash covers `design.md`, the OpenAPI draft, `asyncapi.yaml`, `events/`, `ux-spec.md`, `mockups/`, and the cited ADR. An OpenAPI draft, an AsyncAPI or `events/` contract, a UI, a public route, or `Material: yes` is pinned after that Design approval, and the pin requires Status `Accepted`. Any other design, and P0-A, are pinned first; the Approved row comes with the Build approval, or at Release for P0-A |
+| `docs/agents-v0/design/<feature>/openapi.yaml` | Written when the story adds or modifies an HTTP operation. OpenAPI 3.0+, unique `operationId`, security scheme, `Idempotency-Key` on mutating POSTs, standard error envelope. |
+| `docs/agents-v0/design/<feature>/asyncapi.yaml` & `events/` | Written when the story publishes or consumes events. Event schema changes remain backward-compatible and additive. |
+| `docs/agents-v0/design/<feature>/design.md` | Traces every `AC-*` from Intake, data model, per-operation authorization matrix, failure modes, observability, and rollout. |
+| `docs/agents-v0/adr/<NN>-<slug>.md` | Architectural Decision Record comparing at least two options (`Status: Proposed` → `Accepted` on Design approval). |
+| `docs/agents-v0/design/<feature>/ux-spec.md` & `mockups/` | Written for UI stories. Interactive elements carry `data-component` attributes; mockups are self-contained HTML/CSS. |
+| `docs/agents-v0/design/<feature>/review.md` | Written by `design-reviewer`. Must have zero open `Critical` findings before Design approval. |
 
-When `openapi.yaml` exists, `.agents-v0/ci/check-openapi.sh lint` checks the draft and `compat` checks it against the catalog it will merge into. A missing draft is allowed. When `asyncapi.yaml` exists, `.agents-v0/ci/check-asyncapi.sh lint` runs (also from `.agents-v0/ci/check-design-contracts.sh` in CI). Build merges with `.agents-v0/ci/check-openapi.sh merge` and proves it with `merged`. A service repo uses `openapi/<service>-v1.yaml`. A single-service repo uses `openapi/api-v1.yaml`.
+If Build or Verify discovers that an approved contract must change, the agent stops, updates the design artifact, re-runs `design-reviewer`, and asks the user to re-approve Design before continuing.
 
-A later edit to an approved design is an amendment, not a quiet change. Build or Verify stops, the design files change, `design-reviewer` runs on the design as it stands, and `review.md` names the current hash with no open Critical. The user approves a row in `amendments.md`, and `.agents-v0/ci/check-design.sh --pin` records the new hash. The pin includes `asyncapi.yaml`, `events/`, and the cited ADR. A changed decision supersedes that ADR. `.agents-v0/ci/check-adr.sh` rejects a rewrite once an `Accepted` revision is in git history; before that commit it checks status and successors only. CI rejects a design that drifted from its lock.
+## Architecture Pack
 
-## Architecture pack
-
-`/v0-architecture` writes these files. The pack is complete when `sh .agents-v0/ci/check-architecture-pack.sh` passes and `design-reviewer` has no open Critical. After the `architecture` row, CI re-runs the check with `--approved` through `.agents-v0/ci/check-milestone.sh`. A section that does not apply says `N/A: <reason>`; the heading stays.
+`/v0-architecture` writes the system-level baseline under `docs/agents-v0/` using the `program-architecture` skill and validates it with `design-reviewer`:
 
 | File | Contents |
 |------|----------|
-| `docs/agents-v0/architecture.md` | C4 Context and Container (no product names), Data flow (the Container nodes, edges relabelled `transport / payload`), Data models (conceptual, logical, physical `erDiagram`), State machine, Failure domains and degradation, MVP and future state |
-| `docs/agents-v0/network.md` | Target topology: zones, protocol-labelled edges, security boundaries |
-| `docs/agents-v0/adr/<NN>-<slug>.md` | The pattern ADR: two or more real options, a `Patterns considered` table compared on cost, security, reliability, and operability |
-| `docs/agents-v0/design/system/context-map.md` | Bounded contexts and the service map: service root, contract, sequence diagram, component plan, status |
-| `docs/agents-v0/design/system/components/<service>.md` | One component plan per context (from `_component.template.md`), or `N/A: <reason>`. Links its parent and never contradicts it |
-| `docs/agents-v0/design/system/nfr-slo.md`, `threat-model.md` | SLO and RPO/RTO targets; assets, trust boundaries, STRIDE risks |
-| `docs/agents-v0/design/system/ops-readiness.md` | Build-and-run ownership, error budget policy, database maintenance and operation, the P5 readiness checklist, a runbook template |
-| `docs/agents-v0/design/system/arc-record.md` | Recommendation, plus structural fitness functions (principle, check, threshold, on failure). SLO targets stay in `nfr-slo.md` |
-| `docs/agents-v0/design/system/architecture-review.md` | `design-reviewer` report on the pack |
+| `docs/agents-v0/architecture.md` | C4 Context and Container diagrams, transport-labelled data flows, conceptual/logical/physical `erDiagram` models, state machine, failure domains, MVP vs. target state. |
+| `docs/agents-v0/network.md` | Network zones, protocol-labelled edges, and trust/security boundaries. |
+| `docs/agents-v0/adr/<NN>-<slug>.md` | Pattern ADR selecting `Pack: <id>` and comparing candidate architectures across cost, security, reliability, and operability. |
+| `docs/agents-v0/design/system/context-map.md` & `components/<service>.md` | Bounded contexts, service roots, contracts, sequence diagrams, and per-service component plans. |
+| `docs/agents-v0/design/system/nfr-slo.md` & `threat-model.md` | Availability/latency SLOs, RPO/RTO targets, and STRIDE threat model. |
+| `docs/agents-v0/design/system/ops-readiness.md` | Runbook template, error-budget policy, database operations, and production readiness checklist. |
+| `docs/agents-v0/design/system/arc-record.md` | Architecture Review Committee recommendation and structural fitness functions. |
+| `docs/agents-v0/design/system/architecture-review.md` | `design-reviewer` evaluation of the complete architecture pack. |
 
-## Build and verify
+## Build and Verify
 
-Build starts from a green baseline. A clean checkout of the default branch tip skips the pre-edit verify. It writes `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*`, and works red then green. Before the green run, `check-build-plan.sh <feature> --record-red` may write `red-tests.json`. When that file exists, the done row's test must appear in it. `REQUIRE_RED_REPORT` stays off unless the project sets it. Each attempt appends a card to `build-report.md`. The same test red twice goes to `debug-investigator` before a third try. A third red stops. The phase also has a total budget of failed attempts, default 8 (`.agents-v0/scripts/check-attempt-budget.sh`).
+### Build (`/v0-build`)
+1. Starts from a clean, green baseline and writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` from Intake to concrete implementation units, target files, test cases, and risk level (`standard` vs. `critical`).
+2. Executes units in dependency order using the bound pack's implementation skills (`implement-service`, `implement-bff`, `implement-ui`) and strict red-to-green TDD.
+3. **Failure budgets:** Each unit attempt is logged in `docs/agents-v0/build/<feature>/build-report.md`.
+   - If the same test fails twice consecutively, Build stops and routes a helper brief to `debug-investigator` (`.agents-v0/scripts/check-failure-brief.sh`) before a third attempt.
+   - A third consecutive failure on the same test, or exceeding 8 total failed attempts across the phase (`.agents-v0/scripts/check-attempt-budget.sh`), stops Build and escalates to the user.
 
-The Build gate is not only the agent's report. CI checks:
+### Verify (`/v0-verify`)
+Verify combines **deterministic native stack execution** with **role-separated subagent reviews**:
+1. **`test-engineer` (`quality-gate` skill):**
+   - Resolves the project layout (`.agents-v0/scripts/resolve-layout.sh`) and runs the bound pack's native verify command (`.agents-v0/scripts/run-backend-verify.sh` / `pack.json`, e.g., `dotnet test`, `./mvnw -B clean verify -Pci-security`, `npm test`, `pytest`, or `go test ./...`).
+   - Verifies that every `AC-*` in `requirements/<feature>.md` has a corresponding passing test, checks diff coverage against `docs/agents-v0/quality-gates.md` (default $\ge 80\%$ on changed lines), and records results in `docs/agents-v0/verify/<feature>/quality-gate.md`.
+2. **`security-reviewer` (`vapt-review` skill) & `code-reviewer` (`pr-review` skill):**
+   - Inspect `git diff <baseCommit>...HEAD`, `requirements/<feature>.md`, and `design/<feature>/` against `security-baseline`, `vapt-webapp`, `vapt-pr-review`, `code-review`, and the active stack pack rules.
+   - Write `docs/agents-v0/verify/<feature>/vapt-checklist.md` and `docs/agents-v0/verify/<feature>/code-review.md`.
+   - Any `Critical` finding (including unauthenticated endpoints, broken access control, injection, hardcoded secrets, or missing negative security tests) marks `"verifyPassed": false` and routes the feature back to Build/Maintain (`--reopen build`).
+   - When all three reports pass with zero `Critical` findings, `<feature>.state.json` records `"verifyPassed": true` and pauses for human approval.
 
-| Check | Fails when |
-|-------|------------|
-| `.agents-v0/ci/check-build-plan.sh` | An AC has no row, a done row names a test that does not exist, or that test has no red card. When `red-tests.json` exists, the test name must be in that captured report |
-| `.agents-v0/ci/check-endpoint-auth.sh` | A new route has no pack auth marker. The pack public marker marks a public one on purpose |
-| `.agents-v0/ci/check-frontend-calls.sh` | The frontend calls an `/api/` path the catalog does not list |
-| `.agents-v0/ci/check-openapi.sh merged` | The catalog is missing an operation or component from the approved draft |
-| `.agents-v0/ci/check-design.sh --verify-lock` | The design, including the cited ADR, changed after it was approved |
-| `.agents-v0/ci/check-gate-metrics.sh` | No tests ran, tests failed, changed-line coverage is under 80% (or `docs/agents-v0/quality-gates.md`) for every pack when `DIFF_BASE` is set, a migration or SQL diff was tested only on H2, an optional `mutation_ratchet` floor is missed, or an unsuppressed HIGH or CRITICAL CVE remains. Whole-module line coverage fails when the pack wires it (Pack `java`: JaCoCo 0.80), when `docs/agents-v0/quality-gates.md` has a Whole-module lines row, or when `MIN_LINE_PCT` is set |
+## Local Release (`/v0-local-release`) and Remote Release (`/v0-release`)
 
-Verify runs `test-engineer` first. When `HEAD` is still the build report's commit and Verify adds no tests, it quotes that run and adds only diff coverage and the CVE report. Then `security-reviewer` and `code-reviewer` run together and write separate reports. An applicable miss on an always-on VAPT finding (F4, F8, F9, F10) is Critical. A high or medium regression finding blocks merge when the diff touches that surface. A low finding blocks only when the diff makes it exploitable. A Critical list goes back to Build or Maintain. The reports are stamped with the commit that contains the tests, so the commit happens before the stamp. A trivial maintenance note skips the two reviewers and the UX and end-to-end checks. It still runs the build, the gate metrics, and a CVE scan. P0-A (`Story: P0-A`, `Milestone: P0`) runs only `test-engineer`, the full verify command, and the gate metrics. It skips `security-reviewer`, `code-reviewer`, the UX audit, and end-to-end tests. Its approval is the one Release approval.
+- **`/v0-local-release` (Primary workflow):**
+  1. Verifies that `<feature>.state.json` (or `maintain/<id>/state.json`) has `"verify"` in `approvedPhases` and `"verifyPassed": true`.
+  2. Ensures a clean git working tree and runs the stack pack's native verify command one final time.
+  3. Prompts the user to confirm merging the feature branch into the integration branch (`git merge --no-ff <feature-branch>`), updates `<feature>.state.json` via `sync-feature-state.sh --approve release`, and optionally tags the release or updates `CHANGELOG.md` via `.agents-v0/scripts/release-notes.sh`.
+- **`/v0-release` (Optional remote MR workflow):**
+  - Renders the merge-request summary via `.agents-v0/scripts/render-mr-body.sh` and opens/updates the GitLab MR (`glab mr create`) upon user authorization. `glab mr merge` and `glab mr approve` remain permanently blocked by `pre-shell.sh`.
 
-## Release
+## Onboarding and Maintenance
 
-`/v0-release` renders the merge-request body from the evidence (`.agents-v0/scripts/render-mr-body.sh`) and dry-runs the local delivery gate with `.agents-v0/scripts/check-delivery-gate-local.sh <feature>` (linkage with `CHECK_MR_APPROVER=0`, design contracts, build plan, endpoint authorization). It does not edit `architecture.md` or `network.md`; those stay a docs-only follow-up. When the build and verify reports already name `HEAD`, it does not commit them again. To run that gate on push when the branch name matches `docs/agents-v0/requirements/<feature>.md`, a person installs the git hook: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"`. Git runs only `hooks/pre-push`, and the kit's edit hook blocks agent writes there, so the install is manual. The body names either `Feature-Artifact:` or `Maintain-Note:`, not both. Opening the merge request, and every commit and push, each need their own authorization. The CI fix loop stops after three rounds. A code fix in that loop goes back through Verify, because it makes the evidence commit stale.
+- **Brownfield Onboarding (`/v0-onboard`):**
+  - Runs `.agents-v0/scripts/generate-repo-map.sh`, `.agents-v0/scripts/collect-dependency-graphs.sh`, and `.agents-v0/scripts/discover-codebase.sh` (using `.agents-v0/scripts/endpoint_scan.py` and `.agents-v0/scripts/packlib.py`) to inventory endpoints, entities, migrations, messaging, and config keys under `docs/agents-v0/discovery/`.
+  - Auto-detects the stack pack via `.agents-v0/scripts/activate-stack-pack.sh --detect` when `Pack` is unset.
+  - `codebase-documenter` writes `docs/agents-v0/onboarding/report.md` and per-module docs citing `path/File:line` (validated by `.agents-v0/scripts/check-onboarding-docs.sh`).
+- **Maintenance (`/v0-maintain` & `/v0-triage`):**
+  - Tracked in `docs/agents-v0/maintain/<id>/note.md` and `docs/agents-v0/maintain/<id>/state.json` (`tier`: `trivial`, `standard`, or `emergency`).
+  - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs; all changes flow into `/v0-verify` and `/v0-local-release`.
 
-After Verify or Release approval, teams may run `.agents-v0/scripts/export-audit-pack.sh <feature>` to write `docs/agents-v0/release/<feature>/audit-manifest.json` (SHA-256 hashes of delivery evidence) for compliance archives.
+## Agents, Skills, Rules, and Cross-IDE Portability
 
-The `release` row is written on the merge-request branch before the merge, with the GitLab username of the person who will approve it. A person merges. `glab mr merge` and `glab mr approve` are blocked. After the approval, someone plays the manual `delivery-approval` job (`glab ci trigger delivery-approval`). It matches that username to the `release` or `verify` row, using the CI scripts from the default branch.
+| Layer | Location | How It Loads Across IDEs |
+|-------|----------|--------------------------|
+| **Always-On Conduct & Lifecycle** | Root `AGENTS.md` + `core/common/rules/{workflow-orchestration,project-delivery-core,ai-agent-conduct}.mdc` | Loaded automatically by Cursor (`.cursor/rules/`), Antigravity (`AGENTS.md`), Claude Code (`CLAUDE.md` / `AGENTS.md`), Windsurf, and Copilot. Combined always-on size is capped at $\le 32\text{ KB}$. |
+| **Phase Playbooks (Skills)** | `core/common/skills/*/SKILL.md` & `core/<pack>/skills/*/SKILL.md` | Standard `SKILL.md` format. Each skill explicitly names the domain rules (`security-baseline`, `api-and-events`, pack `backend`/`frontend` rules) to read for that phase, avoiding unnecessary context bloat. |
+| **Role Subagents** | `core/common/agents/*.md` & `core/<pack>/agents/*.md` | Spawned as isolated subagents in Cursor, Claude Code, and Antigravity; executed sequentially via phase skills in single-agent IDEs. Model routing is configured in `.cursor/model-config.json` via `.agents-v0/scripts/update-agents-model.sh`. |
+| **Hub-and-Spoke Helpers** | `explore-researcher`, `debug-investigator`, `schema-author`, `docs-author` | Phase agents write `<slug>.helper-brief.md` (`helper:`, `return_to:`, `ask:`) and return to the main session. Duplicate `ask:` digests are tracked in `state.json` (`helperBriefHashes`) to prevent infinite loops. |
 
-The merge is the completion of the change. When the profile has a Deploy table, each environment after that needs its own authorization, a smoke check (which may include an SLO probe against `docs/agents-v0/design/system/nfr-slo.md`), and a rollback. A failed smoke check or probe runs that rollback and stops. Those records are a later docs-only merge request, not a commit on the default branch. The release owner picks the version and tag. `.agents-v0/scripts/release-notes.sh` fills `CHANGELOG.md` from stories that have an Approved release row.
+## Safety Hooks
 
-## Onboarding an existing repo
+Two lightweight, deterministic guardrails protect local development without slowing down documentation or coding:
 
-`/v0-onboard` does not move source and does not invent a future design. It runs the baseline, then `.agents-v0/scripts/generate-repo-map.sh`, `.agents-v0/scripts/collect-dependency-graphs.sh`, and `.agents-v0/scripts/discover-codebase.sh`. The discovery files under `docs/agents-v0/discovery/` list endpoints, entities, migrations, messaging, configuration key names, frontend routes, and a security snapshot. Endpoint regexes live in `.agents-v0/ci/endpoint_scan.py`, which both `discover-codebase.sh` and `.agents-v0/ci/check-endpoint-auth.sh` use. `docs/agents-v0/discovery/endpoint-stacks.md` proposes rows for .NET, Nest, Express, FastAPI, Django, and Go when those routers are present. A row is copied into **Endpoint authorization** only when that table is still empty and the active pack does not already scan that suffix. When `Pack` is still empty, onboard runs `.agents-v0/scripts/activate-stack-pack.sh --detect` and does not replace a pack id that is already set. No marker asks the person to name the id. Two backend markers stop for a person to choose. Values of secrets are never written. Set `CI_PACK_IMAGE` to the bound pack's `ciImage`.
+1. **Shell & Edit Guardrail (`pre-shell.sh` / `hook-policy.py` & `pre-edit.sh`):**
+   - Blocks destructive shell commands (`git push --force`, `git reset --hard`, `rm -rf`, `glab mr merge`, `glab mr approve`), secret/credential file reads (`.env`, `*.pem`, `*.key`, SSH/cloud keys), and environment variable dumps (`env`, `printenv`, `export -p`).
+   - Protects kit scripts and hook configurations (`.cursor/hooks/*`, `.agents-v0/scripts/*`, `.agents-v0/packs/*`) from agent modification.
+   - Requires interactive user confirmation (`ask`) before `git commit`, `git merge`, `git push`, `git rebase`, `git tag`, or branch deletion.
+2. **Optional Git Pre-Push Hook (`.agents-v0/hooks/pre-push`):**
+   - A lightweight, IDE-agnostic Git hook (`sh scripts/install.sh --git-hooks <repo>`) that verifies any active `<feature>.state.json` on the branch has `"verifyPassed": true` (or `lastApprovedPhase` in `verify`/`release`) before pushing.
 
-Each module gets `docs/agents-v0/onboarding/modules/<module>.md`. Every statement cites `path/File.java:42` or says `UNVERIFIED`. `.agents-v0/scripts/check-onboarding-docs.sh` rejects a citation that does not resolve and any leftover `TEMPLATE:` line. Architecture, network, the context map, inherited decisions, and the flows the user names are written as they are. `/v0-intake` and `/v0-plan` wait for the `onboard` row.
-
-## Maintenance
-
-`docs/agents-v0/maintain/<id>/note.md` is the record. It has the tier, the trigger, what "done" means, the classifier output, and its own approvals. Evidence is `docs/agents-v0/build/<id>/` and `docs/agents-v0/verify/<id>/`. The merge request says `Maintain-Note:`. A code change that only points at an old feature artifact is rejected: that artifact's old Build row is not evidence for this fix.
-
-| Tier | CI requires |
-|------|-------------|
-| trivial | A person's confirmation, the classifier still agrees, an Approved `verify` row |
-| standard | Size within the limit, an Approved `verify` row |
-| emergency | A person's confirmation, a rollback, a `Follow-up verify due` date. The `verify` row may come after the merge. `.agents-v0/scripts/delivery-metrics.sh` marks it OVERDUE once the date passes |
-
-A bug fix writes the reproducing test and shows it fail before the fix. A dependency upgrade records the release notes and a before/after dependency graph. A doc sync re-checks onboarding citations, because a code edit moves line numbers.
-
-## Multi-service repos
-
-The profile Layout lists `Service roots` (for example `services/order, services/inventory`). CI builds, measures, and scans each root. Each service has its own catalog, `openapi/<service>-v1.yaml`, and its own database. A story names `Service root:` and stays in one service. A call between two services is a third story, the integration story, and it depends on both. `docs/agents-v0/workspace.manifest.json` lists other git repositories. CI does not cross repository boundaries.
-
-## Agents and models
-
-The model is chosen by role. Cursor IDs are the role table in `docs/agents-v0/model-routing-matrix.md`. The Kit agent mapping in that file names which agent uses which role. `.cursor/model-config.json` holds the same defaults and is seeded on install. `scripts/install.sh` rewrites `.cursor/agents/*/model:` from that file by running `sh .agents-v0/scripts/update-agents-model.sh`. `KIT_MODEL_PLAN`, `KIT_MODEL_BUILD`, and the other `KIT_MODEL_*` variables override the file for that run. After install, edit `.cursor/model-config.json` and run that script again. Kit source under `core/common/agents/` and `core/<pack>/agents/` keeps the matrix defaults.
-
-| Role | Does |
-|------|------|
-| Plan | Program planning, requirements, architecture |
-| Build | Services, BFF, frontend, tests, maintenance, release |
-| Build (critical) | Auth, uploads, public routes, sagas, consumers — launched with the Plan model |
-| Review | Design review, security review, code review — not the Build model |
-| Explore | Repo exploration |
-| Debug | Runtime failure root-cause |
-| Schemas | Schema and unit-test sub-tasks |
-| Docs | Doc drafting |
-| Documenter | Brownfield onboard as-is documentation (`codebase-documenter` writes the report) |
-| Orchestrator | `/v0-deliver` and `/v0-status`. `/v0-onboard` is routed here and written by `codebase-documenter` |
-| UX Designer | UX design |
-
-Phase agents do not launch other agents. They write a helper brief and return. The main session launches `explore-researcher`, `schema-author`, `debug-investigator`, or `docs-author`, and passes the result back. The same brief a second time is a loop, and the session stops.
-
-## What CI checks at merge
-
-`.agents-v0/ci/check-delivery-linkage.sh` is the front door. A merge request that changes code names a feature artifact or a maintenance note.
-
-| Script | Checks |
-|--------|--------|
-| `check-approvals.sh` | The named phase has an explicit approval |
-| `check-evidence.sh` | Recorded evidence exists, has `commit:`, and is not stale |
-| `check-approver-gitlab.sh` | The Approver matches a human who approved the merge request |
-| `check-milestone.sh` | Every story in a manifest has the phase approval, in dependency order. On `verify` and `release`, a manifest that names `slo-evidence.md` also requires that file's measured or waiver rows |
-| `check-design.sh` | The design is complete, and still matches its lock |
-| `check-architecture-pack.sh` | The architecture pack is complete: C4 names no product, Data flow matches the Container nodes, data models, state machine, failure domains, target topology, ops readiness, a structural fitness function, component plans, and a clean architecture review. `--approved` also needs an Accepted pattern ADR |
-| `check-design-contracts.sh` | OpenAPI lint and compat when a draft and catalog exist, the design lock when present, the UX spec when present, AsyncAPI lint when present, `check-adr.sh`, `check-arc.sh` when `Material: yes`, and `check-intake.sh` when Intake is approved |
-| `check-openapi.sh` | The contract lints, is compatible, and was merged |
-| `check-asyncapi.sh` | Optional `asyncapi.yaml` meets channel and message rules |
-| `check-ux-spec.sh` | Spec rows and mockups agree |
-| `check-build-plan.sh` | The plan matches the ACs. A done row has a red card, and when `red-tests.json` exists that test name is in the captured report |
-| `check-endpoint-auth.sh` | No new unannotated endpoint |
-| `check-frontend-calls.sh` | Frontend calls match the catalog |
-| `check-event-schemas.sh` | Event schemas stay additive |
-| `check-gate-metrics.sh` | Tests, changed-line coverage under 80% (or `docs/agents-v0/quality-gates.md`) when `DIFF_BASE` is set, the profile database on a migration or SQL diff (H2 does not count), an optional `mutation_ratchet`, and CVEs, from the build output. Test failures up to the `known_failures` budget are reported, not failed. Whole-module line coverage fails when the pack wires it (Pack `java`: JaCoCo 0.80), when `docs/agents-v0/quality-gates.md` has a Whole-module lines row, or when `MIN_LINE_PCT` is set |
-| `classify-change.sh` | Whether a trivial note is still trivial |
-| `check-layout-roots.sh` | A repo with a pack detect marker resolved a backend root |
-| `check-coverage-ratchet.sh` | A coverage exception is approved and not expired. A measured percentage is compared only when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set; the GitLab job does not set it |
-| `check-known-failures.sh` | After a verify that exited non-zero, only test failures inside the documented `known_failures` budget are excused. A compile or plugin error is never excused (`--require-failures`) |
-
-On GitLab the gate scripts are read from the default branch, so a merge request cannot rewrite the check that judges it. `.gitlab-ci.yml` supports `CI_IMAGE_PREFIX` for air-gapped container mirrors. `.agents-v0/scripts/verify-gitlab-ci-prereqs.sh` checks the scoped token and documents DinD vs host Docker socket. `CODEOWNERS` covers the delivery records, `docs/agents-v0/design/`, `docs/agents-v0/adr/`, `openapi/`, `.agents-v0/` (the gate scripts, the kit scripts, and the pre-push hook), the project profile (it holds the `known_failures`, `coverage_ratchet`, and optional `mutation_ratchet` rows that CI honors), and the installed commands, skills, agents, and rules. In the delivery jobs the whole `.agents-v0/ci` directory is read from the default branch, so a script the linkage check calls is trusted too. When a phase has several approval rows, the last one is the current decision, and a conditional approval (`Approved with conditions`, `pending`) is not an approval.
-
-## Hooks
-
-Cursor runs the hook scripts via `.cursor/hooks.json`, and `.cursor/cli.json` allows non-interactive CLI sessions (`agent --print`) to invoke `Shell` so `pre-shell.sh` (`hook-policy.py`) is the single shell guardrail (blocking banned commands, prompting on `ask` commands, and running gate/verify scripts without `Rejected:`). `pre-shell.sh` blocks force-push, hard reset, recursive delete, reading secret files (`.env`, SSH and GPG keys, cloud and cluster credentials, `*.pem` and `*.key`, `/proc/*/environ`), and commands that dump environment variables (`env`, `printenv`, `export -p`, `declare -x`, `compgen -e`). They block edits to every `.agents-v0/ci/*.sh` and `.agents-v0/scripts/*.sh`, `.agents-v0/hooks/pre-push`, `.cursor/hooks.json`, `.cursor/cli.json`, and the installed commands, skills, agents, and rules. They block `glab mr merge` and `glab mr approve`. They ask before commit, push, `git rebase`, `git merge`, `git cherry-pick`, `git revert`, `git restore` (unless it only unstages), `git stash pop`/`drop`/`clear`, creating, deleting, or renaming a branch, a new worktree, `glab mr create`, `git tag`, a mutating `glab api` call, `sudo`, and piping a download into a shell or interpreter. Optional `.agents-v0/hooks/pre-push` skips branch-delete pushes (zero SHA). `after-edit.sh` warns on common VAPT mistakes and on new approval rows in delivery artifacts. CI and `CODEOWNERS` enforce the merge contract.
-
-### Phase gate (one list, run automatically)
-
-`.agents-v0/ci/gates.json` is the only place that says which document checks gate which phase (`onboard`, `roadmap`, `architecture`, `plan`, `intake`, `design`, and the state check for `build`, `verify`, and `release`). `sh .agents-v0/ci/gate.sh <phase> <artifact>` runs the phase's checks before approval, and `sh .agents-v0/ci/gate.sh <phase> --approved <artifact>` runs the approved list right after the `Approved` row is recorded. Every check runs, so one pass lists every problem. The `/v0-*` commands call `gate.sh`; they do not list the checks by hand, so the commands and the scripts cannot drift apart (`scripts/validate-kit.sh` fails when they do).
-
-Three things run it without the agent remembering to:
-
-- **`after-edit.sh`** runs `gate.sh --for-path <file>` when a delivery document changes and puts a failing gate into the agent's context. It is advisory and always exits 0.
-- **`.agents-v0/hooks/pre-commit`** runs `gate.sh --staged`. A commit that adds or changes an `Approved` row (or edits an approved roadmap or architecture pack) must pass that phase's approved checks, or it is refused. Commits with no delivery document are not slowed down.
-- **`.agents-v0/hooks/pre-push`** runs the local delivery gate for the feature branch.
-
-`sh scripts/install.sh --git-hooks <repo>` turns the two git hooks on by setting `core.hooksPath=.agents-v0/hooks` in that repo. It is opt-in because it changes the repo's git config. An agent cannot get around the hooks: `pre-shell.sh` blocks `--no-verify`, `-c core.hooksPath=...`, and edits to `gates.json` and `.agents-v0/hooks/*`, and asks before `git config core.hooksPath`. Build, Verify, and Release evidence (`check-evidence.sh`, `check-gate-metrics.sh`) needs committed reports, so the phase commands run it and pre-push and CI repeat it.
-
-`install.sh --update` refuses while a story is in progress (a `state.json` with a non-empty `activePhase`), because new checks must not change under a story mid-phase. Finish or pause the story, or pass `--allow-in-flight`.
-
-## Rules and skills
-
-Three rules load in every Cursor session: `workflow-orchestration.mdc`, `project-delivery-core.mdc`, and `ai-agent-conduct.mdc`. Their combined size is capped at 32 KB (`scripts/validate-kit.sh`). `AGENTS.md` is the kit repository's own summary and is not installed. The other rules load with the files they apply to: the bound pack's backend rules, frontend, API and events, security, VAPT, quality, architecture, UX, code review.
-
-Skills are the phase playbooks (`core/common/skills/*/SKILL.md` and `core/<pack>/skills/*/SKILL.md`). The command names the skill. The skill does not restate the whole command.
-
-## Install
+## Install & Update
 
 ```bash
 ./scripts/install.sh /path/to/repo
-./scripts/install.sh --pack node /path/to/repo   # example cursor seed; does not set the profile Pack row
+./scripts/install.sh --pack dotnet /path/to/repo
 ./scripts/install.sh --with-starters /path/to/repo
-./scripts/install.sh --link --path /path/to/agents-v0 --commit <sha> /path/to/repo
-```
-
-`--link` records `docs/agents-v0/kit-pin` and symlinks `.cursor` and `.agents-v0/ci` into that kit commit. Kit commits stay in the kit repository. The project keeps its delivery records and `.agents-v0/packs/<id>/`. Any pack id is valid once that pack is complete (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). An empty Pack does not select an example. A copy install still writes the kit files into the project; `--update` refreshes that copy. Set `CI_PACK_IMAGE` to the pack `ciImage` so the GitLab build job uses that image.
-
-```bash
 ./scripts/install.sh --update /path/to/repo
-./scripts/install.sh --update --quick /path/to/repo   # offline: skips the app-template build test
 ./scripts/bootstrap-greenfield.sh --profile app --pack java --scaffold-app /path/to/new-repo
-./scripts/pack-app-template.sh   # after editing templates/app/{backend,frontend}
 ./scripts/validate-kit.sh
 ```
 
-On an Intel Mac, missing host tools named by the bound pack's `hostChecks` are installed with MacPorts when a port exists (JDK 21, Node, npm, Python, Go). The .NET SDK comes from the pack image, not MacPorts. The same script installs PyYAML with `python3 -m pip install pyyaml`, or with a `pyXY-yaml` port when Python itself is from MacPorts: `sh .agents-v0/scripts/host-tools-macports.sh` ([gold-standards.md](gold-standards.md)). Apple Silicon, Linux, and CI images are unchanged. Maven stays `./mvnw`.
-
-`--pack` copies that example's rules and skills into `.cursor/` and stores every example `pack.json` under `.agents-v0/packs/`. A project pack with its own id stays. `--update` without `--pack` keeps the `Pack` row already in the profile. `--with-starters` copies kit templates (Dockerfiles, OpenAPI starter) and the active pack's starters from `core/<pack>/starters/` (for pack `java`: Maven quality snippets, ArchUnit, suppressions). It does **not** copy `templates/app/` (the P0 codebase). Without `--with-starters`, the repo gets the rules, the commands, CI, and this documentation. `--update` refreshes kit-managed files and does not overwrite project-owned templates that already exist. Edit `.cursor/model-config.json` when remapping models to your enterprise allowlist, then run `sh .agents-v0/scripts/update-agents-model.sh`.
-
-A new Java repo starts with `bootstrap-greenfield.sh --pack java --scaffold-app` to install the kit and extract `templates/app/p0-platform-skeleton.tar.gz` into `app/backend` and `app/frontend` ([greenfield-onboarding.md](greenfield-onboarding.md)). That archive is the `java` example: Java 21, Spring Boot 4.1.1, Tomcat 11.0.26, Spring Security, PostgreSQL 15, Flyway, React 19, TypeScript 5.9, Vite 7, Vitest 3 — health/shell only. Any other pack follows its scaffold skill and does not extract that archive. The user names the stack on the pattern ADR (`Pack: <id>`). A discovery `Stack preference:` is an input the ADR may accept or reject. `/v0-architecture` writes a complete pack for that id (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id) and binds it after the `architecture` row is approved. An existing repo starts with install (no `--scaffold-app`), then `/v0-onboard` ([brownfield-onboarding.md](brownfield-onboarding.md)). `--link` keeps the kit in its own repository.
-
-## Read next
+## Read Next
 
 | Question | Document |
 |----------|----------|
-| How do I approve a phase? | [user-guide.md](user-guide.md) |
-| How do I start a new repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
-| Intel Mac host tools? | [gold-standards.md](gold-standards.md) |
-| Design fill-in snippets (less invent) | [snippets/README.md](snippets/README.md) |
-| Which model runs which role? | [model-routing-matrix.md](model-routing-matrix.md) |
-| What command do I run? | `core/common/commands/<phase>.md` |
+| How do I review and approve a phase? | [user-guide.md](user-guide.md) |
+| How do I bootstrap a new greenfield repo? | [greenfield-onboarding.md](greenfield-onboarding.md) |
+| How do I onboard an existing brownfield repo? | [brownfield-onboarding.md](brownfield-onboarding.md) |
+| Which model runs which agent role? | [model-routing-matrix.md](model-routing-matrix.md) |
+| Design fill-in templates | [snippets/README.md](snippets/README.md) |

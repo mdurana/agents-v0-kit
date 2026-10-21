@@ -46,7 +46,7 @@ if [ "$DETECT" = 0 ] && [ -z "$REQUESTED" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CI_DIR="$(cd "$SCRIPT_DIR/../ci" && pwd)"
+CI_DIR="$SCRIPT_DIR"
 if [ ! -f "$CI_DIR/packlib.py" ]; then
   printf 'FAIL: packlib.py is not next to this script\n' >&2
   exit 1

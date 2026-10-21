@@ -17,7 +17,7 @@ sh .agents-v0/scripts/host-tools-macports.sh --install
 
 ## Build
 
-The commands in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`.agents-v0/ci/resolve-layout.sh`). They come from the bound pack's `pack.json`. Pack `java` is:
+The commands in `docs/agents-v0/project-profile.md` are the ones CI and agents run (`.agents-v0/scripts/resolve-layout.sh` and `.agents-v0/scripts/run-backend-verify.sh`). They come from the bound pack's `pack.json`. Pack `java` is:
 
 ```bash
 cd app/backend && ./mvnw -B clean verify -Pci-security

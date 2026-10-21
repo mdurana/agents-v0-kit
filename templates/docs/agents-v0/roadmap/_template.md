@@ -42,4 +42,3 @@ roadmap | <this file, the discovery path> | <name> | Approved | <YYYY-MM-DD>
 
 > The `roadmap` row covers the sequence. The discovery file has no kit approval row.
 > `/v0-architecture` runs next and does not write stories. `/v0-plan` then reads this file and does not add a theme it does not name.
-> `.agents-v0/ci/check-roadmap.sh <this file>` checks the roadmap content gate before approval; `.agents-v0/ci/check-roadmap.sh --approved <this file>` (or `.agents-v0/ci/check-approvals.sh <this file> roadmap`) verifies the approved roadmap.

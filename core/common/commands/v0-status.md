@@ -1,21 +1,27 @@
 ---
-description: Resume delivery — read the phase in flight and the approvals table, check the design lock and stale evidence, then report the next command.
+description: Resume delivery — read the JSON state files and on-disk artifacts, then report the current phase and next command.
 ---
 
 # /v0-status
 
-Use the feature, maintenance id, or onboarding the user names. When they name none, list every open state file and ask: `docs/agents-v0/requirements/*.state.json` (features), `docs/agents-v0/maintain/*/state.json` (fixes, patches, upgrades, hotfixes), and `docs/agents-v0/onboarding/state.json`. Do not assume the newest one is the one they mean (`workflow-orchestration.mdc` Parallel features).
+Use the feature, maintenance id, program, or onboarding workstream the user names. When none is named, list every open state file and ask:
+- `docs/agents-v0/requirements/*.state.json` (feature stories)
+- `docs/agents-v0/maintain/*/state.json` (maintenance fixes, upgrades, hotfixes)
+- `docs/agents-v0/onboarding/state.json` (brownfield onboarding)
+- `docs/agents-v0/program.state.json` (greenfield program roadmap / architecture / plan)
 
-Read that feature's `docs/agents-v0/requirements/<feature>.md` and `docs/agents-v0/requirements/<feature>.state.json`, or the maintenance note `docs/agents-v0/maintain/<id>/note.md` and its `state.json`, or `docs/agents-v0/onboarding/report.md` and its `state.json`, or the milestone manifest. Do not advance a phase or infer approval. Follow `workflow-orchestration.mdc` Phase resume.
+Do not assume the newest state file is the one the user means (`workflow-orchestration.mdc` Parallel features).
 
-1. **Change tier** if recorded (a maintenance note records `Tier:` trivial, standard, or emergency); else infer Trivial / Standard / Major from scope.
-2. **Active phase.** Read `activePhase`, `activeStatus`, and `blockedReason`.
-   - `in_progress` or `blocked`: the next command is that same phase (`/v0-onboard`, `/v0-intake`, `/v0-design`, `/v0-build`, `/v0-verify`, `/v0-release`, or `/v0-maintain`), unless an earlier phase's row in `Delivery approvals` is `Re-opened` (step 3) — in which case the next command is that earlier `Re-opened` phase (for example `/v0-build` when Build is `Re-opened` and Verify stopped on the prerequisite). Report files already on disk and what is still missing. Re-entering that command continues from those files. It does not recreate them and does not add an `Approved` row. Include `blockedReason` when status is `blocked`.
-   - `awaiting_approval`: stop and ask for approval of `activePhase`. Do not start the next phase.
-   - No active phase: name the next command from `lastApprovedPhase` (empty → `/v0-intake`; `intake` → `/v0-design`; `design` → `/v0-build`; `build` → `/v0-verify`; `verify` → `/v0-release`, and `/v0-local-release` may be run instead; a release Decision of `Local` → `/v0-release`, and another story may start at `/v0-intake`; `release` Approved → `/v0-maintain` when a later change is requested). For a maintenance note: `maintain` → `/v0-verify <id>`; `verify` → `/v0-release` (a trivial or standard note) and an emergency note owes its full Verify by `Follow-up verify due`. For onboarding: `onboard` → `/v0-roadmap` for a new multi-story program (when no `Approved` `roadmap` row exists), `/v0-intake` for a single ticket or a milestone with an `Approved` `plan` row, or `/v0-maintain` for a fix/upgrade. A new program with no `Approved` `roadmap` row names `/v0-roadmap` next. An approved roadmap with no `architecture` row names `/v0-architecture`. An approved architecture row with no `plan` row names `/v0-plan`.
-3. **Re-opened phases.** A row whose Decision is `Re-opened` was sent back; it is open until the user approves it again and takes precedence over any downstream `blocked` phase as the next command. Name it and the Critical list or amendment that reopened it (`docs/agents-v0/requirements/<feature>.phase-result.md`).
-4. **Delivery approvals** — last completed phase and whether each recorded evidence path exists on disk.
-5. **Design lock.** When `docs/agents-v0/design/<feature>/design.lock` exists, run `sh .agents-v0/ci/check-design.sh <feature> --verify-lock` and report a drifted design: the next step is an amendment (`/v0-design` Amending an approved design), not a Build edit. That amendment reviews the design as it stands, then asks for approval, then pins. When `design.md` is on disk and the Design row is not `Approved`, the next `/v0-design` reviews those files. It does not redraft them.
-6. **`commit:`** lines in Build/Verify reports (or `docs/agents-v0/onboarding/` documents) vs current `HEAD`: warn when non-doc files changed since (stale evidence), and say which phase must be re-run. A stale Verify report names `/v0-verify`. That command sets an `Approved` Verify row to `Re-opened` and stamps the new SHA. When non-doc files are unchanged since every Verify `commit:` line (or every `commit:` line equals `HEAD`) and no code or tests changed, `/v0-verify` keeps the test report and writes only a missing reviewer report.
-7. When a gate was just approved, run `sh .agents-v0/scripts/sync-feature-state.sh` on the artifact (feature artifact, maintenance note, or onboarding report; if seeded) with no active-phase flags, and note its state file. That refreshes `lastApprovedPhase` and clears `awaiting_approval` for the phase that was just approved.
-8. **Program rows.** Report the `roadmap` row, the `architecture` row, and the `plan` row. Report the `arc` row when that story added one. An `Approved` `architecture` row that names the ARC file covers a material story that did not. The architecture pack always writes `docs/agents-v0/design/system/arc-record.md`; that file is not an `arc` approval. Ignore `docs/agents-v0/backlog/tickets.csv` and `docs/agents-v0/presentations/`. Do not name export or deck as the next command.
+Read the selected `.state.json` file and its primary artifact (`artifact` field, plus `<feature>.phase-result.md` when present). Do not advance a phase or infer approval.
+
+1. **Change tier & state summary:** Report `feature`, `tier`, `lastApprovedPhase`, `approvedPhases`, `activePhase`, `activeStatus`, `verifyPassed`, `reopenCount`, and `baseCommit`.
+2. **Next command resolution:**
+   - `activeStatus` is `in_progress` or `blocked`: the next command is `/v0-<activePhase>`. Report the `artifacts` map already recorded in `.state.json` and `blockedReason` when `blocked`. Re-entering that command continues from existing files on disk.
+   - `activeStatus` is `awaiting_approval`: stop and ask the user to approve `activePhase`. Do not start the next phase.
+   - No `activePhase`: name the next command from `lastApprovedPhase`:
+     - Feature: empty → `/v0-intake`; `intake` → `/v0-design`; `design` → `/v0-build`; `build` → `/v0-verify`; `verify` → `/v0-local-release` (primary) or `/v0-release` (remote MR); `release` → complete (use `/v0-maintain` for later changes).
+     - Maintenance note: `maintain` → `/v0-verify <id>`; `verify` → `/v0-local-release` or `/v0-release`.
+     - Onboarding: `onboard` → `/v0-roadmap` (multi-story program), `/v0-intake` (single story), or `/v0-maintain` (fix/upgrade).
+     - Program (`program.state.json`): empty → `/v0-roadmap`; `roadmap` → `/v0-architecture`; `architecture` → `/v0-plan`; `plan` → `/v0-deliver <first-story>`.
+3. **Working-tree & commit check:** If `baseCommit` is set in `.state.json` and `verifyPassed` is `true`, check `git status --porcelain` and whether source files changed since the Verify reports were written; if code changed after Verify, advise re-running `/v0-verify` before release.
+4. Ignore `docs/agents-v0/backlog/tickets.csv` and `docs/agents-v0/presentations/`. Never name `/v0-export` or `/v0-deck` as the next command.

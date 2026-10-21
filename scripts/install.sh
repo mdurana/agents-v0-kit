@@ -169,7 +169,7 @@ install_cursor() {
   if [ -n "$PACK" ] && [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
     cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.cursor/hooks/pack-scan.sh"
   fi
-  rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json"
+  rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json" "$t/.cursor/hooks/after-edit.sh"
   chmod +x "$t"/.cursor/hooks/*.sh "$t/.cursor/hooks/hook-policy.py"
   cp "$KIT/core/common/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
   cp "$KIT/core/common/adapters/cursor/cli.json" "$t/.cursor/cli.json"
@@ -181,45 +181,21 @@ install_cursor() {
 install_templates() {
   t="$1"
   [ -f "$t/README.md" ] || cp "$KIT/README.md" "$t/README.md"
+  [ -f "$t/AGENTS.md" ] || cp "$KIT/AGENTS.md" "$t/AGENTS.md"
   [ -f "$t/.gitignore" ] || cp "$KIT/templates/.gitignore" "$t/.gitignore"
+  if [ "$UPDATE" = 1 ]; then
+    rm -rf "$t/.agents-v0/ci" "$t/.agents-v0/hooks/pre-commit" "$t/.agents-v0/scripts/check-delivery-gate-local.sh"
+    cp "$KIT/AGENTS.md" "$t/AGENTS.md"
+  fi
   minimal="
 .gitignore
 .gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .gitlab/CODEOWNERS
-.agents-v0/ci/check-approvals.sh
-.agents-v0/ci/check-roadmap.sh
-.agents-v0/ci/check-evidence.sh
-.agents-v0/ci/check-milestone.sh
-.agents-v0/ci/check-delivery-linkage.sh
-.agents-v0/ci/check-approver-gitlab.sh
-.agents-v0/ci/check-coverage-ratchet.sh
-.agents-v0/ci/check-gate-metrics.sh
-.agents-v0/ci/check-event-schemas.sh
-.agents-v0/ci/check-layout-roots.sh
-.agents-v0/ci/check-known-failures.sh
-.agents-v0/ci/resolve-layout.sh
-.agents-v0/ci/classify-change.sh
-.agents-v0/ci/check-openapi.sh
-.agents-v0/ci/check-design.sh
-.agents-v0/ci/check-design-contracts.sh
-.agents-v0/ci/check-ux-spec.sh
-.agents-v0/ci/check-build-plan.sh
-.agents-v0/ci/check-endpoint-auth.sh
-.agents-v0/ci/endpoint_scan.py
-.agents-v0/ci/packlib.py
-.agents-v0/ci/run-backend-verify.sh
-.agents-v0/ci/collect-gate-reports.sh
-.agents-v0/ci/unbound-verify-plan.sh
-.agents-v0/ci/check-frontend-calls.sh
-.agents-v0/ci/check-asyncapi.sh
-.agents-v0/ci/check-arc.sh
-.agents-v0/ci/check-adr.sh
-.agents-v0/ci/check-architecture-pack.sh
-.agents-v0/ci/check-intake.sh
-.agents-v0/ci/check-feature-state.sh
-.agents-v0/ci/gate.sh
-.agents-v0/ci/gates.json
+.agents-v0/scripts/packlib.py
+.agents-v0/scripts/endpoint_scan.py
+.agents-v0/scripts/resolve-layout.sh
+.agents-v0/scripts/run-backend-verify.sh
 .agents-v0/scripts/generate-repo-map.sh
 .agents-v0/scripts/collect-dependency-graphs.sh
 .agents-v0/scripts/sync-feature-state.sh
@@ -232,7 +208,6 @@ install_templates() {
 .agents-v0/scripts/audit-brownfield-baseline.sh
 .agents-v0/scripts/render-mr-body.sh
 .agents-v0/scripts/release-notes.sh
-.agents-v0/scripts/check-delivery-gate-local.sh
 .agents-v0/scripts/resolve-integration-branch.sh
 .agents-v0/scripts/verify-gitlab-ci-prereqs.sh
 .agents-v0/scripts/export-audit-pack.sh
@@ -241,7 +216,6 @@ install_templates() {
 .agents-v0/scripts/activate-stack-pack.sh
 .agents-v0/scripts/resolve-kit-root.sh
 .agents-v0/hooks/pre-push
-.agents-v0/hooks/pre-commit
 docs/agents-v0/model-routing-matrix.md
 docs/agents-v0/user-guide.md
 docs/agents-v0/agents-v0-kit.md
@@ -281,9 +255,6 @@ docs/agents-v0/brownfield-onboarding.md
 .gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .agents-v0/hooks/pre-push
-.agents-v0/hooks/pre-commit
-.agents-v0/ci/gate.sh
-.agents-v0/ci/gates.json
 "
   copy_template_file() {
     rel="$1"
@@ -291,24 +262,17 @@ docs/agents-v0/brownfield-onboarding.md
     overwrite=0
     if [ "$UPDATE" = 1 ]; then
       for always in $always_on_update \
-        .agents-v0/ci/check-approvals.sh .agents-v0/ci/check-roadmap.sh .agents-v0/ci/check-evidence.sh .agents-v0/ci/check-milestone.sh \
-        .agents-v0/ci/check-delivery-linkage.sh .agents-v0/ci/check-approver-gitlab.sh .agents-v0/ci/check-coverage-ratchet.sh \
-        .agents-v0/ci/check-known-failures.sh .agents-v0/ci/resolve-layout.sh .agents-v0/ci/check-feature-state.sh \
-        .agents-v0/ci/check-gate-metrics.sh .agents-v0/ci/check-event-schemas.sh .agents-v0/ci/check-layout-roots.sh \
+        .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \
         .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
         .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
-        docs/agents-v0/maintain/_note.template.md .agents-v0/ci/classify-change.sh .agents-v0/ci/check-openapi.sh .agents-v0/ci/check-design.sh \
-        .agents-v0/ci/check-design-contracts.sh .agents-v0/ci/check-ux-spec.sh .agents-v0/ci/check-build-plan.sh .agents-v0/ci/check-endpoint-auth.sh \
-        .agents-v0/ci/endpoint_scan.py .agents-v0/ci/packlib.py .agents-v0/ci/run-backend-verify.sh .agents-v0/ci/collect-gate-reports.sh .agents-v0/ci/unbound-verify-plan.sh \
-        .agents-v0/ci/check-frontend-calls.sh .agents-v0/ci/check-asyncapi.sh .agents-v0/ci/check-arc.sh .agents-v0/ci/check-adr.sh .agents-v0/ci/check-architecture-pack.sh .agents-v0/ci/check-intake.sh docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
-        .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh .agents-v0/scripts/check-delivery-gate-local.sh \
+        docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
+        .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh \
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
         .agents-v0/scripts/activate-stack-pack.sh .agents-v0/scripts/resolve-kit-root.sh \
-        .agents-v0/scripts/run-local-container.sh \
-         .agents-v0/ci/gate.sh .agents-v0/ci/gates.json .agents-v0/hooks/pre-commit .agents-v0/hooks/pre-push; do
+        .agents-v0/scripts/run-local-container.sh .agents-v0/hooks/pre-push; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi
@@ -343,7 +307,7 @@ docs/agents-v0/brownfield-onboarding.md
       chmod +x "$f"
     done
   }
-  chmod_regular "$t"/.agents-v0/ci/*.sh "$t"/.agents-v0/scripts/*.sh
+  chmod_regular "$t"/.agents-v0/scripts/*.sh "$t"/.agents-v0/hooks/*
   # A filled threat model is not replaced. An older copy gains the VAPT table.
   dest="$t/docs/agents-v0/design/system/threat-model.md"
   src="$KIT/templates/docs/agents-v0/design/system/threat-model.md"
@@ -559,7 +523,7 @@ if [ "$GIT_HOOKS" = 1 ]; then
     if [ -n "$prev_hooks" ] && [ "$prev_hooks" != ".agents-v0/hooks" ]; then
       printf 'WARN: core.hooksPath was %s; it is now .agents-v0/hooks. Move any hooks you still need into .agents-v0/hooks/.\n' "$prev_hooks" >&2
     fi
-    printf 'Git hooks: core.hooksPath=.agents-v0/hooks (pre-commit runs gate.sh --staged; pre-push runs the local delivery gate).\n'
+    printf 'Git hooks: core.hooksPath=.agents-v0/hooks (pre-push verifies feature state before push).\n'
   else
     printf 'WARN: --git-hooks skipped: %s is not a git repository.\n' "$TARGET_ABS" >&2
   fi
@@ -577,11 +541,8 @@ if [ -f "$KIT/VERSION" ]; then
   fi
 fi
 
-printf 'Installed agents-v0 (cursor) into %s\n' "$TARGET_ABS"
-if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
-  printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml. Scope GITLAB_TOKEN to the delivery-approval environment (read_api, masked), or that token is visible to every job.\n' >&2
-fi
-printf 'Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh. Wire .agents-v0/ci/check-approvals.sh + .agents-v0/ci/check-evidence.sh into CI (see templates/.gitlab-ci.yml).\n'
+printf 'Installed agents-v0 into %s\n' "$TARGET_ABS"
+printf 'Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.\n'
 printf 'Greenfield: %s/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: %s/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.\n' "$(dirname "$0")" "$(dirname "$0")"
 if [ "$UPDATE" = 0 ]; then
   printf 'To refresh after kit changes: %s --update <target-repo>\n' "$(basename "$0")"

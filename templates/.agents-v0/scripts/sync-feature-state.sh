@@ -1,19 +1,14 @@
 #!/bin/sh
-# sync-feature-state.sh — derive docs/agents-v0/requirements/<feature>.state.json from the feature artifact.
+# sync-feature-state.sh — manage structured JSON workflow state (<feature>.state.json,
+# maintain/<id>/state.json, onboarding/state.json, or program.state.json).
 #
 # Usage:
-#   sh .agents-v0/scripts/sync-feature-state.sh <docs/agents-v0/requirements/feature.md>
+#   sh .agents-v0/scripts/sync-feature-state.sh <artifact>
+#   sh .agents-v0/scripts/sync-feature-state.sh --approve <phase> <artifact>
+#   sh .agents-v0/scripts/sync-feature-state.sh --reopen <phase> <artifact>
+#   sh .agents-v0/scripts/sync-feature-state.sh --verify-passed <true|false> <artifact>
 #   sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status <status> [--reason <text>] <artifact>
 #   sh .agents-v0/scripts/sync-feature-state.sh --clear-active <artifact>
-#
-# Without flags, lastApprovedPhase is derived from Approved rows. An in_progress or
-# blocked active phase is kept. awaiting_approval is cleared once that phase is Approved.
-# With flags, set the phase in flight. Status is in_progress, awaiting_approval, or blocked.
-# blocked requires --reason. --clear-active drops the phase in flight. Decision Local is
-# not an Approved token, so lastApprovedPhase stays on the previous Approved phase.
-# This script never writes an approval.
-# Other artifacts: docs/agents-v0/onboarding/report.md keeps docs/agents-v0/onboarding/state.json (phase "onboard");
-# docs/agents-v0/maintain/<id>/note.md keeps docs/agents-v0/maintain/<id>/state.json (phases "maintain", "verify").
 
 set -eu
 
@@ -21,17 +16,35 @@ art=""
 active_phase=""
 active_status=""
 reason=""
+approve_phase=""
+reopen_phase=""
+verify_passed=""
 set_active=0
 clear_active=0
 
 usage() {
-  printf 'usage: %s [--active-phase PHASE --status STATUS] [--reason TEXT] <requirements-artifact>\n' "$0" >&2
-  printf '       %s --clear-active <requirements-artifact>\n' "$0" >&2
+  printf 'usage: %s [--approve PHASE | --reopen PHASE | --verify-passed true|false] [--active-phase PHASE --status STATUS] [--reason TEXT] <artifact>\n' "$0" >&2
+  printf '       %s --clear-active <artifact>\n' "$0" >&2
   exit 1
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --approve)
+      [ $# -ge 2 ] || usage
+      approve_phase="$2"
+      shift 2
+      ;;
+    --reopen)
+      [ $# -ge 2 ] || usage
+      reopen_phase="$2"
+      shift 2
+      ;;
+    --verify-passed)
+      [ $# -ge 2 ] || usage
+      verify_passed="$2"
+      shift 2
+      ;;
     --active-phase)
       [ $# -ge 2 ] || usage
       active_phase="$2"
@@ -74,12 +87,18 @@ fi
 
 slug="$(basename "$art" .md)"
 state="docs/agents-v0/requirements/${slug}.state.json"
-# /v0-onboard keeps its own state beside its report: docs/agents-v0/onboarding/state.json (phase "onboard").
-# A maintenance note keeps its state beside it: docs/agents-v0/maintain/<id>/state.json (phases "maintain", "verify").
 case "$art" in
-  docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*) state="docs/agents-v0/onboarding/state.json" ;;
-  docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*) state="$(dirname "$art")/state.json" ;;
+  docs/agents-v0/onboarding/* | */docs/agents-v0/onboarding/*)
+    state="docs/agents-v0/onboarding/state.json"
+    ;;
+  docs/agents-v0/maintain/* | */docs/agents-v0/maintain/*)
+    state="$(dirname "$art")/state.json"
+    ;;
+  docs/agents-v0/roadmap/* | */docs/agents-v0/roadmap/* | docs/agents-v0/architecture.md | */docs/agents-v0/architecture.md | docs/agents-v0/milestones/* | */docs/agents-v0/milestones/*)
+    state="docs/agents-v0/program.state.json"
+    ;;
 esac
+
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
@@ -94,10 +113,16 @@ HOOK_CLEAR_ACTIVE="$clear_active" \
 HOOK_ACTIVE_PHASE="$active_phase" \
 HOOK_ACTIVE_STATUS="$active_status" \
 HOOK_BLOCKED_REASON="$reason" \
+HOOK_APPROVE_PHASE="$approve_phase" \
+HOOK_REOPEN_PHASE="$reopen_phase" \
+HOOK_VERIFY_PASSED="$verify_passed" \
 python3 - <<'PY'
+import hashlib
 import json
 import os
+from pathlib import Path
 import re
+import subprocess
 import sys
 import time
 
@@ -106,46 +131,102 @@ out = os.environ["HOOK_STATE_JSON"]
 rel_art = art.replace("\\", "/")
 onboarding = "docs/agents-v0/onboarding/" in rel_art
 maintain_note = "docs/agents-v0/maintain/" in rel_art
+program_doc = out.endswith("program.state.json")
+
 if onboarding:
     phases = ["onboard"]
 elif maintain_note:
     phases = ["maintain", "verify"]
+elif program_doc:
+    phases = ["roadmap", "architecture", "plan"]
 else:
     phases = ["intake", "design", "build", "verify", "release"]
-active_phases = phases if (onboarding or maintain_note) else phases + ["maintain"]
-statuses = {"in_progress", "awaiting_approval", "blocked"}
-# A conditional approval is not an approval; the last row for a phase is its current decision.
-positive = re.compile(
-    r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)", re.I
-)
-reopened_re = re.compile(r"^re-?opened\b", re.I)
 
-text = open(art, encoding="utf-8").read()
-tier_m = re.search(r"^\s*tier:\s*(\S+)", text, re.I | re.M)
+active_phases = phases if (onboarding or maintain_note or program_doc) else phases + ["maintain"]
+statuses = {"in_progress", "awaiting_approval", "blocked"}
+positive = re.compile(
+    r"^\s*(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)",
+    re.I,
+)
+reopened_re = re.compile(r"^\s*re-?opened\b", re.I)
+
+raw_text = open(art, encoding="utf-8").read()
+clean_text = re.sub(r"<!--.*?-->", "", raw_text, flags=re.S)
+tier_m = re.search(r"^\s*tier:\s*(\S+)", clean_text, re.I | re.M)
 tier = tier_m.group(1).lower() if tier_m else "standard"
 
+prev = {}
+if os.path.isfile(out):
+    try:
+        prev = json.load(open(out, encoding="utf-8"))
+    except ValueError:
+        prev = {}
+
 rows, inside = {}, False
-for line in text.splitlines():
+reopen_rows = 0
+for line in clean_text.splitlines():
     if re.match(r"^#+\s*delivery approvals", line, re.I):
         inside = True
         continue
-    if inside and re.match(r"^#+\s", line):
+    if inside and re.match(r"^#+\s+\S", line):
         break
     if not inside or not line.strip().startswith("|"):
         continue
     cells = [c.strip() for c in line.strip().strip("|").split("|")]
     if len(cells) >= 5 and cells[0].lower() in phases:
-        rows[cells[0].lower()] = cells
+        p_key = cells[0].lower()
+        if reopened_re.match(cells[3]):
+            reopen_rows += 1
+        rows[p_key] = cells
 
-last_approved = ""
+approved_list = [p for p in (prev.get("approvedPhases") or []) if p in phases]
+prev_last = (prev.get("lastApprovedPhase") or "").lower()
+if prev_last in phases and prev_last not in approved_list:
+    for p in phases[: phases.index(prev_last) + 1]:
+        if p not in approved_list:
+            approved_list.append(p)
+
+# Sync with Markdown table if present
 first_reopened = ""
-for phase in phases:
-    if phase in rows:
-        if reopened_re.match(rows[phase][3]):
-            first_reopened = phase
-            break
-        if positive.match(rows[phase][3]):
-            last_approved = phase
+if rows:
+    md_approved = []
+    for phase in phases:
+        if phase in rows:
+            if reopened_re.match(rows[phase][3]):
+                first_reopened = phase
+                break
+            if positive.match(rows[phase][3]):
+                md_approved.append(phase)
+    if md_approved or first_reopened:
+        approved_list = md_approved
+
+cli_approve = os.environ.get("HOOK_APPROVE_PHASE", "").strip().lower()
+if cli_approve:
+    if cli_approve not in phases:
+        print(f"FAIL: --approve phase must be one of {', '.join(phases)}", file=sys.stderr)
+        raise SystemExit(1)
+    for p in phases[: phases.index(cli_approve) + 1]:
+        if p not in approved_list:
+            approved_list.append(p)
+    first_reopened = ""
+
+cli_reopen = os.environ.get("HOOK_REOPEN_PHASE", "").strip().lower()
+reopen_count = max(int(prev.get("reopenCount") or 0), reopen_rows)
+if cli_reopen:
+    if cli_reopen not in active_phases:
+        print(f"FAIL: --reopen phase must be one of {', '.join(active_phases)}", file=sys.stderr)
+        raise SystemExit(1)
+    first_reopened = cli_reopen
+    reopen_count += 1
+    if cli_reopen in phases:
+        idx = phases.index(cli_reopen)
+        approved_list = [p for p in approved_list if phases.index(p) < idx]
+
+if reopen_count > 3:
+    print(f"FAIL: exceeded max Re-opened bounce budget ({reopen_count} > 3). Stop and escalate to user.", file=sys.stderr)
+    raise SystemExit(2)
+
+last_approved = approved_list[-1] if approved_list else ""
 
 
 def evidence(phase):
@@ -155,14 +236,15 @@ def evidence(phase):
     return sorted({item.rstrip(".,;") for item in found if "<" not in item})
 
 
-prev = {}
-if os.path.isfile(out):
-    try:
-        prev = json.load(open(out, encoding="utf-8"))
-    except ValueError:
-        prev = {}
-
 if os.environ.get("HOOK_CLEAR_ACTIVE") == "1":
+    active_phase = ""
+    active_status = ""
+    blocked_reason = ""
+elif cli_reopen:
+    active_phase = cli_reopen
+    active_status = "in_progress"
+    blocked_reason = ""
+elif cli_approve:
     active_phase = ""
     active_status = ""
     blocked_reason = ""
@@ -225,6 +307,7 @@ else:
             active_status = "in_progress"
             blocked_reason = ""
 
+
 def resolve_git_head(seed: str) -> str:
     if seed and re.match(r"^[0-9a-f]{7,40}$", seed, re.I):
         return seed
@@ -273,26 +356,27 @@ def resolve_git_head(seed: str) -> str:
 feature_id = (
     "onboarding" if onboarding
     else os.path.basename(os.path.dirname(rel_art)) if maintain_note
+    else "program" if program_doc
     else os.environ.get("HOOK_SLUG", "")
 )
 prev_bc = (prev.get("baseCommit") or "").strip()
 head_bc = resolve_git_head(os.environ.get("HOOK_BASE", ""))
 rep_parent = ""
 if onboarding:
-    m_onb = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", text, re.I | re.M)
+    m_onb = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", raw_text, re.I | re.M)
     if m_onb:
         rep_parent = m_onb.group(1)
         prev_bc = ""
-elif feature_id:
+elif feature_id and not program_doc:
     for rep_path in (
         os.path.join("docs", "agents-v0", "build", feature_id, "build-report.md"),
         os.path.join("docs", "agents-v0", "verify", feature_id, "test-report.md"),
+        os.path.join("docs", "agents-v0", "verify", feature_id, "quality-gate.md"),
     ):
         if os.path.isfile(rep_path):
             try:
                 m = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", open(rep_path, encoding="utf-8").read(), re.I | re.M)
                 if m:
-                    import subprocess
                     rep_sha = m.group(1)
                     r_full = subprocess.run(
                         ["git", "rev-parse", "--verify", "-q", f"{rep_sha}^{{commit}}"],
@@ -313,19 +397,88 @@ elif feature_id:
 
 base_commit = prev_bc or rep_parent or head_bc
 
+# Helper brief deduplication
+prior_hashes = list(prev.get("helperBriefHashes") or [])
+if Path("docs/agents-v0").is_dir():
+    brief_candidates = sorted(
+        set(Path("docs/agents-v0").rglob(f"{feature_id}.helper-brief.md"))
+        | set(Path("docs/agents-v0").rglob(f"{feature_id}/helper-brief.md"))
+    )
+    for brief in brief_candidates:
+        try:
+            b_text = brief.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        m_helper = re.search(r"^helper:\s*(.+)$", b_text, re.M)
+        m_ask = re.search(r"^ask:\s*(.+)$", b_text, re.M)
+        if m_helper and m_ask:
+            digest = hashlib.sha256(
+                f"{brief.parent.name}:{m_helper.group(1).strip()}:{m_ask.group(1).strip()}".encode("utf-8")
+            ).hexdigest()[:16]
+            if digest in prior_hashes:
+                print(
+                    f"FAIL: Duplicate helper brief ask detected ({digest}) in {brief}. Stop loop and escalate to user.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
+            prior_hashes.append(digest)
+
+# Discover on-disk phase artifacts for fast agent context indexing
+artifacts_map = {"primary": art}
+if feature_id and not onboarding and not program_doc:
+    candidates = {
+        "design": f"docs/agents-v0/design/{feature_id}/design.md",
+        "openapi": f"docs/agents-v0/design/{feature_id}/openapi.yaml",
+        "asyncapi": f"docs/agents-v0/design/{feature_id}/asyncapi.yaml",
+        "uxSpec": f"docs/agents-v0/design/{feature_id}/ux-spec.md",
+        "designReview": f"docs/agents-v0/design/{feature_id}/review.md",
+        "buildPlan": f"docs/agents-v0/build/{feature_id}/plan.md",
+        "buildReport": f"docs/agents-v0/build/{feature_id}/build-report.md",
+    }
+    for k, rel_p in candidates.items():
+        if os.path.isfile(rel_p):
+            artifacts_map[k] = rel_p
+    verify_dir = Path(f"docs/agents-v0/verify/{feature_id}")
+    if verify_dir.is_dir():
+        v_files = sorted(p.as_posix() for p in verify_dir.glob("*.md") if p.is_file())
+        if v_files:
+            artifacts_map["verify"] = v_files
+
+build_ev = evidence("build") or prev.get("evidence", {}).get("build", [])
+if not build_ev and "buildReport" in artifacts_map:
+    build_ev = [artifacts_map["buildReport"]]
+verify_ev = evidence("verify") or prev.get("evidence", {}).get("verify", [])
+if not verify_ev and "verify" in artifacts_map:
+    verify_ev = list(artifacts_map["verify"])
+
+vp_raw = os.environ.get("HOOK_VERIFY_PASSED", "").strip().lower()
+if vp_raw in ("true", "1", "yes"):
+    verify_passed = True
+elif vp_raw in ("false", "0", "no"):
+    verify_passed = False
+elif last_approved in ("verify", "release"):
+    verify_passed = True
+else:
+    verify_passed = bool(prev.get("verifyPassed", False))
+
 data = {
     "feature": feature_id,
     "tier": tier,
     "lastApprovedPhase": last_approved,
+    "approvedPhases": approved_list,
     "activePhase": active_phase,
     "activeStatus": active_status,
     "blockedReason": blocked_reason,
+    "verifyPassed": verify_passed,
+    "reopenCount": reopen_count,
+    "helperBriefHashes": prior_hashes,
     "artifact": art,
     "baseCommit": base_commit,
     "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "artifacts": artifacts_map,
     "evidence": {
-        "build": evidence("build") or prev.get("evidence", {}).get("build", []),
-        "verify": evidence("verify") or prev.get("evidence", {}).get("verify", []),
+        "build": build_ev,
+        "verify": verify_ev,
     },
 }
 os.makedirs(os.path.dirname(out) or ".", exist_ok=True)

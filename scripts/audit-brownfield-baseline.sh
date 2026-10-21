@@ -197,15 +197,15 @@ audit_root() {
 }
 
 have_layout=0
-if [ -f .agents-v0/ci/resolve-layout.sh ]; then
-  eval "$(sh .agents-v0/ci/resolve-layout.sh)"
+if [ -f .agents-v0/scripts/resolve-layout.sh ]; then
+  eval "$(sh .agents-v0/scripts/resolve-layout.sh)"
   have_layout=1
 fi
 
-if [ -f .agents-v0/ci/run-backend-verify.sh ]; then
-  be_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Backend verify" || true)"
-  svc_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Service verify" || true)"
-  fe_cmd="$(sh .agents-v0/ci/run-backend-verify.sh "Frontend verify" || true)"
+if [ -f .agents-v0/scripts/run-backend-verify.sh ]; then
+  be_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" || true)"
+  svc_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Service verify" || true)"
+  fe_cmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" || true)"
   if [ -n "$be_cmd" ] && { [ "$have_layout" = 0 ] || [ -n "${BACKEND_ROOT:-}" ] || { [ -z "${BFF_ROOT:-}" ] && [ -z "${SERVICE_ROOTS:-}" ]; }; }; then
     ran=1
     printf -- '--- Backend verify: %s ---\n' "$be_cmd"

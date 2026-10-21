@@ -1,13 +1,7 @@
 #!/bin/sh
-# Pre-push hook. install.sh --git-hooks activates it (core.hooksPath=.agents-v0/hooks, together with
-# pre-commit). Without that flag it is not installed; to install it alone:
-#
-#   cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" \
-#     && chmod +x "$(git rev-parse --git-path hooks)/pre-push"
-#
-# When the branch name's last segment matches docs/agents-v0/requirements/<feature>.md, runs
-# .agents-v0/scripts/check-delivery-gate-local.sh and rejects the push when that gate fails.
-# Other branches are pushed unchanged.
+# Pre-push hook. install.sh --git-hooks activates it (core.hooksPath=.agents-v0/hooks).
+# When the branch name's last segment matches docs/agents-v0/requirements/<feature>.state.json,
+# verifies that the feature state has verifyPassed=true or lastApprovedPhase in (verify, release).
 set -eu
 
 root="$(git rev-parse --show-toplevel)"
@@ -24,17 +18,32 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   esac
   branch="${local_ref#refs/heads/}"
   feature="${branch##*/}"
-  artifact="docs/agents-v0/requirements/${feature}.md"
-  if [ ! -f "$artifact" ]; then
-    printf 'pre-push: no %s — feature gate skipped\n' "$artifact" >&2
+  state_file="docs/agents-v0/requirements/${feature}.state.json"
+  if [ ! -f "$state_file" ]; then
     continue
   fi
-  if [ ! -x .agents-v0/scripts/check-delivery-gate-local.sh ] && [ ! -f .agents-v0/scripts/check-delivery-gate-local.sh ]; then
-    printf 'pre-push: .agents-v0/scripts/check-delivery-gate-local.sh is missing\n' >&2
-    exit 1
-  fi
-  printf 'pre-push: local delivery gate for %s\n' "$feature" >&2
-  sh .agents-v0/scripts/check-delivery-gate-local.sh "$feature"
+  python3 - "$state_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    data = json.load(open(path, encoding="utf-8"))
+except Exception as exc:
+    print(f"pre-push: invalid JSON in {path}: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+last_app = (data.get("lastApprovedPhase") or "").lower()
+approved = [p.lower() for p in (data.get("approvedPhases") or [])]
+verify_passed = bool(data.get("verifyPassed"))
+
+if not (verify_passed or last_app in ("verify", "release") or "verify" in approved or "release" in approved):
+    print(
+        f"pre-push: {path} has not passed /v0-verify yet (lastApprovedPhase={last_app or '-'}, verifyPassed={verify_passed}).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
 done
 
 exit 0

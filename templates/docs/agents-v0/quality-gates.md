@@ -4,14 +4,14 @@
 
 ## Coverage
 
-| Area | Minimum | CI / stretch |
-|------|---------|--------------|
-| Changed lines | 80% | CI fails when DIFF_BASE is set (.agents-v0/ci/check-gate-metrics.sh) |
+| Area | Minimum | Notes |
+|------|---------|-------|
+| Changed lines | 80% | Checked during Verify (`quality-gate` skill) |
 | Backend lines | 80% | 90% where gates require |
 | Backend branches | the pack coverage report (Pack java: JaCoCo / Sonar) | |
 | Frontend | 70% | raise if CI gate exists |
 
-`.agents-v0/ci/check-gate-metrics.sh` reads the Coverage table in `docs/agents-v0/quality-gates.md` directly. On a merge request, changed-line coverage below the Changed lines threshold (default 80%, overridden by `MIN_DIFF_LINE_PCT`) fails for every pack when `DIFF_BASE` is set. If a Whole-module lines row is set, it configures the bundle minimum (overridden by `MIN_LINE_PCT`). Backend 80% and frontend 70% are the report check. Whole-module line coverage fails in CI when the pack wires it, when that row is set, or when `MIN_LINE_PCT` is set. Pack `java` wires a fixed JaCoCo bundle minimum of 0.80 in `core/java/starters/maven/quality-plugins.xml`. A `coverage_ratchet` row is a dated waiver record. The GitLab `coverage-ratchet` job does not pass `LINE_COVERAGE_PCT`, so `.agents-v0/ci/check-coverage-ratchet.sh` checks the approver and the removal date, and compares a measured number only when `LINE_COVERAGE_PCT` or `JACOCO_LINE_PCT` is set. That row does not change the JaCoCo 0.80 gate. Changed lines stay at 80% when `DIFF_BASE` is set. When the diff touches a migration or SQL file and `DIFF_BASE` is set, the same script requires a test against the database named in the profile. H2 does not satisfy that row. An expand/contract step with no down script stays legal when the rollback note is recorded. An optional `mutation_ratchet` row in `project-profile.md` checks a mutation report. It is not a default gate.
+During `/v0-verify`, `test-engineer` (`quality-gate` skill) and the stack's native coverage tool check changed-line coverage (default 80%) and whole-module line coverage (Backend 80%, Frontend 70%, or the Whole-module lines row in `docs/agents-v0/quality-gates.md`). Pack `java` wires a fixed JaCoCo bundle minimum of 0.80 in `core/java/starters/maven/quality-plugins.xml`. A `coverage_ratchet` row in `project-profile.md` is a dated waiver record with a valid approver and unexpired removal date. When the diff touches a migration or SQL file, tests must verify against the target database engine rather than relying only on H2/in-memory substitutes. An expand/contract step with no down script stays legal when the rollback note is recorded. An optional `mutation_ratchet` row in `project-profile.md` checks a mutation report.
 
 ## Complexity and size (Java)
 

@@ -30,8 +30,8 @@ root="${1:-.}"
 cd "$root"
 
 ROOTS=""
-if [ -f "$here/../ci/resolve-layout.sh" ]; then
-  eval "$(sh "$here/../ci/resolve-layout.sh")"
+if [ -f "$here/resolve-layout.sh" ]; then
+  eval "$(sh "$here/resolve-layout.sh")"
   ROOTS="${BACKEND_ROOT:-} ${BFF_ROOT:-} ${SERVICE_ROOTS:-} ${FRONTEND_ROOT:-}"
 fi
 ROOTS="$(printf '%s' "$ROOTS" | tr -s ' ' | sed 's/^ //;s/ $//')"
@@ -40,7 +40,7 @@ ROOTS="$(printf '%s' "$ROOTS" | tr -s ' ' | sed 's/^ //;s/ $//')"
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 COMMIT="$(git rev-parse HEAD 2>/dev/null || printf 'no-git')"
 
-DISCOVER_ROOTS="$ROOTS" DISCOVER_COMMIT="$COMMIT" GATE_SCRIPT="$here/../ci/check-gate-metrics.sh" python3 - <<'PY'
+DISCOVER_ROOTS="$ROOTS" DISCOVER_COMMIT="$COMMIT" SCRIPTS_DIR="$here" python3 - <<'PY'
 import json
 import math
 import os
@@ -48,13 +48,13 @@ import re
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.environ["GATE_SCRIPT"]))
+sys.path.insert(0, os.environ["SCRIPTS_DIR"])
 import endpoint_scan
 import packlib
 
 ROOTS = os.environ["DISCOVER_ROOTS"].split()
 COMMIT = os.environ["DISCOVER_COMMIT"]
-GATE = os.environ.get("GATE_SCRIPT", "")
+GATE = ""
 MAX = int(os.environ.get("DISCOVER_MAX") or 500)
 OUT = os.path.join("docs", "agents-v0", "discovery")
 SKIP = {"node_modules", "target", ".git", "dist", "build", ".svelte-kit", ".next", ".idea",
@@ -358,11 +358,40 @@ for base in ROOTS:
         alt = os.path.join(base, "gate-metrics.json")
         if os.path.isfile(alt):
             summary_path = alt
-    if not os.path.isfile(summary_path):
+    data = None
+    if os.path.isfile(summary_path):
+        with open(summary_path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    elif os.path.isdir(target):
+        import xml.etree.ElementTree as ET
+        run_c = fail_c = err_c = 0
+        has_reports = False
+        for rdir in (os.path.join(target, "surefire-reports"), os.path.join(target, "failsafe-reports")):
+            if os.path.isdir(rdir):
+                for fn in sorted(os.listdir(rdir)):
+                    if fn.startswith("TEST-") and fn.endswith(".xml"):
+                        has_reports = True
+                        root_el = ET.parse(os.path.join(rdir, fn)).getroot()
+                        for ts in ([root_el] if root_el.tag == "testsuite" else root_el.findall(".//testsuite")):
+                            run_c += int(ts.attrib.get("tests", 0))
+                            fail_c += int(ts.attrib.get("failures", 0))
+                            err_c += int(ts.attrib.get("errors", 0))
+        pct_val = None
+        jacoco_xml = os.path.join(target, "site", "jacoco", "jacoco.xml")
+        if os.path.isfile(jacoco_xml):
+            has_reports = True
+            root_el = ET.parse(jacoco_xml).getroot()
+            for cnt in root_el.findall("./counter"):
+                if cnt.attrib.get("type") == "LINE":
+                    missed = int(cnt.attrib.get("missed", 0))
+                    covered = int(cnt.attrib.get("covered", 0))
+                    if missed + covered > 0:
+                        pct_val = round(100.0 * covered / (missed + covered), 1)
+        if has_reports:
+            data = {"tests": {"run": run_c, "failures": fail_c, "errors": err_c}, "lineCoveragePct": pct_val, "highCriticalCves": None}
+    if data is None:
         base_rows.append(f"| {base} | not measured: no gate-metrics summary | | | |")
         continue
-    with open(summary_path, encoding="utf-8") as handle:
-        data = json.load(handle)
     if not jvm(base) and data.get("failures") and (data.get("tests") or {}).get("run", 0) == 0 and data.get("lineCoveragePct") is None:
         base_rows.append(f"| {base} | not measured: no test/coverage reports (run the baseline audit) | | | |")
         continue

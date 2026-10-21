@@ -24,7 +24,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 9. Record **design-system conformance**: tokens/components reused; any deviation gets an ADR reference.
 10. Write **UX acceptance criteria**: testable, one per row, mapped screen → mockup → criterion (the Verify audit maps each to a test of the built UI).
 11. Record N/A determinations (no-UI surface) with the reason. A no-UI story has no mockups and no component table; say so.
-12. Run `sh .agents-v0/ci/check-ux-spec.sh <feature>`: every mockup control has a component row, every row links to a mockup that exists and contains that component, API-backed rows name a draft operation, and no mockup calls the API. Fix both sides until it passes. The script cannot judge that a row and its control describe the same thing, so read each row against its mockup as well.
+12. Verify every mockup control has a component row, every row links to a mockup that exists and contains that `data-component` attribute, API-backed rows name a draft operation, and no mockup calls the API. Read each row against its mockup to confirm they describe the same behavior.
 13. Persist the spec to `docs/agents-v0/design/<feature>/ux-spec.md` and the mockups beside it. Stop for the Design gate. Present the spec and the mockup paths. Do not start Build.
 
 ## Rule-compliance checklist

@@ -97,10 +97,10 @@ done
 
 load_markers() {
   MARKERS=""
-  if [ ! -f "$TARGET_ABS/.agents-v0/ci/packlib.py" ]; then
+  if [ ! -f "$TARGET_ABS/.agents-v0/scripts/packlib.py" ]; then
     return 0
   fi
-  MARKERS="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/ci" python3 - "$TARGET_ABS" <<'PY'
+  MARKERS="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/scripts" python3 - "$TARGET_ABS" <<'PY'
 import os
 import sys
 os.chdir(sys.argv[1])
@@ -139,10 +139,10 @@ detect_pack() {
     PACK="java"
     return 0
   fi
-  if [ ! -f "$TARGET_ABS/.agents-v0/ci/packlib.py" ]; then
+  if [ ! -f "$TARGET_ABS/.agents-v0/scripts/packlib.py" ]; then
     return 0
   fi
-  PACK="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/ci" python3 - "$TARGET_ABS" <<'PY'
+  PACK="$(PACKLIB_DIR="$TARGET_ABS/.agents-v0/scripts" python3 - "$TARGET_ABS" <<'PY'
 import os
 import sys
 os.chdir(sys.argv[1])
