@@ -259,16 +259,21 @@ cli_reopen = os.environ.get("HOOK_REOPEN_PHASE", "").strip().lower()
 reopen_count = max(int(prev.get("reopenCount") or 0), reopen_rows)
 if (
     cli_reopen
-    and not maintain_note
     and not onboarding
     and not program_doc
     and "release" in approved_list
 ):
-    print(
-        "FAIL: this story is released. Do not open it again. "
-        "Start /v0-maintain for a fix or a small change, or /v0-intake with a new slug for a new feature.",
-        file=sys.stderr,
-    )
+    if maintain_note:
+        print(
+            "FAIL: this maintenance note is released. Do not open it again. Start a new id.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "FAIL: this story is released. Do not open it again. "
+            "Start /v0-maintain for a fix or a small change, or /v0-intake with a new slug for a new feature.",
+            file=sys.stderr,
+        )
     raise SystemExit(1)
 if cli_reopen:
     if cli_reopen not in active_phases:

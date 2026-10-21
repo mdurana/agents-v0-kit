@@ -55,7 +55,7 @@ Workflow state, approved phases, `baseCommit`, and on-disk artifact pointers liv
 ## Parallel Features
 
 Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `design/<feature>/`, `build/<feature>/`, and `verify/<feature>/`.
-- **Worktree per feature (preferred):** After Intake is approved, `/v0-intake` runs `sh .agents-v0/scripts/feature-worktree.sh <feature>` (requires user confirmation). The branch is `feature/<feature>`. A reopened Intake reuses that branch. P0-A does not get one.
+- **Worktree per feature (preferred):** After Intake is approved, `/v0-intake` runs `sh .agents-v0/scripts/feature-worktree.sh <feature>` (requires user confirmation). The branch is `feature/<feature>`. A reopened Intake reuses that branch. P0-A does not get one. A standard or emergency maintenance note uses `sh .agents-v0/scripts/feature-worktree.sh --maintain <id>` and branch `maintain/<id>`. A trivial note stays on the integration branch. A branch already contained in the integration ref is not checked out again.
 - **Shared checkout safety:** Stop before editing shared files (`project-profile.md`, `openapi/`, `architecture.md`, `network.md`, `milestones/plan.md`, build/dependency manifests) if `git status` shows uncommitted changes from another feature.
 
 ## Change Tiers
