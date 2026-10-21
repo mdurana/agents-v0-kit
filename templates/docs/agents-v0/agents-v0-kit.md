@@ -25,7 +25,7 @@ flowchart TD
   maintain["/v0-maintain"]
 
   onboard -.->|approved| roadmap
-  onboard -.->|approved| plan
+  onboard -.->|architecture already approved| plan
   onboard -.->|approved| intake
   roadmap -->|approved| arch
   arch -->|approved| plan
@@ -50,7 +50,7 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 
 `/v0-deliver` runs one story end-to-end by following each phase command and stopping at every human gate that applies. It does not run `/v0-export` or `/v0-deck`.
 - **P0-A (platform skeleton):** Skips Intake and Design. Build copies the milestone story and `AC-1` through `AC-4`, writes the minimal `N/A` design, and runs through Verify to a single human approval gate at Release (`/v0-local-release` or `/v0-release`).
-- **Contract-free stories (`Contract: None`):** A story with no OpenAPI draft, no AsyncAPI or `events/` contract, no UX spec, no new public route, and `Material: no` records `No contract` in `design.md` and continues directly into Build without a separate Design approval stop.
+- **Contract-free stories (`Contract: None`):** A story with no OpenAPI draft, no AsyncAPI or `events/` contract, no UX spec, no new public route other than `/health`, `/ready`, or `/live`, and `Material: no` records `N/A: no /api/v1 operation` and `N/A: no event contract` in `design.md` and continues directly into Build without a separate Design approval stop.
 
 | Edge | What it means |
 |------|----------------|
@@ -60,7 +60,7 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | Plan | Turns the approved roadmap and architecture pack into milestones (`docs/agents-v0/milestones/plan.md` and `<milestone>.md`) with ordered stories (`Surface` and `Size` on each story). Single-story work skips Plan. |
 | Design review | `design-reviewer` writes `review.md` whenever the story includes an OpenAPI draft, AsyncAPI or `events/` contract, UX spec, public route (other than `/health`, `/ready`, `/live`), or `Material: yes`. Design cannot advance until `review.md` has zero open Critical findings and the cited ADR is `Accepted`. |
 | P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive when `Pack: java`, or follows the bound pack's scaffold skill. Skips Intake and Design; stops once for human approval at Release. |
-| Local release (primary) | Runs after Verify is approved. Re-verifies the working tree with the stack pack's native verify command, merges the feature branch into the target branch locally (`git merge --no-ff`) upon explicit user confirmation, and marks the story `released` in `<feature>.state.json`. |
+| Local release (primary) | Runs after Verify is approved, or for P0-A when `verifyPassed` is `true` at the single Release gate, or for a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. Re-verifies the working tree with the stack pack's native verify command, merges the feature branch into the target branch locally (`git merge --no-ff`) upon explicit user confirmation, and marks the story `released` in `<feature>.state.json`. |
 | Remote release (optional) | Used when the team ships via remote GitLab merge requests instead of local merge. Renders the MR body and opens the MR upon user confirmation. |
 | Verify back to Build / Maintain | Any `Critical` finding from `test-engineer`, `security-reviewer`, or `code-reviewer` sets `activeStatus: "in_progress"` and `activePhase: "build"` (or `"maintain"`) in the state file and increments `reopenCount` (capped at 3 bounces before mandatory user escalation). |
 | Triage | Docs-only or 1-for-1 patch version bump confirmed by the user; uses abbreviated Verify (native build/test + CVE check, skipping reviewer subagents). |
@@ -183,7 +183,7 @@ If Build or Verify discovers that an approved contract must change, the agent st
 ### Verify (`/v0-verify`)
 Verify combines **deterministic native stack execution** with **role-separated subagent reviews**:
 1. **`test-engineer` (`quality-gate` skill):**
-   - Resolves the project layout (`.agents-v0/scripts/resolve-layout.sh`) and runs the bound pack's native verify command (`.agents-v0/scripts/run-backend-verify.sh` / `pack.json`, e.g., `dotnet test`, `./mvnw -B clean verify -Pci-security`, `npm test`, `pytest`, or `go test ./...`).
+   - Resolves the project layout (`.agents-v0/scripts/resolve-layout.sh`) and the bound pack's native verify command (`.agents-v0/scripts/run-backend-verify.sh` only prints the `pack.json` command, e.g., `dotnet test`, `./mvnw -B clean verify -Pci-security`, `npm test`, `pytest`, or `go test ./...`). The caller executes the printed command.
    - Verifies that every `AC-*` in `requirements/<feature>.md` has a corresponding passing test, checks diff coverage against `docs/agents-v0/quality-gates.md` (default $\ge 80\%$ on changed lines), and records results in `docs/agents-v0/verify/<feature>/quality-gate.md`.
 2. **`security-reviewer` (`vapt-review` skill) & `code-reviewer` (`pr-review` skill):**
    - Inspect `git diff <baseCommit>...HEAD`, `requirements/<feature>.md`, and `design/<feature>/` against `security-baseline`, `vapt-webapp`, `vapt-pr-review`, `code-review`, and the active stack pack rules.
@@ -194,7 +194,7 @@ Verify combines **deterministic native stack execution** with **role-separated s
 ## Local Release (`/v0-local-release`) and Remote Release (`/v0-release`)
 
 - **`/v0-local-release` (Primary workflow):**
-  1. Verifies that `<feature>.state.json` (or `maintain/<id>/state.json`) has `"verify"` in `approvedPhases` and `"verifyPassed": true`.
+  1. Verifies `"verifyPassed": true`. A feature story, including one that already approved Verify, also has `"verify"` in `approvedPhases`. P0-A enters with `verifyPassed: true` while `verify` may still be absent. An emergency maintenance note enters when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`; `verify` stays unapproved until the owed `/v0-verify`.
   2. Ensures a clean git working tree and runs the stack pack's native verify command one final time.
   3. Prompts the user to confirm merging the feature branch into the integration branch (`git merge --no-ff <feature-branch>`), updates `<feature>.state.json` via `sync-feature-state.sh --approve release`, and optionally tags the release or updates `CHANGELOG.md` via `.agents-v0/scripts/release-notes.sh`.
 - **`/v0-release` (Optional remote MR workflow):**
@@ -208,7 +208,7 @@ Verify combines **deterministic native stack execution** with **role-separated s
   - `codebase-documenter` writes `docs/agents-v0/onboarding/report.md`, per-module docs (`docs/agents-v0/onboarding/modules/<module>.md`), as-is system docs (`architecture.md`, `network.md`, `design/system/context-map.md`, `adr/0000-inherited-decisions.md`), and user-selected flow sequence diagrams (`docs/agents-v0/diagrams/sequences/<service>.md`) citing `path/File:line` (validated by `.agents-v0/scripts/check-onboarding-docs.sh`).
 - **Maintenance (`/v0-maintain` & `/v0-triage`):**
   - Tracked in `docs/agents-v0/maintain/<id>/note.md` and `docs/agents-v0/maintain/<id>/state.json` (`tier`: `trivial`, `standard`, or `emergency`).
-  - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs; all changes flow into `/v0-verify` and `/v0-local-release`.
+  - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs. Trivial and standard changes flow into `/v0-verify` and `/v0-local-release`. An emergency note releases first when it records a rollback plan and `Follow-up verify due`; full `/v0-verify` is owed by that date.
 
 ## Agents, Skills, Rules, and Cross-IDE Portability
 

@@ -25,7 +25,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 10. Write **UX acceptance criteria**: testable, one per row, mapped screen → mockup → criterion (the Verify audit maps each to a test of the built UI).
 11. Record N/A determinations (no-UI surface) with the reason. A no-UI story has no mockups and no component table; say so.
 12. Verify every mockup control has a component row, every row links to a mockup that exists and contains that `data-component` attribute, API-backed rows name a draft operation, and no mockup calls the API. Read each row against its mockup to confirm they describe the same behavior.
-13. Persist the spec to `docs/agents-v0/design/<feature>/ux-spec.md` and the mockups beside it. Stop for the Design gate. Present the spec and the mockup paths. Do not start Build.
+13. Persist the spec to `docs/agents-v0/design/<feature>/ux-spec.md` and the mockups beside it. Return the spec and the mockup paths to the main session. Do not collect Design approval and do not start Build. The main session runs `design-reviewer`, then stops once (`/v0-design`).
 
 ## Rule-compliance checklist
 - [ ] HTML mockups exist for each screen state; they are static (no API calls).
@@ -37,4 +37,4 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 - [ ] `frontend-web.mdc`: state matrix; accessibility; the bound pack's `ui` id (the React example is `frontend-web.mdc`).
 - [ ] `architecture-and-diagrams.mdc`: Mermaid conventions for flows.
 - [ ] `quality-and-testing.mdc`: UX acceptance criteria are testable on the built UI.
-- [ ] `workflow-orchestration.mdc`: Design gate criteria met; stopped for approval.
+- [ ] `workflow-orchestration.mdc`: spec returned to the main session. Design approval stays with `/v0-design` after `design-reviewer`.

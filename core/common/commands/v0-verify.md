@@ -8,7 +8,7 @@ You are entering the **Verify** phase of the delivery lifecycle (`workflow-orche
 
 ## Prerequisite & Resume
 1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json` when verifying a maintenance note; use `<id>` for `<feature>` and `docs/agents-v0/maintain/<id>/note.md` as `<artifact>`).
-2. Confirm the producing phase is approved in `.state.json` (`build` in `approvedPhases` for a feature story, or `maintain` in `approvedPhases` for a maintenance note). `Story: P0-A` may enter Verify without `build` in `approvedPhases`. If missing for any other story, mark `--active-phase verify --status blocked --reason "Build/Maintain not approved"` and stop.
+2. Confirm the producing phase is approved in `.state.json` (`build` in `approvedPhases` for a feature story, or `maintain` in `approvedPhases` for a maintenance note). `Story: P0-A` may enter Verify without `build` in `approvedPhases`. If missing for any other story, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status blocked --reason "Build/Maintain not approved" <artifact>` and stop.
 3. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress <artifact>`.
 
 ## Collision

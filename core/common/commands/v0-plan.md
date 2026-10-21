@@ -10,7 +10,7 @@ You are entering **program planning** (`workflow-orchestration.mdc`). Use it whe
 Read `docs/agents-v0/project-profile.md` and `docs/agents-v0/repo-map.md`. On a brownfield repo, `docs/agents-v0/onboarding/state.json` must show `lastApprovedPhase: "onboard"`. Except for a P0-A-only plan, `docs/agents-v0/program.state.json` must record both `roadmap` and `architecture` in `approvedPhases` (or `Approved` rows in `roadmap/<program>.md` and `architecture.md`), and the profile `Pack` cell must be bound to a complete pack.
 
 ## Resume
-Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status in_progress docs/agents-v0/milestones/plan.md`. Continue from the milestone manifests already on disk: preserve approved or seeded `P0-A` rows, replace template stubs, and author concrete stories adhering to the story-size budget and roadmap horizons.
+When `docs/agents-v0/milestones/plan.md` is absent, create it with a title line. Then run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status in_progress docs/agents-v0/milestones/plan.md`. Continue from the milestone manifests already on disk: preserve approved or seeded `P0-A` rows, replace template stubs, and author concrete stories adhering to the story-size budget and roadmap horizons.
 
 ## Collision
 This command writes `docs/agents-v0/milestones/`. Stop before editing if `git status` shows uncommitted changes to those files from a feature in flight.

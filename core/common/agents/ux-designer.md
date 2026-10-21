@@ -33,4 +33,4 @@ Mark every interactive element of a mockup `data-component="<Component name>"` s
 
 ## Stop condition
 
-Stop when the **Design gate** passes (`workflow-orchestration.mdc`): the UX spec and mockups are complete (flows, state matrix, component defaults, a11y, responsive/device matrix, design-system conformance, UX acceptance criteria). Present the spec and the mockup paths to the user and wait for approval before Build.
+Stop when the UX spec and mockups are complete (flows, state matrix, component defaults, a11y, responsive/device matrix, design-system conformance, UX acceptance criteria). Return the spec and the mockup paths to the main session. Do not collect Design approval. The main session runs `design-reviewer`, then stops once (`/v0-design`).

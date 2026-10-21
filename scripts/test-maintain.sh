@@ -86,6 +86,36 @@ else
   fail "metrics: an emergency note past its follow-up date is OVERDUE"
 fi
 
+phases_of() { # id
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(",".join(d["approvedPhases"])); print("true" if d["verifyPassed"] else "false")' \
+    "$r/docs/agents-v0/maintain/$1/state.json"
+}
+branch s-emergency-release
+make_note fix-12 emergency "$confirmed\nFollow-up verify due: 2026-12-31" no "$rollback"
+commit emergency-release
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-12/note.md >/dev/null) \
+   && [ "$(phases_of fix-12)" = "$(printf 'maintain,release\nfalse')" ]; then
+  pass "state: emergency --approve release does not backfill verify or set verifyPassed"
+else
+  fail "state: emergency --approve release does not backfill verify or set verifyPassed"
+fi
+make_note fix-13 standard "" no "$rollback"
+commit standard-release
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-13/note.md >/dev/null) \
+   && [ "$(phases_of fix-13)" = "$(printf 'maintain,verify,release\ntrue')" ]; then
+  pass "state: standard --approve release still backfills verify and sets verifyPassed"
+else
+  fail "state: standard --approve release still backfills verify and sets verifyPassed"
+fi
+make_note fix-14 emergency "$confirmed\nFollow-up verify due: 2026-12-31" yes "$rollback"
+commit emergency-already-verified
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-14/note.md >/dev/null) \
+   && [ "$(phases_of fix-14)" = "$(printf 'maintain,verify,release\ntrue')" ]; then
+  pass "state: emergency --approve release keeps verify when it was already approved"
+else
+  fail "state: emergency --approve release keeps verify when it was already approved"
+fi
+
 if [ "$status" -ne 0 ]; then
   echo "test-maintain: FAILED" >&2
   exit 1

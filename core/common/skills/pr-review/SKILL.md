@@ -20,7 +20,7 @@ Verify phase playbook for the `code-reviewer` agent (`workflow-orchestration.mdc
    - Docs/diagrams: updated if behavior or topology changed.
 3. Label each finding: **Critical** (merge blocker), **Suggestion** (should fix), **Nice to have** (optional).
 4. Cite file:line and the rule clause for each finding.
-5. Persist review notes to `docs/agents-v0/verify/<feature>/code-review.md` (finding, label, file:line, rule clause); report to the orchestrator; on Critical, route back to the responsible agent.
+5. Persist review notes to `docs/agents-v0/verify/<feature>/code-review.md` (finding, label, file:line, rule clause); report to the orchestrator. The main session gathers this report with the VAPT checklist, then routes back once on Critical.
 
 ## Rule-compliance checklist
 - [ ] `code-review.mdc`: full checklist applied.

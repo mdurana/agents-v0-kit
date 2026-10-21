@@ -63,7 +63,7 @@ Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `d
 | Tier | When | Path |
 |------|------|------|
 | **Trivial** | Docs-only or 1-for-1 patch version bump confirmed by the user | `/v0-triage` → `/v0-maintain` → abbreviated Verify (`/v0-verify`) |
-| **Standard** | Feature or bugfix touching application code | Full Intake → Design (when contracts/UI change) → Build → Verify → Local Release / Release |
+| **Standard** | Feature or bugfix touching application code | Full Intake → Design (gate when contracts, UI, or Material apply) → Build → Verify → Local Release / Release |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design (`Material: yes` updates `arc-record.md`) |
 | **Emergency** | User-confirmed production incident with rollback plan and `Follow-up verify due` date | `/v0-maintain` → immediate release; full `/v0-verify` owed by due date |
 
@@ -89,9 +89,9 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 - **Plan (`/v0-plan`, `program-planning`):** Writes `docs/agents-v0/milestones/plan.md` and `<milestone>.md` with `Surface` and `Size` on each story and acyclic dependencies.
 - **Intake (`/v0-intake`, `spec-intake`):** Writes `docs/agents-v0/requirements/<feature>.md` with user story, Gherkin `AC-1`…`AC-8` (including negative/edge scenarios), NFRs, and `Material: yes|no`.
 - **Design (`/v0-design`, `contract-first-design`, `ux-design`):** Writes `design.md`, optional `openapi.yaml` / `asyncapi.yaml` / `events/`, ADR, and UX spec/mockups. Stories with contracts, UI, public routes, or `Material: yes` require `design-reviewer` (`review.md` with zero open Criticals) and stop for Design approval. `Contract: None` stories continue to Build.
-- **Build (`/v0-build`, `implement-*`):** Verifies a green baseline, writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` to a test, merges any approved `openapi.yaml` draft into the catalog, implements units via red-to-green TDD, and runs the bound pack's native verify command (`.agents-v0/scripts/run-backend-verify.sh`).
+- **Build (`/v0-build`, `implement-*`):** Verifies a green baseline, writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` to a test, merges any approved `openapi.yaml` draft into the catalog, implements units via red-to-green TDD, and resolves the bound pack's native verify command with `.agents-v0/scripts/run-backend-verify.sh`. The script only prints. The caller executes the printed command.
 - **Verify (`/v0-verify`, `quality-gate`, `vapt-review`, `pr-review`):** `test-engineer` runs the native stack verify command and checks AC test coverage (`quality-gate.md`); then `security-reviewer` (`vapt-checklist.md`) and `code-reviewer` (`code-review.md`) inspect `git diff <baseCommit>...HEAD`. Zero `Critical` findings sets `verifyPassed: true`.
-- **Local Release (`/v0-local-release`, `local-release`) & Remote Release (`/v0-release`, `release-pr`):** `/v0-local-release` verifies `verifyPassed: true`, re-runs the native verify command on a clean tree, and merges locally (`git merge --no-ff`) after explicit user approval. `/v0-release` prepares and opens a GitLab MR (`glab mr create`) for teams using remote merge requests.
+- **Local Release (`/v0-local-release`, `local-release`) & Remote Release (`/v0-release`, `release-pr`):** `/v0-local-release` verifies `verifyPassed: true`, except a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due` (full `/v0-verify` stays owed by that date). It re-runs the native verify command on a clean tree, and merges locally (`git merge --no-ff`) after explicit user approval. `/v0-release` prepares and opens a GitLab MR (`glab mr create`) for teams using remote merge requests.
 
 ## Rule Precedence
 

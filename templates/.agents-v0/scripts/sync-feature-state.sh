@@ -238,7 +238,14 @@ if cli_approve:
     if cli_approve not in phases:
         print(f"FAIL: --approve phase must be one of {', '.join(phases)}", file=sys.stderr)
         raise SystemExit(1)
+    # An emergency note may release before Verify. Do not backfill verify,
+    # and do not treat that release as verifyPassed. P0-A is a feature story.
+    emergency_skip_verify = (
+        maintain_note and tier == "emergency" and "verify" not in approved_list
+    )
     for p in phases[: phases.index(cli_approve) + 1]:
+        if emergency_skip_verify and p == "verify":
+            continue
         if p not in approved_list:
             approved_list.append(p)
         if p not in phase_dates:
@@ -551,7 +558,10 @@ elif vp_raw in ("false", "0", "no"):
 elif cli_reopen and "verify" not in approved_list:
     verify_passed = False
 elif last_approved in ("verify", "release"):
-    verify_passed = True
+    if maintain_note and tier == "emergency" and "verify" not in approved_list:
+        verify_passed = bool(prev.get("verifyPassed", False))
+    else:
+        verify_passed = True
 else:
     verify_passed = bool(prev.get("verifyPassed", False))
 
