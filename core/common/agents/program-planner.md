@@ -1,7 +1,7 @@
 ---
 name: program-planner
 description: Plan phase for programs. Reads the approved architecture pack and writes milestone manifests and docs/agents-v0/milestones/plan.md. Use for /v0-roadmap and /v0-plan.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

@@ -104,7 +104,7 @@ grep -Fq 'model: remap-plan-model' "$tmp/.cursor/agents/program-planner.md"
 grep -Fq 'model: remap-plan-model' "$tmp/.cursor/agents/requirements-analyst.md"
 grep -Fq 'model: remap-ux-model' "$tmp/.cursor/agents/ux-designer.md"
 grep -Fq 'model: composer-2.5[fast=false]' "$tmp/.cursor/agents/backend-engineer.md"
-grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]' "$tmp/.cursor/agents/code-reviewer.md"
+grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=high,fast=false]' "$tmp/.cursor/agents/code-reviewer.md"
 grep -Fq '`remap-plan-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| backend-engineer     | Build        |' "$tmp/docs/agents-v0/model-routing-matrix.md"
 grep -Fq '| ux-design                           | UX Designer | UX spec authoring                | `remap-ux-model`' "$tmp/docs/agents-v0/model-routing-matrix.md"
@@ -124,7 +124,7 @@ grep -Fq '`codebase-documenter` writes the report' "$tmp/docs/agents-v0/model-ro
 plain="$(mktemp -d)"
 trap 'rm -rf "$tmp" "$plain"' EXIT
 sh "$KIT/scripts/install.sh" "$plain" >/dev/null
-grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]' "$plain/.cursor/agents/program-planner.md"
+grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=high,fast=false]' "$plain/.cursor/agents/program-planner.md"
 rm -f "$plain/.cursor/model-config.json"
 if sh "$plain/.agents-v0/scripts/update-agents-model.sh" >/dev/null 2>&1; then
   printf 'FAIL: update-agents-model.sh should fail when model-config.json is missing\n' >&2

@@ -1,7 +1,7 @@
 ---
 name: debug-investigator
 description: Runtime failure isolation for Build (second red result) and Maintain. Analyzes stack traces and repro steps; proposes smallest fix. Debug role per model-routing-matrix.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

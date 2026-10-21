@@ -29,15 +29,18 @@ main="$(cd "$r" && git rev-parse --abbrev-ref HEAD)"
 branch() { (cd "$r" && git checkout -q "$main" && git checkout -q -b "$1"); }
 commit() { (cd "$r" && git add -A && git_c commit -q -m "$1"); }
 
-make_note() { # id tier extra-lines(\n separated) with-verify(yes|no) rollback-text
+make_note() { # id tier extra-lines(\n separated) with-verify(yes|no) rollback-text [approve-maintain yes|no]
   id="$1"; tier="$2"; extra="$3"; with_verify="$4"; rollback="$5"
+  approve_maintain="${6:-yes}"
   mkdir -p "$r/docs/agents-v0/maintain/$id" "$r/docs/agents-v0/verify/$id"
   {
     printf '# Maintenance note: test\n\nId: %s\nTier: %s\n' "$id" "$tier"
     [ -z "$extra" ] || printf '%b\n' "$extra"
     printf '\n## Rollback\n\n%s\n\n## Delivery approvals\n\n' "$rollback"
     printf '| Phase | Artifacts | Approver | Decision | Date |\n|---|---|---|---|---|\n'
-    printf '| maintain | docs/agents-v0/maintain/%s/note.md | dev | Approved | 2026-01-01 |\n' "$id"
+    if [ "$approve_maintain" != no ]; then
+      printf '| maintain | docs/agents-v0/maintain/%s/note.md | dev | Approved | 2026-01-01 |\n' "$id"
+    fi
     if [ "$with_verify" = yes ]; then printf '| verify | docs/agents-v0/verify/%s/test-report.md | dev | Approved | 2026-01-02 |\n' "$id"; fi
   } > "$r/docs/agents-v0/maintain/$id/note.md"
   printf 'Line coverage 90%%\n' > "$r/docs/agents-v0/verify/$id/test-report.md"
@@ -46,7 +49,7 @@ confirmed='Tier confirmed by: Ada on 2026-01-01'
 rollback='Revert the commit.'
 
 # --- state and metrics for notes ---------------------------------------------
-branch s-state; make_note fix-10 standard "" no "$rollback"; commit state
+branch s-state; make_note fix-10 standard "" no "$rollback" no; commit state
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md --active-phase maintain --status in_progress >/dev/null 2>&1) \
    && grep -Fq '"feature": "fix-10"' "$r/docs/agents-v0/maintain/fix-10/state.json" \
    && grep -Fq '"activePhase": "maintain"' "$r/docs/agents-v0/maintain/fix-10/state.json" \
@@ -66,6 +69,8 @@ if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/mainta
 else
   fail "state: release is a valid phase of a maintenance note"
 fi
+printf '| maintain | docs/agents-v0/maintain/fix-10/note.md | dev | Approved | 2026-01-01 |\n' >> "$r/docs/agents-v0/maintain/fix-10/note.md"
+(cd "$r" && git add docs/agents-v0/maintain/fix-10/note.md && git_c commit -q -m "approve maintain row")
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md >/dev/null 2>&1) && grep -Fq '"lastApprovedPhase": "maintain"' "$r/docs/agents-v0/maintain/fix-10/state.json"; then
   pass "state: the maintain approval is derived"
 else

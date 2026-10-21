@@ -1,7 +1,7 @@
 ---
 name: design-reviewer
 description: Design and Architecture phases. Independent review of the design — contract, authorization, data, failure modes, UX — before the Design gate, and of the program architecture pack before the architecture approval. Read-only except its own report. Use in /v0-design and /v0-architecture.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

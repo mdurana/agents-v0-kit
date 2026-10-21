@@ -1,7 +1,7 @@
 ---
 name: security-reviewer
 description: Verify phase. Runs always-on VAPT findings F4, F8, F9, and F10, plus regression findings for the changed surface. An applicable always-on miss is Critical. Use in /v0-verify.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

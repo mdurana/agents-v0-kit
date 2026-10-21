@@ -1,7 +1,7 @@
 ---
 name: requirements-analyst
 description: Intake phase. Turns Jira/Confluence specs into acceptance criteria, NFRs, and a regulation list. Use in /v0-intake.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

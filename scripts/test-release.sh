@@ -199,7 +199,7 @@ p = sys.argv[1]
 cfg = json.load(open(p, encoding="utf-8"))
 for k in ("plan", "review", "debug"):
     if k in cfg:
-        cfg[k] = cfg[k].replace("reasoning_effort=xhigh", "reasoning_effort=high")
+        cfg[k] = cfg[k].replace("context=500k", "context=200k")
 json.dump(cfg, open(p, "w", encoding="utf-8"), indent=2)
 PY
   sh .agents-v0/scripts/update-agents-model.sh >/dev/null
@@ -209,7 +209,8 @@ PY
 KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --update --quick "$upg" > "$tmp/upg-install.out" 2>&1 || { cat "$tmp/upg-install.out" >&2; fail "upgrade: install.sh --update --quick exited non-zero"; }
 has "upgrade: announces project-profile.md -Pci-security migration" "$tmp/upg-install.out" "MIGRATED (project-owned file edited): docs/agents-v0/project-profile.md"
 has "upgrade: stamps kit version with commit SHA" "$upg/.agents-kit-version" "+"
-has "upgrade: preserves custom reasoning_effort=high on remapped agents" "$upg/.cursor/agents/solution-architect.md" "reasoning_effort=high"
+has "upgrade: preserves a custom context window on remapped agents" "$upg/.cursor/agents/solution-architect.md" "context=200k"
+has "upgrade: remapped agents stay on reasoning_effort=high" "$upg/.cursor/agents/solution-architect.md" "reasoning_effort=high"
 
 if [ "$status" -ne 0 ]; then
   echo "test-release: FAILED" >&2

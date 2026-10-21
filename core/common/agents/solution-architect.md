@@ -1,7 +1,7 @@
 ---
 name: solution-architect
 description: Program architecture and story design. Use for /v0-architecture before any backlog, and for /v0-design after Intake.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

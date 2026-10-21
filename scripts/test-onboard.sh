@@ -243,7 +243,6 @@ The controller is at $cite. The database is reached at db.internal:5432 and \`ex
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| onboard | docs/agents-v0/onboarding/report.md | dev | Approved | 2026-01-01 |
 EOF
 expect_pass "onboarding docs: a real citation passes and hostnames are not citations" "$r" sh .agents-v0/scripts/check-onboarding-docs.sh
 printf 'Also see `services/order/src/Missing.java:3`.\n' >> "$r/docs/agents-v0/onboarding/report.md"

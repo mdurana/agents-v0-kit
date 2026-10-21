@@ -328,6 +328,30 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
         print(f"FAIL: active phase must be one of {', '.join(active_phases)}", file=sys.stderr)
         raise SystemExit(1)
     if active_phase in approved_list and not cli_reopen:
+        verify_next = (
+            "/v0-verify " + os.path.basename(os.path.dirname(rel_art))
+            if maintain_note
+            else "/v0-verify"
+        )
+        story_next = (
+            "/v0-maintain for a fix, /v0-triage for a docs-only edit or patch bump, "
+            "or /v0-intake with a new slug"
+        )
+        if "release" in approved_list:
+            if maintain_note and tier == "emergency" and "verify" not in approved_list:
+                nxt = verify_next
+                released = "this maintenance note is released and still owes Verify"
+            elif maintain_note:
+                nxt = "a new maintenance id"
+                released = "this maintenance note is released"
+            else:
+                nxt = story_next
+                released = "this story is released"
+            print(
+                f"FAIL: {released}. Do not open it again. Next: {nxt}.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
         nxt = {
             "onboard": "/v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain",
             "roadmap": "/v0-architecture",
@@ -337,8 +361,8 @@ elif os.environ.get("HOOK_SET_ACTIVE") == "1":
             "design": "/v0-build",
             "build": "/v0-verify",
             "verify": "/v0-local-release",
-            "maintain": "a new maintenance id",
-            "release": "/v0-maintain for a fix, /v0-triage for a docs-only edit or patch bump, or /v0-intake with a new slug",
+            "maintain": "/v0-local-release" if tier == "emergency" else verify_next,
+            "release": story_next,
         }.get(active_phase, "/v0-status")
         print(
             f"FAIL: {active_phase} is already approved. Do not open it again. Next: {nxt}.",

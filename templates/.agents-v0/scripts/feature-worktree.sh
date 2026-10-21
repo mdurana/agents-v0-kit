@@ -15,6 +15,8 @@
 # whose worktree was removed is attached again, without -b. A new branch is created
 # only when that branch does not exist.
 # A branch already contained in the integration ref (tip differs) is not checked out.
+# Untracked docs/agents-v0/requirements/<feature>.* or docs/agents-v0/maintain/<id>/
+# in the primary checkout move into the worktree. Tracked files stay where they are.
 # Remove the worktree after the merge: git worktree remove <path>
 
 set -eu
@@ -57,6 +59,47 @@ else
 fi
 branch="${prefix}/${feature}"
 
+# Move new untracked intake or maintain docs into the worktree that will continue the work.
+relocate_untracked() {
+  target="$1"
+  primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
+  [ -n "$primary" ] || return 0
+  if [ "$primary" = "$target" ]; then
+    return 0
+  fi
+  if [ "$prefix" = "maintain" ]; then
+    rel="docs/agents-v0/maintain/${feature}"
+    src="${primary}/${rel}"
+    dst="${target}/${rel}"
+    if [ -d "$src" ] && [ ! -e "$dst" ] && [ -z "$(git -C "$primary" ls-files -- "$rel")" ]; then
+      mkdir -p "$(dirname "$dst")"
+      mv "$src" "$dst"
+      printf 'Moved uncommitted %s into the worktree.\n' "$rel"
+    fi
+    return 0
+  fi
+  src_dir="${primary}/docs/agents-v0/requirements"
+  [ -d "$src_dir" ] || return 0
+  found=0
+  for src in "$src_dir"/"${feature}".*; do
+    [ -f "$src" ] || continue
+    rel="docs/agents-v0/requirements/$(basename "$src")"
+    if git -C "$primary" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1; then
+      continue
+    fi
+    dst="${target}/${rel}"
+    if [ -e "$dst" ]; then
+      continue
+    fi
+    mkdir -p "$(dirname "$dst")"
+    mv "$src" "$dst"
+    found=1
+  done
+  if [ "$found" = 1 ]; then
+    printf 'Moved uncommitted docs/agents-v0/requirements/%s.* into the worktree.\n' "$feature"
+  fi
+}
+
 if git show-ref --verify --quiet "refs/heads/${branch}"; then
   tip="$(git rev-parse "refs/heads/${branch}")"
   base_tip="$(git rev-parse "$base")"
@@ -78,6 +121,7 @@ if git show-ref --verify --quiet "refs/heads/${branch}"; then
   ')"
 fi
 if [ -n "$existing" ]; then
+  relocate_untracked "$existing"
   printf 'Worktree already exists: %s on branch %s. Continue there. Do not create another branch.\n' "$existing" "$branch"
   exit 0
 fi
@@ -87,9 +131,11 @@ if [ -e "$dest" ]; then
 fi
 if git show-ref --verify --quiet "refs/heads/${branch}"; then
   git worktree add "$dest" "$branch"
+  relocate_untracked "$dest"
   printf 'Attached worktree %s to existing branch %s.\n' "$dest" "$branch"
 else
   git worktree add -b "$branch" "$dest" "$base"
+  relocate_untracked "$dest"
   printf 'Created worktree %s on branch %s (from %s).\n' "$dest" "$branch" "$base"
 fi
 printf 'Open that folder in the IDE, then run /v0-status %s or the next phase command there.\n' "$feature"

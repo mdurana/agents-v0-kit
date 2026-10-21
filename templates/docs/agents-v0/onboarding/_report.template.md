@@ -48,4 +48,3 @@ Confidence: <high | medium | low, per area, with the reason>
 
 | Phase | Artifacts | Approver | Decision | Date |
 |-------|-----------|----------|----------|------|
-| onboard | docs/agents-v0/onboarding/report.md, docs/agents-v0/onboarding/modules/ | | | |

@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Verify phase. Applies the code-review checklist and labels findings Critical/Suggestion/Nice to have. Runs with the security-reviewer after the test-engineer in /v0-verify.
-model: grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]
+model: grok-4.7[context=500k,reasoning_effort=high,fast=false]
 mode: subagent
 tools:
   - read

@@ -1,9 +1,9 @@
 {
-  "plan": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
+  "plan": "grok-4.7[context=500k,reasoning_effort=high,fast=false]",
   "build": "composer-2.5[fast=false]",
-  "review": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
+  "review": "grok-4.7[context=500k,reasoning_effort=high,fast=false]",
   "explore": "composer-2.5[fast=false]",
-  "debug": "grok-4.7[context=500k,reasoning_effort=xhigh,fast=false]",
+  "debug": "grok-4.7[context=500k,reasoning_effort=high,fast=false]",
   "schemas": "composer-2.5[fast=false]",
   "docs": "composer-2.5[fast=false]",
   "documenter": "composer-2.5[fast=false]",
