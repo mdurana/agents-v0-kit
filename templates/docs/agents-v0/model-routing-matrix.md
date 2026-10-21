@@ -24,7 +24,7 @@ Role IDs and defaults match `templates/.cursor/model-config.json` (installed to 
 
 ## Critical units
 
-The Build role is a fast, inexpensive model. Some units are where a wrong answer is costly: authentication and authorization, uploads, public routes, sagas, and event consumers. A unit is **critical** when the requirements artifact lists a security-review trigger for it, or when the story implements a saga or a consumer (`implement-messaging`). `/v0-build` launches the build agent for a critical unit, and `/v0-maintain` the maintenance agent for a fix that touches one, with the **Build (critical)** row: pass the **Plan** model slug (with any `[...]` frontmatter modifier suffix stripped) as the launch override, or omit the override if the runtime launcher does not accept custom slugs. The agent file is unchanged. Other units stay on the Build role.
+The Build role is a fast, inexpensive model. Some units are where a wrong answer is costly: authentication and authorization, uploads, public routes, cryptography, ledger/money, sagas, and event consumers. A unit is **critical** when the requirements artifact lists a security-review trigger for it, or when the story implements a saga or a consumer (`implement-messaging`). `/v0-build` launches the build agent for a critical unit, and `/v0-maintain` the maintenance agent for a fix that touches one, with the **Build (critical)** row: pass the **Plan** model slug (with any `[...]` frontmatter modifier suffix stripped) as the launch override, or omit the override if the runtime launcher does not accept custom slugs. The agent file is unchanged. Other units stay on the Build role.
 
 ## Independence of the reviewers
 

@@ -8,7 +8,7 @@ You are entering the **Verify** phase of the delivery lifecycle (`workflow-orche
 
 ## Prerequisite & Resume
 1. Read `docs/agents-v0/requirements/<feature>.state.json` (or `docs/agents-v0/maintain/<id>/state.json` when verifying a maintenance note; use `<id>` for `<feature>` and `docs/agents-v0/maintain/<id>/note.md` as `<artifact>`).
-2. Confirm the producing phase is approved in `.state.json` (`build` in `approvedPhases` for a feature story, or `maintain` in `approvedPhases` for a maintenance note). If missing, mark `--active-phase verify --status blocked --reason "Build/Maintain not approved"` and stop.
+2. Confirm the producing phase is approved in `.state.json` (`build` in `approvedPhases` for a feature story, or `maintain` in `approvedPhases` for a maintenance note). `Story: P0-A` may enter Verify without `build` in `approvedPhases`. If missing for any other story, mark `--active-phase verify --status blocked --reason "Build/Maintain not approved"` and stop.
 3. Run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress <artifact>`.
 
 ## Collision
@@ -30,8 +30,8 @@ Check `git status` (`workflow-orchestration.mdc` Parallel features). Stop if ano
 4. **Evaluate Verdict:**
    - Gather any `Critical` findings across `quality-gate.md`, `vapt-checklist.md`, and `code-review.md` into `<feature>.phase-result.md`.
    - **If any `Critical` finding exists:** Run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed false --reopen build <artifact>` (or `--reopen maintain` for a maintenance note) and route back to `/v0-build` (or `/v0-maintain`). If `sync-feature-state.sh` exits 2 (`reopenCount > 3`), stop and escalate to the user.
-   - **If zero `Critical` findings exist:** Run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval <artifact>` and write `<feature>.phase-result.md` (`phase: verify`, `status: awaiting_approval`).
-5. **P0-A deferred gate:** When `/v0-deliver` runs `P0-A`, run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --approve verify <artifact>` and proceed directly to Release (`/v0-local-release` or `/v0-release`) for the single human approval stop.
+   - **If zero `Critical` findings exist and the story is not `P0-A`:** Run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval <artifact>` and write `<feature>.phase-result.md` (`phase: verify`, `status: awaiting_approval`).
+5. **P0-A deferred gate:** When `/v0-deliver` runs `P0-A` and Verify found no `Critical` finding, run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true <artifact>` and proceed directly to Release (`/v0-local-release` or `/v0-release`). Skip step 6. Do not run `--approve verify`. The Release approval records the earlier phases.
 6. **Stop** and present the Verify reports (`quality-gate.md`, `vapt-checklist.md`, `code-review.md`) to the user. After explicit user approval:
    - Update `<feature>.phase-result.md` to `status: approved`.
    - Run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --approve verify <artifact>`.

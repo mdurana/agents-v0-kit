@@ -1,6 +1,6 @@
 #!/bin/sh
 # check-attempt-budget.sh — total failed attempts per phase (workflow-orchestration.mdc
-# Phase attempt budget). The per-test limit does not bound a cascade of different failures.
+# Phase Attempt & Bounce Budgets). The per-test limit does not bound a cascade of different failures.
 #
 # Usage: sh .agents-v0/scripts/check-attempt-budget.sh <build-report.md> [<budget>]
 # Counts command-result cards (table columns: Command, Exit, Attempt, Failing test, Location)

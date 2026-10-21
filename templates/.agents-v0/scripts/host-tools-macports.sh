@@ -92,7 +92,7 @@ HOST_PORTS="openjdk21 nodejs22 npm11"
 HOST_IMAGE=""
 if [ -f docs/agents-v0/project-profile.md ] && [ -f .agents-v0/scripts/packlib.py ]; then
   eval "$(python3 - <<'PY'
-import os, sys
+import os, shlex, sys
 sys.path.insert(0, ".agents-v0/scripts")
 import packlib
 pack_id = packlib.profile_pack()
@@ -108,9 +108,9 @@ for item in ui.get("hostChecks") or []:
 for item in ui.get("hostPorts") or []:
     if item not in ports:
         ports.append(item)
-print("HOST_CHECKS='%s'" % " ".join(checks))
-print("HOST_PORTS='%s'" % " ".join(ports))
-print("HOST_IMAGE='%s'" % (data.get("ciImage") or ""))
+print("HOST_CHECKS=%s" % shlex.quote(" ".join(checks)))
+print("HOST_PORTS=%s" % shlex.quote(" ".join(ports)))
+print("HOST_IMAGE=%s" % shlex.quote(data.get("ciImage") or ""))
 PY
 )"
 fi
