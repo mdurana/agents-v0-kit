@@ -16,7 +16,7 @@ Design phase playbook for the `ux-designer` agent (`workflow-orchestration.mdc`)
 6. Write **component defaults** in the UX spec. One row per interactive component:
    - **Component** and **Screen**. A shared component (the same Delete control on two screens) is defined once; other rows reference that name.
    - **Mockup** path for the state that shows it.
-   - **Operation** — the operation in `docs/agents-v0/design/<feature>/openapi.yaml` when the component calls the API (`POST /api/v1/contacts`). Use `—` when it does not. If the operation is not in that draft, stop. Do not invent an endpoint.
+   - **Operation** — the operation in `docs/agents-v0/design/<feature>/openapi.yaml` when the component calls the API, either its `operationId` or `METHOD /api/v1/...` (`POST /api/v1/contacts`). Use `—` when it does not. If the operation is not in that draft, stop. Do not invent an endpoint.
    - **Default behavior** — what happens if the user does not override it, including the result states: success, validation error, 401, and 5xx, each pointing at a mockup when the user can see that result.
    - **Override** — blank until the user changes it. A change updates this cell and the mockup in the same step.
 7. Specify **accessibility** per screen: keyboard path, focus order, modal focus trap/restore, ARIA needs, color contrast, `prefers-reduced-motion`, touch targets (WCAG 2.1 AA).
