@@ -1,8 +1,8 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, messages between systems, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, messages between systems, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at local release or the optional remote release. That approval records the earlier phases. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
+This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Local Release** (and **Maintain** when something breaks or needs an update). After Verify, `/v0-local-release` is the completion: you confirm, and the feature or fix branch is merged locally. `/v0-release` is the optional path when you want a GitLab merge request. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
 
 ---
 
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at local release or the optional remote release. That approval records the earlier phases. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API.
   - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -61,8 +61,8 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
 | `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
-| `/v0-local-release` | Optional, after verify. Records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
-| `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
+| `/v0-local-release` | After verify. You confirm, and the feature or fix branch is merged locally so the next story can start. The platform skeleton's one approval can be here. |
+| `/v0-release`  | Optional, after verify. Opens a GitLab merge request. Completion is after an authorized merge. The platform skeleton's one approval can be here instead, after the test report and the merge-request link. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
 | `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
@@ -82,7 +82,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 |--------------|-------------|
 | The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved. A second design run reviews that saved design. A second verify run reuses the test report when the code has not changed, and repeats the checks when it has. |
 | The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
-| You did not name a feature | The AI lists the open features and asks which one you mean. |
+| You did not name a feature and more than one is open, or none is | The AI lists the open work and asks which one you mean. One open story is used without asking. |
 
 ---
 
@@ -90,7 +90,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 
 You can approve intake for a second feature while the first feature’s build is still waiting on you, then start design for the second feature. Each feature has its own requirements and design notes.
 
-The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the plan picture (`docs/agents-v0/milestones/plan.md`), the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it. The usual way is one working folder per feature: engineering runs `.agents-v0/scripts/feature-worktree.sh <feature>` once you have said yes, and each feature then builds in its own folder without touching the others.
+The second feature must not change a file the first one is already changing. Those shared files include the project profile, the shared API catalog, architecture notes, the plan picture (`docs/agents-v0/milestones/plan.md`), the README, and the application code. Intake and design for the second feature stay in its own requirements and design documents, including that feature’s own API draft. The shared API catalog is updated when that feature is built. Build, verify, release, and a fix after go-live stop if those shared files, or the other feature’s code, are already modified. Ask engineering for a separate branch before that work continues in the same checkout. Creating that branch still needs you to ask for it. The usual way is one working folder per feature. After you approve intake, engineering runs `.agents-v0/scripts/feature-worktree.sh <feature>` once you have said yes. A fix after go-live uses `.agents-v0/scripts/feature-worktree.sh --maintain <id>`. The platform skeleton and a docs-only or version-only fix stay in the original folder. Each feature then builds in its own folder without touching the others.
 
 ## Big goals: roadmap, then plan
 
@@ -106,7 +106,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, messages between systems, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, messages between systems, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at local release or the optional remote release. That approval records the earlier phases. A story with none of those does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
 
 ### 1. Intake gate
 
@@ -199,7 +199,7 @@ You usually **do not** review code line by line. Trust this gate for “engineer
 | UX / accessibility check | Automated accessibility scan green; UX criteria tested (for UI changes). |
 
 
-Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone. If the code changed after you had already approved verify, that approval is reopened until you approve the new run. A re-run on the same code reuses the test report.
+Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone. After an emergency fix that already shipped, a Critical item starts a new fix instead of reopening the one that shipped. If the code changed after you had already approved verify, that approval is reopened until you approve the new run. A re-run on the same code reuses the test report.
 
 **You might say:**  
 
@@ -218,14 +218,16 @@ Tests finish first. The security checklist and the code review are prepared toge
 | You should see | What it means                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
 | Docs updated   | README and sequence diagrams for what changed. Architecture and network notes are a later docs-only change. |
-| Merge request  | Ready for engineering merge (CI green). |
-| VAPT sign-off  | Security checklist in the merge request description.                                                       |
+| Local merge    | After you confirm, the feature or fix branch is merged on this machine. That is the usual completion. |
+| Merge request  | Only when you asked to publish remotely. Ready for engineering merge (CI green). |
+| VAPT sign-off  | Security checklist in the merge request description, when a merge request was opened.                                                       |
 
 
-"Ready" is not "released": the AI reports readiness and waits for an authorized human merge. Release is complete only after the merge and green CI are confirmed. Approving a phase does not by itself authorize committing, pushing, or opening a merge request; explicitly request those actions when needed.
+"Ready" is not "released": the AI waits for you to confirm the local merge, or for an authorized human merge of the remote request. Release is complete only after that merge. Approving a phase does not by itself authorize committing, pushing, or opening a merge request; explicitly request those actions when needed.
 
 **You might say:**  
 
+- `Approved. Merge it locally.`
 - `Please open the merge request; engineering will merge after CI is green.`  
 - `Wait for product sign-off on release notes.`
 

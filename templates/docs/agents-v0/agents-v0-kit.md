@@ -62,7 +62,7 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive when `Pack: java`, or follows the bound pack's scaffold skill. Skips Intake and Design; stops once for human approval at Release. |
 | Local release (primary) | Runs after Verify is approved, or for P0-A when `verifyPassed` is `true` at the single Release gate, or for a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. Re-verifies the working tree with the stack pack's native verify command, merges the feature branch into the target branch locally (`git merge --no-ff`) upon explicit user confirmation, and marks the story `released` in `<feature>.state.json`. |
 | Remote release (optional) | Used when the team ships via remote GitLab merge requests instead of local merge. Renders the MR body and opens the MR upon user confirmation. |
-| Verify back to Build / Maintain | Any `Critical` finding from `test-engineer`, `security-reviewer`, or `code-reviewer` sets `activeStatus: "in_progress"` and `activePhase: "build"` (or `"maintain"`) in the state file and increments `reopenCount` (capped at 3 bounces before mandatory user escalation). |
+| Verify back to Build / Maintain | Any `Critical` finding from `test-engineer`, `security-reviewer`, or `code-reviewer` on an unreleased story or note sets `activeStatus: "in_progress"` and `activePhase: "build"` (or `"maintain"`) in the state file and increments `reopenCount` (capped at 3 bounces before mandatory user escalation). A released `tier: "emergency"` note does not reopen: owed Verify blocks `verify` and the fix starts as a new maintenance id. |
 | Triage | Docs-only or 1-for-1 patch version bump confirmed by the user; uses abbreviated Verify (native build/test + CVE check, skipping reviewer subagents). |
 
 `/v0-status` is read-only: it inspects the active `state.json` file(s) and names the exact command to run next.
@@ -139,7 +139,7 @@ Workflow state, artifact pointers, and human approvals live in structured JSON s
 - **How gates work:** At the end of a phase, the agent writes `<feature>.phase-result.md`, runs `sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status awaiting_approval <artifact>`, and stops its turn.
 - **How approval works:** Nothing advances until the user explicitly approves in chat (or records an `Approved` row). Upon user approval, the orchestrator runs `sh .agents-v0/scripts/sync-feature-state.sh --approve <phase> <artifact>`, which appends the phase to `approvedPhases`, updates `lastApprovedPhase`, clears `activePhase`, and indexes all created phase artifacts on disk.
 - **Resuming work:** Re-entering any `/v0-*` command reads `<feature>.state.json` (`artifacts` map and `baseCommit`) and continues from existing files on disk without recreating approved artifacts.
-- **Parallel feature isolation:** Two active features in one checkout stop if they touch overlapping files; use `.agents-v0/scripts/feature-worktree.sh <feature>` to isolate branches in separate git worktrees.
+- **Parallel feature isolation:** After Intake is approved, `/v0-intake` runs `.agents-v0/scripts/feature-worktree.sh <feature>` once the user confirms (not P0-A). A standard or emergency maintenance note runs `.agents-v0/scripts/feature-worktree.sh --maintain <id>` on branch `maintain/<id>`. A trivial note stays on the integration branch. Two active features in one checkout stop if they touch overlapping files.
 
 ## Design
 
@@ -188,7 +188,7 @@ Verify combines **deterministic native stack execution** with **role-separated s
 2. **`security-reviewer` (`vapt-review` skill) & `code-reviewer` (`pr-review` skill):**
    - Inspect `git diff <baseCommit>...HEAD`, `requirements/<feature>.md`, and `design/<feature>/` against `security-baseline`, `vapt-webapp`, `vapt-pr-review`, `code-review`, and the active stack pack rules.
    - Write `docs/agents-v0/verify/<feature>/vapt-checklist.md` and `docs/agents-v0/verify/<feature>/code-review.md`.
-   - Any `Critical` finding (including unauthenticated endpoints, broken access control, injection, hardcoded secrets, or missing negative security tests) marks `"verifyPassed": false` and routes the feature back to Build/Maintain (`--reopen build`).
+   - Any `Critical` finding (including unauthenticated endpoints, broken access control, injection, hardcoded secrets, or missing negative security tests) marks `"verifyPassed": false` and routes an unreleased story or note back to Build/Maintain (`--reopen build`, or `--reopen maintain` when the note is not released). A released `tier: "emergency"` note blocks `verify` (`--active-phase verify --status blocked`) and starts a new `/v0-maintain` id. It does not `--reopen maintain`.
    - When all three reports pass with zero `Critical` findings, `<feature>.state.json` records `"verifyPassed": true` and pauses for human approval.
 
 ## Local Release (`/v0-local-release`) and Remote Release (`/v0-release`)
@@ -208,7 +208,7 @@ Verify combines **deterministic native stack execution** with **role-separated s
   - `codebase-documenter` writes `docs/agents-v0/onboarding/report.md`, per-module docs (`docs/agents-v0/onboarding/modules/<module>.md`), as-is system docs (`architecture.md`, `network.md`, `design/system/context-map.md`, `adr/0000-inherited-decisions.md`), and user-selected flow sequence diagrams (`docs/agents-v0/diagrams/sequences/<service>.md`) citing `path/File:line` (validated by `.agents-v0/scripts/check-onboarding-docs.sh`).
 - **Maintenance (`/v0-maintain` & `/v0-triage`):**
   - Tracked in `docs/agents-v0/maintain/<id>/note.md` and `docs/agents-v0/maintain/<id>/state.json` (`tier`: `trivial`, `standard`, or `emergency`).
-  - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs. Trivial and standard changes flow into `/v0-verify` and `/v0-local-release`. An emergency note releases first when it records a rollback plan and `Follow-up verify due`; full `/v0-verify` is owed by that date.
+  - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs. Trivial and standard changes flow into `/v0-verify` and `/v0-local-release`. An emergency note releases first when it records a rollback plan and `Follow-up verify due`; full `/v0-verify` is owed by that date. A `Critical` finding on that owed Verify blocks `verify` and starts a new maintenance id.
 
 ## Agents, Skills, Rules, and Cross-IDE Portability
 
