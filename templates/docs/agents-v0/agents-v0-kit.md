@@ -217,7 +217,7 @@ Verify combines **deterministic native stack execution** with **role-separated s
 | **Always-On Conduct & Lifecycle** | Root `AGENTS.md` + `core/common/rules/{workflow-orchestration,project-delivery-core,ai-agent-conduct}.mdc` | Loaded automatically by Cursor (`.cursor/rules/`), Antigravity (`AGENTS.md`), Claude Code (`CLAUDE.md` / `AGENTS.md`), Windsurf, and Copilot. Combined always-on size is capped at $\le 32\text{ KB}$. |
 | **Phase Playbooks (Skills)** | `core/common/skills/*/SKILL.md` & `core/<pack>/skills/*/SKILL.md` | Standard `SKILL.md` format. Each skill explicitly names the domain rules (`security-baseline`, `api-and-events`, pack `backend`/`frontend` rules) to read for that phase, avoiding unnecessary context bloat. |
 | **Role Subagents** | `core/common/agents/*.md` & `core/<pack>/agents/*.md` | Spawned as isolated subagents in Cursor, Claude Code, and Antigravity; executed sequentially via phase skills in single-agent IDEs. Model routing is configured in `.cursor/model-config.json` via `.agents-v0/scripts/update-agents-model.sh`. |
-| **Hub-and-Spoke Helpers** | `explore-researcher`, `debug-investigator`, `schema-author`, `docs-author` | Phase agents write `<slug>.helper-brief.md` (`helper:`, `return_to:`, `ask:`) and return to the main session. Duplicate `ask:` digests are tracked in `state.json` (`helperBriefHashes`) to prevent infinite loops. |
+| **Hub-and-Spoke Helpers** | `explore-researcher`, `debug-investigator`, `schema-author`, `docs-author` | Phase agents write `<slug>.helper-brief.md` (`helper:`, `outputs:`, `return:`, `ask:`) and return to the main session. Duplicate `ask:` digests are tracked in `state.json` (`helperBriefHashes`) to prevent infinite loops. |
 
 ## Safety Hooks
 
