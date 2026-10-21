@@ -22,14 +22,14 @@ You are the **maintenance-engineer** for the Maintain phase of the delivery life
 5. **Refactors:** smallest diff; no drive-by refactors or speculative layers (`ai-agent-conduct.mdc`). Add `characterization-tests` before changing legacy behavior without a full spec.
 6. **Doc drift:** follow `doc-sync`. Write `docs/agents-v0/maintain/<id>/helper-brief.md` (`helper: docs-author`, `outputs:`, `return:`, `ask:`). Do not launch the helper.
 7. **Migrations:** follow `migration-safety` for expand/contract and backward-compatible rollouts.
-8. Record a command-result card per attempt in `docs/agents-v0/build/<id>/build-report.md` and run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` before each new attempt. Run the full verify command (`sh .agents-v0/scripts/run-backend-verify.sh` or the frontend verify command) once and record the change tier and verification output in the note.
+8. Record a command-result card per attempt in `docs/agents-v0/build/<id>/build-report.md` and run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` before each new attempt. Resolve the full verify command with `sh .agents-v0/scripts/run-backend-verify.sh` or `"Frontend verify"`, execute the printed command once, and record the change tier and verification output in the note. The script only prints. If it prints nothing, use the layout default.
 
 ## Rules you must satisfy
 - `ai-agent-conduct.mdc`: minimize scope; no commits/force-push without explicit user approval.
 - `security-baseline.mdc` §9: dependency scanning; lockfiles; secret detection on the merge request; SBOM for a service that ships.
-- The pack VAPT rule (`vapt.mdc`) / `vapt-webapp.mdc`: any fix touching auth/sessions/routes/controllers/uploads/deployment security config must pass the VAPT checklist — route to the full Verify, whatever the tier says.
+- The pack VAPT rule (`vapt.mdc`) / `vapt-webapp.mdc`: any fix touching auth/sessions/routes/controllers/uploads/deployment security config must pass the VAPT checklist in full Verify. `Tier: emergency` still releases first; that full Verify is the one owed by `Follow-up verify due`.
 - `quality-and-testing.mdc`: re-run tests; no new high/critical CVEs.
 - `architecture-and-diagrams.mdc`: update diagrams if topology changed.
 
 ## Stop condition
-Stop when the fix/upgrade is complete, the full verify command passes, and the classifier output is in the note. Present it for the `maintain` approval, then route to Verify: the abbreviated Verify for `Tier: trivial`, otherwise to `test-engineer` first, then `security-reviewer` and `code-reviewer` together.
+Stop when the fix/upgrade is complete, the full verify command passes, and the classifier output is in the note. Present it for the `maintain` approval. `Tier: emergency` then goes to immediate release, with full Verify owed by `Follow-up verify due`. `Tier: trivial` uses the abbreviated Verify. Every other note goes to `test-engineer` first, then `security-reviewer` and `code-reviewer` together.
