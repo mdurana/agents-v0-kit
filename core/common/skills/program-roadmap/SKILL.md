@@ -14,7 +14,7 @@ Roadmap playbook for the `program-planner` agent (`workflow-orchestration.mdc` R
 4. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave and its sha256 checksum (`Discovery: <path> (sha256: <hash>)`). Copy Problem, Success metric, Chosen option, and Out of scope as facts. Leave the `Delivery approvals` table without an `Approved` row until the user approves in step 7. When the discovery file has a line `Stack preference:`, copy that line onto the roadmap as written. Do not activate a pack from it.
 5. Place each In scope item in exactly one of Now, Next, or Later. The item text is copied verbatim. Do not invent a theme. Do not move an Out of scope item into a horizon.
 6. Verify the roadmap content gate before asking for approval: every required heading is filled, `Discovery:` has the sha256 checksum, and every In scope item belongs to one horizon.
-7. Present the sequence and wait for explicit approval. Then append the `roadmap` row and record the approval with `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/program.state.json --approve roadmap`:
+7. Present the sequence and wait for explicit approval. Then append the `roadmap` row and record the approval with `sh .agents-v0/scripts/sync-feature-state.sh --approve roadmap docs/agents-v0/roadmap/<program>.md`:
 
    | Phase | Artifacts | Approver | Decision | Date |
    |-------|-----------|----------|----------|------|

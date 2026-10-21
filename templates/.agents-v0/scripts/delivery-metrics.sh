@@ -45,6 +45,31 @@ def approvals(path):
                 rows[phase] = dt.date.fromisoformat(cells[4][:10])
             except ValueError:
                 pass
+    rel = path.replace("\\", "/")
+    slug = os.path.basename(path)[:-3]
+    state_path = (
+        os.path.join(os.path.dirname(path), "state.json")
+        if "docs/agents-v0/maintain/" in rel
+        else f"docs/agents-v0/requirements/{slug}.state.json"
+    )
+    if os.path.isfile(state_path):
+        try:
+            st = json.load(open(state_path, encoding="utf-8"))
+            upd_str = (st.get("updatedAt") or "")[:10]
+            fallback_date = dt.date.fromisoformat(upd_str) if upd_str else dt.date.today()
+            phase_dates = st.get("phaseDates") or {}
+        except ValueError:
+            st = {}
+            fallback_date = dt.date.today()
+            phase_dates = {}
+        for p in st.get("approvedPhases") or []:
+            pl = p.lower()
+            if pl not in rows:
+                p_date_str = str(phase_dates.get(pl) or "")[:10]
+                try:
+                    rows[pl] = dt.date.fromisoformat(p_date_str) if p_date_str else fallback_date
+                except ValueError:
+                    rows[pl] = fallback_date
     return rows
 
 

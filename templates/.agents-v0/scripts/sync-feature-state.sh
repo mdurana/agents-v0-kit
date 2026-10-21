@@ -136,7 +136,7 @@ program_doc = out.endswith("program.state.json")
 if onboarding:
     phases = ["onboard"]
 elif maintain_note:
-    phases = ["maintain", "verify"]
+    phases = ["maintain", "verify", "release"]
 elif program_doc:
     phases = ["roadmap", "architecture", "plan"]
 else:
@@ -186,6 +186,9 @@ if prev_last in phases and prev_last not in approved_list:
         if p not in approved_list:
             approved_list.append(p)
 
+today_iso = time.strftime("%Y-%m-%d", time.gmtime())
+phase_dates = {k.lower(): v for k, v in (prev.get("phaseDates") or {}).items() if k.lower() in phases and isinstance(v, str)}
+
 # Sync with Markdown table if present
 first_reopened = ""
 if rows:
@@ -197,6 +200,9 @@ if rows:
                 break
             if positive.match(rows[phase][3]):
                 md_approved.append(phase)
+                d_cell = rows[phase][4][:10] if len(rows[phase]) >= 5 else ""
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", d_cell):
+                    phase_dates[phase] = d_cell
     if md_approved or first_reopened:
         approved_list = md_approved
 
@@ -208,6 +214,9 @@ if cli_approve:
     for p in phases[: phases.index(cli_approve) + 1]:
         if p not in approved_list:
             approved_list.append(p)
+        if p not in phase_dates:
+            phase_dates[p] = today_iso
+    phase_dates[cli_approve] = today_iso
     first_reopened = ""
 
 cli_reopen = os.environ.get("HOOK_REOPEN_PHASE", "").strip().lower()
@@ -221,6 +230,7 @@ if cli_reopen:
     if cli_reopen in phases:
         idx = phases.index(cli_reopen)
         approved_list = [p for p in approved_list if phases.index(p) < idx]
+        phase_dates = {k: v for k, v in phase_dates.items() if k in approved_list}
 
 if reopen_count > 3:
     print(f"FAIL: exceeded max Re-opened bounce budget ({reopen_count} > 3). Stop and escalate to user.", file=sys.stderr)
@@ -400,9 +410,15 @@ base_commit = prev_bc or rep_parent or head_bc
 # Helper brief deduplication
 prior_hashes = list(prev.get("helperBriefHashes") or [])
 if Path("docs/agents-v0").is_dir():
+    extra_briefs = set()
+    if onboarding and Path("docs/agents-v0/onboarding").is_dir():
+        extra_briefs |= set(Path("docs/agents-v0/onboarding").glob("*.helper-brief.md"))
+    if program_doc and Path("docs/agents-v0/design/system").is_dir():
+        extra_briefs |= set(Path("docs/agents-v0/design/system").glob("*.helper-brief.md"))
     brief_candidates = sorted(
         set(Path("docs/agents-v0").rglob(f"{feature_id}.helper-brief.md"))
         | set(Path("docs/agents-v0").rglob(f"{feature_id}/helper-brief.md"))
+        | extra_briefs
     )
     for brief in brief_candidates:
         try:
@@ -410,10 +426,10 @@ if Path("docs/agents-v0").is_dir():
         except OSError:
             continue
         m_helper = re.search(r"^helper:\s*(.+)$", b_text, re.M)
-        m_ask = re.search(r"^ask:\s*(.+)$", b_text, re.M)
+        m_ask = re.search(r"^(?:ask|outputs|return):\s*(.+)$", b_text, re.M)
         if m_helper and m_ask:
             digest = hashlib.sha256(
-                f"{brief.parent.name}:{m_helper.group(1).strip()}:{m_ask.group(1).strip()}".encode("utf-8")
+                f"{brief.name}:{brief.parent.name}:{m_helper.group(1).strip()}:{m_ask.group(1).strip()}".encode("utf-8")
             ).hexdigest()[:16]
             if digest in prior_hashes:
                 print(
@@ -424,8 +440,45 @@ if Path("docs/agents-v0").is_dir():
             prior_hashes.append(digest)
 
 # Discover on-disk phase artifacts for fast agent context indexing
-artifacts_map = {"primary": art}
-if feature_id and not onboarding and not program_doc:
+prev_artifacts = dict(prev.get("artifacts") or {}) if program_doc else {}
+artifacts_map = {**prev_artifacts, "primary": art}
+if program_doc:
+    if "docs/agents-v0/roadmap/" in rel_art:
+        artifacts_map["roadmap"] = art
+    elif rel_art.endswith("docs/agents-v0/architecture.md"):
+        artifacts_map["architecture"] = art
+    elif "docs/agents-v0/milestones/" in rel_art:
+        artifacts_map["plan"] = art
+    for k, rel_p in (
+        ("contextMap", "docs/agents-v0/design/system/context-map.md"),
+        ("arcRecord", "docs/agents-v0/design/system/arc-record.md"),
+        ("architectureReview", "docs/agents-v0/design/system/architecture-review.md"),
+    ):
+        if os.path.isfile(rel_p):
+            artifacts_map[k] = rel_p
+elif onboarding:
+    for k, rel_p in (
+        ("repoMap", "docs/agents-v0/repo-map.md"),
+        ("baseline", "docs/agents-v0/discovery/baseline.md"),
+        ("securityBaseline", "docs/agents-v0/discovery/security-baseline.md"),
+        ("architecture", "docs/agents-v0/architecture.md"),
+        ("network", "docs/agents-v0/network.md"),
+        ("contextMap", "docs/agents-v0/design/system/context-map.md"),
+        ("inheritedDecisions", "docs/agents-v0/adr/0000-inherited-decisions.md"),
+    ):
+        if os.path.isfile(rel_p):
+            artifacts_map[k] = rel_p
+    mod_dir = Path("docs/agents-v0/onboarding/modules")
+    if mod_dir.is_dir():
+        m_files = sorted(p.as_posix() for p in mod_dir.glob("*.md") if p.is_file() and not p.name.startswith("_"))
+        if m_files:
+            artifacts_map["modules"] = m_files
+    seq_dir = Path("docs/agents-v0/diagrams/sequences")
+    if seq_dir.is_dir():
+        s_files = sorted(p.as_posix() for p in seq_dir.glob("*.md") if p.is_file() and not p.name.startswith("_"))
+        if s_files:
+            artifacts_map["sequences"] = s_files
+elif feature_id and not onboarding and not program_doc:
     candidates = {
         "design": f"docs/agents-v0/design/{feature_id}/design.md",
         "openapi": f"docs/agents-v0/design/{feature_id}/openapi.yaml",
@@ -466,6 +519,7 @@ data = {
     "tier": tier,
     "lastApprovedPhase": last_approved,
     "approvedPhases": approved_list,
+    "phaseDates": {p: phase_dates.get(p, today_iso) for p in approved_list},
     "activePhase": active_phase,
     "activeStatus": active_status,
     "blockedReason": blocked_reason,

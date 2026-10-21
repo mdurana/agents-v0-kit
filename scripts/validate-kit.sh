@@ -95,7 +95,7 @@ for ref in $(grep -rhoE '`[a-z-]+\.mdc`' core/common core/java core/dotnet core/
   find core -path "*/rules/$ref" | grep -q . || err "kit content references missing rule $ref"
 done
 for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/common core/java core/dotnet core/node core/python core/go | tr -d '`' | sort -u); do
-  case "$ref" in docs/agents-v0/onboarding/report.md|docs/agents-v0/adr/0000-inherited-decisions.md|docs/agents-v0/discovery/*|docs/agents-v0/design/system/architecture-review.md|docs/agents-v0/*/p0-a-platform-skeleton*) continue ;; esac
+  case "$ref" in docs/agents-v0/onboarding/report.md|docs/agents-v0/adr/0000-inherited-decisions.md|docs/agents-v0/discovery/*|docs/agents-v0/design/system/architecture-review.md|docs/agents-v0/*/p0-a-platform-skeleton*|*phase-result.md) continue ;; esac
   if [ -f "$ref" ]; then
     continue
   fi

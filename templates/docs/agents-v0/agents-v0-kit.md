@@ -107,6 +107,11 @@ Workflow state, artifact pointers, and human approvals live in structured JSON s
   "tier": "standard",
   "lastApprovedPhase": "build",
   "approvedPhases": ["intake", "design", "build"],
+  "phaseDates": {
+    "intake": "2026-10-19",
+    "design": "2026-10-20",
+    "build": "2026-10-21"
+  },
   "activePhase": "verify",
   "activeStatus": "awaiting_approval",
   "blockedReason": "",
@@ -117,7 +122,7 @@ Workflow state, artifact pointers, and human approvals live in structured JSON s
   "baseCommit": "a1b2c3d4e5f6...",
   "updatedAt": "2026-10-21T08:30:00Z",
   "artifacts": {
-    "intake": "docs/agents-v0/requirements/order-cancellation.md",
+    "primary": "docs/agents-v0/requirements/order-cancellation.md",
     "design": "docs/agents-v0/design/order-cancellation/design.md",
     "openapi": "docs/agents-v0/design/order-cancellation/openapi.yaml",
     "buildPlan": "docs/agents-v0/build/order-cancellation/plan.md",
@@ -170,7 +175,7 @@ If Build or Verify discovers that an approved contract must change, the agent st
 
 ### Build (`/v0-build`)
 1. Starts from a clean, green baseline and writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` from Intake to concrete implementation units, target files, test cases, and risk level (`standard` vs. `critical`).
-2. Executes units in dependency order using the bound pack's implementation skills (`implement-service`, `implement-bff`, `implement-ui`) and strict red-to-green TDD.
+2. Executes units in dependency order using the bound pack's implementation skills (`implement-service`, `implement-bff`, `implement-frontend`) and strict red-to-green TDD.
 3. **Failure budgets:** Each unit attempt is logged in `docs/agents-v0/build/<feature>/build-report.md`.
    - If the same test fails twice consecutively, Build stops and routes a helper brief to `debug-investigator` (`.agents-v0/scripts/check-failure-brief.sh`) before a third attempt.
    - A third consecutive failure on the same test, or exceeding 8 total failed attempts across the phase (`.agents-v0/scripts/check-attempt-budget.sh`), stops Build and escalates to the user.
@@ -198,9 +203,9 @@ Verify combines **deterministic native stack execution** with **role-separated s
 ## Onboarding and Maintenance
 
 - **Brownfield Onboarding (`/v0-onboard`):**
-  - Runs `.agents-v0/scripts/generate-repo-map.sh`, `.agents-v0/scripts/collect-dependency-graphs.sh`, and `.agents-v0/scripts/discover-codebase.sh` (using `.agents-v0/scripts/endpoint_scan.py` and `.agents-v0/scripts/packlib.py`) to inventory endpoints, entities, migrations, messaging, and config keys under `docs/agents-v0/discovery/`.
+  - Runs `.agents-v0/scripts/audit-brownfield-baseline.sh`, `.agents-v0/scripts/generate-repo-map.sh`, `.agents-v0/scripts/collect-dependency-graphs.sh`, and `.agents-v0/scripts/discover-codebase.sh` (using `.agents-v0/scripts/endpoint_scan.py` and `.agents-v0/scripts/packlib.py`) to record the test/coverage baseline (`docs/agents-v0/discovery/baseline.md`) and inventory endpoints, entities, migrations, messaging, and config keys under `docs/agents-v0/discovery/`.
   - Auto-detects the stack pack via `.agents-v0/scripts/activate-stack-pack.sh --detect` when `Pack` is unset.
-  - `codebase-documenter` writes `docs/agents-v0/onboarding/report.md` and per-module docs citing `path/File:line` (validated by `.agents-v0/scripts/check-onboarding-docs.sh`).
+  - `codebase-documenter` writes `docs/agents-v0/onboarding/report.md`, per-module docs (`docs/agents-v0/onboarding/modules/<module>.md`), as-is system docs (`architecture.md`, `network.md`, `design/system/context-map.md`, `adr/0000-inherited-decisions.md`), and user-selected flow sequence diagrams (`docs/agents-v0/diagrams/sequences/<service>.md`) citing `path/File:line` (validated by `.agents-v0/scripts/check-onboarding-docs.sh`).
 - **Maintenance (`/v0-maintain` & `/v0-triage`):**
   - Tracked in `docs/agents-v0/maintain/<id>/note.md` and `docs/agents-v0/maintain/<id>/state.json` (`tier`: `trivial`, `standard`, or `emergency`).
   - Bug fixes require a failing reproduction test before the fix; dependency upgrades record before/after dependency graphs; all changes flow into `/v0-verify` and `/v0-local-release`.

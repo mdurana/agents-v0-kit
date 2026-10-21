@@ -12,18 +12,18 @@ Documentation playbook for `/v0-deck`. It does not record a delivery approval. I
    - `intake` also requires the feature slug: `/v0-deck intake <feature> <audience> <decision>`.
    - `product` and `delivery` stay `/v0-deck product <audience> <decision>` and `/v0-deck delivery <audience> <decision>`.
 2. **Intake** sources:
-   - `docs/agents-v0/requirements/<feature>.md` with an `Approved` `intake` row. Refuse when that row is missing.
-   - When that file has `Milestone file:`, that manifest is a source. It must contain the `Story:` id and an `Approved` `plan` row. Refuse when the line is set and either is missing. A file with no `Milestone:` line has no manifest source.
-3. **Product** sources, each of which must already carry an `Approved` row except the discovery file:
-   - the roadmap (`roadmap`). Read the discovery file only at its `Discovery:` path.
-   - `docs/agents-v0/design/system/context-map.md`, cited by an `Approved` `plan` row.
-   - `docs/agents-v0/design/system/arc-record.md` when it exists. An `Approved` `arc` row on that file admits it. So does an `Approved` `architecture` row in `docs/agents-v0/architecture.md` whose Artifacts cell names that file.
-   - every `docs/agents-v0/requirements/*.md` that has an `Approved` `intake` row. Skip a requirements file that does not. Do not fail the deck because some stories are not through Intake yet.
-4. **Delivery** sources are the product sources plus the milestone manifests and the release evidence named on `Approved` `release` rows. Skip a release report that has no `Approved` row.
-5. Refuse a source that lacks its `Approved` row. The discovery file is one exception: the roadmap row is the approval that admits it. The ARC record is the other: an `Approved` `architecture` row that names the file admits it.
+   - `docs/agents-v0/requirements/<feature>.md` with `intake` in `docs/agents-v0/requirements/<feature>.state.json` (`approvedPhases`) or an `Approved` `intake` row. Refuse when neither is present.
+   - When that file has `Milestone file:`, that manifest is a source. It must contain the `Story:` id and have `plan` in `docs/agents-v0/program.state.json` (`approvedPhases`) or an `Approved` `plan` row. Refuse when the line is set and either is missing. A file with no `Milestone:` line has no manifest source.
+3. **Product** sources, each of which must already be approved in `docs/agents-v0/program.state.json` / `<feature>.state.json` (`approvedPhases`) or carry an `Approved` row except the discovery file:
+   - the roadmap (`roadmap` in `program.state.json` or an `Approved` `roadmap` row). Read the discovery file only at its `Discovery:` path.
+   - `docs/agents-v0/design/system/context-map.md`, admitted when `plan` or `architecture` is in `program.state.json` (`approvedPhases`) or cited by an `Approved` `plan` row.
+   - `docs/agents-v0/design/system/arc-record.md` when it exists. `architecture` in `program.state.json` (`approvedPhases`), an `Approved` `arc` row on that file, or an `Approved` `architecture` row in `docs/agents-v0/architecture.md` whose Artifacts cell names that file admits it.
+   - every `docs/agents-v0/requirements/*.md` that has `intake` in `<feature>.state.json` (`approvedPhases`) or an `Approved` `intake` row. Skip a requirements file that does not. Do not fail the deck because some stories are not through Intake yet.
+4. **Delivery** sources are the product sources plus the milestone manifests and the release evidence for stories with `release` in `<feature>.state.json` (`approvedPhases`) or named on `Approved` `release` rows. Skip a release report that is not approved.
+5. Refuse a source that lacks approval in `.state.json` and lacks an `Approved` row. The discovery file is one exception: the roadmap approval admits it. The ARC record is the other: an approved `architecture` phase (in `program.state.json` or an `Approved` `architecture` row that names the file) admits it.
 6. Write the deck as markdown. Every figure, date, and metric is copied from a source. When a number is not in the sources, omit it. Scenario text is copied from the requirements artifact. Do not invent a problem statement.
 7. Use the outline for the kind. For `Non-technical`, an in-scope line is the scenario name only (`### AC-n — <name>`). For `Technical` and `Mixed`, also copy `Kind:` and the `Then` line.
-8. Write the params file with Audience, Decision, and one source line per file (`path`, approval date). The discovery line uses the roadmap approval date. A requirements line uses the date on its `Approved` `intake` row. The ARC line uses the `arc` approval date, or the `architecture` approval date when that row names the file.
+8. Write the params file with Audience, Decision, and one source line per file (`path`, approval date from `.state.json` `phaseDates.<phase>` / `updatedAt` or the `Approved` row). The discovery line uses the roadmap approval date. A requirements line uses the Intake approval date. The ARC line uses the `arc` or `architecture` approval date.
 9. Do not edit those sources. Do not add an `Approved` row.
 
 ### Intake outline
@@ -41,12 +41,12 @@ File: `docs/agents-v0/presentations/<roadmap-stem>.md` for product, and `docs/ag
 1. Decision, in the user's words.
 2. Problem and success metric, copied from the discovery file.
 3. Now, Next, and Later, copied from the roadmap.
-4. Stories: one block per approved requirements artifact, using the intake outline's items 2 through 5. When no requirements artifact has an `Approved` `intake` row, write that no approved Intake artifact is on disk.
-5. Delivery only: the release evidence the `Approved` `release` rows name, copied. Omit a figure the evidence does not contain.
+4. Stories: one block per approved requirements artifact (`intake` in `<feature>.state.json` `approvedPhases` or an `Approved` `intake` row), using the intake outline's items 2 through 5. When no requirements artifact has `intake` approved in `.state.json` or an `Approved` `intake` row, write that no approved Intake artifact is on disk.
+5. Delivery only: the release evidence for stories with `release` approved in `<feature>.state.json` (`approvedPhases` / `artifacts`) or named on `Approved` `release` rows, copied. Omit a figure the evidence does not contain.
 
 ## Rule-compliance checklist
 - [ ] Audience and decision were supplied by the user. Intake also names the feature.
-- [ ] Every source except the discovery file has an `Approved` row. The ARC record may instead be named by an `Approved` `architecture` row.
+- [ ] Every source except the discovery file is approved in `.state.json` (`approvedPhases`) or has an `Approved` row. The ARC record may instead be covered by an approved `architecture` phase in `program.state.json` or named by an `Approved` `architecture` row.
 - [ ] The deck contains no number that the sources do not contain.
 - [ ] Non-technical in-scope lines are scenario names. Technical and Mixed lines also copy `Kind` and `Then`.
 - [ ] Requirements, design, and `Delivery approvals` were not edited.

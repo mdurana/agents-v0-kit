@@ -15,9 +15,9 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
    - Read failing checks (`glab ci status` / pipeline jobs).
    - Route fixes to the responsible agent (backend/bff/frontend/test). A code fix re-enters Verify.
    - Push with its own authorization; re-run. After three rounds record `blocked` and escalate to the user.
-5. **Release approval.** Only after `glab mr create` has returned a URL and the user approves, run `sh .agents-v0/scripts/sync-feature-state.sh <feature> --approve release --clear-active` and optionally append the `release` row with the merge-request URL.
+5. **Release approval.** Only after `glab mr create` has returned a URL and the user approves, run `sh .agents-v0/scripts/sync-feature-state.sh --approve release --clear-active <artifact>` and optionally append the `release` row with the merge-request URL.
 6. Publish a status report in the phase result and the merge-request description.
-7. Optional compliance archive: after Verify/Release approval, run `sh .agents-v0/scripts/export-audit-pack.sh <feature>` and attach `docs/agents-v0/release/<feature>/audit-manifest.json` to the release record (regulated environments).
+7. Optional compliance archive: after Verify/Release approval, run `sh .agents-v0/scripts/export-audit-pack.sh <feature-or-id>` and attach `docs/agents-v0/release/<feature-or-id>/audit-manifest.json` to the release record (regulated environments).
 8. Never merge or approve the merge request, and do not commit, push, force-push, or hard reset without explicit user approval. The version and the tag belong to the release owner; propose the semantic version from the change.
 9. Report merge-request readiness with CI green and stop for an authorized human merge; confirm the merge and CI green before reporting the change released. Deployment records, if any, go through `release-deploy`.
 

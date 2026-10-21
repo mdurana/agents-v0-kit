@@ -10,10 +10,10 @@ Documentation playbook for `/v0-export`. It does not record a delivery approval.
 ## Steps
 1. Read `docs/agents-v0/backlog/export-params.md`. Project key and Issue type must be non-empty. When either is empty, ask once and wait for `yes` or an explicit override. Do not invent a project key.
 2. Collect rows in manifest order. For each story row in `docs/agents-v0/milestones/*.md` that has a concrete feature path:
-   - When that artifact has an `Approved` Intake row, acceptance criteria are the Gherkin scenarios in the artifact.
-   - Otherwise the acceptance criteria cell is the user-story sentence from the manifest, and only when the manifest has an `Approved` `plan` row.
-   - Skip a manifest with no `Approved` `plan` row.
-3. Write `docs/agents-v0/backlog/tickets-sources.md` first. One bullet per source: the path and the date from its `Approved` row. Include the export-params file.
+   - When that artifact has `intake` in `docs/agents-v0/requirements/<feature>.state.json` (`approvedPhases`) or an `Approved` Intake row, acceptance criteria are the Gherkin scenarios in the artifact.
+   - Otherwise the acceptance criteria cell is the user-story sentence from the manifest, and only when `plan` is in `docs/agents-v0/program.state.json` (`approvedPhases`) or the manifest has an `Approved` `plan` row.
+   - Skip a manifest when neither `program.state.json` nor the manifest records `plan` as approved.
+3. Write `docs/agents-v0/backlog/tickets-sources.md` first. One bullet per source: the path and the approval date from `.state.json` (`phaseDates.<phase>` or `updatedAt` date) or its `Approved` row. Include the export-params file.
 4. Rewrite `docs/agents-v0/backlog/tickets.csv` in UTF-8 with this header row and no preamble:
 
    `Issue Type,Parent ID,Summary,Description,Acceptance Criteria,Priority,Story ID,Surface,Size,Milestone,Feature artifact`

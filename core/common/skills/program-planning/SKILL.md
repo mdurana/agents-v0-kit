@@ -27,7 +27,7 @@ Plan phase playbook for the `program-planner` agent (`workflow-orchestration.mdc
 9. Write `docs/agents-v0/milestones/plan.md` from the manifests. Two parts only:
    - A table with columns `Milestone`, `Stories`, and `What they cover`. One row per milestone in the plan, from P0 when it is in scope. `Stories` lists the story ids in dependency order. `What they cover` is one line, not the user-story sentence.
    - A `flowchart TD` of every story (or one `flowchart TD` per milestone when the backlog exceeds ~50 stories so each diagram stays within the ~50-node Mermaid cap in `architecture-and-diagrams.mdc`). The node id is the story id with the hyphen removed (`P2-F` → `P2F`). The label is the story id (`P2F[P2-F]`). One arrow per dependency, including edges that cross milestones. A story with no dependency is a node with no incoming arrow.
-10. Present `docs/agents-v0/milestones/plan.md`. Wait for explicit approval. Then record `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/program.state.json --approve plan` and append the `plan` row to each manifest's `Delivery approvals` table:
+10. Present `docs/agents-v0/milestones/plan.md`. Wait for explicit approval. Then record `sh .agents-v0/scripts/sync-feature-state.sh --approve plan docs/agents-v0/milestones/plan.md` and append the `plan` row to each manifest's `Delivery approvals` table:
 
    | Phase | Artifacts | Approver | Decision | Date |
    |-------|-----------|----------|----------|------|

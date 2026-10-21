@@ -34,7 +34,13 @@ cd "$root"
 command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2; exit 1; }
 
 artifact="docs/agents-v0/requirements/${feature}.md"
-[ -f "$artifact" ] || { printf 'FAIL: requirements artifact not found: %s\n' "$artifact" >&2; exit 1; }
+if [ ! -f "$artifact" ] && [ -f "docs/agents-v0/maintain/${feature}/note.md" ]; then
+  artifact="docs/agents-v0/maintain/${feature}/note.md"
+elif [ ! -f "$artifact" ] && [ -f "$feature" ]; then
+  artifact="$feature"
+  feature="$(basename "$(dirname "$feature")")"
+fi
+[ -f "$artifact" ] || { printf 'FAIL: requirements or maintenance artifact not found: %s\n' "$artifact" >&2; exit 1; }
 
 if [ -z "$out" ]; then
   out="docs/agents-v0/release/${feature}"
@@ -115,7 +121,27 @@ def collect_tree(base_dir):
 
 
 candidates = set(approval_paths(artifact))
+is_note = "docs/agents-v0/maintain/" in artifact.replace("\\", "/")
+state_rel = (
+    f"docs/agents-v0/maintain/{feature}/state.json"
+    if is_note
+    else f"docs/agents-v0/requirements/{feature}.state.json"
+)
+if os.path.isfile(os.path.join(root, state_rel)):
+    candidates.add(state_rel)
+    try:
+        st_data = json.load(open(os.path.join(root, state_rel), encoding="utf-8"))
+        for val in (st_data.get("artifacts") or {}).values():
+            if isinstance(val, str) and val.startswith("docs/"):
+                candidates.add(val)
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, str) and item.startswith("docs/"):
+                        candidates.add(item)
+    except ValueError:
+        pass
 for prefix in (
+    f"docs/agents-v0/maintain/{feature}",
     f"docs/agents-v0/design/{feature}",
     f"docs/agents-v0/build/{feature}",
     f"docs/agents-v0/verify/{feature}",

@@ -19,6 +19,7 @@ command -v python3 >/dev/null 2>&1 || { printf 'FAIL: python3 is required\n' >&2
 
 ARGS="$(printf '%s\n' "$@")" python3 - <<'PY'
 import datetime
+import json
 import os
 import re
 import sys
@@ -88,6 +89,28 @@ def release_row(text):
     return found
 
 
+def state_release_info(path):
+    slug = os.path.basename(path)[:-3]
+    state_path = (
+        os.path.join(os.path.dirname(path), "state.json")
+        if "docs/agents-v0/maintain/" in path.replace("\\", "/")
+        else f"docs/agents-v0/requirements/{slug}.state.json"
+    )
+    if not os.path.isfile(state_path):
+        return False, ""
+    try:
+        st = json.load(open(state_path, encoding="utf-8"))
+    except ValueError:
+        return False, ""
+    approved_phases = [p.lower() for p in (st.get("approvedPhases") or [])]
+    last_app = (st.get("lastApprovedPhase") or "").lower()
+    if "release" in approved_phases or last_app == "release":
+        p_dates = st.get("phaseDates") or {}
+        upd = str(p_dates.get("release") or st.get("updatedAt") or "")[:10]
+        return True, upd
+    return False, ""
+
+
 entries, skipped = [], []
 for story_id, path in artifacts:
     text = read(path)
@@ -95,7 +118,7 @@ for story_id, path in artifacts:
         skipped.append(f"{story_id}: {path} not found")
         continue
     row = release_row(text)
-    approved = bool(
+    md_approved = bool(
         row
         and re.match(
             r"^(approved|approve|yes|pass)\b(?!.*\b(?:conditions?|conditional|provisional|pending|subject to)\b)",
@@ -103,8 +126,10 @@ for story_id, path in artifacts:
             re.I,
         )
     )
+    st_approved, st_date = state_release_info(path)
+    approved = md_approved or st_approved
     if not approved and not include_all:
-        skipped.append(f"{story_id}: no Approved release row in {path}")
+        skipped.append(f"{story_id}: no Approved release row or state in {path}")
         continue
     m = re.search(r"As an? .+?, I want .+?, so that .+?\.", text)
     block = [f"### {story_id}: {m.group(0) if m else os.path.basename(path)}"]
@@ -117,8 +142,10 @@ for story_id, path in artifacts:
         label = re.sub(r"[|*`]", " ", line.replace(am.group(0), "", 1))
         label = re.sub(r"^[\s:\-–—.)]+", "", re.sub(r"\s+", " ", label)).strip()
         block.append(f"- {am.group(0)}: {label}" if label else f"- {am.group(0)}")
-    if row and approved:
+    if row and md_approved:
         block.append(f"- Released {row[4] or 'on an unrecorded date'}, approved by {row[2] or 'an unrecorded approver'}")
+    elif st_approved:
+        block.append(f"- Released {st_date or 'on an unrecorded date'} (recorded in state.json)")
     entries.append("\n".join(block))
 
 date = datetime.date.today().isoformat()

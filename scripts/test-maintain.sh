@@ -55,10 +55,16 @@ if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/mainta
 else
   fail "state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier"
 fi
-if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md --active-phase release --status in_progress >/dev/null 2>&1); then
-  fail "state: release is not a phase of a maintenance note"
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md --active-phase intake --status in_progress >/dev/null 2>&1); then
+  fail "state: intake is not a phase of a maintenance note"
 else
-  pass "state: release is not a phase of a maintenance note"
+  pass "state: intake is not a phase of a maintenance note"
+fi
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md --active-phase release --status in_progress >/dev/null 2>&1) \
+   && grep -Fq '"activePhase": "release"' "$r/docs/agents-v0/maintain/fix-10/state.json"; then
+  pass "state: release is a valid phase of a maintenance note"
+else
+  fail "state: release is a valid phase of a maintenance note"
 fi
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/maintain/fix-10/note.md >/dev/null 2>&1) && grep -Fq '"lastApprovedPhase": "maintain"' "$r/docs/agents-v0/maintain/fix-10/state.json"; then
   pass "state: the maintain approval is derived"
