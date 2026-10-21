@@ -4,7 +4,7 @@ description: Trivial lane — a docs-only or 1-for-1 patch version bump confirme
 
 # /v0-triage
 
-Use `/v0-triage` for changes that qualify for the **Trivial** tier (`workflow-orchestration.mdc` Change tiers).
+Use `/v0-triage` for changes that qualify for the **Trivial** tier (`workflow-orchestration.mdc` Change Tiers).
 
 ## What qualifies
 - Documentation-only edits, or 1-for-1 patch version bumps in dependency manifests/lockfiles.
@@ -14,5 +14,5 @@ Use `/v0-triage` for changes that qualify for the **Trivial** tier (`workflow-or
 ## Instructions
 1. Inspect `git diff` (or the requested change scope) against the qualification criteria above.
 2. **If not eligible:** Explain why (e.g., touches application logic, auth, or schema) and route to `/v0-maintain` (`Tier: standard`) or `/v0-intake`.
-3. **If eligible:** Create `docs/agents-v0/maintain/<id>/note.md` with `Tier: trivial`, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase maintain --status awaiting_approval docs/agents-v0/maintain/<id>/note.md`, and ask the user to confirm the `trivial` tier in chat.
-4. Once the user confirms, record `Tier confirmed by` in the note, complete `/v0-maintain` with the minimal diff, and run `/v0-verify <id>` (Abbreviated Verify: runs the stack's native build/test command without launching `security-reviewer` or `code-reviewer`), followed by `/v0-local-release` (or `/v0-release`).
+3. **If eligible:** Create `docs/agents-v0/maintain/<id>/note.md` with `Tier: trivial`, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase maintain --status in_progress docs/agents-v0/maintain/<id>/note.md`, and ask the user to confirm the `trivial` tier in chat.
+4. Once the user confirms, record `Tier confirmed by` in the note. That confirmation is not `--approve maintain`. Launch `maintenance-engineer`: a documentation edit follows `doc-sync`, and a 1-for-1 patch version bump follows `dependency-upgrade`. Then follow `/v0-maintain`. Its approval stop writes `docs/agents-v0/maintain/<id>/phase-result.md`, and `--approve maintain` is recorded only after the user approves that diff. Next is `/v0-verify <id>` (Abbreviated Verify: the stack's native build/test command, without `security-reviewer` or `code-reviewer`), then `/v0-local-release` (or `/v0-release`).

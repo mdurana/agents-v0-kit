@@ -21,7 +21,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Local release (primary) | `/v0-local-release` | release-manager | local-release | Native stack verify + user-authorized local branch merge (`git merge --no-ff`) + `release` in `<feature>.state.json` |
 | Remote release (optional) | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` & `state.json`; routes to Verify |
-| Trivial fixes | `/v0-triage` | maintenance-engineer | bugfix-triage | User-confirmed doc/version fix (`tier: "trivial"`); abbreviated Verify |
+| Trivial fixes | `/v0-triage` | maintenance-engineer | doc-sync, dependency-upgrade | User-confirmed doc/version fix (`tier: "trivial"`); abbreviated Verify |
 | Deliver (one story) | `/v0-deliver` | orchestrator | — | Follows each phase command and stops at every gate that applies. P0-A starts at Build and stops once, at Release |
 | Export (on request) | `/v0-export` | — | jira-export | `docs/agents-v0/backlog/tickets.csv` (documentation only, approves nothing) |
 | Briefing (on request) | `/v0-deck` | — | leadership-deck | `docs/agents-v0/presentations/<name>.md` (documentation only, approves nothing) |
