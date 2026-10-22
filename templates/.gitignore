@@ -24,6 +24,8 @@ secrets.yml
 
 # --- OS and editors ---
 .DS_Store
+._*
+.AppleDouble/
 Thumbs.db
 *.swp
 *.swo

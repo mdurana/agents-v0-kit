@@ -26,7 +26,7 @@ mkdir -p "$d/.agents-v0/scripts" \
          "$d/docs/agents-v0/design/orders/mockups" \
          "$d/docs/agents-v0/build/orders" \
          "$d/docs/agents-v0/verify/orders"
-cp "$SC/sync-feature-state.sh" "$SC/check-attempt-budget.sh" "$SC/check-failure-brief.sh" \
+cp "$SC/sync-feature-state.sh" "$SC/check-story-dependencies.sh" "$SC/check-attempt-budget.sh" "$SC/check-failure-brief.sh" \
    "$SC/endpoint_scan.py" "$SC/packlib.py" "$SC/resolve-layout.sh" "$d/.agents-v0/scripts/"
 
 cat > "$d/docs/agents-v0/requirements/orders.md" <<'EOF'
@@ -100,6 +100,7 @@ run fail "non-primary artifact path is rejected" "$d" sh .agents-v0/scripts/sync
 printf 'helper: explore-researcher\noutputs: docs/agents-v0/build/orders/notes.md\nask: find all callers of OrderService.create\nscope: src/\n' > "$d/docs/agents-v0/build/orders/helper-brief.md"
 run pass "helper brief: first ask is recorded" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --active-phase build --status in_progress
 run fail "helper brief: identical ask is blocked on next sync" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --active-phase build --status in_progress
+printf '# Quality gate: orders\nCritical: 0\n' > "$d/docs/agents-v0/verify/orders/quality-gate.md"
 run pass "helper brief: approve is not blocked by brief on disk" "$d" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/orders.md --approve verify
 has "state: verifyPassed is true after verify approval" "$ST" '"verifyPassed": true'
 rm -f "$d/docs/agents-v0/build/orders/helper-brief.md"
@@ -118,10 +119,15 @@ EOF
 run fail "failure brief: missing failure-brief.md fails after second red" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
 cat > "$d/docs/agents-v0/build/orders/failure-brief.md" <<'EOF'
 # Failure brief: orders
+helper: debug-investigator
+ask: why does OrderServiceTest#create_valid_returnsId fail twice
 - **Test:** `OrderServiceTest#create_valid_returnsId`
 - **Root cause:** `OrderService.java:42` returns null when SKU is missing
 - **Smallest fix:** Throw `OrderNotFoundException` at `OrderService.java:42`
+return:
 EOF
+run fail "failure brief: brief without outputs: fails (KD-04)" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
+printf 'outputs: docs/agents-v0/build/orders/debug-notes.md\n' >> "$d/docs/agents-v0/build/orders/failure-brief.md"
 run pass "failure brief: valid failure-brief.md with file:line citation passes" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
 
 cat > "$d/docs/agents-v0/build/orders/build-report.md" <<'EOF'
@@ -133,6 +139,49 @@ cat > "$d/docs/agents-v0/build/orders/build-report.md" <<'EOF'
 EOF
 rm -f "$d/docs/agents-v0/build/orders/failure-brief.md"
 run fail "failure brief: test name with spaces, commas, and semicolons fails safely" "$d" sh .agents-v0/scripts/check-failure-brief.sh orders
+
+# --- Milestone dependency gate and --approve preconditions (kitfix 2026-10-22) ---
+g="$tmp/dep-gate"
+mkdir -p "$g/.agents-v0/scripts" "$g/docs/agents-v0/requirements" "$g/docs/agents-v0/milestones"
+cp "$SC/sync-feature-state.sh" "$SC/check-story-dependencies.sh" "$SC/check-release-evidence.sh" "$g/.agents-v0/scripts/"
+cat > "$g/docs/agents-v0/milestones/p0-platform-skeleton.md" <<'EOF'
+# Milestone: P0
+## Stories
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P0-A | baseline | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — | backend | 4 |
+EOF
+cat > "$g/docs/agents-v0/milestones/p1-contracts.md" <<'EOF'
+# Milestone: P1
+## Stories
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P1-A | contract | docs/agents-v0/requirements/p1-a-access-control-contract.md | planned | P0-A | backend | 3 |
+EOF
+printf '# Requirements: p1-a-access-control-contract\nMilestone: P1\nStory: P1-A\n' > "$g/docs/agents-v0/requirements/p1-a-access-control-contract.md"
+P1A=docs/agents-v0/requirements/p1-a-access-control-contract.md
+P0A=docs/agents-v0/requirements/p0-a-platform-skeleton.md
+run fail "dep gate: build in_progress refused while P0-A has no state file" "$g" sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress "$P1A"
+run pass "dep gate: blocked state can still be recorded" "$g" sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status blocked --reason "Dependency P0-A not verified" "$P1A"
+cat > "$g/$P0A" <<'EOF'
+# Requirements: p0-a-platform-skeleton
+Milestone: P0
+Story: P0-A
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+<!-- | verify | docs/agents-v0/verify/p0-a-platform-skeleton/quality-gate.md | mdurana | Approved | 2026-10-20 | -->
+EOF
+run pass "dep gate: P0-A state derived from a commented row" "$g" sh .agents-v0/scripts/sync-feature-state.sh "$P0A"
+run fail "dep gate: a commented-out verify row is not a verified dependency" "$g" sh .agents-v0/scripts/check-story-dependencies.sh "$P1A"
+run fail "KD-02: --approve release without quality-gate.md or verifyPassed is refused" "$g" sh .agents-v0/scripts/sync-feature-state.sh --approve release "$P0A"
+mkdir -p "$g/docs/agents-v0/verify/p0-a-platform-skeleton" && printf 'Critical: 0\n' > "$g/docs/agents-v0/verify/p0-a-platform-skeleton/quality-gate.md"
+run pass "P0-A verify verdict recorded" "$g" sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase release --status in_progress "$P0A"
+run pass "P0-A --approve release with evidence" "$g" sh .agents-v0/scripts/sync-feature-state.sh --approve release "$P0A"
+run fail "KD-01: release without an Approved row or approved phase-result is unsupported" "$g" sh .agents-v0/scripts/check-release-evidence.sh "$P0A"
+run pass "dep gate: P1-A build in_progress allowed once P0-A is verified" "$g" sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress "$P1A"
 
 if [ "$status" -ne 0 ]; then
   echo "test-design-build: FAILED" >&2

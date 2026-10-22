@@ -51,6 +51,18 @@ SUDO_RE = re.compile(
     r"(?:^|[;&|(`]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:sudo|doas)\b"
     r"|\b(?:sh|bash|zsh|dash|ksh)\s+-l?c\s+[\"']\s*(?:sudo|doas)\b"
 )
+# System package installs (the kit never installs host packages; host-tools-macports.sh --install
+# is the one approved path and runs as its own, asked-for script).
+PKG_INSTALL_RE = re.compile(
+    r"(?:^|[;&|(`]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*"
+    r"(?:apt|apt-get|aptitude|dnf|yum|microdnf|apk|zypper|pacman|brew|port|snap|flatpak)\s+"
+    r"(?:-\S+\s+)*(?:install|add|upgrade|update|-S\b|-Sy\b|-Syu\b)"
+)
+# An unauthenticated Docker/Podman TCP API is root on the host; do not use it to get a runtime.
+DOCKER_TCP_RE = re.compile(
+    r"DOCKER_HOST=['\"]?tcp://"
+    r"|\b(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\]):237[56]\b"
+)
 SECRET_READERS = frozenset(
     {
         "cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg",
@@ -573,8 +585,21 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     # sudo is unwrapped when segments are split, and a pipe splits a download from its interpreter,
     # so both are judged on the whole command. A block above still wins.
     if SUDO_RE.search(cmd):
-        worst, msg = "ask", msg or "sudo or doas runs a command as root; requires explicit user approval."
-    elif PIPE_TO_INTERPRETER_RE.search(cmd):
+        return "block", (
+            "sudo/doas is not used by the kit. Do not escalate privileges or install host packages; "
+            "report the missing tool and stop (for a database, run .agents-v0/scripts/check-database-runtime.sh)."
+        )
+    if PKG_INSTALL_RE.search(cmd):
+        return "block", (
+            "system package installs are not allowed. Report the missing tool and stop "
+            "(for a database, run .agents-v0/scripts/check-database-runtime.sh)."
+        )
+    if DOCKER_TCP_RE.search(cmd):
+        return "block", (
+            "a Docker/Podman TCP API (DOCKER_HOST=tcp://, :2375/:2376) is root-equivalent and is not used. "
+            "Run .agents-v0/scripts/check-database-runtime.sh and follow its result."
+        )
+    if PIPE_TO_INTERPRETER_RE.search(cmd):
         worst, msg = "ask", msg or "piping a download into an interpreter requires explicit user approval."
     if worst == "ask":
         return "ask", msg

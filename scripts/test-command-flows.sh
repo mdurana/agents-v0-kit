@@ -114,6 +114,7 @@ grep -Fq '"lastApprovedPhase": "intake"' "$r/docs/agents-v0/requirements/orders.
   && pass "orders.state.json records lastApprovedPhase=intake" \
   || fail "orders.state.json records lastApprovedPhase=intake"
 
+mkdir -p "$r/docs/agents-v0/verify/orders" && printf '# Quality gate: orders\nCritical: 0\n' > "$r/docs/agents-v0/verify/orders/quality-gate.md"
 expect_pass "verify: sync-feature-state approves verify and sets verifyPassed=true" "$r" \
   sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --approve design --approve build --approve verify --verify-passed true --clear-active
 grep -Fq '"verifyPassed": true' "$r/docs/agents-v0/requirements/orders.state.json" \

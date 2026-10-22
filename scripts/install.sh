@@ -185,6 +185,11 @@ install_templates() {
   if [ "$UPDATE" = 1 ]; then
     rm -rf "$t/.agents-v0/ci" "$t/.agents-v0/hooks/pre-commit" "$t/.agents-v0/scripts/check-delivery-gate-local.sh"
     cp "$KIT/AGENTS.md" "$t/AGENTS.md"
+    # macOS AppleDouble files (._*) break Checkstyle and test globs; an existing .gitignore gains the rule.
+    if [ -f "$t/.gitignore" ] && ! grep -Eq '^\._\*$' "$t/.gitignore"; then
+      printf '\n# --- macOS AppleDouble metadata ---\n._*\n.AppleDouble/\n' >> "$t/.gitignore"
+      printf 'MIGRATED (project-owned file edited): .gitignore gained ._* and .AppleDouble/\n'
+    fi
   fi
   minimal="
 .gitignore
@@ -202,6 +207,9 @@ install_templates() {
 .agents-v0/scripts/feature-worktree.sh
 .agents-v0/scripts/check-attempt-budget.sh
 .agents-v0/scripts/check-failure-brief.sh
+.agents-v0/scripts/check-story-dependencies.sh
+.agents-v0/scripts/check-release-evidence.sh
+.agents-v0/scripts/check-database-runtime.sh
 .agents-v0/scripts/discover-codebase.sh
 .agents-v0/scripts/check-onboarding-docs.sh
 .agents-v0/scripts/audit-brownfield-baseline.sh
@@ -262,7 +270,8 @@ docs/agents-v0/brownfield-onboarding.md
     if [ "$UPDATE" = 1 ]; then
       for always in $always_on_update \
         .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \
-        .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
+        .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/check-story-dependencies.sh \
+        .agents-v0/scripts/check-release-evidence.sh .agents-v0/scripts/check-database-runtime.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
         .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \

@@ -109,6 +109,22 @@ case "$art" in
     ;;
 esac
 
+# Deterministic milestone dependency gate (v0-build.md Prerequisite): a story cannot enter
+# Build (in_progress / awaiting_approval) or have Build approved while a dependency is unverified.
+# Recording the blocked state is always allowed.
+case "$art" in
+  docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
+    dep_gate=0
+    if [ "$set_active" = 1 ] && [ "$active_phase" = build ] && [ "$active_status" != blocked ]; then
+      dep_gate=1
+    fi
+    [ "$approve_phase" = build ] && dep_gate=1
+    if [ "$dep_gate" = 1 ]; then
+      sh "$(dirname "$0")/check-story-dependencies.sh" "$art" >/dev/null || exit 1
+    fi
+    ;;
+esac
+
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
@@ -238,6 +254,25 @@ if cli_approve:
     if cli_approve not in phases:
         print(f"FAIL: --approve phase must be one of {', '.join(phases)}", file=sys.stderr)
         raise SystemExit(1)
+    # Preconditions (KD-02): on a feature story, --approve verify|release needs the Verify
+    # evidence on disk, and --approve release needs verifyPassed already true (or set in this
+    # call). A single call can no longer forge a complete, released story from nothing.
+    if not (onboarding or maintain_note or program_doc) and cli_approve in ("verify", "release"):
+        slug_id = os.environ.get("HOOK_SLUG", "")
+        qg = os.path.join("docs", "agents-v0", "verify", slug_id, "quality-gate.md")
+        vp_now = os.environ.get("HOOK_VERIFY_PASSED", "").strip().lower() in ("true", "1", "yes")
+        missing = []
+        if not os.path.isfile(qg):
+            missing.append(f"{qg} is missing")
+        if cli_approve == "release" and not (prev.get("verifyPassed") is True or vp_now):
+            missing.append("verifyPassed is not true (run /v0-verify first)")
+        if missing:
+            print(
+                f"FAIL: --approve {cli_approve} needs Verify evidence: {'; '.join(missing)}. "
+                "Do not approve; run /v0-verify for this story.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
     # An emergency note may release before Verify. Do not backfill verify,
     # and do not treat that release as verifyPassed. P0-A is a feature story.
     emergency_skip_verify = (

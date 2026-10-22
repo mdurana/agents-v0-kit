@@ -7,8 +7,8 @@
 #   sh .agents-v0/scripts/check-failure-brief.sh docs/agents-v0/build/<feature>/build-report.md [<failing-test>]
 #
 # Exit 0 when no second-red situation yet, or when the brief exists and names the test.
-# Exit 1 when the report shows two failed cards for the same test and the brief is missing
-# or does not mention that test / a file:line.
+# Exit 1 when the report shows two failed cards for the same test and the brief is missing,
+# does not mention that test / a file:line, or lacks a helper:, outputs:, return: or ask: field.
 
 set -eu
 
@@ -92,6 +92,13 @@ if missing:
 
 if not has_file_line:
     print(f"FAIL: {brief_path} must cite at least one file:line", file=sys.stderr)
+    raise SystemExit(1)
+
+# v4 brief format (v0-build.md step 5): helper:, outputs:, return:, ask: are required fields.
+absent = [k for k in ("helper", "outputs", "return", "ask")
+          if not re.search(rf"^\s*(?:[-*]\s*)?(?:\*\*)?{k}:(?:\*\*)?", brief_text, re.M | re.I)]
+if absent:
+    print(f"FAIL: {brief_path} lacks required field(s): {', '.join(a + ':' for a in absent)} (v0-build.md step 5)", file=sys.stderr)
     raise SystemExit(1)
 
 print(f"OK: failure-brief present for second-red ({joined})")

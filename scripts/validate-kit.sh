@@ -257,6 +257,17 @@ grep -Fq 'host-tools-macports.sh' scripts/install.sh || err "install.sh must see
 [ -x templates/.agents-v0/scripts/host-tools-macports.sh ] || err "templates/.agents-v0/scripts/host-tools-macports.sh missing or not executable"
 grep -Fq 'openjdk21' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document MacPorts openjdk21 for Intel Macs"
 grep -Fq 'host-tools-macports.sh' core/common/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
+# kitfix 2026-10-22: deterministic gates and no-root database runtime discovery.
+for ks in check-story-dependencies.sh check-release-evidence.sh check-database-runtime.sh; do
+  [ -x "templates/.agents-v0/scripts/$ks" ] || err "templates/.agents-v0/scripts/$ks missing or not executable"
+  grep -Fq ".agents-v0/scripts/$ks" scripts/install.sh || err "install.sh must seed .agents-v0/scripts/$ks"
+done
+grep -Fq 'check-story-dependencies.sh' core/common/commands/v0-build.md || err "v0-build must run check-story-dependencies.sh (dependency gate)"
+grep -Fq 'check-story-dependencies.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must enforce the dependency gate on build"
+grep -Fq 'check-database-runtime.sh' core/common/commands/v0-build.md || err "v0-build must run check-database-runtime.sh before DB-backed tests"
+grep -Fq 'check-database-runtime.sh' core/common/commands/v0-verify.md || err "v0-verify must run check-database-runtime.sh before DB-backed verify"
+grep -Fq 'check-release-evidence.sh' core/common/commands/v0-status.md || err "v0-status must cross-check release evidence before calling a story complete"
+grep -Eq '^\._\*$' templates/.gitignore || err "templates/.gitignore must ignore macOS AppleDouble files (._*)"
 [ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
 [ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"
 [ -f scripts/test-update-agents-model.sh ] || err "scripts/test-update-agents-model.sh missing"
