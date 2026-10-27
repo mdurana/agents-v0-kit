@@ -42,7 +42,7 @@ if [ "$action" = "block" ]; then
   HOOK_DENY_MSG="$message" python3 -c '
 import json, os
 msg = os.environ.get("HOOK_DENY_MSG", "")
-print(json.dumps({"permission": "deny", "user_message": msg}))
+print(json.dumps({"permission": "deny", "decision": "deny", "reason": msg, "user_message": msg}))
 '
   exit 2
 fi

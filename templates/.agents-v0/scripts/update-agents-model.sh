@@ -124,35 +124,40 @@ for name, role in roles:
     path = os.path.join(agents_dir, name + ".md")
     if not os.path.isfile(path):
         sys.exit(f"error: missing agent file {path}")
-    with open(path, encoding="utf-8") as handle:
-        lines = handle.readlines()
-    in_frontmatter = bool(lines) and lines[0].strip() == "---"
-    replaced = False
-    out = []
-    for index, line in enumerate(lines):
-        if index == 0 and line.strip() == "---":
+    target_paths = [path]
+    agy_path = os.path.join(".agents/agents", name + ".md")
+    if os.path.isfile(agy_path) and not os.path.samefile(path, agy_path):
+        target_paths.append(agy_path)
+    for idx_t, tpath in enumerate(target_paths):
+        with open(tpath, encoding="utf-8") as handle:
+            lines = handle.readlines()
+        in_frontmatter = bool(lines) and lines[0].strip() == "---"
+        replaced = False
+        out = []
+        for index, line in enumerate(lines):
+            if index == 0 and line.strip() == "---":
+                out.append(line)
+                continue
+            if in_frontmatter and line.strip() == "---":
+                in_frontmatter = False
+                out.append(line)
+                continue
+            if in_frontmatter and (not replaced) and line.startswith("model:"):
+                ending = "\n" if line.endswith("\n") else ""
+                if line.endswith("\r\n"):
+                    ending = "\r\n"
+                previous = line.split(":", 1)[1].strip()
+                out.append(f"model: {model}{ending}")
+                replaced = True
+                if idx_t == 0 and previous != model:
+                    print(f"{name}: {previous} -> {model}")
+                    updated += 1
+                continue
             out.append(line)
-            continue
-        if in_frontmatter and line.strip() == "---":
-            in_frontmatter = False
-            out.append(line)
-            continue
-        if in_frontmatter and (not replaced) and line.startswith("model:"):
-            ending = "\n" if line.endswith("\n") else ""
-            if line.endswith("\r\n"):
-                ending = "\r\n"
-            previous = line.split(":", 1)[1].strip()
-            out.append(f"model: {model}{ending}")
-            replaced = True
-            if previous != model:
-                print(f"{name}: {previous} -> {model}")
-                updated += 1
-            continue
-        out.append(line)
-    if not replaced:
-        sys.exit(f"error: {path} has no model: line in frontmatter")
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.writelines(out)
+        if not replaced:
+            sys.exit(f"error: {tpath} has no model: line in frontmatter")
+        with open(tpath, "w", encoding="utf-8") as handle:
+            handle.writelines(out)
 
 lines_out = []
 section_name = "intro"

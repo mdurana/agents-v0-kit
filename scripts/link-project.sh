@@ -137,6 +137,14 @@ if os.path.isfile(hooks_json):
 cli_json = os.path.join(root, "core", "common", "adapters", "cursor", "cli.json")
 if os.path.isfile(cli_json):
     link(cli_json, os.path.join(project, ".cursor", "cli.json"))
+link_children(os.path.join(root, "core", "common", "rules"), os.path.join(project, ".agents", "rules", "org"))
+link_children(os.path.join(root, "core", "common", "commands"), os.path.join(project, ".agents", "commands"))
+link_children(os.path.join(root, "core", "common", "agents"), os.path.join(project, ".agents", "agents"))
+link_children(os.path.join(root, "core", "common", "skills"), os.path.join(project, ".agents", "skills"))
+link_children(os.path.join(root, "core", "common", "hooks"), os.path.join(project, ".agents", "hooks"))
+agy_hooks_json = os.path.join(root, "core", "common", "adapters", "antigravity", "hooks.json")
+if os.path.isfile(agy_hooks_json):
+    link(agy_hooks_json, os.path.join(project, ".agents", "hooks.json"))
 link_children(os.path.join(root, "templates", ".agents-v0", "scripts"), os.path.join(project, ".agents-v0", "scripts"))
 agents_md = os.path.join(root, "AGENTS.md")
 if os.path.isfile(agents_md):

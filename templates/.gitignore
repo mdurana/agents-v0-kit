@@ -70,6 +70,8 @@ coverage/
 
 # --- Agent hook audit (local; never commit) ---
 .cursor/hooks/audit.jsonl
+.agents/hooks/audit.jsonl
+.agents/hooks/unattended-allow
 
 # --- Logs and dumps ---
 *.log

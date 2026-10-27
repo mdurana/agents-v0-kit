@@ -177,6 +177,49 @@ install_cursor() {
   fi
 }
 
+install_antigravity() {
+  t="$1"
+  mkdir -p "$t/.agents/rules/org" "$t/.agents/agents" "$t/.agents/commands" "$t/.agents/skills" "$t/.agents/hooks"
+  install_rules "$t/.agents/rules/org"
+  for f in "$KIT"/core/common/agents/*.md; do
+    [ -f "$f" ] || continue
+    emit_agent "$f" "$t/.agents/agents/$(basename "$f")"
+  done
+  if [ -n "$PACK" ]; then
+    for f in "$KIT"/core/"$PACK"/agents/*.md; do
+      [ -f "$f" ] || continue
+      emit_agent "$f" "$t/.agents/agents/$(basename "$f")"
+    done
+  fi
+  for f in "$KIT"/core/common/commands/*.md; do
+    cname="$(basename "$f" .md)"
+    emit_command "$f" "$t/.agents/commands/$(basename "$f")"
+    mkdir -p "$t/.agents/skills/$cname"
+    python3 - "$f" "$cname" "$t/.agents/skills/$cname/SKILL.md" <<'PY'
+import re, sys
+src, cname, dst = sys.argv[1:4]
+raw = open(src, encoding="utf-8").read()
+desc = f"Execute the /{cname} phase of the agents-v0 delivery lifecycle."
+m = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", raw, flags=re.S)
+body = raw
+if m:
+    fm, body = m.group(1), m.group(2)
+    dm = re.search(r"^description:\s*(.+)$", fm, flags=re.M)
+    if dm:
+        desc = dm.group(1).strip()
+with open(dst, "w", encoding="utf-8") as fh:
+    fh.write(f"---\nname: {cname}\ndescription: {desc}\n---\n\n{body}")
+PY
+  done
+  install_skills "$t/.agents/skills"
+  cp "$KIT"/core/common/hooks/*.sh "$KIT"/core/common/hooks/hook-policy.py "$t/.agents/hooks/"
+  if [ -n "$PACK" ] && [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
+    cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.agents/hooks/pack-scan.sh"
+  fi
+  chmod +x "$t"/.agents/hooks/*.sh "$t/.agents/hooks/hook-policy.py"
+  cp "$KIT/core/common/adapters/antigravity/hooks.json" "$t/.agents/hooks.json"
+}
+
 install_templates() {
   t="$1"
   [ -f "$t/README.md" ] || cp "$KIT/README.md" "$t/README.md"
@@ -520,6 +563,7 @@ if [ "$WITH_STARTERS" = 1 ]; then
   install_starters "$TARGET_ABS"
 fi
 install_cursor "$TARGET_ABS"
+install_antigravity "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 
 for hook in "$TARGET_ABS"/.agents-v0/hooks/*; do

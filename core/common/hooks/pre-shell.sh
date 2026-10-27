@@ -11,7 +11,7 @@ cmd="$(hook_extract_command "$payload")"
 block() {
   hook_audit_log "shell" "$cmd" "block" "$1"
   printf 'BLOCK: %s\n' "$1" >&2
-  HOOK_DENY_MSG="$1" python3 -c 'import json,os; m=os.environ.get("HOOK_DENY_MSG",""); print(json.dumps({"permission":"deny","user_message":m,"agent_message":"BLOCKED by kit policy: "+m}))' 2>/dev/null || true
+  HOOK_DENY_MSG="$1" python3 -c 'import json,os; m=os.environ.get("HOOK_DENY_MSG",""); print(json.dumps({"permission":"deny","decision":"deny","reason":m,"user_message":m,"agent_message":"BLOCKED by kit policy: "+m}))' 2>/dev/null || true
   exit 2
 }
 
@@ -36,11 +36,12 @@ case "$action" in
     user_msg="$message Approve only if you explicitly requested this operation."
     hook_audit_log "shell" "$cmd" "ask" "$message"
     printf '%s\n' "$agent_msg" >&2
-    hook_shell_permission_ask "$user_msg" "$agent_msg"
-    exit 0
+    rc=0
+    hook_shell_permission_ask "$user_msg" "$agent_msg" "$cmd" || rc=$?
+    exit "$rc"
     ;;
 esac
 
 hook_audit_log "shell" "$cmd" "allow" ""
-printf '{"permission":"allow"}\n' 2>/dev/null || true
+hook_shell_permission_allow
 exit 0

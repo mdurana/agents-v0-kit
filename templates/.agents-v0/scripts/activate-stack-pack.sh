@@ -182,14 +182,14 @@ def same_file(src, dst):
         return False
 
 
-def install_cursor(data):
+def install_cursor(data, root_dir=".cursor"):
     import tempfile
     pack_id = data["id"]
     directory = data["dir"]
-    org = os.path.join(".cursor", "rules", "org")
-    skills_root = os.path.join(".cursor", "skills")
-    agents = os.path.join(".cursor", "agents")
-    hooks = os.path.join(".cursor", "hooks")
+    org = os.path.join(root_dir, "rules", "org")
+    skills_root = os.path.join(root_dir, "skills")
+    agents = os.path.join(root_dir, "agents")
+    hooks = os.path.join(root_dir, "hooks")
 
     selected_rules = sorted(glob.glob(os.path.join(directory, "rules", "*.mdc")))
     selected_rule_names = {os.path.basename(p) for p in selected_rules}
@@ -461,7 +461,9 @@ for heading, row, value in mapping:
         value = with_frontend_root(text, value)
     text = set_row(text, heading, row, value, force or owned_be or owned_fe)
 try:
-    install_cursor(info)
+    install_cursor(info, ".cursor")
+    if os.path.isdir(".agents"):
+        install_cursor(info, ".agents")
 except Exception as exc:
     fail(f"could not install cursor configuration: {exc}", 1)
 
