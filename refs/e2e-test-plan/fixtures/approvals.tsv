@@ -1,0 +1,16 @@
+# approvals.tsv — the ONLY texts the runner sends at a gate. Tab-separated: gate <TAB> exact text <TAB> per-turn CLI allowlist (comma-separated, or -)
+# gate = the activePhase of the one state file that went to "awaiting_approval" in the turn that just ended,
+#        or "branch" (agent asked to authorise the feature/maintain branch after an Intake or Maintain step).
+# release-p0a applies to story P0-A only. The text "Approved by mdurana" is sent ONLY by an unattended run.
+roadmap	Approved by mdurana	-
+architecture	Approved by mdurana	-
+plan	Approved by mdurana	-
+onboard	Approved by mdurana	-
+intake	Approved by mdurana	-
+design	Approved by mdurana	-
+build	Approved by mdurana, commit it	Shell(git:commit*)
+verify	Approved by mdurana	-
+maintain	Approved by mdurana, commit it	Shell(git:commit*)
+release	Approved by mdurana	Shell(git:commit*),Shell(git:merge*)
+release-p0a	Approved by mdurana	Shell(git:commit*)
+branch	Branch authorized	Shell(sh:.agents-v0/scripts/feature-worktree.sh*)

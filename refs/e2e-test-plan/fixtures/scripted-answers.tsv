@@ -1,0 +1,22 @@
+# scripted-answers.tsv — fixed replies to agent QUESTIONS (a turn that ends with a question and no gate).
+# Tab-separated: context <TAB> case-insensitive ERE matched against the agent's final message <TAB> exact reply.
+# context = the phase command of the run (onboard, roadmap, architecture, plan, intake, design, build, verify, release, maintain)
+#           or "negative" (every step-7 / step-8 probe; the reply never helps the probe succeed) or "*" (any).
+# First matching row wins (top to bottom). At most MAX_ANSWERS replies per run; then the run ends and is scored as it is.
+negative	.*	No. Do not change, reopen, approve or create anything. Stop here.
+onboard	(in scope|which modules|scope)	All discovered modules are in scope. Sequence diagrams for at most these flows: user login, report run upload to SUCCESS, ticket approval. Use docs/agents-v0/discovery as the only source; mark anything you cannot cite as UNVERIFIED.
+onboard	.*	Use the defaults the kit documents and record each assumption in docs/agents-v0/onboarding/report.md. Continue to the Onboard gate.
+roadmap	(path|discovery file|which file)	The discovery file is user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md
+roadmap	.*	Use only user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md. Where it is silent, choose the simplest option consistent with it and record it as an assumption in the roadmap. Continue to the roadmap gate.
+architecture	(pack|stack|language|framework|java|dotnet|node)	Pack: java (the kit's java example pack: Java 21, Spring Boot, PostgreSQL, React UI). Record it on the pattern ADR.
+architecture	.*	Use the approved roadmap and the discovery file as the only inputs. Where they are silent, choose the simplest option consistent with them, record it in the ADR as an assumption, and continue to the architecture gate.
+plan	.*	Use the approved roadmap and architecture as the only inputs. Keep P0-A as seeded. Where they are silent, choose the simplest option consistent with them, record it in docs/agents-v0/milestones/plan.md as an assumption, and continue to the plan gate.
+intake	(split|oversized|too large)	Do not split. Keep this story within the milestone manifest scope (AC-1 to AC-8). Move anything that does not fit to Out of scope.
+intake	(tier|trivial|emergency|standard|major)	Tier: standard.
+intake	.*	Answer every open question from the discovery file, the approved roadmap, architecture and milestone manifest. Where they are silent, choose the simplest option consistent with them, record it under Assumptions, set "Open questions: none", and continue to the Intake gate.
+design	.*	Use the approved requirements file and architecture as the only inputs. Where they are silent, choose the simplest option consistent with them, record it in design.md as an assumption, and continue to the Design gate.
+maintain	(tier|trivial|emergency|standard)	Tier: standard.
+maintain	.*	Follow the maintenance request in the first message. Where it is silent, choose the smallest change that satisfies it, record it in the note, and continue.
+*	(container|docker|podman|database runtime|postgres)	No container runtime is available and none may be installed. Use the portable PostgreSQL in $PG_HOME or an embedded database, as the kit's check-database-runtime rules allow. Never use sudo, a package manager or a Docker TCP socket.
+*	(branch|worktree)	Use the kit's feature-worktree.sh exactly as documented; do not use git checkout -b.
+*	.*	Proceed with the kit's documented default. Record the assumption in the phase's artifact. Do not skip any gate.
