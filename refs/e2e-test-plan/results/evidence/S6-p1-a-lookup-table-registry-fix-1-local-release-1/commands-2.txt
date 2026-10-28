@@ -1,0 +1,4 @@
+git merge -q --no-ff -m 'Merge branch maintain/p1-a-lookup-table-registry-fix-1' maintain/p1-a-lookup-table-registry-fix-1
+sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md
+git add -A
+git commit -q -m 'chore(release): release p1-a-lookup-table-registry-fix-1'

@@ -83,36 +83,44 @@ if conv_id:
                         }))
 
 # Also include any commands logged by .agents/hooks/audit.jsonl during this turn
-audit_offset_file = os.path.join(run_dir, ".audit.offset")
+audit_start_file = os.path.join(run_dir, f"turn-{turn}.audit_start")
 audit_file = os.path.join(ws, ".agents", "hooks", "audit.jsonl")
+turn_cmds = []
 if os.path.isfile(audit_file):
     a_start = 0
-    if os.path.isfile(audit_offset_file):
+    if os.path.isfile(audit_start_file):
         try:
-            a_start = int(open(audit_offset_file, encoding="utf-8").read().strip() or "0")
+            a_start = int(open(audit_start_file, encoding="utf-8").read().strip() or "0")
         except ValueError:
             a_start = 0
     a_lines = open(audit_file, encoding="utf-8", errors="replace").readlines()
-    with open(audit_offset_file, "w", encoding="utf-8") as f:
-        f.write(str(len(a_lines)))
     for aline in a_lines[a_start:]:
         try:
             aobj = json.loads(aline)
         except Exception:
             continue
-        detail = aobj.get("detail") or ""
-        if aobj.get("event") in ("pre-shell", "beforeShellExecution") and detail:
+        cmd_s = aobj.get("subject") or aobj.get("detail") or ""
+        if aobj.get("event") in ("shell", "pre-shell", "beforeShellExecution") and cmd_s:
+            turn_cmds.append(cmd_s)
             out_lines.append(json.dumps({
                 "type": "tool_call",
                 "subtype": "started",
-                "tool_call": {"shellToolCall": {"args": {"command": detail}}}
+                "tool_call": {"shellToolCall": {"args": {"command": cmd_s}}}
             }))
 
 if direct_cmd:
+    turn_cmds.append(direct_cmd)
     out_lines.append(json.dumps({
         "type": "tool_call",
         "subtype": "started",
         "tool_call": {"shellToolCall": {"args": {"command": direct_cmd}}}
+    }))
+
+if not conv_id:
+    out_lines.insert(0, json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "content": final_text or "",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": c}} for c in turn_cmds]
     }))
 
 out_lines.append(json.dumps({
@@ -123,6 +131,11 @@ out_lines.append(json.dumps({
 with open(resp_path, "w", encoding="utf-8") as f:
     for l in out_lines:
         f.write(l + "\n")
+
+try:
+    os.remove(pending_path)
+except OSError:
+    pass
 
 with open(done_path, "w", encoding="utf-8") as f:
     f.write(str(rc_str) + "\n")

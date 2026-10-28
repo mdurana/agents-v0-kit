@@ -1,4 +1,8 @@
-1	P0-A	p0-a-platform-skeleton	-	3	vertical slice	p0-platform-skeleton.md
+1	P0-A	p0-a-platform-skeleton	-	4	vertical slice	p0-platform-skeleton.md
 2	P1-A	p1-a-lookup-table-registry	P0-A	3	backend	p1-contracts-and-data-models.md
 3	P1-B	p1-b-transformation-recipe-schema	P0-A	3	backend	p1-contracts-and-data-models.md
-4	P2-A	p2-a-funding-cost-sap-export	P1-A,P1-B	5	vertical slice	p2-mvp-core-features.md
+4	P2-A	p2-a-funding-cost-sap-export	P1-A,P1-B	4	backend	p2-mvp-core-features.md
+5	P2-B	p2-b-sap-posting-ticket-governance	P2-A	4	backend	p2-mvp-core-features.md
+6	P3-A	p3-a-s3-scheduled-ingestion	P2-B	4	backend	p3-feature-expansion.md
+7	P4-A	p4-a-slo-and-resilience-hardening	P3-A	4	backend	p4-hardening.md
+8	P5-A	p5-a-operational-readiness	P4-A	5	backend	p5-release-readiness.md

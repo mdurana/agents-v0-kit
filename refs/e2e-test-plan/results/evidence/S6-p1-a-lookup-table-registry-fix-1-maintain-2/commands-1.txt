@@ -1,0 +1,1 @@
+(cd app/backend && ./mvnw -B verify) | tail -n 25 && sh .agents-v0/scripts/sync-feature-state.sh --active-phase maintain --status awaiting_approval docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md

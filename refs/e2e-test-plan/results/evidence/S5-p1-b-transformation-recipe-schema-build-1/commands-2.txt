@@ -1,0 +1,3 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p1-b-transformation-recipe-schema.md
+git add -A
+git commit -q -m 'feat(p1-b): implement transformation recipe schema'

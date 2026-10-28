@@ -81,9 +81,9 @@ elif [ "$MODE" = --install ] && [ -n "$A_JDK" ] && [ -n "$OS_JDK" ]; then
 else say jdk21 MISSING "Temurin 21 into $TOOLS_DIR/jdk-21"; fi
 
 # --- Node 22 (Vite 7 accepts >= 20.19, the kit CI uses 22) ---
-node22(){ "$1" -e 'process.exit(+process.versions.node.split(".")[0]>=20?0:1)' 2>/dev/null; }
+node22(){ "$1" -e 'process.exit(+process.versions.node.split(".")[0]==22?0:1)' 2>/dev/null; }
 NH=""
-for nc in "$TOOLS_DIR/node-22/bin/node" "$(command -v node 2>/dev/null || true)" /opt/local/bin/node /usr/local/bin/node /opt/homebrew/bin/node $(ls -d "$HOME"/.nvm/versions/node/v2[024]*/bin/node 2>/dev/null); do
+for nc in "$TOOLS_DIR/node-22/bin/node" "$(command -v node 2>/dev/null || true)" /opt/local/bin/node /usr/local/bin/node /opt/homebrew/bin/node $(ls -d "$HOME"/.nvm/versions/node/v22*/bin/node 2>/dev/null); do
   [ -n "$nc" ] && [ -x "$nc" ] && node22 "$nc" && { NH="$(dirname "$(dirname "$(realpath_py "$nc")")")"; break; }
 done
 if [ -n "$NH" ]; then say node22 PRESENT "$NH ($("$NH/bin/node" -v))"

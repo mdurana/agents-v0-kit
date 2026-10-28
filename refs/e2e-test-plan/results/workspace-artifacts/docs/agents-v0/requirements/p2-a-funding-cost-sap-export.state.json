@@ -1,0 +1,38 @@
+{
+  "feature": "p2-a-funding-cost-sap-export",
+  "tier": "standard",
+  "lastApprovedPhase": "build",
+  "approvedPhases": [
+    "intake",
+    "design",
+    "build"
+  ],
+  "phaseDates": {
+    "intake": "2026-10-28",
+    "design": "2026-10-28",
+    "build": "2026-10-28"
+  },
+  "activePhase": "",
+  "activeStatus": "",
+  "blockedReason": "",
+  "verifyPassed": false,
+  "reopenCount": 0,
+  "helperBriefHashes": [],
+  "artifact": "docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md",
+  "baseCommit": "e3ea11551f2d72cde3ce3312bc3fa579ac94fd2a",
+  "updatedAt": "2026-10-28T06:40:42Z",
+  "artifacts": {
+    "primary": "docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md",
+    "design": "docs/agents-v0/design/p2-a-funding-cost-sap-export/design.md",
+    "openapi": "docs/agents-v0/design/p2-a-funding-cost-sap-export/openapi.yaml",
+    "designReview": "docs/agents-v0/design/p2-a-funding-cost-sap-export/review.md",
+    "buildPlan": "docs/agents-v0/build/p2-a-funding-cost-sap-export/plan.md",
+    "buildReport": "docs/agents-v0/build/p2-a-funding-cost-sap-export/build-report.md"
+  },
+  "evidence": {
+    "build": [
+      "docs/agents-v0/build/p2-a-funding-cost-sap-export/build-report.md"
+    ],
+    "verify": []
+  }
+}

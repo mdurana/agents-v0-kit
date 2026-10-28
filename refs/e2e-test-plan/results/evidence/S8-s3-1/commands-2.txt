@@ -1,0 +1,3 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md
+git add -A
+git commit -q -m 'feat(p2-a): implement funding cost sap export'

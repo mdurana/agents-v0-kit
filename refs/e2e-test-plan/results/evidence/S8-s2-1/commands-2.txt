@@ -1,0 +1,1 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md

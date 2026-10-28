@@ -1,0 +1,2 @@
+Stopped: feature/p2-a-funding-cost-sap-export is checked out in worktree ../portal-p2-a-funding-cost-sap-export, and this checkout is main. Open ../portal-p2-a-funding-cost-sap-export and run /v0-status p2-a-funding-cost-sap-export or /v0-verify p2-a-funding-cost-sap-export there.
+Stopped: feature/p2-a-funding-cost-sap-export is checked out in worktree ../portal-p2-a-funding-cost-sap-export, and this checkout is main. Open ../portal-p2-a-funding-cost-sap-export and run /v0-status p2-a-funding-cost-sap-export or /v0-verify p2-a-funding-cost-sap-export there.

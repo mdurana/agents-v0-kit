@@ -1,0 +1,2 @@
+Created maintenance note docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md (Tier: standard). Please authorize the maintenance branch: sh .agents-v0/scripts/feature-worktree.sh --maintain p1-a-lookup-table-registry-fix-1.
+Created maintenance note docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md (Tier: standard). Please authorize the maintenance branch: sh .agents-v0/scripts/feature-worktree.sh --maintain p1-a-lookup-table-registry-fix-1.

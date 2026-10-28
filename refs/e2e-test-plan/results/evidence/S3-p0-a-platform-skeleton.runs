@@ -1,0 +1,3 @@
+S3-p0-a-platform-skeleton-build-1 NORMAL-END gates: build
+S3-p0-a-platform-skeleton-verify-1 NORMAL-END gates: verify
+S3-p0-a-platform-skeleton-local-release-1 NORMAL-END gates: release-p0a

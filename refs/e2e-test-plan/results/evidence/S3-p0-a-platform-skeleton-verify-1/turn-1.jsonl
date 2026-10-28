@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "P0-A Verify passed (10 tests green, JaCoCo/Checkstyle/SpotBugs clean, 0 Critical findings). Awaiting approval.", "tool_calls": []}
+{"type": "result", "result": "P0-A Verify passed (10 tests green, JaCoCo/Checkstyle/SpotBugs clean, 0 Critical findings). Awaiting approval."}

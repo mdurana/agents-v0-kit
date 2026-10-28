@@ -1,0 +1,3 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p1-a-lookup-table-registry.md
+git add -A
+git commit -q -m 'feat(p1-a): implement lookup table registry'

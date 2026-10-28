@@ -1,0 +1,5 @@
+S4-p1-a-lookup-table-registry-intake-1 NORMAL-END gates: intake branch
+S4-p1-a-lookup-table-registry-design-1 NORMAL-END gates: design
+S4-p1-a-lookup-table-registry-build-1 NORMAL-END gates: build
+S4-p1-a-lookup-table-registry-verify-1 NORMAL-END gates: verify
+S4-p1-a-lookup-table-registry-local-release-1 NORMAL-END gates: release

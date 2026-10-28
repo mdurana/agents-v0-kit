@@ -1,0 +1,50 @@
+{
+  "feature": "p0-a-platform-skeleton",
+  "tier": "standard",
+  "lastApprovedPhase": "release",
+  "approvedPhases": [
+    "intake",
+    "design",
+    "build",
+    "verify",
+    "release"
+  ],
+  "phaseDates": {
+    "intake": "2026-10-28",
+    "design": "2026-10-28",
+    "build": "2026-10-28",
+    "verify": "2026-10-28",
+    "release": "2026-10-28"
+  },
+  "activePhase": "",
+  "activeStatus": "",
+  "blockedReason": "",
+  "verifyPassed": true,
+  "reopenCount": 0,
+  "helperBriefHashes": [],
+  "artifact": "docs/agents-v0/requirements/p0-a-platform-skeleton.md",
+  "baseCommit": "ef5037382052972b4c480c7b5dcd01909a65b852",
+  "updatedAt": "2026-10-28T05:57:19Z",
+  "artifacts": {
+    "primary": "docs/agents-v0/requirements/p0-a-platform-skeleton.md",
+    "design": "docs/agents-v0/design/p0-a-platform-skeleton/design.md",
+    "buildPlan": "docs/agents-v0/build/p0-a-platform-skeleton/plan.md",
+    "buildReport": "docs/agents-v0/build/p0-a-platform-skeleton/build-report.md",
+    "verify": [
+      "docs/agents-v0/verify/p0-a-platform-skeleton/code-review.md",
+      "docs/agents-v0/verify/p0-a-platform-skeleton/quality-gate.md",
+      "docs/agents-v0/verify/p0-a-platform-skeleton/vapt-checklist.md"
+    ]
+  },
+  "evidence": {
+    "build": [
+      "docs/agents-v0/build/p0-a-platform-skeleton/build-report.md",
+      "docs/agents-v0/build/p0-a-platform-skeleton/plan.md"
+    ],
+    "verify": [
+      "docs/agents-v0/verify/p0-a-platform-skeleton/code-review.md",
+      "docs/agents-v0/verify/p0-a-platform-skeleton/quality-gate.md",
+      "docs/agents-v0/verify/p0-a-platform-skeleton/vapt-checklist.md"
+    ]
+  }
+}

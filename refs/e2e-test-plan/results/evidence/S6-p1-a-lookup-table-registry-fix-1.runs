@@ -1,0 +1,4 @@
+S6-p1-a-lookup-table-registry-fix-1-maintain-1 NORMAL-END gates: branch
+S6-p1-a-lookup-table-registry-fix-1-maintain-2 NORMAL-END gates: maintain
+S6-p1-a-lookup-table-registry-fix-1-verify-1 NORMAL-END gates: verify
+S6-p1-a-lookup-table-registry-fix-1-local-release-1 NORMAL-END gates: release

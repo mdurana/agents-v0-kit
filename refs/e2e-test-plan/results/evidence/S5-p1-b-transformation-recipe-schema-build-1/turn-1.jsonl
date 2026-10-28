@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "Build complete for p1-b-transformation-recipe-schema (14/14 tests, JaCoCo, Checkstyle, SpotBugs green). Awaiting approval and commit authorization.", "tool_calls": []}
+{"type": "result", "result": "Build complete for p1-b-transformation-recipe-schema (14/14 tests, JaCoCo, Checkstyle, SpotBugs green). Awaiting approval and commit authorization."}

@@ -1,0 +1,2 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md
+sh .agents-v0/scripts/activate-stack-pack.sh java

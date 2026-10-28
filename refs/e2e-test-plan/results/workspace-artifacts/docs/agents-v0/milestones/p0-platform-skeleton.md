@@ -1,0 +1,47 @@
+# Milestone: P0 — Platform Skeleton
+
+> Program manifest for the first greenfield milestone. One story, one branch, and one
+> merge request: the repo builds, this manifest is the tracked program, quality plugins
+> are bound to verify, and the app runs locally in a container. Later milestones split
+> into one story per contract (`workflow-orchestration.mdc`).
+
+## Goal
+
+Deliver a **known-good baseline**: the project builds and tests cleanly, the test, coverage, and CVE reports named in the bound pack's `pack.json` are bound to `verify`, the agents-v0 kit is installed, and
+one minimal health or hello endpoint (or static shell UI) proves the stack runs locally
+and in CI.
+
+## Scope
+
+- In: repo layout, CI skeleton, quality gate wiring from kit templates, kit install,
+  minimal service or app entrypoint, README build/run/test commands, optional local
+  container run via `Dockerfile` + `docker-compose.yml` and
+  `.agents-v0/scripts/run-local-container.sh` (Podman or Docker).
+- Out: business features, production deployment, full OpenAPI catalog (P1).
+
+## Dependencies
+
+- None (first milestone). P1 depends on this milestone merged with a green
+  profile Backend verify command from that pack's `pack.json`. The `java` example is `./mvnw -B clean verify -Pci-security`. Any other pack uses its own verify command and does not extract the Java archive.
+
+## Stories
+
+| Story ID | User story | Feature artifact | Status | Dependency | Surface | Size |
+|----------|-----------|------------------|--------|------------|---------|------|
+| P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/requirements/p0-a-platform-skeleton.md | planned | — | vertical slice | 4 |
+
+> When `.cursor/` and `.agents-v0/` are already present, do not reinstall the kit. `bootstrap-greenfield.sh` or `install.sh` already did that. For pack `java`, prefer `bootstrap-greenfield.sh --pack java --scaffold-app` so `templates/app/p0-platform-skeleton.tar.gz` seeds `app/backend` and `app/frontend`. Any other pack follows that pack's `scaffold-service` skill and does not extract that archive. Copy container starters from `docker/` only when not using that archive.
+> This row is one story. Record `Vertical slice: yes`. Do not write `## Proposed split` because the container files sit next to the service. Acceptance criteria are only:
+> - `AC-1` the build and tests pass
+> - `AC-2` this milestone is the tracked manifest, and the kit is not installed again when it is already present
+> - `AC-3` the test, coverage, and CVE reports named in the bound pack's `pack.json` are bound to verify (Pack `java` binds JaCoCo, Checkstyle, SpotBugs, and OWASP)
+> - `AC-4` the app runs locally with Dockerfile and Compose
+> A `/health`, `/ready`, or `/live` route with the pack public marker (Pack `java`: `@PreAuthorize("permitAll()")`) does not by itself require `design-reviewer`. Split this row only when a part of the baseline has its own `/api/v1` contract.
+> `/v0-build` records `Milestone: P0 — Platform Skeleton` and `Story: P0-A` in the feature artifact. Do not launch `requirements-analyst`.
+> Do not run `/v0-intake` or `/v0-design`. `/v0-build` copies this story and AC-1 through AC-4 into `docs/agents-v0/requirements/p0-a-platform-skeleton.md` and writes `design.md` (`N/A: no /api/v1 operation`, Events `N/A: no event contract`, `ADR: N/A: no product decision`). One approval, at `/v0-local-release` or `/v0-release`, after the test report exists. That approval records Intake, Design, Build, Verify, and `local-release` (or `release`) in `p0-a-platform-skeleton.state.json`.
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+| plan | docs/agents-v0/milestones/plan.md, docs/agents-v0/milestones/p0-platform-skeleton.md, docs/agents-v0/design/system/context-map.md, docs/agents-v0/roadmap/finance-back-office-portal.md | mdurana | Approved | 2026-10-28 |

@@ -1,0 +1,49 @@
+{
+  "feature": "p1-b-transformation-recipe-schema",
+  "tier": "standard",
+  "lastApprovedPhase": "release",
+  "approvedPhases": [
+    "intake",
+    "design",
+    "build",
+    "verify",
+    "release"
+  ],
+  "phaseDates": {
+    "intake": "2026-10-28",
+    "design": "2026-10-28",
+    "build": "2026-10-28",
+    "verify": "2026-10-28",
+    "release": "2026-10-28"
+  },
+  "activePhase": "",
+  "activeStatus": "",
+  "blockedReason": "",
+  "verifyPassed": true,
+  "reopenCount": 0,
+  "helperBriefHashes": [],
+  "artifact": "docs/agents-v0/requirements/p1-b-transformation-recipe-schema.md",
+  "baseCommit": "c95fb566c7bfb96815b798c0b3036c14b1acbe6a",
+  "updatedAt": "2026-10-28T06:17:57Z",
+  "artifacts": {
+    "primary": "docs/agents-v0/requirements/p1-b-transformation-recipe-schema.md",
+    "design": "docs/agents-v0/design/p1-b-transformation-recipe-schema/design.md",
+    "openapi": "docs/agents-v0/design/p1-b-transformation-recipe-schema/openapi.yaml",
+    "designReview": "docs/agents-v0/design/p1-b-transformation-recipe-schema/review.md",
+    "buildPlan": "docs/agents-v0/build/p1-b-transformation-recipe-schema/plan.md",
+    "buildReport": "docs/agents-v0/build/p1-b-transformation-recipe-schema/build-report.md",
+    "verify": [
+      "docs/agents-v0/verify/p1-b-transformation-recipe-schema/code-review.md",
+      "docs/agents-v0/verify/p1-b-transformation-recipe-schema/quality-gate.md",
+      "docs/agents-v0/verify/p1-b-transformation-recipe-schema/vapt-checklist.md"
+    ]
+  },
+  "evidence": {
+    "build": [
+      "docs/agents-v0/build/p1-b-transformation-recipe-schema/build-report.md"
+    ],
+    "verify": [
+      "docs/agents-v0/verify/p1-b-transformation-recipe-schema/quality-gate.md"
+    ]
+  }
+}

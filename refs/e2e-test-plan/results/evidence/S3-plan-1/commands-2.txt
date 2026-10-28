@@ -1,0 +1,1 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve plan docs/agents-v0/milestones/plan.md

@@ -1,0 +1,1 @@
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p1-b-transformation-recipe-schema.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status awaiting_approval --verify-passed true docs/agents-v0/requirements/p1-b-transformation-recipe-schema.md

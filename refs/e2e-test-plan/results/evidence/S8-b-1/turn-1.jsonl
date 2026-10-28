@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "Stopped: docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md does not exist. Run /v0-intake p2-a-funding-cost-sap-export first.", "tool_calls": []}
+{"type": "result", "result": "Stopped: docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md does not exist. Run /v0-intake p2-a-funding-cost-sap-export first."}

@@ -1,0 +1,1 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve verify docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md

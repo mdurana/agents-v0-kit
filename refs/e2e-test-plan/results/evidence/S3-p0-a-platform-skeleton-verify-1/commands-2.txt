@@ -1,0 +1,1 @@
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --approve verify docs/agents-v0/requirements/p0-a-platform-skeleton.md

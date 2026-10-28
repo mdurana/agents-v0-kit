@@ -1,0 +1,2 @@
+Added AC-3 negative regression test (ac3_createLookupTable_blankCode_returnsBadRequestProblemDetail) in LookupTableControllerTest.java and verified with ./mvnw -B verify (14/14 tests green). Awaiting approval and commit authorization.
+Added AC-3 negative regression test (ac3_createLookupTable_blankCode_returnsBadRequestProblemDetail) in LookupTableControllerTest.java and verified with ./mvnw -B verify (14/14 tests green). Awaiting approval and commit authorization.

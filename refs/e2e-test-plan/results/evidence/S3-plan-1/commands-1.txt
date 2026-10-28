@@ -1,0 +1,3 @@
+ls -la docs/agents-v0/milestones
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status in_progress docs/agents-v0/milestones/plan.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase plan --status awaiting_approval docs/agents-v0/milestones/plan.md

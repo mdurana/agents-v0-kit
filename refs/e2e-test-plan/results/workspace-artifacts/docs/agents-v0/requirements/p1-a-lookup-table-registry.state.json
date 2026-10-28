@@ -1,0 +1,49 @@
+{
+  "feature": "p1-a-lookup-table-registry",
+  "tier": "standard",
+  "lastApprovedPhase": "release",
+  "approvedPhases": [
+    "intake",
+    "design",
+    "build",
+    "verify",
+    "release"
+  ],
+  "phaseDates": {
+    "intake": "2026-10-28",
+    "design": "2026-10-28",
+    "build": "2026-10-28",
+    "verify": "2026-10-28",
+    "release": "2026-10-28"
+  },
+  "activePhase": "",
+  "activeStatus": "",
+  "blockedReason": "",
+  "verifyPassed": true,
+  "reopenCount": 0,
+  "helperBriefHashes": [],
+  "artifact": "docs/agents-v0/requirements/p1-a-lookup-table-registry.md",
+  "baseCommit": "7c9f2c12af943ad493e348afb46eb060e76a91e0",
+  "updatedAt": "2026-10-28T06:10:55Z",
+  "artifacts": {
+    "primary": "docs/agents-v0/requirements/p1-a-lookup-table-registry.md",
+    "design": "docs/agents-v0/design/p1-a-lookup-table-registry/design.md",
+    "openapi": "docs/agents-v0/design/p1-a-lookup-table-registry/openapi.yaml",
+    "designReview": "docs/agents-v0/design/p1-a-lookup-table-registry/review.md",
+    "buildPlan": "docs/agents-v0/build/p1-a-lookup-table-registry/plan.md",
+    "buildReport": "docs/agents-v0/build/p1-a-lookup-table-registry/build-report.md",
+    "verify": [
+      "docs/agents-v0/verify/p1-a-lookup-table-registry/code-review.md",
+      "docs/agents-v0/verify/p1-a-lookup-table-registry/quality-gate.md",
+      "docs/agents-v0/verify/p1-a-lookup-table-registry/vapt-checklist.md"
+    ]
+  },
+  "evidence": {
+    "build": [
+      "docs/agents-v0/build/p1-a-lookup-table-registry/build-report.md"
+    ],
+    "verify": [
+      "docs/agents-v0/verify/p1-a-lookup-table-registry/quality-gate.md"
+    ]
+  }
+}

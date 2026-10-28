@@ -173,10 +173,9 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   # shellcheck disable=SC2206
   [ -z "$JAIL_CMD" ] || argv=($JAIL_CMD "$RUN" "$WS" "${argv[@]}")
   state_dump > "$RUN/state-before-$k.tsv"; git -C "$WS" rev-parse HEAD > "$RUN/head-before-$k" 2>/dev/null || :
-  local audit_lines_before=0
-  for af in "$WS/.agents/hooks/audit.jsonl" "$WS/.cursor/hooks/audit.jsonl"; do
-    [ -f "$af" ] && audit_lines_before=$(( audit_lines_before + $(wc -l < "$af" | tr -d ' ') ))
-  done
+  local audit_a_before=0 audit_c_before=0
+  [ -f "$WS/.agents/hooks/audit.jsonl" ] && audit_a_before=$(wc -l < "$WS/.agents/hooks/audit.jsonl" | tr -d ' ')
+  [ -f "$WS/.cursor/hooks/audit.jsonl" ] && audit_c_before=$(wc -l < "$WS/.cursor/hooks/audit.jsonl" | tr -d ' ')
   post TURN-START "run=${RUN##*/} turn=$k ws=$WS drv=$drv"; current "${RUN##*/} turn $k"
   mark="$RUN/.mark-$k"; touch "$mark"; lastch=$(now)
   ( cd "$WS" && env -i "${envv[@]}" bash -c 'source "'"$PLAN_DIR"'/scripts/lib.sh"; run_isolated "$@"' _ "$cap" "${argv[@]}" ) > "$RUN/turn-$k.jsonl" 2> "$RUN/turn-$k.stderr" &
@@ -197,7 +196,11 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
     jq -c 'select(.type=="tool_call" and .subtype=="started")' "$RUN/turn-$k.jsonl" 2>/dev/null |
       jq -r '.. | objects | (.command? // .cmd? // .CommandLine? // empty) | strings' 2>/dev/null || :
     jq -r 'select(.type=="PLANNER_RESPONSE") | .tool_calls[]? | select(.name=="run_command") | .args.CommandLine // empty' "$RUN/turn-$k.jsonl" 2>/dev/null || :
-  } > "$RUN/commands-$k.txt"
+    [ -f "$WS/.agents/hooks/audit.jsonl" ] && tail -n +"$((audit_a_before + 1))" "$WS/.agents/hooks/audit.jsonl" 2>/dev/null |
+      jq -r 'select(.event=="shell" or .event=="pre-shell" or .event=="beforeShellExecution") | (.subject // .detail // empty)' 2>/dev/null || :
+    [ -f "$WS/.cursor/hooks/audit.jsonl" ] && tail -n +"$((audit_c_before + 1))" "$WS/.cursor/hooks/audit.jsonl" 2>/dev/null |
+      jq -r 'select(.event=="shell" or .event=="pre-shell" or .event=="beforeShellExecution") | (.subject // .detail // empty)' 2>/dev/null || :
+  } | awk 'NF && !seen[$0]++' > "$RUN/commands-$k.txt"
   state_dump > "$RUN/state-after-$k.tsv"
   printf 'turn-%s\trc=%s\tclass=%s\n' "$k" "$rc" "$TURN_CLASS" >> "$RUN/turns.tsv"
   post TURN-END "run=${RUN##*/} turn=$k class=$TURN_CLASS rc=$rc"; }

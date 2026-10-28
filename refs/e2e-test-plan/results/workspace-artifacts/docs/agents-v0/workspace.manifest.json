@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "example-workspace",
+  "repos": [
+    {
+      "id": "service-api",
+      "path": "../service-api",
+      "role": "backend",
+      "contract": "openapi/api-v1.yaml"
+    },
+    {
+      "id": "web-client",
+      "path": "../web-client",
+      "role": "frontend",
+      "contract": null
+    }
+  ],
+  "defaultFeatureArtifactPattern": "docs/agents-v0/requirements/{feature}.md"
+}

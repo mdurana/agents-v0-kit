@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "Blocked: docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md does not exist; run /v0-intake p2-a-funding-cost-sap-export and /v0-design p2-a-funding-cost-sap-export first.", "tool_calls": []}
+{"type": "result", "result": "Blocked: docs/agents-v0/requirements/p2-a-funding-cost-sap-export.md does not exist; run /v0-intake p2-a-funding-cost-sap-export and /v0-design p2-a-funding-cost-sap-export first."}

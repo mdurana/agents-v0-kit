@@ -1,0 +1,2 @@
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status in_progress docs/agents-v0/architecture.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status awaiting_approval docs/agents-v0/architecture.md

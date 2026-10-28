@@ -1,0 +1,2 @@
+shasum -a 256 user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status awaiting_approval docs/agents-v0/roadmap/finance-back-office-portal.md

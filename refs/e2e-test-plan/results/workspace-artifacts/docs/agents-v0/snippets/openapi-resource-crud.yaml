@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: <Feature> API
+  version: 0.1.0
+  description: Feature draft only. Build merges into the org catalog.
+servers:
+  - url: /
+paths:
+  /api/v1/<resources>:
+    get:
+      summary: List <resources>
+      operationId: list<Resources>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paged list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>ListResponse' }
+        '401':
+          description: Unauthorized
+    post:
+      summary: Create <resource>
+      operationId: create<Resource>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/<Resource>CreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>Response' }
+        '400':
+          description: Validation failed
+        '401':
+          description: Unauthorized
+  /api/v1/<resources>/{id}:
+    get:
+      summary: Get <resource>
+      operationId: get<Resource>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>Response' }
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+    put:
+      summary: Update <resource>
+      operationId: update<Resource>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/<Resource>UpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/<Resource>Response' }
+        '400':
+          description: Validation failed
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+    delete:
+      summary: Delete <resource>
+      operationId: delete<Resource>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    <Resource>CreateRequest:
+      type: object
+      additionalProperties: false
+      required: [<field>]
+      properties:
+        <field>: { type: string, minLength: 1 }
+    <Resource>UpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        <field>: { type: string, minLength: 1 }
+    <Resource>Response:
+      type: object
+      required: [id, <field>]
+      properties:
+        id: { type: string }
+        <field>: { type: string }
+    <Resource>ListResponse:
+      type: object
+      required: [success, data, metadata]
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/<Resource>Response' }
+        metadata:
+          type: object
+          required: [page, limit, total, totalPages]
+          properties:
+            page: { type: integer }
+            limit: { type: integer }
+            total: { type: integer }
+            totalPages: { type: integer }

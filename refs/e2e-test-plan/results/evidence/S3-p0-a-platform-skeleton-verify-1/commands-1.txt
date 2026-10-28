@@ -1,0 +1,2 @@
+cd app/backend && ./mvnw -B verify
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p0-a-platform-skeleton.md

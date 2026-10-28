@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: Finance Back-Office Portal — Transformation Recipe Schema API
+  version: 1.0.0
+paths:
+  /api/v1/recipes:
+    post:
+      operationId: createRecipe
+      summary: Register and validate a versioned transformation recipe referencing a lookup table
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecipeRequest'
+      responses:
+        '201':
+          description: Created recipe version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeResponse'
+        '400':
+          description: Validation error (RFC 7807 ProblemDetail)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/recipes/{code}:
+    get:
+      operationId: getRecipe
+      summary: Retrieve active transformation recipe by code
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Active transformation recipe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeResponse'
+        '404':
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateRecipeRequest:
+      type: object
+      required:
+        - code
+        - lookupCode
+      properties:
+        code:
+          type: string
+        lookupCode:
+          type: string
+    RecipeResponse:
+      type: object
+      required:
+        - code
+        - lookupCode
+        - versionNo
+        - status
+      properties:
+        code:
+          type: string
+        lookupCode:
+          type: string
+        versionNo:
+          type: integer
+        status:
+          type: string
+    ProblemDetail:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

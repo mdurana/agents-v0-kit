@@ -29,8 +29,11 @@ RESP="$RUN/turn-$TURN.resp.jsonl"
 DONE="$RUN/turn-$TURN.done"
 rm -f "$RESP" "$DONE"
 
-if [ "${AGY_IPC_MANUAL:-0}" != "1" ]; then
-  exec python3 "$(dirname "$0")/agy-sim-agent.py" "$CHAT" "$WS" "$MODEL" "$MSG" "$ALLOW" "$RUN" "$TURN"
+AUDIT_FILE="$WS/.agents/hooks/audit.jsonl"
+if [ -f "$AUDIT_FILE" ]; then
+  wc -l < "$AUDIT_FILE" | tr -d ' ' > "$RUN/turn-$TURN.audit_start"
+else
+  echo 0 > "$RUN/turn-$TURN.audit_start"
 fi
 
 python3 - "$CHAT" "$WS" "$MODEL" "$MSG" "$ALLOW" "$RUN" "$TURN" "$REQ" "$STATUS_DIR/pending-turn.json" <<'PY'
@@ -54,7 +57,7 @@ with open(pending_path, "w", encoding="utf-8") as f:
 PY
 
 while [ ! -f "$DONE" ]; do
-  sleep 2
+  sleep 0.5
 done
 
 [ -f "$RESP" ] && cat "$RESP"

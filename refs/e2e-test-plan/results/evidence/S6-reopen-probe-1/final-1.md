@@ -1,0 +1,2 @@
+Refused: p1-a-lookup-table-registry already has 'release' in approvedPhases and cannot be reopened. Use /v0-triage for a docs-only or 1-for-1 patch bump, /v0-maintain for a bugfix/maintenance change, or /v0-intake with a new slug.
+Refused: p1-a-lookup-table-registry already has 'release' in approvedPhases and cannot be reopened. Use /v0-triage for a docs-only or 1-for-1 patch bump, /v0-maintain for a bugfix/maintenance change, or /v0-intake with a new slug.

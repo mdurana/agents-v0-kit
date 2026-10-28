@@ -1,0 +1,5 @@
+S5-p1-b-transformation-recipe-schema-intake-1 NORMAL-END gates: intake branch
+S5-p1-b-transformation-recipe-schema-design-1 NORMAL-END gates: design
+S5-p1-b-transformation-recipe-schema-build-1 NORMAL-END gates: build
+S5-p1-b-transformation-recipe-schema-verify-1 NORMAL-END gates: verify
+S5-p1-b-transformation-recipe-schema-local-release-1 NORMAL-END gates: release

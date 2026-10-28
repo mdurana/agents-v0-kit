@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "Command blocked by pre-shell hook (unattended ask denied without allowlist).", "tool_calls": []}
+{"type": "result", "result": "Command blocked by pre-shell hook (unattended ask denied without allowlist)."}

@@ -1,0 +1,2 @@
+{"type": "PLANNER_RESPONSE", "content": "Blocked: Verify not approved for p2-a-funding-cost-sap-export. Run /v0-design, /v0-build, and /v0-verify first.", "tool_calls": []}
+{"type": "result", "result": "Blocked: Verify not approved for p2-a-funding-cost-sap-export. Run /v0-design, /v0-build, and /v0-verify first."}

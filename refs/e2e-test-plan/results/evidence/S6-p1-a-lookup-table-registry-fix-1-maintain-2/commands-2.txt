@@ -1,0 +1,3 @@
+sh .agents-v0/scripts/sync-feature-state.sh --approve maintain docs/agents-v0/maintain/p1-a-lookup-table-registry-fix-1/note.md
+git add -A
+git commit -q -m 'fix(p1-a): add AC-3 negative regression test'

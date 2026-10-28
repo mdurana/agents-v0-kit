@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: Finance Back-Office Portal — Funding Cost SAP Export API
+  version: 1.0.0
+paths:
+  /api/v1/funding-cost-exports:
+    post:
+      operationId: createFundingCostExport
+      summary: Execute a funding cost transformation batch and generate a balanced SAP journal voucher export
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFundingCostExportRequest'
+      responses:
+        '201':
+          description: Created balanced SAP export batch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FundingCostExportResponse'
+        '400':
+          description: Validation error (RFC 7807 ProblemDetail)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/funding-cost-exports/{period}:
+    get:
+      operationId: getFundingCostExport
+      summary: Retrieve SAP export batch status by period
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SAP export batch status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FundingCostExportResponse'
+        '404':
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateFundingCostExportRequest:
+      type: object
+      required:
+        - period
+        - recipeCode
+      properties:
+        period:
+          type: string
+        recipeCode:
+          type: string
+    FundingCostExportResponse:
+      type: object
+      required:
+        - period
+        - recipeCode
+        - status
+      properties:
+        period:
+          type: string
+        recipeCode:
+          type: string
+        status:
+          type: string
+    ProblemDetail:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

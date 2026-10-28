@@ -1,0 +1,3 @@
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md
+cd app/backend && ./mvnw -B test
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p0-a-platform-skeleton.md
