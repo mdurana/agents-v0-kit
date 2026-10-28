@@ -12,5 +12,5 @@ build	Approved by mdurana, commit it	Shell(git:commit*)
 verify	Approved by mdurana	-
 maintain	Approved by mdurana, commit it	Shell(git:commit*)
 release	Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	Shell(git:commit*),Shell(git:merge*)
-release-p0a	Approved by mdurana	Shell(git:commit*)
+release-p0a	Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	Shell(git:commit*)
 branch	Branch authorized	Shell(sh:.agents-v0/scripts/feature-worktree.sh*)

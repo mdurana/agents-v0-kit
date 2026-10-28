@@ -200,6 +200,10 @@ if sh "$KIT/scripts/install.sh" "$t" >"$tmp/install.log" 2>&1; then
   printf '\nlocal note\n' >> "$t/docs/agents-v0/lessons.md"
   run fail "pre-push: story-branch edit to lessons.md fails" "$t" sh -c "printf 'refs/heads/feature/orders %s refs/heads/feature/orders 0000000000000000000000000000000000000000\n' '$head_sha' | sh .agents-v0/hooks/pre-push"
   has "pre-push: story-branch guard message" "$tmp/out" "Story branches never edit lessons.md"
+  git -C "$t" commit -qam "edit lessons on feature/orders"
+  feat_sha="$(git -C "$t" rev-parse HEAD)"
+  git -C "$t" checkout -q main
+  run fail "pre-push: pushing feature/orders from main checkout catches committed lessons.md edit" "$t" sh -c "printf 'refs/heads/feature/orders %s refs/heads/feature/orders 0000000000000000000000000000000000000000\n' '$feat_sha' | sh .agents-v0/hooks/pre-push"
 else
   fail "install.sh into a fresh target"; cat "$tmp/install.log" >&2
 fi

@@ -46,13 +46,14 @@
 set -eu
 
 usage() {
-  printf 'usage: %s [--phase-result FILE]... [--decided] [--unchanged-since REF] [--max-active N] [--max-chars N] [--next-id] [--root DIR]\n' "$0" >&2
+  printf 'usage: %s [--phase-result FILE]... [--decided] [--unchanged-since REF] [--tip REF] [--max-active N] [--max-chars N] [--next-id] [--root DIR]\n' "$0" >&2
   exit 2
 }
 
 prs=""
 decided=0
 since=""
+tip="HEAD"
 next_id=0
 max_active="${LESSONS_MAX_ACTIVE:-30}"
 max_chars="${LESSONS_MAX_CHARS:-800}"
@@ -64,6 +65,7 @@ while [ $# -gt 0 ]; do
     --phase-result) [ $# -ge 2 ] || usage; prs="${prs}${2}${nl}"; shift 2 ;;
     --decided) decided=1; shift ;;
     --unchanged-since) [ $# -ge 2 ] || usage; since="$2"; shift 2 ;;
+    --tip) [ $# -ge 2 ] || usage; tip="$2"; shift 2 ;;
     --max-active) [ $# -ge 2 ] || usage; max_active="$2"; shift 2 ;;
     --max-chars) [ $# -ge 2 ] || usage; max_chars="$2"; shift 2 ;;
     --next-id) next_id=1; shift ;;
@@ -78,7 +80,7 @@ if [ -n "$root" ]; then
   cd "$root" || { printf 'FAIL: --root not found: %s\n' "$root" >&2; exit 2; }
 fi
 
-CL_PRS="$prs" CL_DECIDED="$decided" CL_SINCE="$since" CL_NEXT="$next_id" \
+CL_PRS="$prs" CL_DECIDED="$decided" CL_SINCE="$since" CL_TIP="$tip" CL_NEXT="$next_id" \
 CL_MAX_ACTIVE="$max_active" CL_MAX_CHARS="$max_chars" python3 - <<'PY'
 import os
 import re
@@ -92,6 +94,7 @@ MAX_ACTIVE = int(os.environ["CL_MAX_ACTIVE"])
 MAX_CHARS = int(os.environ["CL_MAX_CHARS"])
 DECIDED = os.environ.get("CL_DECIDED") == "1"
 SINCE = os.environ.get("CL_SINCE", "")
+TIP = os.environ.get("CL_TIP", "HEAD") or "HEAD"
 TRIGGERS = {"failure-brief", "verify-fail", "reopen", "review", "attempt-budget", "blocked", "other"}
 PHASES = {"intake", "design", "build", "verify", "release", "maintain"}
 REQUIRED = ("Story/phase", "Trigger", "What happened", "Do instead", "Scope")
@@ -323,15 +326,23 @@ if SINCE:
     paths = [str(LESSONS), str(ARCHIVE)]
     r = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{SINCE}^{{commit}}"],
                        capture_output=True, text=True, check=False)
+    rt = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{TIP}^{{commit}}"],
+                        capture_output=True, text=True, check=False)
+    head = subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD^{commit}"],
+                          capture_output=True, text=True, check=False)
     if r.returncode != 0:
         fail(f"--unchanged-since: unknown ref {SINCE}")
+    elif rt.returncode != 0:
+        fail(f"--tip: unknown ref {TIP}")
     else:
-        committed = subprocess.run(["git", "diff", "--name-only", f"{SINCE}...HEAD", "--", *paths],
+        committed = subprocess.run(["git", "diff", "--name-only", f"{SINCE}...{TIP}", "--", *paths],
                                    capture_output=True, text=True, check=False).stdout.split()
-        local = subprocess.run(["git", "diff", "--name-only", "HEAD", "--", *paths],
-                               capture_output=True, text=True, check=False).stdout.split()
-        untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *paths],
+        local, untracked = [], []
+        if TIP == "HEAD" or (head.returncode == 0 and rt.stdout.strip() == head.stdout.strip()):
+            local = subprocess.run(["git", "diff", "--name-only", "HEAD", "--", *paths],
                                    capture_output=True, text=True, check=False).stdout.split()
+            untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *paths],
+                                       capture_output=True, text=True, check=False).stdout.split()
         changed = sorted(set(committed + local + untracked))
         if changed:
             fail("this branch changed " + ", ".join(changed) + f" since {SINCE}. Story branches never edit "

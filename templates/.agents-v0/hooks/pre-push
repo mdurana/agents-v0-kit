@@ -30,7 +30,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
           base_ref="$(sh .agents-v0/scripts/resolve-integration-branch.sh 2>/dev/null || printf 'main')"
         fi
         if [ "$base_ref" != "HEAD" ] && git rev-parse --verify -q "${base_ref}^{commit}" >/dev/null 2>&1; then
-          sh .agents-v0/scripts/check-lessons.sh --unchanged-since "$base_ref"
+          sh .agents-v0/scripts/check-lessons.sh --unchanged-since "$base_ref" --tip "$local_sha"
         fi
       fi
       ;;
