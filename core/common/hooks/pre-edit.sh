@@ -47,6 +47,9 @@ print(json.dumps({"permission": "deny", "decision": "deny", "reason": msg, "user
   exit 2
 fi
 
+# MEM-13: lessons.md / lessons-archive.md in a story checkout (feature/*, maintain/*) come back as
+# "block" above and are denied for both flavors. In the integration checkout they stay "ask", which is
+# recorded below and allowed, so the release-manager's file-edit append works without a prompt.
 if [ "$action" = "ask" ]; then
   # Cursor accepts "ask" for preToolUse but does not enforce it; rely on after-edit context + CI.
   hook_audit_log "path" "$path" "allow-flagged" "$message"

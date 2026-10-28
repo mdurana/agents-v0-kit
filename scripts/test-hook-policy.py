@@ -4,25 +4,56 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POLICY = os.path.join(ROOT, "core", "common", "hooks", "hook-policy.py")
 
 
-def _run(mode: str, env_extra: dict) -> str:
-    env = {**os.environ, **env_extra}
-    out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True)
+# MEM-13: the lessons rule depends on the git branch of the edited file's worktree, so every case
+# runs inside a scratch repository on main (CWD), never in the kit checkout (which may be on any branch).
+CWD = ""
+
+
+def _run(mode: str, env_extra: dict, cwd: str = "") -> str:
+    env = {k: v for k, v in os.environ.items() if k != "HOOK_CWD"}
+    env.update(env_extra)
+    out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
     return json.loads(out)["action"]
 
 
-def shell(cmd: str) -> str:
-    return _run("shell", {"HOOK_CMD": cmd})
+def shell(cmd: str, cwd: str = "", hook_cwd: str = "") -> str:
+    extra = {"HOOK_CMD": cmd}
+    if hook_cwd:
+        extra["HOOK_CWD"] = hook_cwd
+    return _run("shell", extra, cwd)
 
 
-def path(p: str) -> str:
-    return _run("path", {"HOOK_PATH": p})
+def path(p: str, cwd: str = "") -> str:
+    return _run("path", {"HOOK_PATH": p}, cwd)
+
+
+def make_story_repos(tmp: str) -> dict:
+    """main checkout + feature/orders and maintain/fix-1 worktrees, each with the lessons files."""
+    main = os.path.join(tmp, "shop")
+    def git(*a, cwd=main):
+        subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)
+    os.makedirs(os.path.join(main, "docs", "agents-v0"))
+    subprocess.run(["git", "init", "-q", "-b", "main", main], check=True, capture_output=True)
+    for f in ("lessons.md", "lessons-archive.md"):
+        with open(os.path.join(main, "docs", "agents-v0", f), "w", encoding="utf-8") as fh:
+            fh.write("# Lessons\n")
+    git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A")
+    git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
+        "commit", "-qm", "base")
+    orders = os.path.join(tmp, "shop-orders")
+    fix = os.path.join(tmp, "shop-maintain-fix-1")
+    git("worktree", "add", "-q", "-b", "feature/orders", orders, "main")
+    git("worktree", "add", "-q", "-b", "maintain/fix-1", fix, "main")
+    return {"main": main, "orders": orders, "fix": fix}
 
 
 SHELL_CASES = [
@@ -297,8 +328,46 @@ PATH_CASES = [
 ]
 
 
+def lessons_cases(r: dict) -> list:
+    """(kind, arg, cwd, hook_cwd, want) — MEM-13 story-branch lessons rule."""
+    m, o, f = r["main"], r["orders"], r["fix"]
+    L, A = "docs/agents-v0/lessons.md", "docs/agents-v0/lessons-archive.md"
+    return [
+        # file edits (pre-edit.sh path mode)
+        ("path", os.path.join(o, L), m, "", "block"),            # story worktree, absolute path
+        ("path", os.path.join(o, A), m, "", "block"),            # archive, same rule
+        ("path", os.path.join(f, L), m, "", "block"),            # maintain/<id> worktree
+        ("path", L, o, "", "block"),                             # relative path, cwd in the story worktree
+        ("path", "../shop-orders/" + L, m, "", "block"),         # from main into the story worktree
+        ("path", os.path.join(m, L), o, "", "ask"),              # integration checkout: allowed (flagged)
+        ("path", os.path.join(m, A), o, "", "ask"),
+        ("path", L, m, "", "ask"),
+        ("path", "docs/agents-v0/requirements/orders.phase-result.md", o, "", "allow"),
+        # shell writes
+        ("shell", "echo '### L-009' >> " + L, o, "", "block"),
+        ("shell", "tee -a " + A, o, "", "block"),
+        ("shell", "sed -i 's/a/b/' " + L, f, "", "block"),
+        ("shell", "python3 -c \"open('" + L + "','a').write('x')\"", o, "", "block"),
+        ("shell", "cd ../shop-orders && echo x >> " + L, m, "", "block"),
+        ("shell", "echo x >> " + L, m, o, "block"),              # payload cwd (HOOK_CWD) is the worktree
+        ("shell", "echo x >> " + L, m, "", "ask"),               # integration checkout keeps ask
+        ("shell", "tee -a " + A, m, "", "ask"),
+        ("shell", "cat " + L, o, "", "allow"),                   # reading stays allowed
+        ("shell", "git show main:" + L, o, "", "allow"),
+    ]
+
+
 def main() -> int:
+    global CWD
     fail = 0
+    tmp = tempfile.mkdtemp(prefix="hook-policy-")
+    try:
+        repos = make_story_repos(tmp)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
+        print(f"FAIL: cannot create scratch git repos: {exc}", file=sys.stderr)
+        return 1
+    CWD = repos["main"]
 
     def check(got: str, want: str, label: str) -> None:
         nonlocal fail
@@ -310,8 +379,14 @@ def main() -> int:
         check(shell(cmd), want, f"shell `{cmd}`")
     for p, want in PATH_CASES:
         check(path(p), want, f"path {p}")
+    extra = lessons_cases(repos)
+    for kind, arg, cwd, hook_cwd, want in extra:
+        got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
+        check(got, want, f"MEM-13 {kind} `{arg}` (cwd={os.path.relpath(cwd, tmp)}"
+              + (f", HOOK_CWD={os.path.relpath(hook_cwd, tmp)}" if hook_cwd else "") + ")")
+    shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES)
+    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra)
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

@@ -180,6 +180,70 @@ git -C "$g" commit -qam "edit lessons on story branch"
 run fail "check-lessons: committed lessons.md edit on a story branch" "$g" sh "$CL" --unchanged-since main
 has "check-lessons: guard message" "$tmp/out" "Story branches never edit lessons.md"
 run fail "check-lessons: unknown ref" "$g" sh "$CL" --unchanged-since no-such-branch
+# MEM-12: main gains a lesson after the branch was cut; the hint restores from the merge-base.
+git -C "$g" checkout -q main
+printf '\nlesson added on main by another release\n' >> "$g/docs/agents-v0/lessons.md"
+git -C "$g" commit -qam "release(other): lessons on main"
+git -C "$g" checkout -q feature/orders
+run fail "check-lessons: guard still fails after main gained lessons" "$g" sh "$CL" --unchanged-since main
+has "check-lessons: hint restores from the merge-base" "$tmp/out" 'git checkout $(git merge-base main HEAD) -- docs/agents-v0/lessons.md'
+git -C "$g" checkout main -- docs/agents-v0/lessons.md
+run fail "check-lessons: old hint (checkout main -- file) does not clear the guard" "$g" sh "$CL" --unchanged-since main
+git -C "$g" checkout "$(git -C "$g" merge-base main HEAD)" -- docs/agents-v0/lessons.md
+run fail "check-lessons: a committed edit needs the restore committed too" "$g" sh "$CL" --unchanged-since main
+git -C "$g" commit -qam "restore lessons.md from the branch point"
+run ok "check-lessons: following the merge-base hint clears the guard (committed)" "$g" sh "$CL" --unchanged-since main
+
+# MEM-14: decisions and lessons.md match the user's release approval.
+a="$tmp/approval"
+mkdir -p "$a/docs/agents-v0/requirements" "$a/docs/agents-v0/maintain/fix-1"
+APR=docs/agents-v0/requirements/orders.phase-result.md
+P1='Trigger: review · What happened: Rounding was specified twice. · Do instead: Point to one rounding rule. · Scope: Stories that compute totals.'
+P2='Trigger: failure-brief · What happened: Enum mapped as ordinal. · Do instead: Map enums by name. · Scope: Stories that persist enums.'
+P3='Trigger: verify-fail · What happened: Empty cart AC had no test. · Do instead: Name a test per negative AC. · Scope: Every story.'
+lesson() { # id story phase trigger what do scope
+  printf '\n### %s · 2026-10-28 · accepted\n- Story/phase: %s / %s\n- Trigger: %s\n- What happened: %s\n- Do instead: %s\n- Scope: %s\n' "$@"
+}
+appr_pr() { # status1 status2 status3
+  printf '## Lessons\n\n### design\n- %s\n\n### build\n- %s\n\n### verify\n- %s\n\n## Proposed lessons\n\n- P-1 · %s · design · %s\n- P-2 · %s · build · %s\n- P-3 · %s · verify · %s\n' \
+    "$P1" "$P2" "$P3" "$1" "$P1" "$2" "$P2" "$3" "$P3" > "$a/$APR"
+}
+appr_lessons() { # extra entries appended after L-001 (P-1)
+  { printf '# Lessons\n\n## Active lessons\n'; lesson L-001 orders design review 'Rounding was specified twice.' 'Point to one rounding rule.' 'Stories that compute totals.'; } > "$a/docs/agents-v0/lessons.md"
+}
+APP='Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.'
+appr_pr accepted rejected rejected; appr_lessons
+run ok "approval: e2e release text, only P-1 accepted and appended" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+has "approval: summary line" "$tmp/out" "approval matches (P-1 accepted, 2 rejected"
+run ok "approval: --accepted P-1" "$a" sh "$CL" --phase-result "$APR" --accepted P-1
+run fail "approval: --accepted none while P-1 is accepted" "$a" sh "$CL" --phase-result "$APR" --accepted none
+run fail "approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)" "$a" sh "$CL" --phase-result "$APR" --approval-text "Approved. Accept P-1 and P-3, reject P-2."
+has "approval: wrong mark message" "$tmp/out" "P-3 is marked rejected but the approval accepts it"
+has "approval: missing entry message" "$tmp/out" "accepted P-3 (orders / verify) has no active entry"
+appr_pr accepted accepted rejected
+run fail "approval: P-2 marked accepted although not accepted" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+appr_pr accepted rejected rejected; appr_lessons
+lesson L-002 orders build failure-brief 'Enum mapped as ordinal.' 'Map enums by name.' 'Stories that persist enums.' >> "$a/docs/agents-v0/lessons.md"
+run fail "approval: rejected P-2 appended to lessons.md" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+has "approval: rejected-appended message" "$tmp/out" "L-002 repeats P-2, which the user did not accept"
+{ printf '# Lessons\n\n## Active lessons\n\n_No entries yet._\n'; } > "$a/docs/agents-v0/lessons.md"
+run fail "approval: accepted P-1 missing from lessons.md" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+appr_lessons; sed -i.bak 's/^- Do instead: Point to one rounding rule./- Do instead: Round however you like./' "$a/docs/agents-v0/lessons.md"
+run fail "approval: lessons.md entry content differs from accepted P-1" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+has "approval: mismatch message" "$tmp/out" "L-001 does not match accepted P-1"
+appr_lessons; sed -i.bak 's#^- Story/phase: orders / design#- Story/phase: orders / build#' "$a/docs/agents-v0/lessons.md"
+run fail "approval: lessons.md entry has the wrong phase" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+appr_lessons; lesson L-002 orders design review 'Rounding was specified twice.' 'Point to one rounding rule.' 'Stories that compute totals.' >> "$a/docs/agents-v0/lessons.md"
+run fail "approval: accepted P-1 appended twice" "$a" sh "$CL" --phase-result "$APR" --approval-text "$APP"
+appr_lessons
+run fail "approval: accepting a P-n that is not proposed" "$a" sh "$CL" --phase-result "$APR" --approval-text "Accept P-1 and P-9."
+run ok "approval: 'if proposed' tolerates a missing P-n" "$a" sh "$CL" --phase-result "$APR" --approval-text "Accept P-1. Accept P-9 if proposed."
+run fail "approval: P-1 both accepted and rejected" "$a" sh "$CL" --phase-result "$APR" --approval-text "Accept P-1. Reject P-1."
+run ok "approval: 'Accept all, reject P-2 and P-3'" "$a" sh "$CL" --phase-result "$APR" --approval-text "Approved. Accept all, reject P-2 and P-3."
+run fail "approval: needs exactly one --phase-result" "$a" sh "$CL" --approval-text "$APP"
+printf '## Lessons\n\n### maintain\n- %s\n\n## Proposed lessons\n\n- P-1 · accepted · maintain · %s\n' "$P2" "$P2" > "$a/docs/agents-v0/maintain/fix-1/phase-result.md"
+lesson L-002 fix-1 maintain failure-brief 'Enum mapped as ordinal.' 'Map enums by name.' 'Stories that persist enums.' >> "$a/docs/agents-v0/lessons.md"
+run ok "approval: maintenance note (story id from maintain/<id>/)" "$a" sh "$CL" --phase-result docs/agents-v0/maintain/fix-1/phase-result.md --approval-text "Approved. Keep P-1."
 
 # ---------------------------------------------------------------- install.sh seeds the memory files
 t="$tmp/target"

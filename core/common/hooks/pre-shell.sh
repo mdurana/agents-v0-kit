@@ -19,7 +19,12 @@ if ! command -v python3 >/dev/null 2>&1; then
   block "python3 is required for delivery kit shell guardrails (fail-closed)."
 fi
 
-result="$(HOOK_CMD="$cmd" python3 "$(dirname "$0")/hook-policy.py" shell 2>/dev/null)" || {
+# MEM-13: the command's working directory (Cursor "cwd", Antigravity "Cwd"), so hook-policy.py can
+# tell whether a write to docs/agents-v0/lessons.md happens in a story worktree.
+cmd_cwd="$(printf '%s' "$payload" | hook_json_string_field cwd 2>/dev/null || true)"
+[ -n "$cmd_cwd" ] || cmd_cwd="$(printf '%s' "$payload" | hook_json_string_field toolCall.args.Cwd 2>/dev/null || true)"
+
+result="$(HOOK_CMD="$cmd" HOOK_CWD="$cmd_cwd" python3 "$(dirname "$0")/hook-policy.py" shell 2>/dev/null)" || {
   block "shell guardrail failed to run (fail-closed)."
 }
 [ -n "$result" ] || block "shell guardrail returned empty result (fail-closed)."

@@ -232,6 +232,9 @@ Tests finish first. The security checklist and the code review are prepared toge
 <!-- MEM-11: approvers decide which lessons from this story become cross-story memory. -->
 **Lessons from this story.** With a local release (`/v0-local-release`), the report also lists **Proposed lessons** (`P-1`, `P-2`, ...): short notes on what went wrong in this story and what to do instead next time. Say which to keep, for example `Accept P-1 and P-3, reject P-2.` Only the ones you accept are added to `docs/agents-v0/lessons.md`, which every later story reads before it starts. Nothing is added without your yes.
 
+<!-- MEM-14: how the approval message is read. -->
+Write each decision as `Accept P-<n>` (or `Keep P-<n>`), with several ids joined by commas or `and`, and `Reject P-<n>` (or `Drop P-<n>`). `Accept all` accepts every proposal you do not also reject. Any `P-<n>` you do not explicitly accept is rejected. Accepting a `P-<n>` that does not exist is an error unless you add `if proposed` (`Accept P-1 if proposed`). The release-manager runs `check-lessons.sh --approval-text` with your exact message, so the lessons it appends are checked against what you wrote. Agents working on a story branch cannot edit `lessons.md`: the edit hook blocks it there.
+
 ---
 
 

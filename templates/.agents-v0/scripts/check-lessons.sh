@@ -22,7 +22,22 @@
 #   --max-active <n>          active-entry cap in lessons.md (default 30, or $LESSONS_MAX_ACTIVE)
 #   --max-chars <n>           size limit per entry or candidate (default 800, or $LESSONS_MAX_CHARS)
 #   --next-id                 print the next free lesson id (e.g. L-007) and exit 0
+#   --approval-text <text>    with exactly one --phase-result: check the release decisions against the
+#                             user's release approval message, passed verbatim (MEM-14, grammar below)
+#   --accepted <P-1,P-3>      same check with an explicit accepted list instead of the message
+#                             ("none" or "" = nothing accepted)
 #   --root <dir>              repository root (default: current directory)
+#
+# Approval grammar (--approval-text, MEM-14; case does not matter):
+#   "Accept P-1"  "Accept P-1, P-3"  "Accept P-1 and P-3"  "Keep P-2"  "Accept all"  -> accepted
+#   "Reject P-2"  "Reject P-2 and P-4"  "Drop P-5"  "reject any other proposed lessons" -> rejected
+#   ("Accept all, reject P-2" accepts every P-<n> except P-2.)
+#   "Accept P-1 if proposed" is tolerated: no error when P-1 does not exist. Without "if proposed",
+#   accepting a P-<n> that is not in "## Proposed lessons" fails. A P-<n> that is both accepted and
+#   rejected fails. Anything not explicitly accepted is rejected (the local-release rule).
+# The check then requires: every P-<n> is marked accepted exactly when the message accepts it, and
+# docs/agents-v0/lessons.md holds exactly one active entry per accepted P-<n> for this story
+# (same Story/phase, What happened, Do instead, Trigger, Scope) and none for a rejected one.
 #
 # Exit 0: all checks pass. Exit 1: a check failed (plain FAIL lines on stderr). Exit 2: usage.
 #
@@ -46,7 +61,7 @@
 set -eu
 
 usage() {
-  printf 'usage: %s [--phase-result FILE]... [--decided] [--unchanged-since REF] [--tip REF] [--max-active N] [--max-chars N] [--next-id] [--root DIR]\n' "$0" >&2
+  printf 'usage: %s [--phase-result FILE]... [--decided] [--unchanged-since REF] [--tip REF] [--max-active N] [--max-chars N] [--next-id] [--approval-text TEXT | --accepted LIST] [--root DIR]\n' "$0" >&2
   exit 2
 }
 
@@ -55,6 +70,10 @@ decided=0
 since=""
 tip="HEAD"
 next_id=0
+approval=""
+approval_set=0
+accepted_list=""
+accepted_set=0
 max_active="${LESSONS_MAX_ACTIVE:-30}"
 max_chars="${LESSONS_MAX_CHARS:-800}"
 root=""
@@ -69,6 +88,8 @@ while [ $# -gt 0 ]; do
     --max-active) [ $# -ge 2 ] || usage; max_active="$2"; shift 2 ;;
     --max-chars) [ $# -ge 2 ] || usage; max_chars="$2"; shift 2 ;;
     --next-id) next_id=1; shift ;;
+    --approval-text) [ $# -ge 2 ] || usage; approval="$2"; approval_set=1; shift 2 ;;
+    --accepted) [ $# -ge 2 ] || usage; accepted_list="$2"; accepted_set=1; shift 2 ;;
     --root) [ $# -ge 2 ] || usage; root="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) usage ;;
@@ -76,10 +97,22 @@ while [ $# -gt 0 ]; do
 done
 case "$max_active" in ''|*[!0-9]*) usage ;; esac
 case "$max_chars" in ''|*[!0-9]*) usage ;; esac
+if [ "$approval_set" = 1 ] && [ "$accepted_set" = 1 ]; then
+  printf 'FAIL: use --approval-text or --accepted, not both\n' >&2
+  exit 2
+fi
+if [ "$approval_set" = 1 ] || [ "$accepted_set" = 1 ]; then
+  # MEM-14: the decision check is about one story, so it needs exactly one phase-result.
+  if [ "$(printf '%s' "$prs" | grep -c .)" != 1 ]; then
+    printf 'FAIL: --approval-text / --accepted needs exactly one --phase-result <file>\n' >&2
+    exit 2
+  fi
+fi
 if [ -n "$root" ]; then
   cd "$root" || { printf 'FAIL: --root not found: %s\n' "$root" >&2; exit 2; }
 fi
 
+CL_APPROVAL="$approval" CL_APPROVAL_SET="$approval_set" CL_ACCEPTED="$accepted_list" CL_ACCEPTED_SET="$accepted_set" \
 CL_PRS="$prs" CL_DECIDED="$decided" CL_SINCE="$since" CL_TIP="$tip" CL_NEXT="$next_id" \
 CL_MAX_ACTIVE="$max_active" CL_MAX_CHARS="$max_chars" python3 - <<'PY'
 import os
@@ -345,9 +378,135 @@ if SINCE:
                                        capture_output=True, text=True, check=False).stdout.split()
         changed = sorted(set(committed + local + untracked))
         if changed:
+            # MEM-12: restore from the branch point, not from <ref>. When <ref> gained lessons after the
+            # branch was cut (another story released), "git checkout <ref> -- <file>" would copy those
+            # new lessons into the branch and this check would still fail.
+            base = subprocess.run(["git", "merge-base", SINCE, TIP], capture_output=True, text=True,
+                                  check=False).stdout.strip()
+            at = f" (= {base[:12]})" if base else ""
             fail("this branch changed " + ", ".join(changed) + f" since {SINCE}. Story branches never edit "
-                 "lessons.md; put candidates in the phase-result '## Lessons' section and restore the file "
-                 f"(git checkout {SINCE} -- <file>, after the user agrees).")
+                 "lessons.md; put candidates in the phase-result '## Lessons' section and, after the user "
+                 f"agrees, restore the file from the branch point{at}: "
+                 f"git checkout $(git merge-base {SINCE} {TIP}) -- {' '.join(changed)} (then commit the restore when the "
+                 "edit was committed)")
+
+# --- MEM-14: the decisions and lessons.md match the user's release approval -------------------
+FIELD_RE = re.compile(r"(Trigger|What happened|Do instead|Scope):\s*(.*?)(?=\s+·\s+(?:Trigger|What happened|Do instead|Scope):|$)")
+
+
+def norm_text(v):
+    return re.sub(r"\s+", " ", (v or "").strip()).rstrip(".").lower()
+
+
+def parse_approval(text, proposed_ids):
+    """Return (accepted set, problems). Grammar in the header of this script."""
+    problems, accepted, rejected = [], set(), set()
+    pid_list = r"P-\d+(?:\s*(?:,|and|&|\+)\s*P-\d+)*"
+    for m in re.finditer(rf"\b(accept(?:ed|s|ing)?|keep|reject(?:ed|s|ing)?|drop)\s+({pid_list})(\s+if\s+proposed)?",
+                         text, re.I):
+        verb = m.group(1).lower()
+        ids = [x.upper() for x in re.findall(r"P-\d+", m.group(2), re.I)]
+        tolerant = bool(m.group(3))
+        for pid in ids:
+            if pid not in proposed_ids:
+                if not tolerant:
+                    problems.append(f"the approval {'accepts' if verb[0] in 'ak' else 'rejects'} {pid}, "
+                                    "which is not in ## Proposed lessons")
+                continue
+            (accepted if verb[0] in "ak" else rejected).add(pid)
+    both = sorted(accepted & rejected, key=lambda x: int(x[2:]))
+    for pid in both:
+        problems.append(f"the approval both accepts and rejects {pid}; ask the user which one they meant")
+    if re.search(r"\b(?:accept|keep)\s+all\b", text, re.I):
+        accepted |= set(proposed_ids) - rejected
+    return accepted - rejected, problems
+
+
+def story_of(pr):
+    parts = Path(pr).parts
+    if pr.name == "phase-result.md" and "maintain" in parts:
+        return pr.parent.name
+    return pr.name[: -len(".phase-result.md")] if pr.name.endswith(".phase-result.md") else pr.stem
+
+
+if os.environ.get("CL_APPROVAL_SET") == "1" or os.environ.get("CL_ACCEPTED_SET") == "1":
+    pr = prs[0]
+    story = story_of(pr)
+    props = []
+    if pr.is_file():
+        start, body = section(strip_comments(read(pr)), "Proposed lessons")
+        for line in body or []:
+            m = re.match(r"^- (P-\d+)\s+·\s+(pending|accepted|rejected)\s+·\s+(\S+)\s+·\s+(.*)$", line)
+            if m:
+                fields = dict(FIELD_RE.findall(m.group(4)))
+                props.append({"id": m.group(1), "status": m.group(2), "phase": m.group(3).lower(), "f": fields})
+    ids = [p["id"] for p in props]
+    if os.environ.get("CL_APPROVAL_SET") == "1":
+        want, problems = parse_approval(os.environ.get("CL_APPROVAL", ""), ids)
+        for msg in problems:
+            fail(f"{pr}: {msg}")
+    else:
+        raw_list = os.environ.get("CL_ACCEPTED", "").strip()
+        want = set()
+        if raw_list.lower() not in ("", "none", "-"):
+            for tok in re.split(r"[,\s]+", raw_list):
+                if not tok:
+                    continue
+                if not re.fullmatch(r"P-\d+", tok, re.I):
+                    fail(f"--accepted: '{tok}' is not a P-<n> id")
+                elif tok.upper() not in ids:
+                    fail(f"{pr}: --accepted names {tok.upper()}, which is not in ## Proposed lessons")
+                else:
+                    want.add(tok.upper())
+    # Active entries of this story in lessons.md.
+    mine = []
+    for e in active:
+        sp = e["fields"].get("Story/phase", "")
+        st, _, ph = sp.partition("/")
+        if st.strip().lower() == story.lower():
+            mine.append({"e": e, "phase": ph.strip().lower()})
+    used = set()
+    for p in props:
+        expect = "accepted" if p["id"] in want else "rejected"
+        if p["status"] != expect:
+            fail(f"{pr}: {p['id']} is marked {p['status']} but the approval {'accepts' if expect == 'accepted' else 'does not accept'} "
+                 f"it; mark it {expect}")
+        what, do = norm_text(p["f"].get("What happened")), norm_text(p["f"].get("Do instead"))
+        hits = [i for i, m in enumerate(mine)
+                if norm_text(m["e"]["fields"].get("What happened")) == what
+                or norm_text(m["e"]["fields"].get("Do instead")) == do]
+        if expect == "rejected":
+            for i in hits:
+                used.add(i)
+                fail(f"{LESSONS}: {mine[i]['e']['id']} repeats {p['id']}, which the user did not accept; remove it "
+                     "(rejected lessons stay in the phase-result only)")
+            continue
+        if not hits:
+            fail(f"{LESSONS}: accepted {p['id']} ({story} / {p['phase']}) has no active entry; append it with an id "
+                 "from --next-id")
+            continue
+        if len(hits) > 1:
+            fail(f"{LESSONS}: accepted {p['id']} appears {len(hits)} times ("
+                 + ", ".join(mine[i]["e"]["id"] for i in hits) + "); keep one")
+        for i in hits:
+            used.add(i)
+            e = mine[i]["e"]
+            diffs = []
+            if mine[i]["phase"] != p["phase"]:
+                diffs.append(f"Story/phase '{e['fields'].get('Story/phase')}' (want '{story} / {p['phase']}')")
+            for key in ("What happened", "Do instead", "Trigger", "Scope"):
+                if norm_text(e["fields"].get(key)) != norm_text(p["f"].get(key)):
+                    diffs.append(f"{key}")
+            if diffs:
+                fail(f"{LESSONS}: {e['id']} does not match accepted {p['id']}: " + "; ".join(diffs)
+                     + " differ from the phase-result proposal")
+    for i, m in enumerate(mine):
+        if i not in used:
+            fail(f"{LESSONS}: {m['e']['id']} is a lesson for {story} that matches no accepted proposal in {pr}")
+    if not errors:
+        acc = sorted(want, key=lambda x: int(x[2:]))
+        print(f"check-lessons: approval matches ({', '.join(acc) or 'none'} accepted, "
+              f"{len(props) - len(acc)} rejected, {len(mine)} lesson(s) for {story})")
 
 if errors:
     for msg in errors:

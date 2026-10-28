@@ -95,6 +95,34 @@ for SH in sh "$DASH"; do
     || err "$SH pre-edit.sh (antigravity): missing decision allow JSON"
 done
 
+# MEM-13: lessons memory edits are denied in a story worktree (feature/*, maintain/*) for both flavors,
+# also in unattended mode with an allowlist, and allowed in the integration checkout.
+git init -q -b main "$scratch/shop"
+mkdir -p "$scratch/shop/docs/agents-v0"
+printf '# Lessons\n' > "$scratch/shop/docs/agents-v0/lessons.md"
+printf '# Lessons archive\n' > "$scratch/shop/docs/agents-v0/lessons-archive.md"
+git -C "$scratch/shop" add -A
+git -C "$scratch/shop" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false commit -qm base
+git -C "$scratch/shop" worktree add -q -b feature/orders "$scratch/shop-orders" main
+git -C "$scratch/shop" worktree add -q -b maintain/fix-1 "$scratch/shop-maintain-fix-1" main
+for f in lessons.md lessons-archive.md; do
+  for wt in shop-orders shop-maintain-fix-1; do
+    p="$scratch/$wt/docs/agents-v0/$f"
+    run_hook pre-edit.sh cursor "{\"tool_input\":{\"file_path\":$(json_str "$p")}}" block "cursor edit $wt/$f"
+    run_hook pre-edit.sh antigravity "{\"toolCall\":{\"name\":\"edit_file\",\"args\":{\"Path\":$(json_str "$p")}}}" block "antigravity edit $wt/$f"
+    AGY_ALLOW_TOOLS='Shell(git:commit*),Shell(git:merge*)' run_hook pre-edit.sh cursor "{\"tool_input\":{\"file_path\":$(json_str "$p")}}" block "unattended cursor edit $wt/$f"
+  done
+  p="$scratch/shop/docs/agents-v0/$f"
+  run_hook pre-edit.sh cursor "{\"tool_input\":{\"file_path\":$(json_str "$p")}}" allow "cursor edit main/$f"
+  run_hook pre-edit.sh antigravity "{\"toolCall\":{\"name\":\"edit_file\",\"args\":{\"Path\":$(json_str "$p")}}}" allow "antigravity edit main/$f"
+  AGY_ALLOW_TOOLS='Shell(git:commit*),Shell(git:merge*)' run_hook pre-edit.sh antigravity "{\"toolCall\":{\"name\":\"edit_file\",\"args\":{\"Path\":$(json_str "$p")}}}" allow "unattended antigravity edit main/$f"
+done
+w="echo x >> docs/agents-v0/lessons.md"
+run_hook pre-shell.sh cursor "{\"command\":$(json_str "$w"),\"cwd\":$(json_str "$scratch/shop-orders")}" block "cursor shell write lessons.md in story worktree"
+run_hook pre-shell.sh antigravity "{\"toolCall\":{\"name\":\"run_command\",\"args\":{\"CommandLine\":$(json_str "$w"),\"Cwd\":$(json_str "$scratch/shop-orders")}}}" block "antigravity shell write lessons.md in story worktree"
+AGY_ALLOW_TOOLS='Shell(echo:*)' run_hook pre-shell.sh cursor "{\"command\":$(json_str "$w"),\"cwd\":$(json_str "$scratch/shop-orders")}" block "unattended shell write lessons.md in story worktree"
+run_hook pre-shell.sh cursor "{\"command\":$(json_str "$w"),\"cwd\":$(json_str "$scratch/shop")}" ask "cursor shell write lessons.md in main (asks)"
+
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then

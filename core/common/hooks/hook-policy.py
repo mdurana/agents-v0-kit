@@ -7,6 +7,7 @@ import os
 import posixpath
 import re
 import shlex
+import subprocess
 import sys
 from typing import List, Literal, Optional, Tuple
 
@@ -358,6 +359,11 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             f"Protected kit/CI path cannot be modified via shell: {wpath}",
         )
 
+    # MEM-13: a shell write to lessons.md / lessons-archive.md from a story checkout is blocked.
+    lpath = _segment_writes_matching_path(seg, lambda p: lessons_story_block(p) is not None)
+    if lpath:
+        return "block", lessons_story_block(lpath) or "Lessons memory is read-only on a story branch."
+
     apath = _segment_writes_ask_path(seg)
     if apath:
         return "ask", apath[1]
@@ -589,22 +595,41 @@ def _heredoc_writes_ask_path(cmd: str) -> Optional[Tuple[str, str]]:
         return None
     for lit in re.findall(r"['\"]([^'\"\n]+)['\"]", cmd):
         act, msg = classify_path(lit)
-        if act == "ask":
+        if act == "ask" or (act == "block" and LESSONS_PATH_RE.search(lit.replace("\\", "/"))):
             return lit, msg
     return None
 
 
+def _cd_target(seg: str) -> Optional[str]:
+    m = re.fullmatch(r"\s*cd\s+(?:--\s+)?(['\"]?)([^'\"\s;&|]+)\1\s*", seg)
+    return m.group(2) if m else None
+
+
 def classify_command(cmd: str) -> Tuple[Action, str]:
+    global _BASE_DIR
+    _BASE_DIR = None
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
-    ha = _heredoc_writes_ask_path(cmd)
     segments = split_segments(cmd)
+    # MEM-13: "cd <dir> && ..." moves the base for relative paths, so the lessons branch check reads
+    # the worktree the command really writes in.
+    lead = _cd_target(segments[0]) if segments else None
+    if lead:
+        _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(lead)))
+    ha = _heredoc_writes_ask_path(cmd)
+    if ha and LESSONS_PATH_RE.search(ha[0].replace("\\", "/")) and lessons_story_block(ha[0]):
+        return "block", ha[1]
+    _BASE_DIR = None
     if not segments:
         return ("ask", ha[1]) if ha else ("allow", "")
     worst: Action = "ask" if ha else "allow"
     msg = ha[1] if ha else ""
     for seg in segments:
+        cd_to = _cd_target(seg)
+        if cd_to:
+            _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(cd_to)))
+            continue
         action, message = classify_segment(seg)
         if action == "block":
             return "block", message
@@ -737,6 +762,59 @@ def is_protected_path(path: str) -> bool:
     return False
 
 
+# MEM-13: a story checkout (branch feature/* or maintain/*) must never write the cross-story lessons
+# memory. The branch is read from the edited file's own worktree (git -C <dir of file>), so an agent
+# working in ../<repo>-<feature> is caught even when the hook runs from the main checkout.
+LESSONS_PATH_RE = re.compile(r"(^|/)docs/agents-v0/lessons(-archive)?\.md$")
+STORY_BRANCH_RE = re.compile(r"^(feature|maintain)/")
+_BASE_DIR: Optional[str] = None  # directory relative paths start from (cd prefix or payload cwd)
+
+
+def _base_dir() -> str:
+    for cand in (_BASE_DIR, os.environ.get("HOOK_CWD", "")):
+        if cand and os.path.isdir(cand):
+            return cand
+    return os.getcwd()
+
+
+def _existing_dir_of(path: str) -> str:
+    p = os.path.expanduser(path.strip().strip("'\""))
+    if not os.path.isabs(p):
+        p = os.path.join(_base_dir(), p)
+    d = os.path.dirname(os.path.normpath(p))
+    while d and not os.path.isdir(d):
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return d or _base_dir()
+
+
+def _branch_of(path: str) -> str:
+    """Current branch of the worktree that holds <path> ('' when unknown, detached, or not git)."""
+    try:
+        r = subprocess.run(["git", "-C", _existing_dir_of(path), "symbolic-ref", "--short", "-q", "HEAD"],
+                           capture_output=True, text=True, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def lessons_story_block(path: str) -> Optional[str]:
+    """Block message when <path> is lessons.md / lessons-archive.md inside a story checkout."""
+    norm = path.replace("\\", "/").strip().strip("'\"")
+    if not LESSONS_PATH_RE.search(norm):
+        return None
+    branch = _branch_of(norm)
+    if not STORY_BRANCH_RE.match(branch):
+        return None
+    return (
+        f"Lessons memory is read-only on story branch {branch}: {os.path.basename(norm)} changes only in the "
+        "integration checkout, where the release-manager appends the lessons the user accepted. Write "
+        "candidates in the phase-result '## Lessons' section instead."
+    )
+
+
 def classify_path(path: str) -> Tuple[Action, str]:
     if is_protected_path(path):
         return (
@@ -754,7 +832,13 @@ def classify_path(path: str) -> Tuple[Action, str]:
     # MEM-08: the cross-story lessons memory changes only at the local-release gate, in the
     # integration checkout, with lessons the user accepted. Any other edit (for example a phase
     # agent on a story branch writing straight into lessons.md) asks the human first.
-    if re.search(r"(^|/)docs/agents-v0/lessons(-archive)?\.md$", norm):
+    # MEM-13: on a story branch the edit is blocked; in the integration checkout it stays "ask", which
+    # pre-edit.sh records as allow-flagged (the release-manager's file-edit append works unattended) and
+    # which a shell write still asks for.
+    if LESSONS_PATH_RE.search(norm):
+        blocked = lessons_story_block(norm)
+        if blocked:
+            return "block", blocked
         return (
             "ask",
             "Lessons memory edit: only the release-manager appends user-accepted lessons in the "
