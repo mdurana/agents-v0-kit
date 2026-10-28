@@ -193,6 +193,13 @@ if sh "$KIT/scripts/install.sh" "$t" >"$tmp/install.log" 2>&1; then
   done
   run ok "check-lessons: passes in a fresh install" "$t" sh .agents-v0/scripts/check-lessons.sh
   run ok "stories-status: runs in a fresh install" "$t" sh .agents-v0/scripts/stories-status.sh
+  git -C "$t" add -A && git -C "$t" commit -qm "initial install"
+  git -C "$t" checkout -qb feature/orders
+  head_sha="$(git -C "$t" rev-parse HEAD)"
+  run ok "pre-push: untouched lessons.md on feature/orders passes" "$t" sh -c "printf 'refs/heads/feature/orders %s refs/heads/feature/orders 0000000000000000000000000000000000000000\n' '$head_sha' | sh .agents-v0/hooks/pre-push"
+  printf '\nlocal note\n' >> "$t/docs/agents-v0/lessons.md"
+  run fail "pre-push: story-branch edit to lessons.md fails" "$t" sh -c "printf 'refs/heads/feature/orders %s refs/heads/feature/orders 0000000000000000000000000000000000000000\n' '$head_sha' | sh .agents-v0/hooks/pre-push"
+  has "pre-push: story-branch guard message" "$tmp/out" "Story branches never edit lessons.md"
 else
   fail "install.sh into a fresh target"; cat "$tmp/install.log" >&2
 fi

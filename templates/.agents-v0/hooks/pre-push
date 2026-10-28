@@ -22,6 +22,19 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     *) continue ;;
   esac
   branch="${local_ref#refs/heads/}"
+  case "$branch" in
+    feature/*|maintain/*)
+      if [ -f ".agents-v0/scripts/check-lessons.sh" ]; then
+        base_ref="main"
+        if [ -f ".agents-v0/scripts/resolve-integration-branch.sh" ]; then
+          base_ref="$(sh .agents-v0/scripts/resolve-integration-branch.sh 2>/dev/null || printf 'main')"
+        fi
+        if [ "$base_ref" != "HEAD" ] && git rev-parse --verify -q "${base_ref}^{commit}" >/dev/null 2>&1; then
+          sh .agents-v0/scripts/check-lessons.sh --unchanged-since "$base_ref"
+        fi
+      fi
+      ;;
+  esac
   feature="${branch##*/}"
   state_file="docs/agents-v0/requirements/${feature}.state.json"
   if ! git cat-file -e "$local_sha:$state_file" 2>/dev/null && [ ! -f "$state_file" ]; then
