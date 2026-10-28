@@ -140,12 +140,9 @@ elif [ "$MODE" = --install ]; then
 else say odc-data MISSING "copy ${ODC_SRC:-<none>} or build via the NVD mirror into $ODC_DST"; fi
 
 # --- Agent driver (Antigravity / Cursor CLI): presence, auth, model ---
-DRV="$AGENT_DRIVER"
-if [ "$DRV" = auto ]; then
-  if [ -n "${AGENT_TURN_CMD:-}" ] || [ -x "${AGY_BIN:-}" ]; then DRV=antigravity
-  elif [ -x "$AGENT_BIN" ]; then DRV=cursor
-  else DRV=antigravity; fi
-fi
+# HARNESS-FIX 2026-10-28: use the same resolve_driver as the run (env.sh), so step 1 checks the agent that will run.
+DRV="$(resolve_driver)"
+say agent-driver PRESENT "$DRV (AGENT_DRIVER=$AGENT_DRIVER)"
 if [ "$DRV" = antigravity ]; then
   if [ -n "${AGENT_TURN_CMD:-}" ]; then
     say agent-cli PRESENT "antigravity custom driver ($AGENT_TURN_CMD)"

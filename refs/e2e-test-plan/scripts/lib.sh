@@ -41,12 +41,7 @@ except subprocess.TimeoutExpired:
 ' "$cap" "$@"
   fi
 }
-resolve_driver() {
-  if [ "${AGENT_DRIVER:-auto}" != auto ]; then echo "$AGENT_DRIVER"
-  elif [ -x "${AGENT_BIN:-}" ]; then echo cursor
-  elif [ -n "${AGENT_TURN_CMD:-}" ]; then echo antigravity
-  else echo antigravity; fi
-}
+# resolve_driver() is defined in env.sh (sourced before this file) so prereqs.sh and the run share one rule.
 create_agent_chat() { # <workspace>
   local ws="$1" drv; drv="$(resolve_driver)"
   if [ "$drv" = cursor ] && [ -x "${AGENT_BIN:-}" ]; then

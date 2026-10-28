@@ -81,7 +81,12 @@ s1(){ local ok=1 c0 c1
   chk 1 - P1 "every prerequisite present (DEGRADED allowed)" -- test "$c0" = 0 || ok=0
   [ "$ok" = 1 ] || { post NEEDS-HUMAN "$(awk '$3=="HUMAN"||$3=="FAILED"||$3=="MISSING"{printf "%s(%s) ",$2,$3}' "$RES/prereqs-after.txt")"; return 1; }
   # calibration repo with the kit installed, so the kit's hooks are active
-  git clone -q "$KIT_URL" "$TEST_ROOT/calib/kit" && git -C "$TEST_ROOT/calib/kit" checkout -q --detach "$KIT_REF" || return 1
+  # HARNESS-FIX 2026-10-28: a fresh clone only has the default branch locally, so `checkout --detach <other-branch>`
+  # failed (e.g. KIT_REF=kitfix-20261022). Fetch the ref and check out FETCH_HEAD, as kit_checkout does; fall back
+  # to the plain ref for commit ids or tags the fetch does not cover.
+  git clone -q "$KIT_URL" "$TEST_ROOT/calib/kit" || return 1
+  { git -C "$TEST_ROOT/calib/kit" fetch -q origin "$KIT_REF" 2>/dev/null && git -C "$TEST_ROOT/calib/kit" checkout -q --detach FETCH_HEAD 2>/dev/null; } \
+    || git -C "$TEST_ROOT/calib/kit" checkout -q --detach "$KIT_REF" || return 1
   if [ "${KIT_USE_WORKTREE:-0}" = 1 ] && [ -d "$KIT_URL" ]; then
     rsync -a --exclude='.git' --exclude='refs/e2e-test-plan' "$KIT_URL"/ "$TEST_ROOT/calib/kit"/
   fi
