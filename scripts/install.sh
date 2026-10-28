@@ -234,6 +234,10 @@ install_templates() {
       printf 'MIGRATED (project-owned file edited): .gitignore gained ._* and .AppleDouble/\n'
     fi
   fi
+  # MEM-07: the cross-story memory adds two scripts (stories-status.sh, check-lessons.sh) and two
+  # project-owned docs (lessons.md, lessons-archive.md). The scripts are kit-managed and are refreshed
+  # by --update (always list below). The docs are seeded only when missing, so --update never
+  # overwrites the lessons a project has accepted.
   minimal="
 .gitignore
 .gitlab-ci.yml
@@ -265,6 +269,8 @@ install_templates() {
 .agents-v0/scripts/host-tools-macports.sh
 .agents-v0/scripts/activate-stack-pack.sh
 .agents-v0/scripts/resolve-kit-root.sh
+.agents-v0/scripts/stories-status.sh
+.agents-v0/scripts/check-lessons.sh
 .agents-v0/hooks/pre-push
 docs/agents-v0/model-routing-matrix.md
 docs/agents-v0/user-guide.md
@@ -293,6 +299,8 @@ docs/agents-v0/backlog/tickets-sources.md
 docs/agents-v0/presentations/_params.md
 docs/agents-v0/architecture.md
 docs/agents-v0/network.md
+docs/agents-v0/lessons.md
+docs/agents-v0/lessons-archive.md
 CHANGELOG.md
 "
   always_on_update="
@@ -323,7 +331,8 @@ docs/agents-v0/brownfield-onboarding.md
         .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
         .agents-v0/scripts/activate-stack-pack.sh .agents-v0/scripts/resolve-kit-root.sh \
-        .agents-v0/scripts/run-local-container.sh .agents-v0/hooks/pre-push; do
+        .agents-v0/scripts/run-local-container.sh .agents-v0/scripts/stories-status.sh .agents-v0/scripts/check-lessons.sh \
+        .agents-v0/hooks/pre-push; do
         [ "$rel" = "$always" ] && overwrite=1 && break
       done
     fi

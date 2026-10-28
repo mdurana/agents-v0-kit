@@ -50,7 +50,8 @@ Workflow state, approved phases, `baseCommit`, and on-disk artifact pointers liv
 - **Stopping at a Gate:** Write `<feature>.phase-result.md`, run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase <phase> --status awaiting_approval <artifact>`, and stop your turn. Never self-approve or infer approval.
 - **Recording Human Approval:** Only after the user explicitly approves in chat (or records an `Approved` row in `Delivery approvals`), run `sh .agents-v0/scripts/sync-feature-state.sh --approve <phase> <artifact>`.
 
-`/v0-status` is read-only: it inspects the state file(s) and names the next command to run, including the feature slug or maintenance id. Naming when the user omitted that name is the Parallel Features rule below.
+<!-- MEM-01: /v0-status sees stories in every worktree through stories-status.sh (read-only). -->
+`/v0-status` is read-only: it inspects the state file(s), including every worktree's through `sh .agents-v0/scripts/stories-status.sh`, and names the next command to run, including the feature slug or maintenance id. Naming when the user omitted that name is the Parallel Features rule below.
 
 ## Parallel Features
 
@@ -79,6 +80,13 @@ Phase subagents do not spawn subagents directly. When a phase agent needs codeba
 
 - **Build test-failure budget:** Each verify run in Build appends a card to `docs/agents-v0/build/<feature>/build-report.md`. Before each attempt, run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<feature>/build-report.md` (default max 8 failed attempts). Two consecutive failures on the same test require a `failure-brief.md` (`check-failure-brief.sh`) to `debug-investigator`; a third consecutive failure stops Build.
 - **Verify → Build bounce budget:** When Verify finds a `Critical` issue, run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed false --reopen build <artifact>`. If `reopenCount` exceeds 3, stop and escalate to the user.
+
+## Lessons Memory (cross-story)
+
+<!-- MEM-03: lessons from one story (failure briefs, Verify fails, re-opens, review findings) now reach later stories through docs/agents-v0/lessons.md, with a human decision at the local-release gate. See refs/MEMORY-20261028.md in the kit. -->
+- **Read:** At the start of Plan, Intake, Design, Build, Verify, and Maintain, read `## Active lessons` in `docs/agents-v0/lessons.md` when it exists. In a story worktree, read the integration branch's copy (`git show <ref>:docs/agents-v0/lessons.md`, ref from `resolve-integration-branch.sh`), which has lessons accepted after the branch was cut; fall back to the file on disk. Apply entries whose `Scope` matches the work. A lesson never overrides an approved artifact, the profile, or these rules.
+- **Candidates:** At a gate stop, the phase agent adds at most 3 candidates for its phase under `## Lessons` → `### <phase>` in the story's phase-result (`requirements/<feature>.phase-result.md` or `maintain/<id>/phase-result.md`): `- Trigger: <failure-brief|verify-fail|reopen|review|attempt-budget|blocked|other> · What happened: … · Do instead: … · Scope: …`, or `- none`. Only from what happened in this story. Keep earlier phases' subsections when rewriting the file. No secrets.
+- **Accepting:** Story branches never edit `docs/agents-v0/lessons.md` or `lessons-archive.md`. `/v0-local-release` proposes the candidates, the user accepts or rejects each, and accepted ones are appended in the integration checkout after the merge. `sh .agents-v0/scripts/check-lessons.sh` checks format, ids, the active cap (30), size, and secrets.
 
 ## Phase Gates Summary
 

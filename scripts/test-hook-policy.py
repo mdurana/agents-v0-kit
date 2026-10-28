@@ -234,6 +234,11 @@ SHELL_CASES = [
 ]
 
 PATH_CASES = [
+    # MEM-08: lessons memory edits ask; phase-result candidates stay allowed.
+    ("docs/agents-v0/lessons.md", "ask"),
+    ("docs/agents-v0/lessons-archive.md", "ask"),
+    ("../app-orders/docs/agents-v0/lessons.md", "ask"),
+    ("docs/agents-v0/requirements/orders.phase-result.md", "allow"),
     (".cursor/hooks.json", "block"),
     (".agents/hooks.json", "block"),
     (".cursor/./rules/org/x.mdc", "block"),

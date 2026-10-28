@@ -222,3 +222,30 @@ delivery-metrics:
     paths:
       - delivery-metrics.md
     expire_in: 2 weeks
+
+# MEM-09: cross-story lessons memory check. Fails the merge request when docs/agents-v0/lessons.md or
+# lessons-archive.md is malformed, over its active cap, or holds something that looks like a secret,
+# or when a phase-result has more than 3 lesson candidates for one phase. On a story branch it also
+# fails when the branch edited lessons.md (only the integration branch appends accepted lessons).
+lessons-check:
+  stage: delivery-gate
+  image: ${CI_IMAGE_PREFIX}alpine:3.20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - apk add --no-cache python3 git
+  script:
+    - |
+      if [ -f .agents-v0/scripts/check-lessons.sh ]; then
+        sh .agents-v0/scripts/check-lessons.sh
+        case "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" in
+          feature/*|maintain/*)
+            git fetch -q origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+            sh .agents-v0/scripts/check-lessons.sh --unchanged-since FETCH_HEAD
+            ;;
+        esac
+      else
+        echo "check-lessons.sh not installed; skipping"
+      fi

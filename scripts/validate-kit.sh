@@ -75,6 +75,11 @@ validate_target() {
   [ -f "$t/.gitlab/merge_request_templates/default.md" ] || err "target GitLab MR template missing"
   [ -f "$t/docs/agents-v0/model-routing-matrix.md" ] || err "target docs/agents-v0/model-routing-matrix.md missing"
   [ -f "$t/docs/agents-v0/user-guide.md" ] || err "target docs/agents-v0/user-guide.md missing"
+  # MEM-10: an installed project has the cross-story memory scripts and its seeded lessons files.
+  [ -x "$t/.agents-v0/scripts/stories-status.sh" ] || err "target .agents-v0/scripts/stories-status.sh missing or not executable"
+  [ -x "$t/.agents-v0/scripts/check-lessons.sh" ] || err "target .agents-v0/scripts/check-lessons.sh missing or not executable"
+  [ -f "$t/docs/agents-v0/lessons.md" ] || err "target docs/agents-v0/lessons.md missing (install.sh seeds it)"
+  [ -f "$t/docs/agents-v0/lessons-archive.md" ] || err "target docs/agents-v0/lessons-archive.md missing (install.sh seeds it)"
   if [ -f "$t/.gitignore" ]; then
     grep -Fq '!docs/agents-v0/build/' "$t/.gitignore" || err "target .gitignore lacks the !docs/agents-v0/build/ negation (build evidence would be ignored)"
   fi
@@ -305,6 +310,21 @@ sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
 sh scripts/test-release.sh || err "scripts/test-release.sh failed"
 [ -f scripts/test-command-flows.sh ] || err "scripts/test-command-flows.sh missing"
 sh scripts/test-command-flows.sh || err "scripts/test-command-flows.sh failed"
+# MEM-10: behavior tests for stories-status.sh and check-lessons.sh, and the prompt wiring they need.
+[ -f scripts/test-memory.sh ] || err "scripts/test-memory.sh missing"
+sh scripts/test-memory.sh || err "scripts/test-memory.sh failed"
+grep -Fq 'stories-status.sh' core/common/commands/v0-status.md || err "/v0-status does not use stories-status.sh"
+grep -Fq 'check-lessons.sh' core/common/commands/v0-local-release.md || err "/v0-local-release does not run check-lessons.sh"
+grep -Fq '## Proposed lessons' core/common/skills/local-release/SKILL.md || err "local-release does not collect Proposed lessons"
+for c in plan intake design build verify maintain; do
+  grep -Fq 'docs/agents-v0/lessons.md' "core/common/commands/v0-$c.md" || err "/v0-$c does not read docs/agents-v0/lessons.md"
+done
+for s in stories-status.sh check-lessons.sh; do
+  grep -Fq ".agents-v0/scripts/$s" scripts/install.sh || err "install.sh does not install .agents-v0/scripts/$s"
+done
+for doc in lessons.md lessons-archive.md; do
+  grep -Fq "docs/agents-v0/$doc" scripts/install.sh || err "install.sh does not seed docs/agents-v0/$doc"
+done
 grep -Fq 'git status --porcelain' core/common/hooks/stop.sh || err "stop hook is not evidence-based (expected git status check)"
 
 # 10. Entry files: AGENTS.md states the lifecycle and precedence; README documents
@@ -338,6 +358,10 @@ for artifact in \
   templates/.agents-v0/scripts/sync-feature-state.sh \
   templates/.agents-v0/scripts/delivery-metrics.sh \
   templates/.agents-v0/scripts/run-local-container.sh \
+  templates/.agents-v0/scripts/stories-status.sh \
+  templates/.agents-v0/scripts/check-lessons.sh \
+  templates/docs/agents-v0/lessons.md \
+  templates/docs/agents-v0/lessons-archive.md \
   templates/.agents-v0/hooks/pre-push \
   templates/.cursor/model-config.json \
   templates/docs/agents-v0/milestones/_template.md \

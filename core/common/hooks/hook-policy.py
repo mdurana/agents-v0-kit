@@ -722,6 +722,16 @@ def classify_path(path: str) -> Tuple[Action, str]:
             "ask",
             "Delivery artifact edit — do not change Delivery approvals without explicit human gate approval.",
         )
+    # MEM-08: the cross-story lessons memory changes only at the local-release gate, in the
+    # integration checkout, with lessons the user accepted. Any other edit (for example a phase
+    # agent on a story branch writing straight into lessons.md) asks the human first.
+    if re.search(r"(^|/)docs/agents-v0/lessons(-archive)?\.md$", norm):
+        return (
+            "ask",
+            "Lessons memory edit: only the release-manager appends user-accepted lessons in the "
+            "integration checkout after the local-release merge. Story phases write candidates in "
+            "the phase-result '## Lessons' section instead.",
+        )
     if re.search(r"(^|/)docs/agents-v0/milestones/.+\.md$", norm):
         return (
             "ask",

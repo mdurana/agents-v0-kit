@@ -141,6 +141,14 @@ Workflow state, artifact pointers, and human approvals live in structured JSON s
 - **Resuming work:** Re-entering any `/v0-*` command reads `<feature>.state.json` (`artifacts` map and `baseCommit`) and continues from existing files on disk without recreating approved artifacts.
 - **Parallel feature isolation:** Two active features in one checkout stop if they touch overlapping files; use `.agents-v0/scripts/feature-worktree.sh <feature>` to isolate branches in separate git worktrees.
 
+## Cross-story memory (`stories-status.sh`, `lessons.md`)
+
+<!-- MEM-11: reference for the two memory pieces added on 2026-10-28 (kit refs/MEMORY-20261028.md). -->
+- **All-stories view:** `sh .agents-v0/scripts/stories-status.sh [--json] [--all-copies]` reads `program.state.json`, `onboarding/state.json`, `requirements/*.state.json`, and `maintain/*/state.json` in the main checkout and every worktree from `git worktree list`, and prints one row per story (branch, worktree, `activePhase`, `activeStatus`, `lastApprovedPhase`, `verifyPassed`, `reopenCount`, `tier`, `blockedReason`, last commit date, note). A story's own worktree (`feature/<feature>` or `maintain/<id>`) wins over a stale copy on main; a malformed or missing state file is reported in the note column. Read-only: it writes no files and keeps no cache. `/v0-status` starts with it.
+- **Lessons memory:** `docs/agents-v0/lessons.md` (at most 30 active entries) and `docs/agents-v0/lessons-archive.md` (promoted or retired entries) live on the integration branch. Entry: `### L-NNN · YYYY-MM-DD · accepted` with `Story/phase`, `Trigger`, `What happened`, `Do instead`, and `Scope` bullets. Phase agents read the active entries before Plan, Intake, Design, Build, Verify, and Maintain, and write at most 3 candidates per phase under `## Lessons` → `### <phase>` in the story's phase-result. Story branches never edit `lessons.md`.
+- **Accepting lessons:** `/v0-local-release` collects the candidates into `## Proposed lessons` (`- P-<n> · pending · <phase> · ...`), the user accepts or rejects each at the Release gate, and after the merge the release-manager appends the accepted ones (ids from `check-lessons.sh --next-id`) in the integration checkout, in the release-state commit.
+- **Check:** `sh .agents-v0/scripts/check-lessons.sh` validates both files (heading and bullets, unique sequential ids, active cap `--max-active`/`LESSONS_MAX_ACTIVE`, entry size `--max-chars`, a secrets scan) and every phase-result's `## Lessons` (max 3 per phase) and `## Proposed lessons`. `--decided` requires a decision on each proposal; `--unchanged-since <ref>` fails when the branch edited `lessons.md`. The GitLab `lessons-check` job runs it on merge requests, and editing `lessons.md` asks the user first (`hook-policy.py`).
+
 ## Design
 
 `/v0-design` produces contract-first specifications guided by the `contract-first-design` and `ux-design` skills:

@@ -25,8 +25,9 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Deliver (one story) | `/v0-deliver` | orchestrator | — | Follows each phase command and stops at every gate that applies. P0-A starts at Build and stops once, at Release |
 | Export (on request) | `/v0-export` | — | jira-export | `docs/agents-v0/backlog/tickets.csv` (documentation only, approves nothing) |
 | Briefing (on request) | `/v0-deck` | — | leadership-deck | `docs/agents-v0/presentations/<name>.md` (documentation only, approves nothing) |
-| Resume | `/v0-status` | orchestrator | — | Next phase from `<feature>.state.json` + on-disk evidence |
+| Resume | `/v0-status` | orchestrator | — | Next phase from `<feature>.state.json` + on-disk evidence; all stories across worktrees via `.agents-v0/scripts/stories-status.sh` |
 
+<!-- MEM-01/MEM-03: /v0-status reads every worktree through stories-status.sh; accepted cross-story lessons live in docs/agents-v0/lessons.md (workflow-orchestration.mdc Lessons Memory). -->
 ## Non-negotiable conduct
 
 - Reconnaissance → Plan → Execute → Verify → Report in every phase.
@@ -34,6 +35,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 - Record workflow state and approvals via `.agents-v0/scripts/sync-feature-state.sh` (`<feature>.state.json`, `maintain/<id>/state.json`, `onboarding/state.json`, `program.state.json`).
 - Commits, local merges, pushes, and merge-request creation each need explicit human authorization.
 - Smallest correct diff; no drive-by refactors; no unsolicited files.
+- Read `docs/agents-v0/lessons.md` before a story phase; never edit it on a story branch (lesson candidates go in the phase-result).
 - Build & Verify gate: the profile Backend verify command (`.agents-v0/scripts/run-backend-verify.sh`, e.g. `./mvnw -B clean verify -Pci-security` or `dotnet test`) and Frontend verify command pass.
 - No secrets in code, logs, or client bundles; sanitize log values; never dump environment variables.
 

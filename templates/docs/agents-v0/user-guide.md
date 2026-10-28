@@ -82,7 +82,7 @@ You can also write in normal language, for example: *â€œRun intake on PROJ-1234â
 |--------------|-------------|
 | The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved. A second design run reviews that saved design. A second verify run reuses the test report when the code has not changed, and repeats the checks when it has. |
 | The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
-| You did not name a feature | The AI lists the open features and asks which one you mean. |
+| You did not name a feature | The AI lists the open features and asks which one you mean. It also shows features being worked on in their own folders (`.agents-v0/scripts/stories-status.sh`). |
 
 ---
 
@@ -228,6 +228,9 @@ Tests finish first. The security checklist and the code review are prepared toge
 
 - `Please open the merge request; engineering will merge after CI is green.`  
 - `Wait for product sign-off on release notes.`
+
+<!-- MEM-11: approvers decide which lessons from this story become cross-story memory. -->
+**Lessons from this story.** With a local release (`/v0-local-release`), the report also lists **Proposed lessons** (`P-1`, `P-2`, ...): short notes on what went wrong in this story and what to do instead next time. Say which to keep, for example `Accept P-1 and P-3, reject P-2.` Only the ones you accept are added to `docs/agents-v0/lessons.md`, which every later story reads before it starts. Nothing is added without your yes.
 
 ---
 
