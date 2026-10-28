@@ -1,0 +1,15 @@
+Updated 0 agent model(s).
+Installed agents-v0 into /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+To refresh after kit changes: install.sh --update <target-repo>
+seeded /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal/app/backend
+seeded /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal/app/frontend
+seeded /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal/docker-compose.yml
+Recorded layout profile app in /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal/docs/agents-v0/project-profile.md
+
+Greenfield bootstrap complete.
+Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.
+P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).
+      run ./scripts/audit-brownfield-baseline.sh /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal
+Then start P0-A with /v0-build or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md

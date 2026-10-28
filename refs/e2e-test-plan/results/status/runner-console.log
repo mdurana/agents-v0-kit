@@ -1,0 +1,77 @@
+mkdir: /Users/marlondurana/.local/agents-v0-tools: Operation not permitted
+curl: (6) Could not resolve host: repo1.maven.org
+curl: (6) Could not resolve host: repo1.maven.org
+curl: (6) Could not resolve host: repo1.maven.org
+curl: (6) Could not resolve host: repo1.maven.org
+/Users/marlondurana/REPO/agents-v0-20261012-dotnet/refs/e2e-test-plan/scripts/prereqs.sh: line 197: /Users/marlondurana/.local/agents-v0-tools/tools.env: No such file or directory
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+cp: /Users/marlondurana/.cursor/cli-config.json: Operation not permitted
+cp: /Users/marlondurana/.cursor/cli-config.json: Operation not permitted
+cp: /Users/marlondurana/.cursor/cli-config.json: Operation not permitted
+cp: /Users/marlondurana/.cursor/cli-config.json: Operation not permitted
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys;p=sys.argv[1];d=json.load(open(p));a=d.setdefault("permissions",{}).setdefault("allow",[]);[a.append(x) for x in sys.argv[2].split(",") if x and x not in a];json.dump(d,open(p,"w"),indent=2)
+                                              ~~~~^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/calib/CAL-ASK-ALLOW/cfg-1/cli-config.json'
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+/Users/marlondurana/REPO/agents-v0-20261012-dotnet/refs/e2e-test-plan/scripts/lib.sh: line 150: 29078 Terminated: 15          ( cd "$WS" && env -i "${envv[@]}" bash -c 'source "'"$PLAN_DIR"'/scripts/lib.sh"; run_isolated "$@"' _ "$cap" "${argv[@]}" ) > "$RUN/turn-$k.jsonl" 2> "$RUN/turn-$k.stderr"
+/Users/marlondurana/REPO/agents-v0-20261012-dotnet/refs/e2e-test-plan/scripts/lib.sh: line 150: 39104 Terminated: 15          ( cd "$WS" && env -i "${envv[@]}" bash -c 'source "'"$PLAN_DIR"'/scripts/lib.sh"; run_isolated "$@"' _ "$cap" "${argv[@]}" ) > "$RUN/turn-$k.jsonl" 2> "$RUN/turn-$k.stderr"
+/Users/marlondurana/REPO/agents-v0-20261012-dotnet/refs/e2e-test-plan/scripts/lib.sh: line 150: 50192 Terminated: 15          ( cd "$WS" && env -i "${envv[@]}" bash -c 'source "'"$PLAN_DIR"'/scripts/lib.sh"; run_isolated "$@"' _ "$cap" "${argv[@]}" ) > "$RUN/turn-$k.jsonl" 2> "$RUN/turn-$k.stderr"
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted
+warning: unable to access '/Users/marlondurana/.gitignore_global': Operation not permitted

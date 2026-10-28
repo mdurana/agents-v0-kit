@@ -1,0 +1,22 @@
+PREREQ os             PRESENT   Darwin (x86_64)
+PREREQ git            PRESENT   /usr/bin/git
+PREREQ jq             PRESENT   /usr/bin/jq
+PREREQ python3        PRESENT   /usr/local/bin/python3
+PREREQ curl           PRESENT   /usr/bin/curl
+PREREQ tar            PRESENT   /usr/bin/tar
+PREREQ xz             PRESENT   /usr/local/bin/xz
+PREREQ sha256         PRESENT   /sbin/sha256sum
+PREREQ timeout        PRESENT   python3 fallback (Darwin)
+PREREQ setsid         PRESENT   python3 fallback (Darwin)
+PREREQ pyyaml         PRESENT   python3 -c 'import yaml' ok
+PREREQ python-docx    DEGRADED  optional; only needed to rebuild test-plan.docx
+PREREQ jdk21          PRESENT   /Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+PREREQ node22         PRESENT   /Users/marlondurana/.nvm/versions/node/v20.18.3 (v20.18.3)
+PREREQ postgres17     DEGRADED  download/verify of embedded-postgres-binaries-darwin-amd64-17.2.0.jar from Maven Central failed
+PREREQ odc-data       PRESENT   /Users/marlondurana/.m2/repository/org/owasp/dependency-check-data/9.0/odc.mv.db (192M, 2026-10-19 14:43)
+PREREQ agent-cli      PRESENT   antigravity custom driver (bash /Users/marlondurana/REPO/agents-v0-20261012-dotnet/refs/e2e-test-plan/scripts/agy-ipc-turn.sh)
+PREREQ agent-auth     PRESENT   managed by Antigravity session / AGENT_TURN_CMD
+PREREQ agent-model    PRESENT   grok-4.7-high
+PREREQ container      DEGRADED  no working docker/podman; P0-A AC-4 (container run) is scored DEGRADED; installing one needs root
+PREREQ network        DEGRADED  Maven Central or npm not reachable
+PREREQ disk           PRESENT   92 GB free

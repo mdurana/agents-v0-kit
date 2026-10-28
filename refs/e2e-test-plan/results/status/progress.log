@@ -1,0 +1,274 @@
+2026-10-28 05:29:01 Asia/Manila RUN-START test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1 kit=/Users/marlondurana/REPO/agents-v0-20261012-dotnet@HEAD start_step=0
+2026-10-28 05:29:01 Asia/Manila STEP-START 0 preflight kit=not-yet
+2026-10-28 05:29:06 Asia/Manila PREFLIGHT will-install: | needs-human: | degraded: python-docx postgres17 container network 
+2026-10-28 05:29:06 Asia/Manila RESULT step-0 preflight PASS kit=? 
+2026-10-28 05:29:06 Asia/Manila STEP-END 0 PASS
+2026-10-28 05:29:06 Asia/Manila STEP-START 1 prerequisites kit=not-yet
+2026-10-28 05:29:28 Asia/Manila TURN-START run=CAL-AUTH turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/calib/repo drv=antigravity
+2026-10-28 05:30:24 Asia/Manila TURN-END run=CAL-AUTH turn=1 class=NORMAL rc=0
+2026-10-28 05:30:24 Asia/Manila TURN-START run=CAL-STREAM turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/calib/repo drv=antigravity
+2026-10-28 05:30:28 Asia/Manila TURN-END run=CAL-STREAM turn=1 class=NORMAL rc=0
+2026-10-28 05:30:28 Asia/Manila TURN-START run=CAL-ASK-DENY turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/calib/repo drv=antigravity
+2026-10-28 05:30:33 Asia/Manila TURN-END run=CAL-ASK-DENY turn=1 class=NORMAL rc=0
+2026-10-28 05:30:33 Asia/Manila TURN-START run=CAL-ASK-ALLOW turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/calib/repo drv=antigravity
+2026-10-28 05:30:49 Asia/Manila TURN-END run=CAL-ASK-ALLOW turn=1 class=NORMAL rc=0
+2026-10-28 05:30:50 Asia/Manila BEFORE-STEP-2 needs-human: none | degraded: python-docx postgres17 container network | ask_mode=allowlist
+2026-10-28 05:30:50 Asia/Manila RESULT step-1 prerequisites PASS kit=? 
+2026-10-28 05:30:50 Asia/Manila STEP-END 1 PASS
+2026-10-28 05:30:50 Asia/Manila SNAPSHOT BEFORE-2 (no workspace yet)
+2026-10-28 05:30:50 Asia/Manila STEP-START 2 workspace-and-onboard kit=not-yet
+2026-10-28 05:30:53 Asia/Manila KIT kit=c51b0e81dee2+worktree from /Users/marlondurana/REPO/agents-v0-20261012-dotnet HEAD
+2026-10-28 05:31:06 Asia/Manila SNAPSHOT S2-WORKSPACE kit=c51b0e81dee2+worktree
+2026-10-28 05:31:06 Asia/Manila RESULT step-2 workspace-and-onboard PASS kit=c51b0e81dee2+worktree 
+2026-10-28 05:31:06 Asia/Manila STEP-END 2 PASS
+2026-10-28 05:31:06 Asia/Manila STOP-AFTER reached STOP_AFTER_STEP=2
+2026-10-28 05:31:06 Asia/Manila SUMMARY /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/results/summary.md
+2026-10-28 05:31:06 Asia/Manila RUN-END exit=0
+2026-10-28 05:33:28 Asia/Manila RESTORE BEFORE-3
+2026-10-28 05:35:44 Asia/Manila RESUME attempt 1 from step 3 reason=env-fix kit c51b0e81dee2+worktree -> c51b0e81dee2+worktree
+2026-10-28 05:35:44 Asia/Manila RUN-START test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1 kit=/Users/marlondurana/REPO/agents-v0-20261012-dotnet@HEAD start_step=3
+2026-10-28 05:35:44 Asia/Manila STEP-START 3 happy-1-program-and-P0-A kit=c51b0e81dee2+worktree
+2026-10-28 05:35:46 Asia/Manila TURN-START run=S3-roadmap-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 05:50:46 Asia/Manila STALL run=S3-roadmap-1 turn=1 no output and no file change for 900s
+2026-10-28 05:51:16 Asia/Manila TURN-END run=S3-roadmap-1 turn=1 class=STALL rc=143
+2026-10-28 05:51:17 Asia/Manila RETRY S3-roadmap after STALL (try 1 of 2)
+2026-10-28 05:53:22 Asia/Manila TURN-START run=S3-roadmap-2 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 06:08:22 Asia/Manila STALL run=S3-roadmap-2 turn=1 no output and no file change for 900s
+2026-10-28 06:08:52 Asia/Manila TURN-END run=S3-roadmap-2 turn=1 class=STALL rc=143
+2026-10-28 06:08:52 Asia/Manila RETRY S3-roadmap after STALL (try 2 of 2)
+2026-10-28 06:10:56 Asia/Manila TURN-START run=S3-roadmap-3 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 06:25:56 Asia/Manila STALL run=S3-roadmap-3 turn=1 no output and no file change for 900s
+2026-10-28 06:26:26 Asia/Manila TURN-END run=S3-roadmap-3 turn=1 class=STALL rc=143
+2026-10-28 06:26:26 Asia/Manila RESULT step-3 happy-1-program-and-P0-A FAIL kit=c51b0e81dee2+worktree 
+2026-10-28 06:26:26 Asia/Manila STEP-END 3 FAIL
+2026-10-28 06:26:27 Asia/Manila RESULT step-4 happy-2-story-N1 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:26:27 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:26:27 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:26:27 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:26:27 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:26:27 Asia/Manila SUMMARY /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/results/summary.md
+2026-10-28 06:26:27 Asia/Manila RUN-END exit=1
+2026-10-28 06:28:23 Asia/Manila RESTORE BEFORE-3
+2026-10-28 06:28:23 Asia/Manila RESUME attempt 2 from step 3 reason=harness-fix kit c51b0e81dee2+worktree -> c51b0e81dee2+worktree
+2026-10-28 06:28:23 Asia/Manila RUN-START test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1 kit=/Users/marlondurana/REPO/agents-v0-20261012-dotnet@HEAD start_step=3
+2026-10-28 06:28:23 Asia/Manila STEP-START 3 happy-1-program-and-P0-A kit=c51b0e81dee2+worktree
+2026-10-28 06:28:26 Asia/Manila TURN-START run=S3-roadmap-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 06:32:24 Asia/Manila TURN-END run=S3-roadmap-1 turn=1 class=NORMAL rc=0
+2026-10-28 06:32:24 Asia/Manila RESULT step-3 happy-1-program-and-P0-A FAIL kit=c51b0e81dee2+worktree 
+2026-10-28 06:32:24 Asia/Manila STEP-END 3 FAIL
+2026-10-28 06:32:24 Asia/Manila RESULT step-4 happy-2-story-N1 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:32:24 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:32:24 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:32:24 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:32:24 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=c51b0e81dee2+worktree after an earlier failure
+2026-10-28 06:32:24 Asia/Manila SUMMARY /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/results/summary.md
+2026-10-28 06:32:24 Asia/Manila RUN-END exit=1
+2026-10-28 07:31:50 Asia/Manila RESTORE BEFORE-3
+2026-10-28 07:31:51 Asia/Manila RESUME attempt 1 from step 3 reason=harness-fix kit c51b0e81dee2+worktree -> c51b0e81dee2+worktree
+2026-10-28 07:31:51 Asia/Manila RUN-START test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1 kit=/Users/marlondurana/REPO/agents-v0-20261012-dotnet@HEAD start_step=3
+2026-10-28 07:31:51 Asia/Manila STEP-START 3 happy-1-program-and-P0-A kit=c51b0e81dee2+worktree
+2026-10-28 07:31:53 Asia/Manila TURN-START run=S3-roadmap-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:31:56 Asia/Manila TURN-END run=S3-roadmap-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:31:56 Asia/Manila TURN-START run=S3-roadmap-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:31:59 Asia/Manila TURN-END run=S3-roadmap-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:02 Asia/Manila TURN-START run=S3-architecture-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:05 Asia/Manila TURN-END run=S3-architecture-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:32:05 Asia/Manila TURN-START run=S3-architecture-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:10 Asia/Manila TURN-END run=S3-architecture-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:12 Asia/Manila TURN-START run=S3-plan-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:18 Asia/Manila TURN-END run=S3-plan-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:32:18 Asia/Manila TURN-START run=S3-plan-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:23 Asia/Manila TURN-END run=S3-plan-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:25 Asia/Manila SNAPSHOT S3-PLANNED kit=c51b0e81dee2+worktree
+2026-10-28 07:32:28 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-build-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:31 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-build-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:32:31 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-build-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:36 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-build-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:38 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-verify-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:42 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-verify-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:32:42 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-verify-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:44 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-verify-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:47 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-local-release-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:49 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:32:50 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-local-release-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:32:54 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:32:57 Asia/Manila SNAPSHOT S3-END kit=c51b0e81dee2+worktree
+2026-10-28 07:32:57 Asia/Manila RESULT step-3 happy-1-program-and-P0-A PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:32:57 Asia/Manila STEP-END 3 PASS
+2026-10-28 07:32:59 Asia/Manila SNAPSHOT BEFORE-4 kit=c51b0e81dee2+worktree
+2026-10-28 07:33:00 Asia/Manila STEP-START 4 happy-2-story-N1 kit=c51b0e81dee2+worktree
+2026-10-28 07:33:00 Asia/Manila STORY step 4 story P1-A (p1-a-lookup-table-registry)
+2026-10-28 07:33:02 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-intake-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:33:04 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-intake-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:33:05 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-intake-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:33:07 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-intake-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:33:07 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-intake-1 turn=3 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:33:10 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-intake-1 turn=3 class=NORMAL rc=0
+2026-10-28 07:33:13 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-design-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:17 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-design-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:33:17 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-design-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:20 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-design-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:33:23 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-build-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:27 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-build-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:33:27 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-build-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:32 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-build-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:33:36 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-verify-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:39 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-verify-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:33:40 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-verify-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:42 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-verify-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:33:46 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-local-release-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:48 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:33:49 Asia/Manila TURN-START run=S4-p1-a-lookup-table-registry-local-release-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-a-lookup-table-registry drv=antigravity
+2026-10-28 07:33:53 Asia/Manila TURN-END run=S4-p1-a-lookup-table-registry-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:33:58 Asia/Manila SNAPSHOT S4-END kit=c51b0e81dee2+worktree
+2026-10-28 07:33:58 Asia/Manila RESULT step-4 happy-2-story-N1 PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:33:58 Asia/Manila STEP-END 4 PASS
+2026-10-28 07:34:01 Asia/Manila SNAPSHOT BEFORE-5 kit=c51b0e81dee2+worktree
+2026-10-28 07:34:01 Asia/Manila STEP-START 5 happy-3-story-N2 kit=c51b0e81dee2+worktree
+2026-10-28 07:34:01 Asia/Manila STORY step 5 story P1-B (p1-b-transformation-recipe-schema)
+2026-10-28 07:34:05 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-intake-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:34:07 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-intake-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:34:08 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-intake-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:34:11 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-intake-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:34:11 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-intake-1 turn=3 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:34:14 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-intake-1 turn=3 class=NORMAL rc=0
+2026-10-28 07:34:20 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-design-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:24 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-design-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:34:24 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-design-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:26 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-design-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:34:31 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-build-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:35 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-build-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:34:35 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-build-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:40 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-build-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:34:45 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-verify-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:49 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-verify-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:34:49 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-verify-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:52 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-verify-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:34:57 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-local-release-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:34:59 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:35:00 Asia/Manila TURN-START run=S5-p1-b-transformation-recipe-schema-local-release-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p1-b-transformation-recipe-schema drv=antigravity
+2026-10-28 07:35:04 Asia/Manila TURN-END run=S5-p1-b-transformation-recipe-schema-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:35:10 Asia/Manila SNAPSHOT S5-END kit=c51b0e81dee2+worktree
+2026-10-28 07:35:10 Asia/Manila RESULT step-5 happy-3-story-N2 PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:35:10 Asia/Manila STEP-END 5 PASS
+2026-10-28 07:35:14 Asia/Manila SNAPSHOT BEFORE-6 kit=c51b0e81dee2+worktree
+2026-10-28 07:35:14 Asia/Manila STEP-START 6 reopen-story-N1 kit=c51b0e81dee2+worktree
+2026-10-28 07:35:19 Asia/Manila TURN-START run=S6-reopen-probe-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:35:21 Asia/Manila TURN-END run=S6-reopen-probe-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:35:21 Asia/Manila RESULT 6.1 reopen-refused PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:35:24 Asia/Manila RESTORE S5-END
+2026-10-28 07:35:29 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-maintain-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:35:32 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-maintain-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:35:32 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-maintain-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:35:35 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-maintain-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:35:41 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-maintain-2 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:35:45 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-maintain-2 turn=1 class=NORMAL rc=0
+2026-10-28 07:35:45 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-maintain-2 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:35:49 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-maintain-2 turn=2 class=NORMAL rc=0
+2026-10-28 07:35:55 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-verify-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:35:59 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-verify-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:35:59 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-verify-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:36:02 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-verify-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:36:08 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-local-release-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:36:11 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:36:11 Asia/Manila TURN-START run=S6-p1-a-lookup-table-registry-fix-1-local-release-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-maintain-p1-a-lookup-table-registry-fix-1 drv=antigravity
+2026-10-28 07:36:16 Asia/Manila TURN-END run=S6-p1-a-lookup-table-registry-fix-1-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:36:17 Asia/Manila RESULT 6.2 maintain-to-local-release PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:36:23 Asia/Manila SNAPSHOT S6-END kit=c51b0e81dee2+worktree
+2026-10-28 07:36:23 Asia/Manila RESULT step-6 reopen-story-N1 PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:36:23 Asia/Manila STEP-END 6 PASS
+2026-10-28 07:36:29 Asia/Manila SNAPSHOT BEFORE-7 kit=c51b0e81dee2+worktree
+2026-10-28 07:36:29 Asia/Manila STEP-START 7 negative-program-rerun kit=c51b0e81dee2+worktree
+2026-10-28 07:36:34 Asia/Manila RESTORE S6-END
+2026-10-28 07:36:40 Asia/Manila TURN-START run=S7-1-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:36:41 Asia/Manila TURN-END run=S7-1-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:36:42 Asia/Manila RESULT 7.1 /v0-roadmap user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S7-1-1
+2026-10-28 07:36:46 Asia/Manila RESTORE S6-END
+2026-10-28 07:36:53 Asia/Manila TURN-START run=S7-2-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:36:54 Asia/Manila TURN-END run=S7-2-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:36:54 Asia/Manila RESULT 7.2 /v0-roadmap user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md --refresh PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S7-2-1
+2026-10-28 07:36:59 Asia/Manila RESTORE S6-END
+2026-10-28 07:37:05 Asia/Manila TURN-START run=S7-3-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:37:07 Asia/Manila TURN-END run=S7-3-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:37:07 Asia/Manila RESULT 7.3 /v0-architecture PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S7-3-1
+2026-10-28 07:37:12 Asia/Manila RESTORE S6-END
+2026-10-28 07:37:19 Asia/Manila TURN-START run=S7-4-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:37:20 Asia/Manila TURN-END run=S7-4-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:37:21 Asia/Manila RESULT 7.4 /v0-plan PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S7-4-1
+2026-10-28 07:37:26 Asia/Manila RESTORE S6-END
+2026-10-28 07:37:32 Asia/Manila TURN-START run=S7-5-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:37:34 Asia/Manila TURN-END run=S7-5-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:37:34 Asia/Manila RESULT 7.5 /v0-plan
+
+Re-plan the program from scratch and overwrite docs/agents-v0/milestones/ with the new plan. PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S7-5-1
+2026-10-28 07:37:34 Asia/Manila RESULT step-7 negative-program-rerun PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:37:34 Asia/Manila STEP-END 7 PASS
+2026-10-28 07:37:40 Asia/Manila SNAPSHOT BEFORE-8 kit=c51b0e81dee2+worktree
+2026-10-28 07:37:40 Asia/Manila STEP-START 8 edge-phase-skips-N3 kit=c51b0e81dee2+worktree
+2026-10-28 07:37:45 Asia/Manila RESTORE S6-END
+2026-10-28 07:37:52 Asia/Manila TURN-START run=S8-a-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:37:53 Asia/Manila TURN-END run=S8-a-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:37:53 Asia/Manila RESULT 8.a /v0-build at S6-END (main) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-a-1
+2026-10-28 07:37:58 Asia/Manila RESTORE S6-END
+2026-10-28 07:38:05 Asia/Manila TURN-START run=S8-b-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:38:06 Asia/Manila TURN-END run=S8-b-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:38:06 Asia/Manila RESULT 8.b /v0-design at S6-END (main) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-b-1
+2026-10-28 07:38:11 Asia/Manila RESTORE S6-END
+2026-10-28 07:38:18 Asia/Manila TURN-START run=S8-c-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:38:20 Asia/Manila TURN-END run=S8-c-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:38:20 Asia/Manila RESULT 8.c /v0-local-release at S6-END (main) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-c-1
+2026-10-28 07:38:25 Asia/Manila RESTORE S6-END
+2026-10-28 07:38:32 Asia/Manila TURN-START run=S8-s1-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:38:35 Asia/Manila TURN-END run=S8-s1-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:38:36 Asia/Manila TURN-START run=S8-s1-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:38:38 Asia/Manila TURN-END run=S8-s1-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:38:39 Asia/Manila TURN-START run=S8-s1-1 turn=3 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:38:41 Asia/Manila TURN-END run=S8-s1-1 turn=3 class=NORMAL rc=0
+2026-10-28 07:38:49 Asia/Manila SNAPSHOT S8-N3-INTAKE kit=c51b0e81dee2+worktree
+2026-10-28 07:38:49 Asia/Manila RESULT 8.s1 setup PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:38:54 Asia/Manila RESTORE S8-N3-INTAKE
+2026-10-28 07:39:02 Asia/Manila TURN-START run=S8-d-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:39:04 Asia/Manila TURN-END run=S8-d-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:39:04 Asia/Manila RESULT 8.d /v0-build at S8-N3-INTAKE (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-d-1
+2026-10-28 07:39:10 Asia/Manila RESTORE S8-N3-INTAKE
+2026-10-28 07:39:18 Asia/Manila TURN-START run=S8-e-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:39:19 Asia/Manila TURN-END run=S8-e-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:39:20 Asia/Manila RESULT 8.e /v0-verify at S8-N3-INTAKE (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-e-1
+2026-10-28 07:39:25 Asia/Manila RESTORE S8-N3-INTAKE
+2026-10-28 07:39:33 Asia/Manila TURN-START run=S8-f-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:39:34 Asia/Manila TURN-END run=S8-f-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:39:35 Asia/Manila RESULT 8.f /v0-local-release at S8-N3-INTAKE (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-f-1
+2026-10-28 07:39:40 Asia/Manila RESTORE S8-N3-INTAKE
+2026-10-28 07:39:48 Asia/Manila TURN-START run=S8-s2-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:39:52 Asia/Manila TURN-END run=S8-s2-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:39:53 Asia/Manila TURN-START run=S8-s2-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:39:55 Asia/Manila TURN-END run=S8-s2-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:40:03 Asia/Manila SNAPSHOT S8-N3-DESIGN kit=c51b0e81dee2+worktree
+2026-10-28 07:40:03 Asia/Manila RESULT 8.s2 setup PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:40:09 Asia/Manila RESTORE S8-N3-DESIGN
+2026-10-28 07:40:17 Asia/Manila TURN-START run=S8-g-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:40:18 Asia/Manila TURN-END run=S8-g-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:40:19 Asia/Manila RESULT 8.g /v0-verify at S8-N3-DESIGN (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-g-1
+2026-10-28 07:40:24 Asia/Manila RESTORE S8-N3-DESIGN
+2026-10-28 07:40:32 Asia/Manila TURN-START run=S8-h-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:40:34 Asia/Manila TURN-END run=S8-h-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:40:34 Asia/Manila RESULT 8.h /v0-local-release at S8-N3-DESIGN (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-h-1
+2026-10-28 07:40:40 Asia/Manila RESTORE S8-N3-DESIGN
+2026-10-28 07:40:48 Asia/Manila TURN-START run=S8-s3-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:40:52 Asia/Manila TURN-END run=S8-s3-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:40:52 Asia/Manila TURN-START run=S8-s3-1 turn=2 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:40:57 Asia/Manila TURN-END run=S8-s3-1 turn=2 class=NORMAL rc=0
+2026-10-28 07:41:05 Asia/Manila SNAPSHOT S8-N3-BUILT kit=c51b0e81dee2+worktree
+2026-10-28 07:41:05 Asia/Manila RESULT 8.s3 setup PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:41:11 Asia/Manila RESTORE S8-N3-BUILT
+2026-10-28 07:41:20 Asia/Manila TURN-START run=S8-i-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal-p2-a-funding-cost-sap-export drv=antigravity
+2026-10-28 07:41:21 Asia/Manila TURN-END run=S8-i-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:41:22 Asia/Manila RESULT 8.i /v0-local-release at S8-N3-BUILT (story) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-i-1
+2026-10-28 07:41:27 Asia/Manila RESTORE S8-N3-BUILT
+2026-10-28 07:41:35 Asia/Manila TURN-START run=S8-j-1 turn=1 ws=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/work/portal drv=antigravity
+2026-10-28 07:41:36 Asia/Manila TURN-END run=S8-j-1 turn=1 class=NORMAL rc=0
+2026-10-28 07:41:37 Asia/Manila RESULT 8.j /v0-verify at S8-N3-BUILT (main) PASS kit=c51b0e81dee2+worktree end=NORMAL-END run=S8-j-1
+2026-10-28 07:41:37 Asia/Manila RESULT step-8 edge-phase-skips-N3 PASS kit=c51b0e81dee2+worktree 
+2026-10-28 07:41:37 Asia/Manila STEP-END 8 PASS
+2026-10-28 07:41:37 Asia/Manila SUMMARY /Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1/results/summary.md
+2026-10-28 07:41:37 Asia/Manila RUN-END exit=0

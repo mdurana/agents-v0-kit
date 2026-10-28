@@ -1,0 +1,11 @@
+test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-run-1
+kit_url=/Users/marlondurana/REPO/agents-v0-20261012-dotnet
+kit_ref=HEAD
+agent_model=grok-4.7-high
+started=2026-10-28 05:29:01 Asia/Manila
+kit_sha=c51b0e81dee2b234c6cdbab160cdaf3c3452e3ee
+kit_label=c51b0e81dee2+worktree
+kit_source=/Users/marlondurana/REPO/agents-v0-20261012-dotnet HEAD
+resume_1=2026-10-28 05:35:44 step=3 reason=env-fix old_kit=c51b0e81dee2+worktree new_kit=c51b0e81dee2+worktree harness_sha=697c6ff0ee9d
+resume_2=2026-10-28 06:28:23 step=3 reason=harness-fix old_kit=c51b0e81dee2+worktree new_kit=c51b0e81dee2+worktree harness_sha=dc751d67940f
+resume_1=2026-10-28 07:31:51 step=3 reason=harness-fix old_kit=c51b0e81dee2+worktree new_kit=c51b0e81dee2+worktree harness_sha=a58ba6c66498
