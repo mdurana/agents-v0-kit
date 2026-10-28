@@ -218,6 +218,9 @@ PY
   fi
   chmod +x "$t"/.agents/hooks/*.sh "$t/.agents/hooks/hook-policy.py"
   cp "$KIT/core/common/adapters/antigravity/hooks.json" "$t/.agents/hooks.json"
+  if [ -f "$KIT/templates/.agents/model-config.json" ] && [ ! -f "$t/.agents/model-config.json" ]; then
+    cp "$KIT/templates/.agents/model-config.json" "$t/.agents/model-config.json"
+  fi
 }
 
 install_templates() {

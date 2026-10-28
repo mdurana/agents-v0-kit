@@ -1,6 +1,6 @@
 # Results — agents-v0 portal end-to-end plan
 
-Run: `/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-real-1` · kit source `/Users/marlondurana/REPO/agents-v0-20261012-dotnet` @ `e2086a8` · current kit `e2086a801e0a` · model `grok-4.7-high` · ask_mode `allowlist` · written 2026-10-28 14:42:27 Asia/Manila
+Run: `/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-real-1` · kit source `/Users/marlondurana/REPO/agents-v0-20261012-dotnet` @ `e2086a8` · current kit `e2086a801e0a` · model `Gemini 4 argon medium / gemini 3.8 flash medium` · ask_mode `allowlist` · written 2026-10-28 14:42:27 Asia/Manila
 
 | Step | Name | Result | Time (Asia/Manila) | Note | Kit |
 |---|---|---|---|---|---|

@@ -12,7 +12,6 @@ mkdir -p "$TOOLS_DIR" 2>/dev/null || TOOLS_DIR="$TEST_ROOT/tools"
 : "${AGENT_BIN:=$(command -v agent 2>/dev/null || echo "$HOME/.local/bin/agent")}"
 : "${AGY_BIN:=$(command -v agy 2>/dev/null || echo "$HOME/.antigravity/bin/agy")}"
 : "${AGENT_TURN_CMD:=bash $PLAN_DIR/scripts/agy-ipc-turn.sh}"  # Antigravity IPC turn bridge (subagent transcript -> stream-json)
-: "${AGENT_MODEL:=grok-4.7-high}"
 # resolve_driver: the ONE rule for AGENT_DRIVER=auto, used by both prereqs.sh and lib.sh (HARNESS-FIX 2026-10-28).
 #   Before this fix, prereqs.sh picked Antigravity whenever AGENT_TURN_CMD was set (env.sh always sets it), while
 #   lib.sh picked Cursor whenever the Cursor CLI was installed. On a machine with both, step 1 checked Antigravity
@@ -23,6 +22,13 @@ resolve_driver() {
   elif [ -x "${AGENT_BIN:-}" ]; then echo cursor
   else echo antigravity; fi
 }
+if [ -z "${AGENT_MODEL:-}" ]; then
+  if [ "$(resolve_driver)" = antigravity ]; then
+    AGENT_MODEL="Gemini 4 argon medium / gemini 3.8 flash medium"
+  else
+    AGENT_MODEL="grok-4.7-high"
+  fi
+fi
 : "${APPROVER:=mdurana}"
 : "${PACK:=java}"                                      # stack pack the scripted architecture answer names
 : "${PROFILE:=app}"                                    # bootstrap-greenfield.sh --profile

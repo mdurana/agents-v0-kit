@@ -1,7 +1,7 @@
 test_root=/Users/marlondurana/.gemini/antigravity/brain/f2176ec5-5d28-4bdc-8054-74b4903ee331/scratch/e2e-real-1
 kit_url=/Users/marlondurana/REPO/agents-v0-20261012-dotnet
 kit_ref=e2086a8
-agent_model=grok-4.7-high
+agent_model=Gemini 4 argon medium / gemini 3.8 flash medium
 started=2026-10-28 13:43:05 Asia/Manila
 kit_sha=e2086a801e0a3f715d93608c57609e27a27a6086
 kit_label=e2086a801e0a

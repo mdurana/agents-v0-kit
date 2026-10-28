@@ -28,12 +28,13 @@ role_key = {
     "ux designer": "ux-designer",
 }
 found = {}
+found_agy = {}
 critical = ""
 for line in head.splitlines():
     if not line.startswith("|"):
         continue
     cols = [col.strip() for col in line.strip().strip("|").split("|")]
-    if len(cols) < 3:
+    if len(cols) < 4:
         continue
     role = re.sub(r"[*_]", "", cols[0]).strip().lower()
     if not role or role == "role" or set(role) <= set("-: "):
@@ -47,10 +48,15 @@ for line in head.splitlines():
     if not match:
         raise SystemExit(f"role row has no Cursor ID: {role}")
     model = match.group(1)
+    agy_match = re.search(r"`([^`]+)`", cols[3])
+    if not agy_match:
+        raise SystemExit(f"role row has no Antigravity ID: {role}")
+    agy_model = agy_match.group(1)
     key = role_key.get(role)
     if not key:
         raise SystemExit(f"unknown role row in model-routing-matrix.md: {role}")
     found[key] = model
+    found_agy[key] = agy_model
 if not critical:
     raise SystemExit("matrix is missing the Build (critical) row")
 
@@ -61,6 +67,14 @@ if set(data) != set(found):
 for key, model in found.items():
     if data[key] != model:
         raise SystemExit(f"{path} {key}={data[key]!r} != matrix {model!r}")
+
+agy_path = Path("templates/.agents/model-config.json")
+agy_data = json.loads(agy_path.read_text(encoding="utf-8"))
+if set(agy_data) != set(found_agy):
+    raise SystemExit(f"{agy_path} keys {sorted(agy_data)} != matrix roles {sorted(found_agy)}")
+for key, model in found_agy.items():
+    if agy_data[key] != model:
+        raise SystemExit(f"{agy_path} {key}={agy_data[key]!r} != matrix {model!r}")
 
 section = matrix.split("## Kit agent mapping", 1)[1].split("## Skill-launched", 1)[0]
 roles = set()
@@ -125,6 +139,8 @@ plain="$(mktemp -d)"
 trap 'rm -rf "$tmp" "$plain"' EXIT
 sh "$KIT/scripts/install.sh" "$plain" >/dev/null
 grep -Fq 'model: grok-4.7[context=500k,reasoning_effort=high,fast=false]' "$plain/.cursor/agents/program-planner.md"
+grep -Fq 'model: Gemini 4 argon medium' "$plain/.agents/agents/program-planner.md"
+grep -Fq 'model: gemini 3.8 flash medium' "$plain/.agents/agents/backend-engineer.md"
 rm -f "$plain/.cursor/model-config.json"
 if sh "$plain/.agents-v0/scripts/update-agents-model.sh" >/dev/null 2>&1; then
   printf 'FAIL: update-agents-model.sh should fail when model-config.json is missing\n' >&2

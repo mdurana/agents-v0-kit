@@ -1,0 +1,12 @@
+{
+  "plan": "Gemini 4 argon medium",
+  "build": "gemini 3.8 flash medium",
+  "review": "Gemini 4 argon medium",
+  "explore": "gemini 3.8 flash medium",
+  "debug": "Gemini 4 argon medium",
+  "schemas": "gemini 3.8 flash medium",
+  "docs": "gemini 3.8 flash medium",
+  "documenter": "gemini 3.8 flash medium",
+  "orchestrator": "gemini 3.8 flash medium",
+  "ux-designer": "gemini 3.8 flash medium"
+}

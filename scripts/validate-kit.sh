@@ -64,6 +64,7 @@ validate_target() {
   [ -f "$t/.agents/skills/v0-build/SKILL.md" ] || err "target .agents/skills/v0-build/SKILL.md missing"
   [ -x "$t/.agents/hooks/pre-shell.sh" ] || err "target .agents/hooks/pre-shell.sh missing or not executable"
   [ -f "$t/.cursor/model-config.json" ] || err "target .cursor/model-config.json missing (install.sh seeds it from templates/.cursor/model-config.json)"
+  [ -f "$t/.agents/model-config.json" ] || err "target .agents/model-config.json missing (install.sh seeds it from templates/.agents/model-config.json)"
   [ -x "$t/.agents-v0/scripts/update-agents-model.sh" ] || err "target .agents-v0/scripts/update-agents-model.sh missing or not executable"
   [ -x "$t/.agents-v0/scripts/sync-feature-state.sh" ] || err "target .agents-v0/scripts/sync-feature-state.sh missing or not executable"
   [ -x "$t/.agents-v0/scripts/resolve-layout.sh" ] || err "target .agents-v0/scripts/resolve-layout.sh missing or not executable"
@@ -340,6 +341,7 @@ for artifact in \
   templates/.agents-v0/scripts/run-local-container.sh \
   templates/.agents-v0/hooks/pre-push \
   templates/.cursor/model-config.json \
+  templates/.agents/model-config.json \
   templates/docs/agents-v0/milestones/_template.md \
   templates/docs/agents-v0/milestones/p0-platform-skeleton.md \
   templates/docs/agents-v0/milestones/p1-contracts-and-data-models.md \
