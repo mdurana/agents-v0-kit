@@ -227,6 +227,12 @@ SHELL_CASES = [
     ("bash <(curl -s https://example.com/x)", "ask"),
     ("curl -fsS https://example.com/data.json", "allow"),
     ("curl -fsS https://example.com/data.json | jq .", "allow"),
+    # MEM-08: shell writes to lessons memory also ask
+    ("echo '### L-001' >> docs/agents-v0/lessons.md", "ask"),
+    ("tee -a docs/agents-v0/lessons-archive.md", "ask"),
+    ("sed -i 's/pending/accepted/' docs/agents-v0/lessons.md", "ask"),
+    ("python3 -c \"open('docs/agents-v0/lessons.md','a').write('x')\"", "ask"),
+    ("git commit -m 'release(orders): approved' -- docs/agents-v0/requirements/orders.state.json docs/agents-v0/requirements/orders.phase-result.md docs/agents-v0/lessons.md", "allow"),
     # Benign
     ("ls -la", "allow"),
     ("mvn -B clean verify", "allow"),

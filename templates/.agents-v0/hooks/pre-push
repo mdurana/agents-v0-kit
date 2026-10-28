@@ -8,6 +8,10 @@ set -eu
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
 
+if [ -f ".agents-v0/scripts/check-lessons.sh" ]; then
+  sh .agents-v0/scripts/check-lessons.sh
+fi
+
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
   if [ "${local_sha:-}" = "0000000000000000000000000000000000000000" ]; then

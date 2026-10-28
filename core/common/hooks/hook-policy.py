@@ -279,14 +279,25 @@ def _segment_reads_secret_file(seg: str) -> bool:
 
 def _segment_writes_protected_path(seg: str) -> Optional[str]:
     """Detect shell redirection or cp/mv/tee targeting protected paths."""
+    return _segment_writes_matching_path(seg, is_protected_path)
+
+
+def _segment_writes_ask_path(seg: str) -> Optional[Tuple[str, str]]:
+    """Detect shell redirection or cp/mv/tee/sed/interpreter writes targeting ask-level paths."""
+    target = _segment_writes_matching_path(seg, lambda p: classify_path(p)[0] == "ask")
+    if target:
+        return target, classify_path(target)[1]
+    return None
+
+
+def _segment_writes_matching_path(seg: str, predicate) -> Optional[str]:
     seg = _strip_env_prefix(seg.strip())
     if not seg:
         return None
     # Redirection targets
-    for m in re.finditer(r">\s*([^\s;|&]+)", seg):
-        target = m.group(1).lstrip(">")
-        target = target.strip().strip("'\"")
-        if is_protected_path(target):
+    for m in re.finditer(r">+\s*([^\s;|&]+)", seg):
+        target = m.group(1).strip().strip("'\"")
+        if predicate(target):
             return target
     try:
         parts = shlex.split(seg, posix=True)
@@ -299,15 +310,15 @@ def _segment_writes_protected_path(seg: str) -> Optional[str]:
         for p in parts[1:]:
             if p.startswith("-"):
                 continue
-            if is_protected_path(p):
+            if predicate(p):
                 return p
     if bin0 in ("sed", "perl") and any(p.startswith("-i") for p in parts[1:]):
         for p in parts:
-            if not p.startswith("-") and is_protected_path(p):
+            if not p.startswith("-") and predicate(p):
                 return p
     if bin0 in SCRIPT_INTERPRETERS and SCRIPT_WRITE_HINT.search(seg):
         for lit in _script_literals(parts):
-            if is_protected_path(lit):
+            if predicate(lit):
                 return lit
     return None
 
@@ -346,6 +357,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             "block",
             f"Protected kit/CI path cannot be modified via shell: {wpath}",
         )
+
+    apath = _segment_writes_ask_path(seg)
+    if apath:
+        return "ask", apath[1]
 
     # Destructive / production patterns (heuristic)
     if re.search(r"\bkubectl\s+delete\b", low) or re.search(
@@ -531,6 +546,7 @@ def _commit_paths_are_evidence(parts: List[str]) -> bool:
         elif (
             (norm.startswith("docs/agents-v0/requirements/") and norm.endswith(".md"))
             or (norm.startswith("docs/agents-v0/maintain/") and norm.endswith("/note.md"))
+            or norm in ("docs/agents-v0/lessons.md", "docs/agents-v0/lessons-archive.md")
         ):
             continue
         else:
@@ -566,15 +582,28 @@ def _heredoc_writes_protected(cmd: str) -> Optional[str]:
     return None
 
 
+def _heredoc_writes_ask_path(cmd: str) -> Optional[Tuple[str, str]]:
+    if not re.search(r"\b(?:python3?|node|perl|ruby)\b[^\n|;&]*(?:\s-\s*)?<<-?\s*['\"]?\w+", cmd):
+        return None
+    if not SCRIPT_WRITE_HINT.search(cmd):
+        return None
+    for lit in re.findall(r"['\"]([^'\"\n]+)['\"]", cmd):
+        act, msg = classify_path(lit)
+        if act == "ask":
+            return lit, msg
+    return None
+
+
 def classify_command(cmd: str) -> Tuple[Action, str]:
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
+    ha = _heredoc_writes_ask_path(cmd)
     segments = split_segments(cmd)
     if not segments:
-        return "allow", ""
-    worst: Action = "allow"
-    msg = ""
+        return ("ask", ha[1]) if ha else ("allow", "")
+    worst: Action = "ask" if ha else "allow"
+    msg = ha[1] if ha else ""
     for seg in segments:
         action, message = classify_segment(seg)
         if action == "block":
