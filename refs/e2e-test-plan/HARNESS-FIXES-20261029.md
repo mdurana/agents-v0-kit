@@ -137,7 +137,36 @@ folder (the box trusts only `/workspace`). Sign in to agy only after any machine
 `agy-turn-loop.sh` appends `agy --version` and `agent --version` at loop start and end to
 `$TEST_ROOT/agy-driver/cli-versions.txt` (agy updates itself).
 
+## SV-01 — `scripts/setup-vm.sh`: prepare a fresh Linode VM (new script)
+
+**Why.** Setting up the Linode shared 16 GB VM (Ubuntu 24.04, sg-sin-2) by hand from §12 was error-prone, and the
+captured image must stay under the Linode image limit (6 GB; the script keeps 5.4 GB) and hold no credential.
+**Decision (Marlon).** Native tools only: no Docker, Podman, Testcontainers or Redis; portable PostgreSQL 17 under
+`$PG_HOME` (prereqs.sh zonky path); P0-A AC-4 stays DEGRADED.
+**Fix.** `setup-vm.sh` (root; `set -eu`; idempotent; `--dry-run` prints every action):
+- setup: apt packages (`git jq python3 python3-yaml python3-docx curl xz-utils tmux rsync unzip`), timezone
+  Asia/Manila, user `e2e`; kit from a git bundle / local repo / https with `GITHUB_TOKEN_E2E_VM` (environment only:
+  passed to git as `GIT_CONFIG_*` for the one clone/fetch, never on disk, in argv or in a log; `origin` stays
+  token-free); then as `e2e`: latest agy and Cursor CLI from their official installers, agy `trustedWorkspaces`,
+  `prereqs.sh --install` / `--check`, `~/.profile` block, `~/launch.env`, `~/setup-vm/versions.txt`.
+- `--pre-image [--defer-odc]`: removes apt/npm/pip/maven caches, old Cursor CLI versions, agy logs, logs, `/tmp` and
+  shell history; checks for sign-in files; prints `df -h /`; exits 3 with a banner if used > 5.4 GB.
+- `--after-image`: installs the deferred OWASP data.
+- No sign-in of any kind; no secret in the script.
+**prereqs.sh.** `ODC_DEFER=1` reports `odc-data DEFERRED` (new status, does not fail the check) instead of
+installing the OWASP data.
+**How to check.** `bash -n` and shellcheck clean; `--dry-run` of all three modes on Marlon's box (no root, no apt);
+cleanup and credential-scan snippets run on a fake home. Not run on a real VM.
+
+## CR-01 — Resume in chain mode keeps the scope (`run-plan.sh`, `fix-and-resume.md` 5.4)
+
+**Why.** A resume that forgot `TARGET_SURFACE=frontend` would build story N1 at step 4 and continue to steps 5–8.
+**Fix.** On `--resume-from`, the runner compares `TARGET_SURFACE` with `target_surface=` in `results/run.meta` and
+refuses (exit 3) when they differ. `fix-and-resume.md` 5.4 explains chain-mode resume (same `launch.env`, steps 0–4
+only, a step-4 resume reruns the whole chain from `BEFORE-4`, `S4-<id>-END` snapshots are not resume points).
+**How to check.** Unit tests: resume without / with another `TARGET_SURFACE` exits 3; `--resume-from 6` exits 3.
+
 ## Not changed
 
-- The kit (`templates/`, `scripts/`), the fixtures, `fix-and-resume.md`, `resume-point.sh`, `triage.sh`.
+- The kit (`templates/`, `scripts/`), the fixtures, `resume-point.sh`, `triage.sh`. (`fix-and-resume.md` gained 5.4, see CR-01.)
 - `fixtures/scripted-answers.tsv` still says no container runtime exists; installing Docker on the VM would contradict it.

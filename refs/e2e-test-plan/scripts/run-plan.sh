@@ -31,6 +31,11 @@ if [ -z "$RESUME_FROM" ]; then
 else
   [ -d "$TEST_ROOT/results" ] || { echo "--resume-from needs --test-root of an earlier run" >&2; exit 3; }
   case "$RESUME_REASON" in kit-fix|harness-fix|env-fix|agent-retry) ;; *) echo "--reason must be kit-fix, harness-fix, env-fix or agent-retry" >&2; exit 3;; esac
+  # HARNESS-FIX 2026-10-29 (chain-mode resume): a resume must run the same scope as the first run. Without this, a
+  #   resume that forgot TARGET_SURFACE=frontend would build story N1 at step 4 and go on to steps 5-8.
+  first_scope="$(sed -n 's/^target_surface=//p' "$TEST_ROOT/results/run.meta" 2>/dev/null | head -1)"
+  [ -z "$first_scope" ] || [ "$first_scope" = "${TARGET_SURFACE:-none}" ] || {
+    echo "resume refused: the first run used TARGET_SURFACE=$first_scope, this one has '${TARGET_SURFACE:-none}'; load the same launch.env (fix-and-resume.md 5.4)" >&2; exit 3; }
 fi
 mkdir -p "$TEST_ROOT"/{status,evidence,snapshots,results,trash,calib}
 exec 2> >(tee -a "$TEST_ROOT/status/runner-console.log" >&2)   # runner errors, read by triage.sh

@@ -173,6 +173,15 @@ bash scripts/run-plan.sh --resume-from auto --test-root "$TEST_ROOT" --reason ag
 - Seed-only templates (files the kit copies once and `install.sh --update` never refreshes) do not reach an existing workspace. That is why a fix to them restarts from step 2 (§6).
 - The harness commits made by the update are labelled `[harness commit]`, like the other harness commits.
 
+### 5.4 Resume in chain mode (`TARGET_SURFACE=frontend`)
+
+The frontend-chain run (`TARGET_SURFACE=frontend`, steps 0–4 only) resumes with the same commands as §5.1, with these differences:
+
+- **Load the same settings first.** Export the same `TARGET_SURFACE` as the first run (on the VM: `. ~/launch.env`, or start through `scripts/start-tmux.sh ~/launch.env` with the resume command). The runner reads `target_surface=` from `results/run.meta` and refuses (exit 3) a resume whose `TARGET_SURFACE` differs, so a forgotten export cannot turn step 4 into story N1 followed by steps 5–8.
+- **Only steps 0–4 can be resumed.** `--resume-from 5` or later is refused (exit 3); `STOP_AFTER_STEP` stays ≤ 4 (default 4).
+- **A step-4 resume runs the whole chain again.** It restores `BEFORE-4` and builds every story of the chain from the first one, even if some stories had reached local release; the per-story `S4-<id>-END` snapshots are evidence only and are never used as a resume point.
+- With the agy driver, the `agy` tmux window (`agy-turn-loop.sh`) must be running for the resumed runner; `start-tmux.sh` starts both windows from one `launch.env`.
+
 ## 6. When a fix is too big to resume
 
 The runner decides this from files; you do not override it to save time.

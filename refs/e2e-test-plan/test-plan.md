@@ -383,26 +383,40 @@ At the end (or at the first failure) the runner writes `$TEST_ROOT/results/summa
 
 Audit of 2026-10-29: the harness itself is portable (defaults derive from `$HOME`; GNU `timeout`, `setsid`, `flock`, `stat -c` ship with Ubuntu). What differed from Marlon's box was the agy driver glue and the launch; those are fixed in `scripts/` (see `HARNESS-FIXES-20261029.md`, VM-01…VM-05). Run everything as a non-root user (e.g. `e2e`); only the one-time package install uses root.
 
-**Setup outline (`setup-vm.sh`, run once as root on a fresh VM; no secrets):**
-1. `apt-get update && apt-get install -y git jq python3 python3-yaml python3-docx curl xz-utils tmux rsync unzip` and `timedatectl set-timezone Asia/Manila`. Do not apt-install `nodejs` (too old) or a JDK: step 1 installs Temurin 21, Node 22 and PostgreSQL 17 into `$TOOLS_DIR`. PyYAML must come from apt: Ubuntu 24.04 refuses `pip install --user` (PEP 668). No Docker by default: the box ran without a container runtime (P0-A AC-4 DEGRADED) and `fixtures/scripted-answers.tsv` tells the agent none exists; installing Docker would change the database path the kit picks (Testcontainers).
-2. `adduser --disabled-password e2e`; everything below runs as `e2e`.
-3. **Kit from a git bundle.** The kit repo is private and the VM gets no GitHub credential. On a machine that can read it: `git -C <kit clone> bundle create kit.bundle <branch>`; copy it to the VM; `git clone kit.bundle ~/kit-src` and set `KIT_URL=$HOME/kit-src` (a bundle file path also works). The plan folder is `~/kit-src/refs/e2e-test-plan`.
-4. **OWASP data:** copy a prebuilt `odc.mv.db` folder (≈250 MB) and set `ODC_SRC`; otherwise step 1 builds it (30–60 min).
-5. **agy:** `curl -fsSL https://antigravity.google/cli/install.sh | bash` (installs `~/.local/bin/agy`; `AGY_BIN` finds it). Write `~/.gemini/antigravity-cli/settings.json` with `"trustedWorkspaces": ["/home/e2e"]` (Marlon's box trusts `/workspace`; a fresh VM trusts nothing; whether `agy -p` would prompt is unverified, this avoids the question). Optional: Cursor CLI `curl -fsS https://cursor.com/install | bash`. Record `agy --version` and `agent --version`.
-6. `bash scripts/prereqs.sh --install` then `--check`: no `MISSING`/`HUMAN` rows except agent sign-in.
-7. Capture any machine image now, **before** any sign-in, so no image holds a credential.
-8. **Sign in last:** run `agy` once interactively over SSH (it prints a sign-in URL; paste the code back). Prove it: `agy -p 'Reply with exactly: ok'` prints `ok`. Step 1 (CAL-AUTH) proves it again.
+**Native tools only (Marlon, 2026-10-29):** no Docker, no Podman, no Testcontainers, no Redis on the VM. PostgreSQL 17 is the portable build that `prereqs.sh` installs under `$PG_HOME` (zonky path), exactly as on Marlon's box; P0-A AC-4 (container run) stays **DEGRADED**, and `fixtures/scripted-answers.tsv` (no container runtime) stays true. Installing Docker would change the database path the kit picks (Testcontainers).
+
+**Setup: `scripts/setup-vm.sh`** (HARNESS-FIXES SV-01). Run as root on a fresh VM; every mode can be run again; `--dry-run` prints every action and changes nothing. The script holds no secret and performs no sign-in.
+
+```
+# on a machine that can read the private repo:  git -C <kit clone> bundle create kit.bundle <branch>; copy kit.bundle (and odc-data/) to the VM
+bash setup-vm.sh --kit-url /root/kit.bundle --kit-ref <branch|commit> [--odc-src /root/odc-data] [--defer-odc] [--user e2e]
+# or, instead of a bundle (read-only fine-grained token, environment only, never written to disk or logs):
+GITHUB_TOKEN_E2E_VM=... bash setup-vm.sh --kit-url https://github.com/mdurana/agents-v0-kit.git --kit-ref <branch|commit>
+bash /usr/local/lib/agents-v0-setup-vm.sh --pre-image [--defer-odc]     # last command before the image
+```
+
+What it does, in order:
+1. As root: `apt-get install git jq python3 python3-yaml python3-docx curl xz-utils tmux rsync unzip` (PyYAML from apt: Ubuntu 24.04 refuses `pip install --user`, PEP 668; no apt `nodejs` or JDK), timezone `Asia/Manila`, non-root user `e2e` (root's SSH keys copied).
+2. Kit source into `~e2e/kit-src`, checked out at the commit of `--kit-ref` (bundle, local repo, or https with `GITHUB_TOKEN_E2E_VM` passed to git only through `GIT_CONFIG_*` environment variables; `origin` is left without the token).
+3. Optional prebuilt OWASP data from `--odc-src` into `~e2e/odc-data` (≈250 MB; otherwise built from the NVD mirror, 30–60 min).
+4. As `e2e`: latest `agy` (`curl -fsSL https://antigravity.google/cli/install.sh | bash`) and latest Cursor CLI `agent` (`curl -fsS https://cursor.com/install | bash`) into `~/.local/bin`; agy `~/.gemini/antigravity-cli/settings.json` `trustedWorkspaces` += `/home/e2e`, `/home/e2e/agents-v0-e2e` (a fresh VM trusts nothing; whether `agy -p` would prompt is unverified, this avoids the question).
+5. As `e2e`: `prereqs.sh --install` (Temurin JDK 21, Node 22, PostgreSQL 17, OWASP data, `tools.env` in `~/.local/agents-v0-tools`; with `--defer-odc` the OWASP row reads `DEFERRED`), then `--check` into `~/setup-vm/prereqs-check.txt`; it stops if a core row is `MISSING`/`HUMAN`/`FAILED`.
+6. A marked `~/.profile` block (loads `tools.env`, `~/.local/bin`), `~/launch.env` (below, no secrets), and `~/setup-vm/versions.txt` (OS, kit commit, agy, agent, java, node/npm, postgres, OWASP, git/python3/jq/tmux).
+
+**Before the image (`--pre-image`):** cleans apt lists/cache, npm/pip/maven caches (keeps only the OWASP data under `~/.m2`), old Cursor CLI versions, agy logs, `/tmp`, logs and shell history; removes `~/odc-data` (already copied into `~/.m2`); refuses if a sign-in or token file exists; prints `df -h /` and **fails (exit 3) if used > 5.4 GB** (Linode image limit 6 GB). `--defer-odc` also removes the OWASP data (≈250 MB) to install after capture.
+
+**After the image, in this order:** boot the image; sign in to agy as `e2e` (run `agy` once over SSH, paste the code back; prove it with `agy -p 'Reply with exactly: ok'`); Cursor (`CURSOR_API_KEY` in the environment) only if that driver is used; if deferred, copy a prebuilt `odc-data` to `~e2e/odc-data` and run `setup-vm.sh --after-image` as root. Step 1 (CAL-AUTH) proves the sign-in again. No sign-in ever happens before the image, so the image holds no credential.
 
 **No browser needed:** the frontend `verify` uses vitest with jsdom; Playwright is only an optional peer dependency in the lockfile.
 
-**Network (outbound):** api.adoptium.net, nodejs.org, repo1.maven.org / repo.maven.apache.org, archive.apache.org, registry.npmjs.org (`npm audit`), dependency-check.github.io, and agy's Google endpoints. GitHub is not needed with the bundle.
+**Network (outbound):** api.adoptium.net, nodejs.org, repo1.maven.org / repo.maven.apache.org, archive.apache.org, registry.npmjs.org (`npm audit`), dependency-check.github.io, and agy's Google endpoints. GitHub is not needed with the bundle (github.com only for the https + token path); antigravity.google and cursor.com for the CLI installers.
 
-**launch.env (no secrets)** — example for the frontend-chain run:
+**launch.env (no secrets)** — `setup-vm.sh` writes `~/launch.env` like this for the frontend-chain run (`KIT_REF` = the commit it checked out):
 ```
 export AGENT_DRIVER=antigravity AGENT_MODEL=gemini-4-argon-medium AGY_MODEL=gemini-4-argon-medium
-export KIT_URL=$HOME/kit-src KIT_REF=<commit or branch>
+export KIT_URL=$HOME/kit-src KIT_REF=<commit>   # a commit: ~/kit-src is a detached checkout
 export TARGET_SURFACE=frontend STOP_AFTER_STEP=4
-export ODC_SRC=$HOME/odc-data LANG=C.UTF-8
+export LANG=C.UTF-8   # OWASP data: already in ~/.m2 (or setup-vm.sh --after-image), so no ODC_SRC
 # optional: TURN_CAP=3600 AGY_TURN_TIMEOUT=3540 MAX_RETRY_INFRA=4 are the defaults now
 ```
 **Start:** `bash scripts/start-tmux.sh ~/launch.env` starts tmux session `e2e` with window `runner` (`run-plan.sh`) and window `agy` (`agy-turn-loop.sh` for that runner), both from the same `launch.env`, `RUN_ID` and `TEST_ROOT`. The loop loads `tools.env` (JAVA_HOME, JDK/Node/PG on `PATH`) itself, so agy's shell commands find the toolchain; on Marlon's box `~/.bashrc` had supplied `JAVA_HOME`, which a tmux window on a VM does not read. Follow `tail -f $TEST_ROOT/status/progress.log`; the run survives SSH disconnects. CLI versions at the start and end of the run are in `$TEST_ROOT/agy-driver/cli-versions.txt`.

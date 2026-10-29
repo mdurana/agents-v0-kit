@@ -120,6 +120,9 @@ else say postgres17 MISSING "zonky embedded-postgres-binaries into $TOOLS_DIR/po
 # --- OWASP dependency-check data (H2 DB used by ./mvnw -Pci-security) ---
 odc_ok(){ [ "$(file_size "$ODC_DST/odc.mv.db")" -gt 100000000 ]; }
 if odc_ok; then say odc-data PRESENT "$ODC_DST/odc.mv.db ($(du -h "$ODC_DST/odc.mv.db" | cut -f1), $(file_mtime "$ODC_DST/odc.mv.db"))"
+# HARNESS-FIX 2026-10-29 (setup-vm.sh): ODC_DEFER=1 skips the OWASP data (about 250 MB) so a VM image stays under the
+#   Linode image size limit; the data is installed after the image is captured (setup-vm.sh --after-image, or step 1).
+elif [ "${ODC_DEFER:-0}" = 1 ]; then say odc-data DEFERRED "ODC_DEFER=1: install after image capture (setup-vm.sh --after-image or run step 1)"
 elif [ "$MODE" = --install ]; then
   [ -e "$ODC_DST" ] && mv "$ODC_DST" "$ODC_DST.partial-$RUN_ID"   # never delete: keep the old dir
   mkdir -p "$ODC_DST"
