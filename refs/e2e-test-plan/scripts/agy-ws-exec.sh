@@ -44,7 +44,20 @@ if [ -f "$WS/.agents/hooks/pre-shell.sh" ]; then
 fi
 
 cd "$WS"
-export JAVA_HOME="${JAVA_HOME:-/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home}"
+# HARNESS-FIX 2026-10-29 (VM-02): JAVA_HOME used to fall back to a macOS-only path, so on Linux a command run without
+#   JAVA_HOME (e.g. ./mvnw on a fresh VM) failed. Now: keep JAVA_HOME if set; else load the harness's tools.env; else
+#   use the macOS JDK path only if it exists; else derive it from `java` on PATH (Linux).
+if [ -z "${JAVA_HOME:-}" ] && [ -f "${TOOLS_DIR:-$HOME/.local/agents-v0-tools}/tools.env" ]; then
+  . "${TOOLS_DIR:-$HOME/.local/agents-v0-tools}/tools.env"; [ -z "${TOOLS_PATH:-}" ] || PATH="$TOOLS_PATH:$PATH"
+fi
+if [ -z "${JAVA_HOME:-}" ] && [ -d /Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home ]; then
+  JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+fi
+if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1 && readlink -f "$(command -v java)" >/dev/null 2>&1; then
+  JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+fi
+[ -z "${JAVA_HOME:-}" ] || export JAVA_HOME
+export PATH
 export TESTCONTAINERS_RYUK_DISABLED=true
 export MAVEN_OPTS="-Xmx1536m"
 eval "$CMD"

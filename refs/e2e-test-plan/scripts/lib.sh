@@ -142,6 +142,12 @@ classify(){ # <rc> <stderr> <jsonl> <stalled>
   elif [ "$1" = 124 ] || [ "$1" = 137 ]; then echo CAP
   elif [ "$1" = 0 ] && jq -e 'select(.type=="result" or .type=="PLANNER_RESPONSE")' "$3" >/dev/null 2>&1; then echo NORMAL
   elif grep -qiE 'Connection stalled|no progress|ECONNRESET|network error|503|502' "$2"; then echo INFRA
+  # HARNESS-FIX 2026-10-29 (step 4): an agy turn whose model stream dropped ends with rc!=0 and the error only in the
+  #   stream (turn-<k>.jsonl), not in stderr, so it used to be AGENT-ERROR (the run ended, no retry). Last run, P1-A
+  #   build tries 1, 3, 4, 5: "The stream was interrupted. Please continue the task you were working on." and
+  #   "API error ... streamGenerateContent: EOF". A failed turn with that text is now INFRA (retried with backoff).
+  #   A turn that recovered from a drop (rc=0 with a result) is still NORMAL, because that rule comes first.
+  elif grep -qiE 'stream was interrupted|streamGenerateContent[^"]*EOF|API error[^"]*EOF|unexpected EOF' "$3" "$2" 2>/dev/null; then echo INFRA
   else echo AGENT-ERROR; fi; }
 run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; sets TURN_CLASS
   local k="$1" msg="$2" allow="$3" rem cap pid rc sz last=0 lastch st=0 mark drv
@@ -180,10 +186,14 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
     sz=$(file_size "$RUN/turn-$k.jsonl")
     if [ "$sz" != "$last" ] || [ -n "$(find "$WORK" -newer "$mark" -type f -print -quit 2>/dev/null)" ]; then last=$sz; lastch=$(now); touch "$mark"; fi
     if [ $(( $(now) - lastch )) -ge "$STALL_SEC" ]; then st=1; post STALL "run=${RUN##*/} turn=$k no output and no file change for ${STALL_SEC}s"
-      kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null; sleep 30; kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null; fi
+      kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null; sleep 30; kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
+      # HARNESS-FIX 2026-10-29: with the agy driver the real agent runs in agy-turn-loop.sh, not under $pid, so killing
+      #   $pid left agy running and the next turn waited behind it. Stop that agy turn too (the loop writes its pid).
+      agy_stop_turn; fi
     hb_tick
   done
   wait "$pid"; rc=$?
+  { [ "$rc" = 124 ] || [ "$rc" = 137 ]; } && agy_stop_turn   # HARNESS-FIX 2026-10-29: the cap also ends the agy turn
   rm -f "$WS/.agents/hooks/unattended-allow" "$MAIN/.agents/hooks/unattended-allow" 2>/dev/null || :
   TURN_CLASS=$(classify "$rc" "$RUN/turn-$k.stderr" "$RUN/turn-$k.jsonl" "$st")
   jq -r 'select(.type=="result" or .type=="PLANNER_RESPONSE") | (.result // .content // empty)' "$RUN/turn-$k.jsonl" > "$RUN/final-$k.md" 2>/dev/null || :
@@ -200,7 +210,19 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   printf 'turn-%s\trc=%s\tclass=%s\n' "$k" "$rc" "$TURN_CLASS" >> "$RUN/turns.tsv"
   post TURN-END "run=${RUN##*/} turn=$k class=$TURN_CLASS rc=$rc"; }
 
+# HARNESS-FIX 2026-10-29: stop the agy turn that agy-turn-loop.sh is running (its process group), if any.
+agy_stop_turn(){ local f="$TEST_ROOT/agy-driver/agy-turn.pid" p; [ -s "$f" ] || return 0; p="$(cat "$f")"
+  kill -TERM -- "-$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null || return 0; post AGY-STOP "agy turn pid=$p stopped (stall or cap)"; }
+# HARNESS-FIX 2026-10-29: wait before fresh retry <try>: INFRA_BACKOFF values in order, the last one repeats.
+infra_backoff(){ local i=0 v last=120; for v in $INFRA_BACKOFF; do i=$((i+1)); last=$v; [ "$i" -lt "$1" ] || { echo "$v"; return; }; done; echo "$last"; }
+
 # ---------- one agent run: new chat, first prompt, then scripted replies only ----------
+# gate_pending <k>: 0 when exactly one state file went to awaiting_approval in turn k, its gate is in drive_run's
+#   $allowed and was not sent yet ($sent). Sets gfile. Uses drive_run's locals (bash dynamic scope). HARNESS-FIX 2026-10-29.
+gate_pending(){ local g; gfile="$(comm -13 "$RUN/state-before-$1.tsv" "$RUN/state-after-$1.tsv" | awk -F'\t' '$2 ~ /"activeStatus":"awaiting_approval"/ {print $1}')"
+  [ -n "$gfile" ] && [ "$(printf '%s\n' "$gfile" | wc -l | tr -d ' ')" = 1 ] || return 1
+  g="$(jq -r .activePhase "$gfile")"; case "$gfile" in *"/${P0A_SLUG:-p0-a-platform-skeleton}.state.json") [ "$g" = release ] && g=release-p0a;; esac
+  printf ' %s ' "$allowed" | grep -q " ${g%-p0a} " && ! printf '%s' "$sent" | grep -q "|$gfile:$g|"; }
 # drive_run <name> <workspace> <prompt> <context> "<allowed gates>" <timeout>
 #   allowed gates: words from approvals.tsv (roadmap architecture plan onboard intake design build verify maintain release branch)
 #   context: scripted-answers.tsv context (phase name, or "negative")
@@ -215,6 +237,14 @@ drive_run(){
     RUN_DEADLINE=$(( $(now) + tmo )); GATES_SENT=""; answers=0; sent=""
     run_turn 1 "$prompt" -; k=1
     while :; do
+      # HARNESS-FIX 2026-10-29 (gate-aware end of turn): last run, P1-A build tries 4 and 5 had already set the story
+      #   state to build/awaiting_approval when the agy stream dropped and the turn was classed STALL. The harness
+      #   retried from scratch instead of approving, and the step failed. Now, after STALL, INFRA or CAP, if exactly one
+      #   state file went to awaiting_approval in this turn and that gate is allowed and not yet approved in this run,
+      #   the turn is treated like a normal one and the scripted approval is sent (same rules as below).
+      case "$TURN_CLASS" in
+        STALL|INFRA|CAP) if gate_pending "$k"; then post GATE-AWARE "run=${RUN##*/} turn=$k class=$TURN_CLASS but $(jq -r .activePhase "$gfile") is awaiting approval: sending the scripted approval"; TURN_CLASS=NORMAL; fi;;
+      esac
       case "$TURN_CLASS" in
         USAGE|AUTH) halt "$TURN_CLASS in ${RUN##*/}"; RUN_END=$TURN_CLASS; return 0;;
         STALL|INFRA) RUN_END=$TURN_CLASS; break;;
@@ -263,7 +293,8 @@ drive_run(){
     done
     # stall / infra: fresh retry from the pre-run copy (never a resume)
     try=$((try+1)); [ "$try" -le "$MAX_RETRY_INFRA" ] || { RUN_END=INFRA-GIVEUP; return 0; }
-    post RETRY "$name after $RUN_END (try $try of $MAX_RETRY_INFRA)"; sleep 120
+    local wait_s; wait_s="$(infra_backoff "$try")"   # HARNESS-FIX 2026-10-29: 60/120/240 s backoff (was a flat 120 s)
+    post RETRY "$name after $RUN_END (try $try of $MAX_RETRY_INFRA, waiting ${wait_s}s)"; sleep "$wait_s"
     mv "$WORK" "$TEST_ROOT/trash/work.$(date +%s%N)"; tar -C "$TEST_ROOT" -xzf "$RUN/pre.tgz"
   done; }
 

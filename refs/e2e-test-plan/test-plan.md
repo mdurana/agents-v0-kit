@@ -1,6 +1,6 @@
 # agents-v0 kit: end-to-end test plan with the Finance Back Office Portal (unattended, sequential)
 
-Version 1, written 2026-10-23 (Asia/Manila) for Marlon Durana (`mdurana`). It has not been run yet. This document is addressed to **you, the LLM operator** who runs it. You need no access to the author's machine, chat or memory. Everything you need is in this folder (`test-plan.md`, `fixtures/`, `scripts/`) and in the public kit repository.
+Version 1, written 2026-10-23 (Asia/Manila) for Marlon Durana (`mdurana`). Updated 2026-10-29: frontend-chain scope (§8 step 4b), lessons check L1, step-4 stream-drop fixes (§6.4) and running on a Linode VM (§12); every change is listed in `HARNESS-FIXES-20261029.md`. This document is addressed to **you, the LLM operator** who runs it. You need no access to the author's machine, chat or memory. Everything you need is in this folder (`test-plan.md`, `fixtures/`, `scripts/`) and in the public kit repository.
 
 ## 1. Purpose
 
@@ -98,10 +98,17 @@ Set them before you start (`export NAME=value`), or accept the defaults in `scri
 | `PG_HOME` | auto-detect, else install | Portable PostgreSQL 17 (`bin/initdb`, `bin/pg_ctl`) |
 | `ODC_SRC` | empty | Optional prebuilt OWASP dependency-check data folder (contains `odc.mv.db`) |
 | `ODC_DST` | `$HOME/.m2/repository/org/owasp/dependency-check-data/9.0` | Where `dependency-check-maven` 10.0.4 reads its database |
-| `TURN_CAP` / `RUN_TIMEOUT` / `RUN_TIMEOUT_P0A` | `1740` / `7200` / `14400` s | Per turn / per agent run / per P0-A run |
+| `TURN_CAP` / `RUN_TIMEOUT` / `RUN_TIMEOUT_P0A` | `3600` / `7200` / `14400` s | Per turn / per agent run / per P0-A run (`TURN_CAP` was 1740 before 2026-10-29) |
+| `AGY_BIN` | `agy` on `PATH`, else `$HOME/.local/bin/agy`, else `$HOME/.antigravity/bin/agy` | Antigravity CLI used by `agy-turn-loop.sh` |
+| `AGY_MODEL` | empty (agy default) | Model `agy-turn-loop.sh` passes to agy, e.g. `gemini-4-argon-medium`. Set `AGENT_MODEL` to the same value so `run.meta` names it |
+| `AGY_TURN_TIMEOUT` | `3540` s | agy's own per-turn limit in `agy-turn-loop.sh`; keep it below `TURN_CAP` |
+| `INFRA_BACKOFF` | `60 120 240` s | Wait before fresh retry 1, 2, 3…; the last value repeats |
+| `TARGET_SURFACE` | empty | `frontend` = frontend-chain scope (§8 step 4b); empty = the full plan |
+| `STOP_AFTER_STEP` | empty (`4` when `TARGET_SURFACE` is set) | Stop cleanly after this step (save point `BEFORE-<N+1>`, `STOP-AFTER` line, exit 0) |
+| `LESSONS_CHECK` | `1` when `TARGET_SURFACE` is set, else `0` | `1` = check L1 (`check-lessons.sh`) after every story release |
 | `STALL_SEC` | `900` | A turn with no new output and no file change under `$TEST_ROOT/work` for this long is a stall |
 | `HEARTBEAT_SEC` | `1500` | Status line at least this often (≤ 1800) |
-| `MAX_TURNS` / `MAX_ANSWERS` / `MAX_RETRY_INFRA` / `MAX_RUNS_PER_STORY` | `12` / `3` / `2` / `10` | Loop limits |
+| `MAX_TURNS` / `MAX_ANSWERS` / `MAX_RETRY_INFRA` / `MAX_RUNS_PER_STORY` | `12` / `3` / `4` / `10` | Loop limits (`MAX_RETRY_INFRA` was 2 before 2026-10-29) |
 | `ASK_MODE` | `auto` | `auto` (decided by calibration in step 1), `allowlist`, `harness` (§6.6) |
 | `CONTINUE_AFTER_PROBE_FAIL` | `0` | `1` = step 8 still runs when a step-7 probe failed |
 | `JAIL_CMD` | empty | Optional sandbox wrapper, called as `$JAIL_CMD <run dir> <workspace> agent …` |
@@ -119,6 +126,7 @@ Set them before you start (`export NAME=value`), or accept the defaults in `scri
 | 2 Workspace | git init, discovery commit, kit install at `KIT_REF` | 2 commits on `main`, kit and app skeleton present | W1–W4 |
 | 3 Happy 1 | roadmap → architecture → plan → P0-A to local release | program approved; P0-A released on `main` | R1–R4, A1–A5, L1–L4, P1–P3 |
 | 4 Happy 2 | story N+1 intake → local release | N+1 released, `feature/<N+1>` merged | H1–H5 |
+| 4b Chain (`TARGET_SURFACE=frontend`) | every story the first frontend story needs, then that story, each intake → local release; the run stops here | the whole chain released and merged | H1–H5 + L1 per story, F1, L1-END |
 | 5 Happy 3 | story N+2 intake → local release | N+2 released, merged | H1–H5 |
 | 6 Reopen N+1 | reopen probe, then `/v0-maintain` fix to local release | released record untouched; fix merged | Q1, M1–M5 |
 | 7 Negative | re-run roadmap, architecture, plan (5 probes) | nothing changed | X1–X3 per probe |
@@ -162,10 +170,14 @@ Call chain: `run-plan.sh` → `drive_story` / `drive_run` → `run_turn` → opt
 | `STALL` | no new stream output **and** no new file under `$TEST_ROOT/work` for `STALL_SEC`; the runner kills the turn's process group | fresh retry |
 | `CAP` | exit 124 or 137 (turn or run time cap) | the run ends; a story re-enters with the phase command for the state on disk (the kit resumes from files); a probe scores `FAIL` |
 | `NORMAL` | exit 0 and a `result` event in the stream | §6.3 step 4 |
-| `INFRA` | stderr has `Connection stalled`, `no progress`, `ECONNRESET`, 502/503 | fresh retry |
+| `INFRA` | stderr has `Connection stalled`, `no progress`, `ECONNRESET`, 502/503; **or** (since 2026-10-29) the turn failed (exit ≠ 0) and its stream or stderr shows a dropped model stream: `stream was interrupted`, `streamGenerateContent … EOF`, `API error … EOF`, `unexpected EOF` | fresh retry |
 | `AGENT-ERROR` | anything else | the run ends; checks decide |
 
-**Fresh retry:** wait 120 s, move the workspace aside, restore `<run>/pre.tgz`, start a new chat with the same prompt. At most `MAX_RETRY_INFRA` per run, then `INFRA-GIVEUP`. A retry is never a resume.
+**Gate-aware end of turn (since 2026-10-29).** After a `STALL`, `INFRA` or `CAP` turn the runner first looks at the state files, exactly as for a normal turn: if exactly one state file went to `awaiting_approval` in that turn, its phase is allowed in this run and was not approved yet, the agent did reach the gate before its stream dropped. The runner then posts `GATE-AWARE`, treats the turn as `NORMAL` and sends the scripted approval (§6.3 step 4). The self-approval and forbidden-command checks still apply to that turn. Why: on 2026-10-28, P1-A build tries 4 and 5 had already set `build/awaiting_approval` when the agy stream dropped; the old runner classed them `STALL`, retried from scratch and step 4 failed.
+
+**Stopping the agy turn.** With the Antigravity driver the agent runs inside `agy-turn-loop.sh`, not under the runner. After a `STALL` or `CAP` the runner also stops that agy turn's process group (pid in `$TEST_ROOT/agy-driver/agy-turn.pid`, status line `AGY-STOP`), so no agent keeps running behind the next turn.
+
+**Fresh retry:** wait (`INFRA_BACKOFF`: 60, 120, 240, 240 s for tries 1–4; before 2026-10-29 a flat 120 s), move the workspace aside, restore `<run>/pre.tgz`, start a new chat with the same prompt. At most `MAX_RETRY_INFRA` (4) per run, then `INFRA-GIVEUP`. A retry is never a resume.
 
 **Story loop (`drive_story`):** for a story, the runner repeats agent runs, each a new chat whose first message is the next kit command derived from the story's state file (no state → `/v0-intake`, or `/v0-build` for P0-A; `in_progress`/`blocked` → the same phase again; otherwise from `lastApprovedPhase`: intake→design→build→verify→local-release; for a fix: maintain→verify→local-release). It runs the command in the story's worktree once it exists. It stops when `release` is approved, after `MAX_RUNS_PER_STORY` runs, when the state did not change in two consecutive runs, or when a run starts with the state already `awaiting_approval` (`STUCK`, the step fails).
 
@@ -176,8 +188,8 @@ Call chain: `run-plan.sh` → `drive_story` / `drive_run` → `run_turn` → opt
 |---|---|---|
 | roadmap, architecture, plan, onboard, intake, design, verify | `Approved by mdurana` | none |
 | build, maintain | `Approved by mdurana, commit it` | `Shell(git:commit*)` |
-| release (story) | `Approved by mdurana` | `Shell(git:commit*)`, `Shell(git:merge*)` |
-| release-p0a | `Approved by mdurana` | `Shell(git:commit*)` |
+| release (story) | `Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.` | `Shell(git:commit*)`, `Shell(git:merge*)` |
+| release-p0a | `Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.` | `Shell(git:commit*)` |
 | branch | `Branch authorized` | `Shell(sh:.agents-v0/scripts/feature-worktree.sh*)` |
 
 The allowlist is applied by giving that one turn its own `CURSOR_CONFIG_DIR` whose `cli-config.json` adds the entries to `permissions.allow` (Cursor CLI documents `permissions.allow`, the `Shell(command:args)` form and `CURSOR_CONFIG_DIR`). Whether a CLI allow entry overrides a kit hook's "ask" is not documented; step 1 measures it.
@@ -272,11 +284,26 @@ git -C "$MAIN" add -A && git -C "$MAIN" commit -m "Install agents-v0 kit (<ref> 
 - **Evidence:** `evidence/S3-*`, snapshots `S3-PLANNED`, `S3-END`.
 
 ### Step 4 — Happy path 2: story N+1 from intake to local release
+(With `TARGET_SURFACE` set, step 4 runs the frontend chain instead: see Step 4b.)
 - **Goal:** the first story after P0-A in roadmap order, whose dependencies are released, goes through every story phase.
 - **Story selection:** `python3 scripts/next-story.py next "$MAIN" P0-A` → `N1` id and slug, appended to `results/story-ids.tsv`.
 - **Agent runs:** `/v0-intake <slug>` (gate intake; then `Branch authorized`; the kit creates `../portal-<slug>` on `feature/<slug>`), then in that worktree `/v0-design <slug>` (gate design, or straight on to build for a Contract: None story), `/v0-build <slug>` (gate build: `Approved by mdurana, commit it`), `/v0-verify <slug>` (gate verify), `/v0-local-release <slug>` (gate release: commit, `git merge --no-ff feature/<slug>` into `main`, `--approve release`).
 - **Pass/fail:** H1 `intake design build verify release` approved, `verifyPassed: true`, evidence, state committed (`check-release-evidence.sh` exit 0 when present); H2 `feature/<slug>` is an ancestor of `main` and a merge commit names it; H3 `phaseDates` non-decreasing intake ≤ design ≤ build ≤ verify ≤ release; H4 every earlier released story's state unchanged; H5 clean `main`, no self-approval, no forbidden command.
 - **Evidence:** `evidence/S4-*`, `evidence/S4-<slug>.runs`, snapshot `S4-END`.
+
+### Step 4b — Frontend-chain scope (`TARGET_SURFACE=frontend`, run stops after step 4)
+Use this mode when the run must reach a frontend story but must not run steps 5–8. Steps 0–3 are unchanged (P0-A also gets check L1). Step 4 is replaced by:
+- **Target:** the first story in roadmap order whose `Surface` cell is `frontend` (word match, case-insensitive): `python3 scripts/next-story.py chain "$MAIN" frontend P0-A`. It prints every story the target depends on, directly or not, that is not released yet, in roadmap order, then the target; the list is saved as `results/chain.tsv` and posted as a `CHAIN` line. Exit 2 = no frontend story in the plan → check C0 fails and the step fails. Example from the 2026-10-28 plan: `P1-A, P1-B, P1-C, P2-A, P2-C`, then target `P2-O` (ids differ per plan; the rule is fixed).
+- **Agent runs:** each chain story exactly as a step-4 story (intake → design → build → verify → local release, same gates, same scripted texts), one after the other. `story-ids.tsv` gets rows `C1…Cn` and `T1` (the target). A snapshot `S4-<id>-END` is taken after each passed story.
+- **Stop:** the first story that fails a check stops the chain and the step fails (`FAIL chain stopped at <id>`). After a passed step 4 the runner stops (`STOP_AFTER_STEP=4`, `STOP-AFTER` line, `RUN-END exit=0`). Steps 5–8 are out of scope in this mode: they are not run and not failures. A `STOP_AFTER_STEP` above 4 or a resume from step 5+ is refused (exit 3).
+- **Checks per chain story:** H1–H5 as in step 4, plus **L1** (below).
+- **F1 (target only):** `git diff --name-only <main before the target>..HEAD` lists a file under `app/frontend/`, **and** the target's evidence (`docs/agents-v0/verify/<slug>/*.md` or `docs/agents-v0/build/<slug>/*.md`) has a line naming `npm run verify` with `PASS` (or exit 0). The frontend `verify` script is `vitest run && tsc --noEmit && vite build && npm audit --audit-level=high` (jsdom); no browser is needed.
+- **L1 (every story release, P0-A included, when `LESSONS_CHECK=1`):** in `$MAIN`:
+  `sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/<slug>.phase-result.md --approval-text 'Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.'`
+  The approval text is the release text the runner actually sent (`fixtures/approvals.tsv`, `release` / `release-p0a`), so the script checks that `docs/agents-v0/lessons.md` holds exactly the lessons that approval accepted (P-1 if it was proposed, nothing else). Non-zero exit = FAIL; the chain stops.
+- **L1-END (once, after the target):** `sh .agents-v0/scripts/check-lessons.sh` with no options in `$MAIN` must exit 0 (`lessons.md`, `lessons-archive.md` and every phase-result's lessons sections are well-formed).
+- **Pass criteria for this mode:** steps 0–3 PASS; step 4 PASS or PASS-SEMI with `STOP-AFTER` and `RUN-END exit=0`; `results/checks.tsv` has 0 FAIL rows; every chain story passed H1–H5 and L1; F1 and L1-END passed; DEGRADED only for the container check; no HALT, no self-approval, no forbidden command.
+- **Evidence:** `results/chain.tsv`, `evidence/S4-*`, snapshots `S4-<id>-END`, `S4-END`, `BEFORE-5`.
 
 ### Step 5 — Happy path 3: story N+2 from intake to local release
 Same as step 4 with `next-story.py next "$MAIN" P0-A <N1>`. Same checks H1–H5. Snapshot `S5-END`.
@@ -351,3 +378,31 @@ At the end (or at the first failure) the runner writes `$TEST_ROOT/results/summa
 6. **Stop rule vs. probes.** With `CONTINUE_AFTER_PROBE_FAIL=0` a single step-7 finding stops step 8. Set it to 1 by default?
 7. **Contract: None N+3.** If N+3 has no contract, design cannot be approved alone (8.s2). Pick the next contract story instead, or accept the failure as the finding?
 8. **Model.** `AGENT_MODEL=grok-4.7-high` is the earlier suites' value; confirm.
+
+## 12. Running on a Linode VM (fresh Ubuntu 24.04)
+
+Audit of 2026-10-29: the harness itself is portable (defaults derive from `$HOME`; GNU `timeout`, `setsid`, `flock`, `stat -c` ship with Ubuntu). What differed from Marlon's box was the agy driver glue and the launch; those are fixed in `scripts/` (see `HARNESS-FIXES-20261029.md`, VM-01…VM-05). Run everything as a non-root user (e.g. `e2e`); only the one-time package install uses root.
+
+**Setup outline (`setup-vm.sh`, run once as root on a fresh VM; no secrets):**
+1. `apt-get update && apt-get install -y git jq python3 python3-yaml python3-docx curl xz-utils tmux rsync unzip` and `timedatectl set-timezone Asia/Manila`. Do not apt-install `nodejs` (too old) or a JDK: step 1 installs Temurin 21, Node 22 and PostgreSQL 17 into `$TOOLS_DIR`. PyYAML must come from apt: Ubuntu 24.04 refuses `pip install --user` (PEP 668). No Docker by default: the box ran without a container runtime (P0-A AC-4 DEGRADED) and `fixtures/scripted-answers.tsv` tells the agent none exists; installing Docker would change the database path the kit picks (Testcontainers).
+2. `adduser --disabled-password e2e`; everything below runs as `e2e`.
+3. **Kit from a git bundle.** The kit repo is private and the VM gets no GitHub credential. On a machine that can read it: `git -C <kit clone> bundle create kit.bundle <branch>`; copy it to the VM; `git clone kit.bundle ~/kit-src` and set `KIT_URL=$HOME/kit-src` (a bundle file path also works). The plan folder is `~/kit-src/refs/e2e-test-plan`.
+4. **OWASP data:** copy a prebuilt `odc.mv.db` folder (≈250 MB) and set `ODC_SRC`; otherwise step 1 builds it (30–60 min).
+5. **agy:** `curl -fsSL https://antigravity.google/cli/install.sh | bash` (installs `~/.local/bin/agy`; `AGY_BIN` finds it). Write `~/.gemini/antigravity-cli/settings.json` with `"trustedWorkspaces": ["/home/e2e"]` (Marlon's box trusts `/workspace`; a fresh VM trusts nothing; whether `agy -p` would prompt is unverified, this avoids the question). Optional: Cursor CLI `curl -fsS https://cursor.com/install | bash`. Record `agy --version` and `agent --version`.
+6. `bash scripts/prereqs.sh --install` then `--check`: no `MISSING`/`HUMAN` rows except agent sign-in.
+7. Capture any machine image now, **before** any sign-in, so no image holds a credential.
+8. **Sign in last:** run `agy` once interactively over SSH (it prints a sign-in URL; paste the code back). Prove it: `agy -p 'Reply with exactly: ok'` prints `ok`. Step 1 (CAL-AUTH) proves it again.
+
+**No browser needed:** the frontend `verify` uses vitest with jsdom; Playwright is only an optional peer dependency in the lockfile.
+
+**Network (outbound):** api.adoptium.net, nodejs.org, repo1.maven.org / repo.maven.apache.org, archive.apache.org, registry.npmjs.org (`npm audit`), dependency-check.github.io, and agy's Google endpoints. GitHub is not needed with the bundle.
+
+**launch.env (no secrets)** — example for the frontend-chain run:
+```
+export AGENT_DRIVER=antigravity AGENT_MODEL=gemini-4-argon-medium AGY_MODEL=gemini-4-argon-medium
+export KIT_URL=$HOME/kit-src KIT_REF=<commit or branch>
+export TARGET_SURFACE=frontend STOP_AFTER_STEP=4
+export ODC_SRC=$HOME/odc-data LANG=C.UTF-8
+# optional: TURN_CAP=3600 AGY_TURN_TIMEOUT=3540 MAX_RETRY_INFRA=4 are the defaults now
+```
+**Start:** `bash scripts/start-tmux.sh ~/launch.env` starts tmux session `e2e` with window `runner` (`run-plan.sh`) and window `agy` (`agy-turn-loop.sh` for that runner), both from the same `launch.env`, `RUN_ID` and `TEST_ROOT`. The loop loads `tools.env` (JAVA_HOME, JDK/Node/PG on `PATH`) itself, so agy's shell commands find the toolchain; on Marlon's box `~/.bashrc` had supplied `JAVA_HOME`, which a tmux window on a VM does not read. Follow `tail -f $TEST_ROOT/status/progress.log`; the run survives SSH disconnects. CLI versions at the start and end of the run are in `$TEST_ROOT/agy-driver/cli-versions.txt`.

@@ -17,6 +17,14 @@ while [ $# -gt 0 ]; do case "$1" in
   --reason) RESUME_REASON="$2"; shift 2;;
   *) echo "unknown argument: $1" >&2; exit 3;; esac; done
 . "$HERE/env.sh"
+# HARNESS-FIX 2026-10-29 (frontend-chain scope): with TARGET_SURFACE set, step 4 builds the first story of that surface
+#   and its dependency chain, and the run never goes past step 4 (steps 5-8 need N1/N2/N3, which this mode does not
+#   pick). STOP_AFTER_STEP defaults to 4 in this mode; a later stop point or resume step is refused.
+if [ -n "$TARGET_SURFACE" ]; then
+  : "${STOP_AFTER_STEP:=4}"; export STOP_AFTER_STEP
+  [ "$STOP_AFTER_STEP" -le 4 ] 2>/dev/null || { echo "TARGET_SURFACE=$TARGET_SURFACE runs steps 0-4 only; STOP_AFTER_STEP must be <= 4" >&2; exit 3; }
+  [ -z "$RESUME_FROM" ] || [ "$RESUME_FROM" = auto ] || [ "${RESUME_FROM%%.*}" -le 4 ] 2>/dev/null || { echo "TARGET_SURFACE=$TARGET_SURFACE: --resume-from must be a step <= 4" >&2; exit 3; }
+fi
 : "${MAX_FIX_ATTEMPTS_PER_STEP:=2}" "${MAX_FIX_ATTEMPTS_TOTAL:=5}" "${MAX_AGENT_RETRY_PER_STEP:=1}" "${MAX_RESUMES_TOTAL:=8}"
 if [ -z "$RESUME_FROM" ]; then
   [ ! -e "$TEST_ROOT/work" ] || { echo "TEST_ROOT $TEST_ROOT already has a workspace; choose a new RUN_ID/TEST_ROOT or use --resume-from" >&2; exit 2; }
@@ -29,9 +37,13 @@ exec 2> >(tee -a "$TEST_ROOT/status/runner-console.log" >&2)   # runner errors, 
 . "$HERE/lib.sh"
 STEPS=(0 1 2 3 4 5 6 7 8)
 NAMES=([0]=preflight [1]=prerequisites [2]=workspace-and-onboard [3]=happy-1-program-and-P0-A [4]=happy-2-story-N1 [5]=happy-3-story-N2 [6]=reopen-story-N1 [7]=negative-program-rerun [8]=edge-phase-skips-N3)
+[ -z "$TARGET_SURFACE" ] || NAMES[4]="chain-to-first-$TARGET_SURFACE-story"   # HARNESS-FIX 2026-10-29
 if [ -z "$RESUME_FROM" ]; then
   : > "$RES/results.tsv"; : > "$RES/checks.tsv"
   printf 'test_root=%s\nkit_url=%s\nkit_ref=%s\nagent_model=%s\nstarted=%s Asia/Manila\n' "$TEST_ROOT" "$KIT_URL" "$KIT_REF" "$AGENT_MODEL" "$(ts)" > "$RES/run.meta"
+  # HARNESS-FIX 2026-10-29: record the scope and the agy settings, so the results say what kind of run this was
+  printf 'target_surface=%s\nstop_after_step=%s\nlessons_check=%s\nagent_driver=%s\nagy_model=%s\nturn_cap=%s\nagy_turn_timeout=%s\nmax_retry_infra=%s\n' \
+    "${TARGET_SURFACE:-none}" "${STOP_AFTER_STEP:-none}" "$LESSONS_CHECK" "$(resolve_driver)" "${AGY_MODEL:-default}" "$TURN_CAP" "$AGY_TURN_TIMEOUT" "$MAX_RETRY_INFRA" >> "$RES/run.meta"
   real_dirs_fp > "$TEST_ROOT/status/real-dirs.baseline"
 fi
 # kit_checkout: clone (if needed) and check out the kit the next steps run under; sets KIT_SHA and KIT_LABEL.
@@ -161,15 +173,23 @@ s3(){ local ok=1 rm map
   chk 3 P0-A P1 "P0-A released: build+verify+release approved, verifyPassed, evidence, state committed" -- released_ok "$P0A_SLUG" 1 || ok=0
   chk 3 P0-A P2 "P0-A on main only: no feature branch, no extra worktree, no merge commit" -- bash -c "test \"\$(git -C '$MAIN' branch --format='%(refname:short)')\" = main && test \$(git -C '$MAIN' worktree list | wc -l | tr -d ' ') = 1 && test -z \"\$(git -C '$MAIN' rev-list --merges $h0..HEAD)\"" || ok=0
   chk 3 P0-A P3 "tree clean, no self-approval, no forbidden command" -- bash -c "test -z \"\$(git -C '$MAIN' status --porcelain)\" && ! ls '$EVID'/S3-*/self-approval.txt >/dev/null 2>&1 && ! cat '$EVID'/S3-*/forbidden-commands.txt 2>/dev/null | grep -q ." || ok=0
+  lessons_chk 3 P0-A "$P0A_SLUG" 1 || ok=0   # HARNESS-FIX 2026-10-29: L1, only when LESSONS_CHECK=1
   [ "$ok" = 1 ] && snap S3-END; [ "$ok" = 1 ]; }
 
 # ================= steps 4 and 5: next story in roadmap order, intake -> local release =================
 happy_story(){ # <step> <var name to set> <released ids...>
-  local st="$1" var="$2"; shift 2; local ok=1 row id slug before
+  local st="$1" var="$2"; shift 2; local row
   row="$(python3 "$HERE/next-story.py" next "$MAIN" "$@")" || { post FAIL "no eligible story after: $*"; return 1; }
+  story_run "$st" "$var" "$row" "S$st-END"; }
+# story_run <step> <var name to set> <next-story.py TSV row> <snapshot name on pass>: one story intake -> local release,
+#   checks H1-H5 (and L1 when LESSONS_CHECK=1). HARNESS-FIX 2026-10-29: split out of happy_story, unchanged otherwise,
+#   so the frontend chain (step 4 with TARGET_SURFACE) can run it for each story of the chain. Sets STORY_H0.
+story_run(){
+  local st="$1" var="$2" row="$3" sname="$4" ok=1 id slug before
   id="$(story_field "$row" 2)"; slug="$(story_field "$row" 3)"; printf '%s\t%s\t%s\n' "$var" "$id" "$slug" >> "$RES/story-ids.tsv"
   printf -v "$var" '%s' "$id"; printf -v "${var}_SLUG" '%s' "$slug"; export "$var" "${var}_SLUG"
   before="$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)"
+  STORY_H0="$(git -C "$MAIN" rev-parse HEAD)"
   post STORY "step $st story $id ($slug)"
   drive_story "S$st" feature "$slug" 0
   chk "$st" "$id" H1 "$id released: intake design build verify release approved, verifyPassed, evidence, state committed" -- released_ok "$slug" 0 || ok=0
@@ -177,8 +197,42 @@ happy_story(){ # <step> <var name to set> <released ids...>
   chk "$st" "$id" H3 "phases approved in order (phaseDates non-decreasing)" -- jq -e '.phaseDates as $d | ($d.intake<=$d.design) and ($d.design<=$d.build) and ($d.build<=$d.verify) and ($d.verify<=$d.release)' "$(story_state "$slug")" || ok=0
   chk "$st" "$id" H4 "earlier released stories unchanged" -- test "$before" = "$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)" || ok=0
   chk "$st" "$id" H5 "main clean, no self-approval, no forbidden command" -- bash -c "test -z \"\$(git -C '$MAIN' status --porcelain)\" && ! ls '$EVID'/S$st-*/self-approval.txt >/dev/null 2>&1 && ! cat '$EVID'/S$st-*/forbidden-commands.txt 2>/dev/null | grep -q ." || ok=0
+  lessons_chk "$st" "$id" "$slug" 0 || ok=0
+  [ "$ok" = 1 ] && snap "$sname"; [ "$ok" = 1 ]; }
+# lessons_chk <step> <story id> <slug> <is_p0a>: check L1 (HARNESS-FIX 2026-10-29). Runs only when LESSONS_CHECK=1.
+#   Plain words: after a story is released, the kit's lessons memory (docs/agents-v0/lessons.md) must be well-formed
+#   and must hold exactly the lessons the release approval accepted. The approval text is the one the harness sent at
+#   the release gate (fixtures/approvals.tsv: "... Accept P-1 if proposed; reject any other proposed lessons."), so
+#   check-lessons.sh verifies the accepted set against what was actually approved. Non-zero exit = FAIL, step stops.
+lessons_chk(){ [ "${LESSONS_CHECK:-0}" = 1 ] || return 0
+  local line text; line="$(approval_for "$( [ "$4" = 1 ] && echo release-p0a || echo release)")"; text="${line%%$'\t'*}"
+  chk "$1" "$2" L1 "check-lessons.sh passes for $2 (phase-result + release approval text)" -- \
+    bash -c 'cd "$1" && sh .agents-v0/scripts/check-lessons.sh --phase-result "docs/agents-v0/requirements/$2.phase-result.md" --approval-text "$3"' _ "$MAIN" "$3" "$text"; }
+# chain_steps <step>: TARGET_SURFACE mode of step 4 (HARNESS-FIX 2026-10-29). Plain words: ask next-story.py for the first
+#   story whose Surface is $TARGET_SURFACE and every story it needs, in roadmap order; build each one to local release
+#   with the same checks as a normal step-4 story (H1-H5, L1); stop at the first failed story. Then F1 on the target
+#   story and the end-of-run lessons check L1-END. The step passes only if every check passed.
+chain_steps(){ local st="$1" ok=1 i=0 row id slug tgt n
+  local -a rows
+  mapfile -t rows < <(python3 "$HERE/next-story.py" chain "$MAIN" "$TARGET_SURFACE" P0-A) || true
+  if [ "${#rows[@]}" = 0 ]; then post FAIL "no story with Surface '$TARGET_SURFACE' in the plan (next-story.py chain)"
+    chk "$st" chain C0 "plan has a story with Surface $TARGET_SURFACE" -- false; return 1; fi
+  printf '%s\n' "${rows[@]}" > "$RES/chain.tsv"; n="${#rows[@]}"; tgt="$(story_field "${rows[$((n-1))]}" 2)"
+  post CHAIN "target $tgt (Surface $TARGET_SURFACE), $n stories: $(printf '%s\n' "${rows[@]}" | cut -f2 | tr '\n' ' ')"
+  for row in "${rows[@]}"; do i=$((i+1)); id="$(story_field "$row" 2)"
+    [ ! -e "$TEST_ROOT/HALT" ] || return 1
+    if [ "$i" = "$n" ]; then story_run "$st" "T1" "$row" "S$st-$id-END" || ok=0
+    else story_run "$st" "C$i" "$row" "S$st-$id-END" || ok=0; fi
+    [ "$ok" = 1 ] || { post FAIL "chain stopped at $id ($i of $n)"; return 1; }
+  done
+  slug="$(story_field "${rows[$((n-1))]}" 3)"
+  chk "$st" "$tgt" F1 "$tgt changed files under app/frontend/ and its build/verify evidence shows npm run verify passing" -- \
+    bash -c 'git -C "$1" diff --name-only "$2"..HEAD | grep -q "^app/frontend/" &&
+             cat "$1"/docs/agents-v0/verify/"$3"/*.md "$1"/docs/agents-v0/build/"$3"/*.md 2>/dev/null | grep -iE "npm run verify" | grep -qiE "\bPASS(ED)?\b|exit (code )?0"' _ "$MAIN" "$STORY_H0" "$slug" || ok=0
+  if [ "${LESSONS_CHECK:-0}" = 1 ]; then
+    chk "$st" lessons L1-END "check-lessons.sh (no options) exits 0 at the end of the run" -- bash -c 'cd "$1" && sh .agents-v0/scripts/check-lessons.sh' _ "$MAIN" || ok=0; fi
   [ "$ok" = 1 ] && snap "S$st-END"; [ "$ok" = 1 ]; }
-s4(){ happy_story 4 N1 P0-A; }
+s4(){ if [ -n "$TARGET_SURFACE" ]; then chain_steps 4; else happy_story 4 N1 P0-A; fi; }   # HARNESS-FIX 2026-10-29
 s5(){ happy_story 5 N2 P0-A "$N1"; }
 
 # ================= step 6: reopen released story N1 =================
@@ -262,6 +316,7 @@ s8(){ local ok=1 row
 # ================= driver =================
 write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   echo "Run: \`$TEST_ROOT\` · kit source \`$KIT_URL\` @ \`$KIT_REF\` · current kit \`${KIT_LABEL:-?}\` · model \`$AGENT_MODEL\` · ask_mode \`${ASK_MODE}\` · written $(ts) Asia/Manila"; echo
+  [ -z "$TARGET_SURFACE" ] || { echo "Scope: chain to the first \`$TARGET_SURFACE\` story, stop after step ${STOP_AFTER_STEP:-4} (steps 5-8 out of scope) · lessons check L1 \`$LESSONS_CHECK\`"; echo; }   # HARNESS-FIX 2026-10-29
   echo "| Step | Name | Result | Time (Asia/Manila) | Note | Kit |"; echo "|---|---|---|---|---|---|"
   awk -F'\t' '$1 ~ /^step-/ {printf "| %s | %s | %s | %s | %s | %s |\n",$1,$2,$3,$4,$5,$6}' "$RES/results.tsv"; echo
   echo "## Scenarios"; echo; echo "| Id | Scenario | Result | Time | Note | Kit |"; echo "|---|---|---|---|---|---|"

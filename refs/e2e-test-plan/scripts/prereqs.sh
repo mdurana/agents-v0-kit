@@ -55,7 +55,7 @@ fi
 for t in timeout setsid; do
   command -v "$t" >/dev/null 2>&1 && say "$t" PRESENT "$(command -v "$t")" || say "$t" PRESENT "python3 fallback ($OS)"; done
 python3 -c 'import yaml' 2>/dev/null && say pyyaml PRESENT "python3 -c 'import yaml' ok" || {
-  if [ "$MODE" = --install ] && python3 -m pip install --user --quiet pyyaml 2>/dev/null; then say pyyaml INSTALLED "pip --user"; else say pyyaml MISSING "python3 -m pip install --user pyyaml"; fi; }
+  if [ "$MODE" = --install ] && python3 -m pip install --user --quiet pyyaml 2>/dev/null; then say pyyaml INSTALLED "pip --user"; else say pyyaml MISSING "python3 -m pip install --user pyyaml (Ubuntu 24.04 refuses pip --user: install the python3-yaml package once, as root)"; fi; }
 python3 -c 'import docx' 2>/dev/null && say python-docx PRESENT "optional (report rendering only)" || say python-docx DEGRADED "optional; only needed to rebuild test-plan.docx"
 
 # --- JDK 21 ---
@@ -146,7 +146,12 @@ say agent-driver PRESENT "$DRV (AGENT_DRIVER=$AGENT_DRIVER)"
 if [ "$DRV" = antigravity ]; then
   if [ -n "${AGENT_TURN_CMD:-}" ]; then
     say agent-cli PRESENT "antigravity custom driver ($AGENT_TURN_CMD)"
-    say agent-auth PRESENT "managed by Antigravity session / AGENT_TURN_CMD"
+    # HARNESS-FIX 2026-10-29 (VM): the custom driver needs agy itself (run by agy-turn-loop.sh). Report its path and
+    #   version; when it is missing say so here instead of failing later in the CAL-AUTH turn. Sign-in is still only
+    #   proven by CAL-AUTH in step 1 (no agy command checks it without starting a model turn).
+    if [ -x "${AGY_BIN:-}" ]; then say agy-bin PRESENT "$AGY_BIN $("$AGY_BIN" --version 2>/dev/null | head -1)"
+    else say agy-bin HUMAN "agy not found (AGY_BIN=${AGY_BIN:-}); install: curl -fsSL https://antigravity.google/cli/install.sh | bash"; fi
+    say agent-auth PRESENT "managed by Antigravity session / AGENT_TURN_CMD (proven by CAL-AUTH in step 1)"
     say agent-model PRESENT "${AGENT_MODEL:-inherit}"
   elif [ -x "${AGY_BIN:-}" ]; then
     say agent-cli PRESENT "$AGY_BIN $("$AGY_BIN" --version 2>/dev/null | head -1)"
