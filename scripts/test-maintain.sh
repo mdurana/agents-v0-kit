@@ -18,7 +18,8 @@ mkdir -p "$r/.agents-v0/scripts" "$r/src/main/java/com/acme" "$r/docs/agents-v0/
 cp "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh \
    "$KIT"/templates/.agents-v0/scripts/delivery-metrics.sh \
    "$KIT"/templates/.agents-v0/scripts/packlib.py \
-   "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh "$r/.agents-v0/scripts/"
+   "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh \
+   "$KIT"/templates/.agents-v0/scripts/resolve-integration-branch.sh "$r/.agents-v0/scripts/"
 
 git_c() { git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
 
@@ -28,6 +29,8 @@ main="$(cd "$r" && git rev-parse --abbrev-ref HEAD)"
 
 branch() { (cd "$r" && git checkout -q "$main" && git checkout -q -b "$1"); }
 commit() { (cd "$r" && git add -A && git_c commit -q -m "$1"); }
+# Release is approved only on the integration branch (kitfix-20261029-step4-p1e): merge the story branch first.
+merge_to_main() { (cd "$r" && b="$(git rev-parse --abbrev-ref HEAD)" && git checkout -q "$main" && git_c merge -q --no-ff -m "merge $b" "$b"); }
 
 make_note() { # id tier extra-lines(\n separated) with-verify(yes|no) rollback-text [approve-maintain yes|no]
   id="$1"; tier="$2"; extra="$3"; with_verify="$4"; rollback="$5"
@@ -98,22 +101,30 @@ phases_of() { # id
 branch s-emergency-release
 make_note fix-12 emergency "$confirmed\nFollow-up verify due: 2026-12-31" no "$rollback"
 commit emergency-release
+if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-12/note.md >/dev/null 2>&1); then
+  fail "state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)"
+else
+  pass "state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)"
+fi
+merge_to_main
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-12/note.md >/dev/null) \
    && [ "$(phases_of fix-12)" = "$(printf 'maintain,release\nfalse')" ]; then
   pass "state: emergency --approve release does not backfill verify or set verifyPassed"
 else
   fail "state: emergency --approve release does not backfill verify or set verifyPassed"
 fi
-make_note fix-13 standard "" no "$rollback"
+branch s-standard-release; make_note fix-13 standard "" no "$rollback"
 commit standard-release
+merge_to_main
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-13/note.md >/dev/null) \
    && [ "$(phases_of fix-13)" = "$(printf 'maintain,verify,release\ntrue')" ]; then
   pass "state: standard --approve release still backfills verify and sets verifyPassed"
 else
   fail "state: standard --approve release still backfills verify and sets verifyPassed"
 fi
-make_note fix-14 emergency "$confirmed\nFollow-up verify due: 2026-12-31" yes "$rollback"
+branch s-emergency-verified; make_note fix-14 emergency "$confirmed\nFollow-up verify due: 2026-12-31" yes "$rollback"
 commit emergency-already-verified
+merge_to_main
 if (cd "$r" && sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/maintain/fix-14/note.md >/dev/null) \
    && [ "$(phases_of fix-14)" = "$(printf 'maintain,verify,release\ntrue')" ]; then
   pass "state: emergency --approve release keeps verify when it was already approved"

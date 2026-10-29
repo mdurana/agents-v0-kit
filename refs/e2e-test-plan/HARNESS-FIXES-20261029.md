@@ -166,7 +166,38 @@ refuses (exit 3) when they differ. `fix-and-resume.md` 5.4 explains chain-mode r
 only, a step-4 resume reruns the whole chain from `BEFORE-4`, `S4-<id>-END` snapshots are not resume points).
 **How to check.** Unit tests: resume without / with another `TARGET_SURFACE` exits 3; `--resume-from 6` exits 3.
 
-## Not changed
+## PE-01 — No double merge at release; `merge --abort` after a failed merge (`lib.sh`)
 
-- The kit (`templates/`, `scripts/`), the fixtures, `resume-point.sh`, `triage.sh`. (`fix-and-resume.md` gained 5.4, see CR-01.)
+**Why.** P1-E: the agent merged `feature/<slug>` into `main` itself, then made one more commit on the feature branch
+(98fa7a9). The branch tip was no longer an ancestor of `main`, so `harness_complete` ran a second `git merge --no-ff`;
+it conflicted in the story's state.json and left `main` half-merged (`MERGE_HEAD`, a `UU` file).
+**Fix.** New `main_merge_of <branch>`: the merge commit on `main`'s first-parent history that already merged the branch
+(or names it). At release, `harness_complete` does not merge when `main` already has that merge, or is mid-merge; it writes
+a `FINDING` to `harness-complete.log` (with the branch-only commits) instead. A merge that fails is undone with
+`git merge --abort`, so `main` is never left half-merged. The kit side of this error is `kitfix-20261029-step4-p1e`
+in `refs/kit-fixes.md`.
+**How to check.** `bash -n scripts/lib.sh`; on a repo where `feature/x` was merged and then got one more commit,
+`harness_complete` logs `FINDING release: main already has merge commit … NOT merging again` and `main` is unchanged. (Patched on the VM after P1-E; the scenario was not replayed on the box.)
+
+## PE-02 — Resume step 4 from a chain story (`--resume-from-story`, `run-plan.sh`, `start-tmux.sh`, `fix-and-resume.md` 5.5)
+
+**Why.** After the P1-E failure, P1-A…P1-D were released and passed; rebuilding the whole chain from `BEFORE-4` (CR-01)
+would redo them.
+**Fix.** `run-plan.sh --resume-from 4 --reason <harness-fix|env-fix|agent-retry> --resume-from-story <ID>` (or
+`CHAIN_RESUME_FROM_STORY`, with `CHAIN_RESUME_NOTE`): chain mode only, never with `kit-fix`. Earlier stories are kept and
+re-checked (`CHAIN-SKIP`); the workspace must be the `S4-<previous>-END` snapshot and pass the resume checks.
+`start-tmux.sh` passes the same settings from `launch.env`. Details and records: `fix-and-resume.md` §5.5.
+**How to check.** `bash -n scripts/run-plan.sh scripts/start-tmux.sh`; `--resume-from-story` without `TARGET_SURFACE`,
+with `--resume-from` other than 4, or with `--reason kit-fix` exits 3. (Refusal lines checked by reading; on the box, runs without an earlier `--test-root` exit 3 at the earlier test-root check first.)
+
+## FR-01 — `fix-and-resume.md` §5.6 and §5.7 (docs)
+
+§5.6: Marlon's standing rule for story failures (roll back, fix the cause, rerun the failed story; automatic during an
+unattended watch, at most 2 attempts per story), the P1-E agent logic error and the earlier ones (P0-A `._*` files,
+P1-B `*IT.java`, P1-C design evidence), and the rule that an agent logic error is fixed in the kit, not only rolled back.
+§5.7: the post-P1-E sequence (commit and push only with Sensei's approval, restore image, re-pull the kit, check the
+harness, then resume with `--resume-from-story` at the next story after P1-E, P2-A in this run).
+
+
+- The kit (`templates/`, `scripts/`), the fixtures, `resume-point.sh`, `triage.sh`. (`fix-and-resume.md` gained 5.4, see CR-01, and 5.5–5.7, see PE-02 and FR-01.) The kit fix for the P1-E error is recorded separately as `kitfix-20261029-step4-p1e` in `refs/kit-fixes.md`.
 - `fixtures/scripted-answers.tsv` still says no container runtime exists; installing Docker on the VM would contradict it.

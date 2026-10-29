@@ -10,6 +10,9 @@
 # Exit 1: release is approved but the evidence does not support it. Report the state as
 #         "unsupported by evidence", do not call the story complete, do not name a next story,
 #         and tell the user to restore the state file (the kit cannot re-open a released story).
+#         Also exit 1 when feature/<feature> still exists and is not fully merged into the
+#         integration branch (resolve-integration-branch.sh): commits were made on the feature
+#         branch after the merge (kitfix-20261029-step4-p1e). Report it; the human decides how to reconcile.
 set -eu
 
 art="${1:-}"
@@ -18,8 +21,8 @@ if [ -z "$art" ] || [ ! -f "$art" ]; then
   exit 2
 fi
 
-ART="$art" python3 - <<'PY'
-import json, os, re, sys
+ART="$art" RESOLVER="$(dirname "$0")/resolve-integration-branch.sh" python3 - <<'PY'
+import json, os, re, subprocess, sys
 from pathlib import Path
 
 art = Path(os.environ["ART"])
@@ -56,5 +59,29 @@ if missing:
     print("Report the state as unsupported by evidence. Do not call it complete or name the next story. "
           "The human restores the state file; sync-feature-state.sh cannot re-open a released story.", file=sys.stderr)
     raise SystemExit(1)
+
+# kitfix-20261029-step4-p1e: a released story's branch must be fully contained in the integration branch.
+# P0-A (no feature branch) and a branch deleted after the merge have nothing to check.
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+
+branch = f"feature/{slug}"
+if git("rev-parse", "--is-inside-work-tree").returncode == 0 \
+        and git("show-ref", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0:
+    resolver = os.environ["RESOLVER"]
+    if not os.path.isfile(resolver):
+        print(f"FAIL: {resolver} is missing; cannot check that {branch} is merged", file=sys.stderr)
+        raise SystemExit(1)
+    integration = subprocess.run(["sh", resolver], capture_output=True, text=True, check=False).stdout.strip() or "HEAD"
+    if git("merge-base", "--is-ancestor", branch, integration).returncode != 0:
+        ahead = git("rev-list", "--oneline", f"{integration}..{branch}").stdout.strip().splitlines()
+        print(f"FAIL: {slug} is released, but {branch} is not fully merged into {integration} "
+              f"({len(ahead)} commit(s) on {branch} only):", file=sys.stderr)
+        for line in ahead[:10]:
+            print(f"  - {line}", file=sys.stderr)
+        print(f"Report the story as not cleanly released. Do not commit to {branch} after the merge, "
+              f"do not merge it again, and do not name the next story; the human decides how to "
+              f"reconcile {branch} with {integration}.", file=sys.stderr)
+        raise SystemExit(1)
 print(f"OK: release evidence present for {slug}")
 PY

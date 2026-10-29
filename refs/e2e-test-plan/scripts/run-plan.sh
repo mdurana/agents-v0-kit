@@ -5,6 +5,10 @@
 #        resume an earlier run (see fix-and-resume.md): restore the snapshot taken before step N, move the workspace
 #        to the kit named by KIT_FIX_URL+KIT_FIX_REF or KIT_FIX_PATCH (kit-fix only), re-run N..8. N.x (x = scenario id
 #        of step 7 or 8) keeps that step's earlier scenario results. auto = the first failed step in results.tsv.
+#   bash scripts/run-plan.sh --resume-from 4 --test-root <dir> --reason harness-fix --resume-from-story <ID>
+#        (or CHAIN_RESUME_FROM_STORY=<ID>) chain mode only (TARGET_SURFACE set): resume step 4 at story <ID> of
+#        results/chain.tsv instead of at the first chain story. See "chain resume from a story" below and
+#        fix-and-resume.md 5.5. CHAIN_RESUME_NOTE=<text> is recorded with it (progress.log, fix-attempts.tsv, summary).
 #   exit 0 = every step PASS/PASS-SEMI, 1 = a step failed, 2 = halted, 3 = resume refused (limit, missing snapshot, bad args)
 # One step at a time; one scenario at a time; one agent process at a time. A step starts only after the previous step
 # passed its checks. The first failed step stops the run; later steps are recorded NOT-RUN and the summary is written.
@@ -15,6 +19,7 @@ while [ $# -gt 0 ]; do case "$1" in
   --resume-from) RESUME_FROM="$2"; shift 2;;
   --test-root) export TEST_ROOT="$2"; shift 2;;
   --reason) RESUME_REASON="$2"; shift 2;;
+  --resume-from-story) export CHAIN_RESUME_FROM_STORY="$2"; shift 2;;   # HARNESS-FIX 2026-10-29 (chain resume from a story)
   *) echo "unknown argument: $1" >&2; exit 3;; esac; done
 . "$HERE/env.sh"
 # HARNESS-FIX 2026-10-29 (frontend-chain scope): with TARGET_SURFACE set, step 4 builds the first story of that surface
@@ -36,6 +41,15 @@ else
   first_scope="$(sed -n 's/^target_surface=//p' "$TEST_ROOT/results/run.meta" 2>/dev/null | head -1)"
   [ -z "$first_scope" ] || [ "$first_scope" = "${TARGET_SURFACE:-none}" ] || {
     echo "resume refused: the first run used TARGET_SURFACE=$first_scope, this one has '${TARGET_SURFACE:-none}'; load the same launch.env (fix-and-resume.md 5.4)" >&2; exit 3; }
+fi
+# HARNESS-FIX 2026-10-29 (chain resume from a story): only with a step-4 resume in chain mode, never with kit-fix
+#   (a kit fix may move the resume point back, and then stories released under the old kit would be kept wrongly).
+CRS="${CHAIN_RESUME_FROM_STORY:-}"; CRS_NOTE="${CHAIN_RESUME_NOTE:-manual-resume-from-story}"; CRS_SKIP_IDS=""; CRS_SKIP_SLUGS=""; CRS_PREV=""
+if [ -n "$CRS" ]; then
+  [ -n "$TARGET_SURFACE" ] || { echo "--resume-from-story needs TARGET_SURFACE (chain mode)" >&2; exit 3; }
+  [ "$RESUME_FROM" = 4 ] || { echo "--resume-from-story needs --resume-from 4" >&2; exit 3; }
+  [ "$RESUME_REASON" != kit-fix ] || { echo "--resume-from-story is refused with --reason kit-fix (resume step 4 from its first story instead)" >&2; exit 3; }
+  case "$CRS_NOTE" in *$'\t'*|*$'\n'*) echo "CHAIN_RESUME_NOTE must be one line without tabs" >&2; exit 3;; esac
 fi
 mkdir -p "$TEST_ROOT"/{status,evidence,snapshots,results,trash,calib}
 exec 2> >(tee -a "$TEST_ROOT/status/runner-console.log" >&2)   # runner errors, read by triage.sh
@@ -226,6 +240,14 @@ chain_steps(){ local st="$1" ok=1 i=0 row id slug tgt n
   post CHAIN "target $tgt (Surface $TARGET_SURFACE), $n stories: $(printf '%s\n' "${rows[@]}" | cut -f2 | tr '\n' ' ')"
   for row in "${rows[@]}"; do i=$((i+1)); id="$(story_field "$row" 2)"
     [ ! -e "$TEST_ROOT/HALT" ] || return 1
+    # HARNESS-FIX 2026-10-29 (chain resume from a story): a kept story is not run again; it must still be released
+    #   and merged on main (the harness's own checks); its PASS rows from the earlier attempt stay in checks.tsv.
+    if [ -n "${CRS:-}" ] && [ "$i" != "$n" ] && printf ' %s' "$CRS_SKIP_IDS" | grep -q " $id "; then
+      slug="$(story_field "$row" 3)"
+      if released_ok "$slug" 0 >>"$RES/check-output.log" 2>&1 && merged_into_main "feature/$slug"; then
+        post CHAIN-SKIP "$id ($slug) already released on main; kept from the earlier attempt (resume from $CRS)"; continue
+      else post FAIL "chain resume: kept story $id is not released/merged on main"; return 1; fi
+    fi
     if [ "$i" = "$n" ]; then story_run "$st" "T1" "$row" "S$st-$id-END" || ok=0
     else story_run "$st" "C$i" "$row" "S$st-$id-END" || ok=0; fi
     [ "$ok" = 1 ] || { post FAIL "chain stopped at $id ($i of $n)"; return 1; }
@@ -332,9 +354,28 @@ write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   echo "## Resumes and fix attempts"; echo
   if [ -s "$RES/fix-attempts.tsv" ]; then echo "| Time | Attempt | Step | Reason | Kit | Outcome | Failed checks |"; echo "|---|---|---|---|---|---|---|"
     awk -F'\t' '{printf "| %s | %s | %s | %s | %s | %s | %s |\n",$1,$2,$3,$4,$5,$6,$7}' "$RES/fix-attempts.tsv"; else echo "none"; fi; echo
+  grep -h ' RESUME-FROM-STORY ' "$STATUS_LOG" 2>/dev/null | sed 's/^/- /'; grep -q ' RESUME-FROM-STORY ' "$STATUS_LOG" 2>/dev/null && echo   # HARNESS-FIX 2026-10-29
   [ -s "$RES/stop.txt" ] && { echo "## Stop condition"; echo; cat "$RES/stop.txt"; echo; }
   echo "## Labels"; echo; find "$EVID" -maxdepth 2 -name SEMI-SYNTHETIC -not -path '*/attempt-*' 2>/dev/null | sed 's/^/- SEMI-SYNTHETIC: /'; grep -h DEGRADED "$STATUS_LOG" | sed 's/^/- /'
   } > "$RES/summary.md"; post SUMMARY "$RES/summary.md"; }
+# chain_resume_prepare <attempt dir> (HARNESS-FIX 2026-10-29, chain resume from a story): story-ids rows of the kept
+#   stories; work/ = S4-<previous story>-END (restored with the usual checksum + trash rules when work/ is absent; an
+#   existing work/ is used as is and must pass the checks below); then every kept story must pass the harness's own
+#   released_ok + merged_into_main, main must be clean and not mid-merge, and the resume story must have no branch or
+#   worktree yet. Details in <attempt dir>/chain-resume-check.log.
+chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cslug
+  awk -F'\t' -v keep="$CRS_SKIP_IDS" 'index(" " keep, " " $2 " ")' "$A/story-ids.tsv" > "$RES/story-ids.tsv"
+  if [ ! -e "$WORK" ]; then restore "S4-$CRS_PREV-END" || return 1
+  else post RESUME-FROM-STORY "work/ present: used as is (must be the post-$CRS_PREV state), not restored"; fi
+  cslug="$(awk -F'\t' -v id="$CRS" '$2==id{print $3; exit}' "$RES/chain.tsv")"
+  { echo "$(ts) chain resume check: from $CRS ($cslug), kept: $CRS_SKIP_IDS"
+    for id in $CRS_SKIP_IDS; do sl="$(awk -F'\t' -v id="$id" '$2==id{print $3; exit}' "$RES/chain.tsv")"
+      if released_ok "$sl" 0 && merged_into_main "feature/$sl"; then echo "OK   $id $sl released_ok + merged_into_main"; else echo "FAIL $id $sl"; ok=1; fi; done
+    if clean_main; then echo "OK   main clean"; else echo "FAIL main not clean"; ok=1; fi
+    if git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then echo "FAIL main has MERGE_HEAD"; ok=1; else echo "OK   no MERGE_HEAD"; fi
+    if git -C "$MAIN" rev-parse -q --verify "feature/$cslug" >/dev/null || [ -n "$(wt_for_branch "feature/$cslug")" ]; then echo "FAIL feature/$cslug branch or worktree exists"; ok=1; else echo "OK   no feature/$cslug branch or worktree"; fi
+    echo "main HEAD $(git -C "$MAIN" log -1 --format='%h %s')"; } >> "$L" 2>&1
+  return "$ok"; }
 failed_checks_of(){ awk -F'\t' -v s="$1" '$2==s && $5=="FAIL"{print $3"/"$4}' "$RES/checks.tsv" | sort -u | tr '\n' ' '; }
 stop_resume(){ printf '%s Asia/Manila %s\n' "$(ts)" "$*" >> "$RES/stop.txt"; post STOP "$*"; write_summary; exit 3; }
 
@@ -348,7 +389,7 @@ if [ -n "$RESUME_FROM" ]; then
   [ -z "$RESUME_SCEN" ] || case "$RESUME_STEP" in 7|8) ;; *) stop_resume "resume refused: a scenario id is only valid for step 7 or 8";; esac
   # limits
   nres=$(cat "$RES/fix-attempts.tsv" 2>/dev/null | grep -c .)
-  nstep=$(awk -F'\t' -v s="$RESUME_STEP" -v r="$RESUME_REASON" '$3==s && $4==r' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
+  nstep=$(awk -F'\t' -v s="$RESUME_STEP" -v r="$RESUME_REASON" '$3==s && ($4==r || index($4, r " (")==1)' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
   nfix=$(awk -F'\t' '$4=="kit-fix"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
   [ "$nres" -lt "$MAX_RESUMES_TOTAL" ] || stop_resume "FIX-LIMIT: $nres resumes already (MAX_RESUMES_TOTAL=$MAX_RESUMES_TOTAL)"
   case "$RESUME_REASON" in
@@ -386,6 +427,20 @@ if [ -n "$RESUME_FROM" ]; then
     if [ "$back" -lt "$RESUME_STEP" ]; then post RESUME-MOVED "fix touches files that produced step-$back artifacts: resuming from step $back instead of $RESUME_FROM"; RESUME_STEP=$back; RESUME_SCEN=""
       nks="$KIT_SHA"; nkl="$KIT_LABEL"; [ "$RESUME_STEP" -le 2 ] || load_state "$SNAP/BEFORE-$RESUME_STEP.state.env"; KIT_SHA="$nks"; KIT_LABEL="$nkl"; export KIT_SHA KIT_LABEL; fi
   fi
+  # chain resume from a story (HARNESS-FIX 2026-10-29): the stories before <ID> in results/chain.tsv (the chain the
+  #   failed attempt built, in order) are kept: their check rows, story-ids rows and evidence stay, they are not run
+  #   again, and the workspace must be the S4-<previous story>-END snapshot (restored below if work/ is absent).
+  if [ -n "$CRS" ]; then
+    [ -s "$RES/chain.tsv" ] || stop_resume "resume refused: --resume-from-story needs results/chain.tsv of the earlier attempt"
+    crs_i="$(awk -F'\t' -v id="$CRS" '$2==id{print NR; exit}' "$RES/chain.tsv")"
+    [ -n "$crs_i" ] || stop_resume "resume refused: story $CRS is not in results/chain.tsv"
+    [ "$crs_i" -gt 1 ] || stop_resume "resume refused: $CRS is the first chain story; use a plain --resume-from 4"
+    CRS_SKIP_IDS="$(awk -F'\t' -v n="$crs_i" 'NR<n{printf "%s ",$2}' "$RES/chain.tsv")"
+    CRS_SKIP_SLUGS="$(awk -F'\t' -v n="$crs_i" 'NR<n{printf "%s ",$3}' "$RES/chain.tsv")"
+    CRS_PREV="$(awk -F'\t' -v n="$crs_i" 'NR==n-1{print $2}' "$RES/chain.tsv")"
+    [ -f "$SNAP/S4-$CRS_PREV-END.tgz" ] || stop_resume "resume refused: no snapshot S4-$CRS_PREV-END for --resume-from-story $CRS"
+    export CRS CRS_SKIP_IDS CRS_SKIP_SLUGS
+  fi
   k=$(( nres + 1 )); A="$RES/attempt-$k"; mkdir -p "$A" "$EVID/attempt-$k"
   cp "$RES/results.tsv" "$RES/checks.tsv" "$RES/story-ids.tsv" "$A/" 2>/dev/null; cp "$RES/summary.md" "$A/" 2>/dev/null
   [ ! -e "$TEST_ROOT/HALT" ] || mv "$TEST_ROOT/HALT" "$A/HALT"
@@ -395,12 +450,16 @@ if [ -n "$RESUME_FROM" ]; then
     { id=$1; if (id ~ /^step-/) { st=substr(id,6)+0; if (st<s) print; next }
       split(id,p,"."); st=p[1]+0; if (st<s) {print; next}
       if (sc!="" && st==s) { rk=(s==7)?r7[p[2]]:r8[p[2]]; rs=(s==7)?r7[sc]:r8[sc]; if (rk && rs && rk<rs) print } }' "$A/results.tsv" > "$RES/results.tsv"
-  awk -F'\t' -v s="$RESUME_STEP" -v sc="$RESUME_SCEN" -v o7="$ORDER7" -v o8="$ORDER8" '
+  awk -F'\t' -v s="$RESUME_STEP" -v sc="$RESUME_SCEN" -v o7="$ORDER7" -v o8="$ORDER8" -v keep="$CRS_SKIP_IDS" '
     BEGIN{n=split(o7,a," "); for(i=1;i<=n;i++) r7[a[i]]=i; n=split(o8,b," "); for(i=1;i<=n;i++) r8[b[i]]=i}
     $2=="-" || ($2+0)<s {print; next}
+    keep!="" && ($2+0)==s && index(" " keep, " " $3 " ") {print; next}
     sc!="" && ($2+0)==s { rk=(s==7)?r7[$3]:r8[$3]; rs=(s==7)?r7[sc]:r8[sc]; if (rk && rs && rk<rs) print }' "$A/checks.tsv" > "$RES/checks.tsv"
   for d in "$EVID"/S*; do [ -e "$d" ] || continue; b="${d##*/}"; st="${b#S}"; st="${st%%[-.]*}"
     [ "$st" -ge "$RESUME_STEP" ] 2>/dev/null || continue
+    if [ -n "$CRS" ] && [ "$st" = 4 ]; then crs_keep=0   # keep the evidence of the kept chain stories
+      for sl in $CRS_SKIP_SLUGS; do case "$b" in "S4-$sl-"*|"S4-$sl.runs"|"S4-$sl.stuck") crs_keep=1;; esac; done
+      [ "$crs_keep" = 0 ] || continue; fi
     if [ -n "$RESUME_SCEN" ] && [ "$st" = "$RESUME_STEP" ]; then sid="${b#S$st-}"; sid="${sid%%-*}"   # keep evidence of earlier scenarios
       [ "$(scen_rank "$st" "$sid")" -lt "$(scen_rank "$st" "$RESUME_SCEN")" ] && continue; fi
     mv "$d" "$EVID/attempt-$k/"; done
@@ -409,8 +468,11 @@ if [ -n "$RESUME_FROM" ]; then
     [ ! -e "$WORK" ] || mv "$WORK" "$TEST_ROOT/trash/work.resume-$k"
     if [ "$RESUME_STEP" = 2 ] && [ -e "$KIT" ]; then mv "$KIT" "$TEST_ROOT/trash/kit.resume-$k"; fi   # step 2 clones the kit again (kit_checkout)
   else
+    if [ -n "$CRS" ]; then chain_resume_prepare "$A" || stop_resume "resume refused: workspace is not the clean post-$CRS_PREV state (see $A/chain-resume-check.log)"
+    else
     [ -n "$RESUME_SCEN" ] || cp "$SNAP/BEFORE-$RESUME_STEP.story-ids.tsv" "$RES/story-ids.tsv" 2>/dev/null
     restore "BEFORE-$RESUME_STEP" || stop_resume "resume refused: BEFORE-$RESUME_STEP could not be restored or the kit update failed (see $RES/kit-update.log)"
+    fi
     # compatibility of the earlier, already-passed work with the fixed kit
     compat=1
     if [ "${SKIP_RESUME_VALIDATE:-0}" != 1 ]; then
@@ -424,6 +486,7 @@ if [ -n "$RESUME_FROM" ]; then
           has_appr "$MAIN/docs/agents-v0/requirements/$s.state.json" release || continue
           (cd "$MAIN" && sh .agents-v0/scripts/check-release-evidence.sh "docs/agents-v0/requirements/$s.md") >> "$A/compat-release-evidence.log" 2>&1 || compat=0; done; fi
     fi
+    if [ "$compat" = 0 ] && [ -n "$CRS" ]; then stop_resume "resume refused: kept stories before $CRS fail the compatibility check (see $A/); no automatic restart with --resume-from-story"; fi
     if [ "$compat" = 0 ]; then
       post RESTART-REQUIRED "work of steps before $RESUME_STEP does not pass the fixed kit's checks (see $A/); resuming from step 2 instead"
       [ "${RESUME_FALLBACK_TO_2:-1}" = 1 ] || stop_resume "RESTART-REQUIRED and RESUME_FALLBACK_TO_2=0"
@@ -432,9 +495,10 @@ if [ -n "$RESUME_FROM" ]; then
       mv "$WORK" "$TEST_ROOT/trash/work.restart-$k"; mv "$KIT" "$TEST_ROOT/trash/kit.restart-$k"
     fi
   fi
-  printf 'resume_%s=%s step=%s%s reason=%s old_kit=%s new_kit=%s harness_sha=%s\n' "$k" "$(ts)" "$RESUME_STEP" "${RESUME_SCEN:+.$RESUME_SCEN}" "$RESUME_REASON" "$OLD_KIT_LABEL" "${KIT_LABEL:-?}" "$(cat "$HERE"/*.sh "$HERE"/*.py | sha256_cmd | cut -c1-12)" >> "$RES/run.meta"
-  printf '%s\t%s\t%s\t%s\t%s\t\t\n' "$(ts)" "$k" "$RESUME_STEP" "$RESUME_REASON" "${KIT_LABEL:-?}" >> "$RES/fix-attempts.tsv"
+  printf 'resume_%s=%s step=%s%s reason=%s old_kit=%s new_kit=%s harness_sha=%s%s\n' "$k" "$(ts)" "$RESUME_STEP" "${RESUME_SCEN:+.$RESUME_SCEN}" "$RESUME_REASON" "$OLD_KIT_LABEL" "${KIT_LABEL:-?}" "$(cat "$HERE"/*.sh "$HERE"/*.py | sha256_cmd | cut -c1-12)" "${CRS:+ from_story=$CRS kept=\"$CRS_SKIP_IDS\" note=\"$CRS_NOTE\"}" >> "$RES/run.meta"
+  printf '%s\t%s\t%s\t%s\t%s\t\t\n' "$(ts)" "$k" "$RESUME_STEP" "$RESUME_REASON${CRS:+ (from story $CRS: $CRS_NOTE)}" "${KIT_LABEL:-?}" >> "$RES/fix-attempts.tsv"
   START=$RESUME_STEP; post RESUME "attempt $k from step $RESUME_STEP${RESUME_SCEN:+.$RESUME_SCEN} reason=$RESUME_REASON kit $OLD_KIT_LABEL -> ${KIT_LABEL:-?}"
+  [ -z "$CRS" ] || post RESUME-FROM-STORY "attempt $k step 4 chain resumes at $CRS; skipping released ${CRS_SKIP_IDS% } (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-$CRS_PREV-END; reason: $CRS_NOTE"
 fi
 
 : > "$TEST_ROOT/RUNNING"; trap 'rm -f "$TEST_ROOT/RUNNING"' EXIT

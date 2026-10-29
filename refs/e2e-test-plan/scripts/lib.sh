@@ -318,10 +318,44 @@ harness_complete(){ # <gate> <allow> <state file>
             if [ "$g" = release ] && [ -n "${STORY_SLUG:-}" ]; then
               local br="feature/$STORY_SLUG"; [ "${STORY_KIND:-feature}" = maintain ] && br="maintain/$STORY_SLUG"
               if git -C "$MAIN" rev-parse -q --verify "$br" >/dev/null && ! git -C "$MAIN" merge-base --is-ancestor "$br" HEAD; then
-                git -C "$MAIN" merge -q --no-ff -m "Merge branch '$br'" "$br" >> "$RUN/harness-complete.log" 2>&1 &&
-                { SEMI=1; echo "$(ts) release: merged $br into $(git -C "$MAIN" branch --show-current)" >> "$RUN/SEMI-SYNTHETIC"; }; fi
+                # HARNESS-FIX 2026-10-29 (P1-E double merge): last run, the agent merged feature/<slug> into main itself,
+                #   then made one more commit on the feature branch (98fa7a9). The branch tip was then no longer an
+                #   ancestor of main, so this step ran a SECOND `git merge --no-ff`, which conflicted in the story's
+                #   state.json and left main half-merged (MERGE_HEAD, UU file). Now: if main already holds a merge of
+                #   the branch, or main is mid-merge, do not merge; write a FINDING to harness-complete.log instead.
+                #   A merge that fails is undone with `git merge --abort`, so main is never left half-merged.
+                local mc; mc="$(main_merge_of "$br")"
+                if git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                  echo "$(ts) FINDING release: main is already mid-merge (MERGE_HEAD exists); not merging $br" >> "$RUN/harness-complete.log"
+                  post FINDING "harness-complete: main mid-merge before release merge of $br; not merging (see ${RUN##*/}/harness-complete.log)"
+                elif [ -n "$mc" ]; then
+                  { echo "$(ts) FINDING release: main already has merge commit ${mc:0:12} of $br, but the branch tip $(git -C "$MAIN" rev-parse --short "$br") is not an ancestor of main; NOT merging again. Branch commits not on main:"
+                    git -C "$MAIN" log --oneline "HEAD..$br" 2>&1 | sed 's/^/    /'; } >> "$RUN/harness-complete.log"
+                  post FINDING "harness-complete: $br already merged into main (${mc:0:12}) but has later commits; no second merge (see ${RUN##*/}/harness-complete.log)"
+                elif git -C "$MAIN" merge -q --no-ff -m "Merge branch '$br'" "$br" >> "$RUN/harness-complete.log" 2>&1; then
+                  SEMI=1; echo "$(ts) release: merged $br into $(git -C "$MAIN" branch --show-current)" >> "$RUN/SEMI-SYNTHETIC"
+                else
+                  echo "$(ts) FINDING release: git merge of $br into main failed; running git merge --abort" >> "$RUN/harness-complete.log"
+                  if ! git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                    echo "$(ts) release: no merge in progress (git merge stopped before starting); nothing to abort" >> "$RUN/harness-complete.log"
+                  elif git -C "$MAIN" merge --abort >> "$RUN/harness-complete.log" 2>&1; then
+                    echo "$(ts) release: git merge --abort done; main back at $(git -C "$MAIN" rev-parse --short HEAD)" >> "$RUN/harness-complete.log"
+                  else echo "$(ts) release: git merge --abort FAILED; main may be half-merged" >> "$RUN/harness-complete.log"; fi
+                  post FINDING "harness-complete: merge of $br failed and was aborted (see ${RUN##*/}/harness-complete.log)"
+                fi
+              fi
             fi;;
   esac; }
+
+# main_merge_of <branch>: prints the merge commit on main's first-parent history (since the branch forked) that merged
+#   <branch> (one of its later parents is an ancestor of <branch>), or one whose subject names the branch; empty if none.
+#   HARNESS-FIX 2026-10-29 (P1-E double merge).
+main_merge_of(){ local b="$1" base line c p
+  base="$(git -C "$MAIN" merge-base HEAD "$b" 2>/dev/null)" || return 0
+  while read -r line; do set -- $line; c="$1"; shift 2
+    for p in "$@"; do git -C "$MAIN" merge-base --is-ancestor "$p" "$b" 2>/dev/null && { echo "$c"; return 0; }; done
+  done < <(git -C "$MAIN" rev-list --merges --first-parent --parents "$base..HEAD" 2>/dev/null)
+  git -C "$MAIN" log --merges --first-parent --format='%H %s' "$base..HEAD" 2>/dev/null | grep -F "'$b'" | head -1 | cut -d' ' -f1; }
 
 # ---------- a whole story (feature or maintenance note) to local release ----------
 next_cmd(){ # <state file> <kind> <is_p0a>  -> phase command word or DONE / STUCK:<why>

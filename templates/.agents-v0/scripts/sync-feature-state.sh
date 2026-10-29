@@ -125,6 +125,31 @@ case "$art" in
     ;;
 esac
 
+# Release approval only on the integration branch (kitfix-20261029-step4-p1e). Release is recorded in the
+# integration checkout after the merge (v0-local-release step 6, local-release step 8;
+# P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
+# after the merge leaves that branch ahead of the integration branch.
+approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
+if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
+   && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  resolver="$(dirname "$0")/resolve-integration-branch.sh"
+  if [ ! -f "$resolver" ]; then
+    printf 'FAIL: --approve release needs %s to find the integration branch\n' "$resolver" >&2
+    exit 1
+  fi
+  integration="$(sh "$resolver")"
+  integration="${integration#origin/}"
+  current="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [ "$integration" != HEAD ] && [ "$current" != "$integration" ]; then
+    printf 'FAIL: --approve release runs only on the integration branch %s (current: %s).\n' \
+      "$integration" "${current:-detached HEAD}" >&2
+    printf '  Merge the story branch into %s, then run this in the %s checkout (git worktree list).\n' \
+      "$integration" "$integration" >&2
+    printf '  After the merge, do not commit to feature/<feature> or maintain/<id> or update its state.\n' >&2
+    exit 1
+  fi
+fi
+
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"

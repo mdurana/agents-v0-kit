@@ -20,7 +20,12 @@ Primary local completion for the `release-manager` agent (`workflow-orchestratio
 <!-- MEM-14: check-lessons.sh --approval-text compares the marks and lessons.md with the user's approval message. -->
 9. In that integration checkout, before the commit in step 8: mark each `P-<n>` `accepted` (when explicitly accepted by the user) or `rejected` (when rejected or not mentioned in the user's release approval), run `sh .agents-v0/scripts/check-lessons.sh --decided --phase-result <phase-result>`, append each accepted one to `## Active lessons` in `docs/agents-v0/lessons.md` using the file edit tool (not shell redirection) as `### L-NNN · <today> · accepted` (id from `check-lessons.sh --next-id`) with the `Story/phase`, `Trigger`, `What happened`, `Do instead`, and `Scope` bullets, run `sh .agents-v0/scripts/check-lessons.sh`, then `sh .agents-v0/scripts/check-lessons.sh --phase-result <phase-result> --approval-text '<the user's release approval message, verbatim>'` (exit 1: fix the marks or `lessons.md` from its `FAIL` lines; never reword the approval), and commit `lessons.md` with the release state. Over the active cap: ask the user what to move to `docs/agents-v0/lessons-archive.md`.
 
+<!-- kitfix-20261029-step4-p1e: after the merge, no commit or state change on the story branch; check it is fully merged; list every commit. -->
+10. After the release-state commit (feature stories), run `sh .agents-v0/scripts/check-release-evidence.sh <artifact>` in the integration checkout. Exit 1 (for example `feature/<feature>` is not fully merged into the integration branch): report its `FAIL` lines and stop; do not merge again and do not name the next story.
+11. Final summary: list every commit made in this turn (short SHA, branch, subject), on every branch and worktree.
+
 ## Do not
+- Commit to `feature/<feature>` or `maintain/<id>` after it was merged into the integration branch, or run `sync-feature-state.sh` (any option) or edit its state, phase-result, or evidence in the feature or maintain worktree after the merge. Release approval happens only on the integration branch; `sync-feature-state.sh --approve release` refuses on any other branch.
 - Call `glab` or push unless the user explicitly asks to push or run `/v0-release`.
 - Merge or approve a merge request.
 - Treat `/v0-release` as required for this local completion.

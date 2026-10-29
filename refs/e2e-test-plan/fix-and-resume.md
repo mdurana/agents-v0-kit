@@ -182,6 +182,65 @@ The frontend-chain run (`TARGET_SURFACE=frontend`, steps 0–4 only) resumes wit
 - **A step-4 resume runs the whole chain again.** It restores `BEFORE-4` and builds every story of the chain from the first one, even if some stories had reached local release; the per-story `S4-<id>-END` snapshots are evidence only and are never used as a resume point.
 - With the agy driver, the `agy` tmux window (`agy-turn-loop.sh`) must be running for the resumed runner; `start-tmux.sh` starts both windows from one `launch.env`.
 
+### 5.5 Resume step 4 from a story of the chain (`--resume-from-story`, HARNESS-FIX 2026-10-29)
+
+When a chain story failed for a reason that a harness fix (or an environment fix, or an agent retry) addresses, and every story before it reached local release and passed its checks, step 4 can resume at that story instead of building the whole chain again (§5.4):
+
+```bash
+. ~/launch.env
+CHAIN_RESUME_NOTE="manual-resume-from-story approved by <owner>, after harness-fix" \
+  bash scripts/run-plan.sh --resume-from 4 --test-root "$TEST_ROOT" --reason harness-fix --resume-from-story P1-E
+# or through tmux: add to a copy of launch.env  export RUN_ID=<id> TEST_ROOT=<dir> RESUME_FROM=4 RESUME_REASON=harness-fix
+#   CHAIN_RESUME_FROM_STORY=P1-E CHAIN_RESUME_NOTE="..."   and run  bash scripts/start-tmux.sh <that file>
+```
+
+- Only in chain mode, only with `--resume-from 4`, and never with `--reason kit-fix` (refused, exit 3).
+- The stories before `<ID>` in `results/chain.tsv` are **kept**: their step-4 check rows stay in `checks.tsv`, their rows in `story-ids.tsv` and their evidence folders stay; only `<ID>` and later go to `attempt-<k>/`. Steps 0–3 are not run again (as in every step-4 resume).
+- The workspace must be the `S4-<previous story>-END` snapshot. If `work/` is absent the runner restores it (checksum first, as `restore` always does); if `work/` is present it is used as is. Either way the runner then checks, and refuses on failure (log in `results/attempt-<k>/chain-resume-check.log`): every kept story passes `released_ok` and `merged_into_main`, main is clean and has no `MERGE_HEAD`, and `<ID>` has no branch or worktree yet. The compatibility check of §5.2 step 7 also runs; a failure stops the resume instead of restarting from step 2.
+- During step 4 each kept story is re-checked (`released_ok` + `merged_into_main`) and logged as `CHAIN-SKIP`; it is not run again.
+- Records: `RESUME-FROM-STORY` lines in `status/progress.log` (also listed in `summary.md` under **Resumes and fix attempts**), the reason column of `fix-attempts.tsv` reads `<reason> (from story <ID>: <CHAIN_RESUME_NOTE>)`, and the `resume_<k>=` line in `run.meta` has `from_story=`, `kept=` and `note=`.
+
+### 5.6 Standing rule for story failures (set by Marlon, 2026-10-29 21:46 Asia/Manila)
+
+On any story failure in the step-4 chain (or any later story step):
+
+1. **Roll back first.** Before anything else, return `main` to the previous clean release commit, the last story that passed all its checks. Prefer restoring that story's `S4-<story>-END` snapshot, which brings back the whole workspace. Move the failed tree to `trash/` (never delete), and remove the failed story's worktree and feature branch from the live repo.
+2. **Fix the cause.** Fix the harness, the error, or the kit logic that caused the failure. Back up every edited file first and record the fix (HARNESS-FIXES / fix-attempts.tsv).
+3. **Rerun the failed story.** After the fix, resume step 4 from the failed story with `--resume-from-story <ID>` (§5.5), so earlier released stories are skipped, not replayed.
+
+**Automatic, no waiting (updated by Marlon, 2026-10-29 21:47 Asia/Manila).** During an unattended watch, the watcher carries out steps 1-3 on its own as soon as it sees a story failure. It does not report and wait for approval first. Limits: at most 2 automatic fix-and-rerun attempts per story. If the cause can't be found, the fix would need Docker/Redis or other new infrastructure, or the second rerun of the same story also fails, it stops after the rollback (main clean at the last release) and waits for Marlon. Fixes go only into the harness scripts or kit files on the VM, each with a backup and a HARNESS-FIXES / fix-attempts.tsv record.
+
+**Known agent logic error (P1-E, 2026-10-29).** In the local-release turn, the agent committed evidence on the feature branch, merged it into `main`, ran `sync-feature-state.sh --approve release` on `main` and committed. Then it ran `--approve release` again in the feature worktree and committed there too (98fa7a9), reasoning that the worktree should also show the approved state "for any inspection tool". Its final summary left out that extra commit. That left the feature branch ahead of `main`, the harness merged it a second time, the merge conflicted, and H1/H2/H5 failed. No hook or check caught it: `git commit` is allowed, the `v0-local-release` skill doesn't forbid committing to the feature branch after the merge, and the approval script doesn't check the branch.
+
+**Earlier logic errors from previous runs.** Each of these should be caught by a check or fixed in the kit, not just rolled back:
+- **P0-A, skeleton archive.** The skeleton archive contained macOS `._*` (AppleDouble) metadata files. They broke Checkstyle and Vitest on Linux. Fix in the kit: repack the archive without `._*` files and add a validate-kit check that rejects any `._*` entry.
+- **P1-B, integration test naming.** The PostgreSQL integration tests were named `*IT.java` instead of `*Test.java`, so Maven skipped them because Failsafe wasn't set up. Fix in the kit: either add Failsafe (and its JaCoCo report) to the skeleton pom, or add a skill rule and a check that integration tests are named `*Test.java` while Failsafe is absent. Either way, a check should fail when integration test classes exist but none of them ran.
+- **P1-C, design evidence.** The harness completed the agent's design evidence instead of the agent doing it. Fix: the design skill must make the agent produce its own evidence, and a check should fail when the evidence is missing at the end of the agent's turn. The harness must not fill it in.
+
+**Agent logic errors must be fixed, not just rolled back.** If this or any similar agent logic error causes a story failure, the failure handling (step 2) must also fix the cause in the kit, not only roll back and rerun. Examples: make the skill wording explicit, add a guard to the script the agent misused, or add a check that catches the bad state. Record the fix in HARNESS-FIXES and fix-attempts.tsv. A bare agent-retry with no kit change is allowed only when no kit gap contributed. For the P1-E error, the kit fixes are: (1) a `v0-local-release` SKILL line saying not to commit to `feature/<feature>` or update its state after the merge, (2) `sync-feature-state.sh --approve release` refusing to run on any branch other than the integration branch (except P0-A), and (3) a post-release check that the feature branch is fully contained in the integration branch.
+
+No git commit or push of kit changes without Marlon's explicit approval (the harness's own run commits are fine). Report each failure, rollback, fix and rerun to Marlon as it happens.
+
+### 5.7 Post-P1-E sequence (added by Marlon, 2026-10-29 22:19 Asia/Manila)
+
+Follow these steps in order. Each one starts only after the previous one is done.
+
+1. After P1-E finishes, check whether it passed or failed: read `checks.tsv`, the H1/H2/H5 rows and the RUN-END line. If it failed, apply §5.6 first.
+2. Commit and push all kit changes, but **only with Sensei's explicit approval**. The changes are: the harness fixes (no double merge, `--resume-from-story`), the `v0-local-release` skill wording, the branch guard in `sync-feature-state.sh`, the post-release merge check, and the §5.6 logic-error entries. Never force-push.
+3. Restore the saved VM image `agents-v0-e2e-20261029` (private/42212138). It was saved at 3:58 PM Manila on 2026-10-29, before the agy sign-in, before the Cursor key was added and before the run started.
+4. After the restore, re-clone or re-pull the kit from the repo so the pushed fixes come back. The kit in the image is the pre-fix version (0aa3a43).
+5. Check that the harness is the new version. `lib.sh` must have the double-merge fix (`main_merge_of` plus `merge --abort`), `run-plan.sh` and `start-tmux.sh` must accept `--resume-from-story`, and `fix-and-resume.md` must contain §5.5, §5.6 and this §5.7.
+6. Only then resume testing with `--resume-from-story` at the next story after P1-E (P2-A in this run).
+
+Known risks:
+- About 10 to 20 minutes of downtime.
+- Linode may move the VM to another host.
+- The SSH host key may change after the restore. Update known_hosts before reconnecting.
+- The sign-ins must be redone: agy for user e2e (a new code through the secret form), and the Cursor CLI key in `/home/e2e/.config/e2e-secrets.env` (mode 600). Never copy Sensei's own agy token file to the VM.
+- agy remote control and the memory logger must be restarted by hand.
+
+Note (Naruto): the image does not contain the run folder (`/home/e2e/agents-v0-e2e/run-20261029-1629`). That folder holds the portal repo, with P1-A to P1-E released on main, plus the evidence, the story END snapshots, the status files and the memory logs. Before step 3, copy it off the VM, checking it against SHA256SUMS. After step 5, put it back in place. Without it, resuming at the next story after P1-E (P2-A) isn't possible, and the chain would have to restart from step 0.
+
 ## 6. When a fix is too big to resume
 
 The runner decides this from files; you do not override it to save time.
