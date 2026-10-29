@@ -245,7 +245,7 @@ if prev_last in phases and prev_last not in approved_list:
         if p not in approved_list:
             approved_list.append(p)
 
-today_iso = time.strftime("%Y-%m-%d", time.gmtime())
+today_iso = time.strftime("%Y-%m-%d", time.localtime())  # same clock as the decision-table dates the agent writes (P2-A H3, 2026-10-30)
 phase_dates = {k.lower(): v for k, v in (prev.get("phaseDates") or {}).items() if k.lower() in phases and isinstance(v, str)}
 
 # Merge Markdown table rows with state.json approvals (union positive rows; withdraw on Re-opened or non-positive row)

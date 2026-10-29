@@ -201,3 +201,21 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 
 - The kit (`templates/`, `scripts/`), the fixtures, `resume-point.sh`, `triage.sh`. (`fix-and-resume.md` gained 5.4, see CR-01, and 5.5–5.7, see PE-02 and FR-01.) The kit fix for the P1-E error is recorded separately as `kitfix-20261029-step4-p1e` in `refs/kit-fixes.md`.
 - `fixtures/scripted-answers.tsv` still says no container runtime exists; installing Docker on the VM would contradict it.
+
+## 2026-10-30 01:15 Asia/Manila — P2-A H2 FAIL, automatic fix 1 of 2 (§5.6, watcher)
+
+- Failure: step 4 chain stopped at P2-A (6 of 20) at 01:01. H2 FAIL: `feature/p2-a-bff-oidc-fail-closed-session-auth` never existed; design, build, verify and release all committed straight onto `main` (588a77a, 82649b1). H1, H3, H4, H5, L1 passed.
+- Cause: intake turn 2 ("Approved by mdurana") ended with rc=0 and an EMPTY final result right after `sync-feature-state.sh --approve intake`, before the kit's branch-authorisation question and `feature-worktree.sh` (intake step 7). The harness classed it NORMAL, so the intake run ended NORMAL-END with no worktree, and design/build ran on main. Only empty-result turn in the whole run (1 of 65).
+- Harness fix (scripts/lib.sh, classify; backup lib.sh.bak-20261030-p2a): a turn with rc=0 whose last `result` event has empty text is INFRA (gate-aware approval or fresh retry from pre.tgz), not NORMAL. Tested: failed turn -> INFRA, all 64 other turns -> NORMAL; bash -n OK.
+- Kit gap (agent logic, fixed in kit-src working tree, NOT committed, not in this run's kit cca2773): v0-design and v0-build only stopped when a feature worktree existed elsewhere; they did not stop when none existed. Both now say to stop and not work on the integration branch when no `feature/<feature>` worktree exists (backups *.bak-20261030-p2a). Needs Marlon's approval to commit.
+- Rollback: work/ moved to trash/work-p2a-failed-20261030-0115 (with results/ and status/ copies); restored S4-P1-E-END-KIT-cca2773 (SHA256 OK); main 22c944f clean, no MERGE_HEAD, no p2-a branch/worktree. Old tmux session renamed old-run1629-p2a-failed-1.
+- Rerun: --resume-from-story P2-A, reason harness-fix, env ~/launch-resume-p2a-fix1.env.
+
+## 2026-10-30 02:50 Asia/Manila — P2-A H3 FAIL, automatic fix 2 of 2 (§5.6, watcher; last automatic attempt)
+
+- Failure: step 4 chain stopped at P2-A (6 of 20) at 02:11 after rerun 1. Only H3 FAILED (phaseDates not non-decreasing); H1, H2, H4, H5, L1 passed. State: intake/design/build 2026-10-29, verify 2026-10-30, release 2026-10-29.
+- Cause (clock mismatch, not a real ordering error): the kit's `sync-feature-state.sh` dates `--approve` calls with UTC (`time.gmtime()`), while the agent ran with TZ=Asia/Manila and wrote local dates in the decision table (Verify/Release rows 2026-10-30). Between 00:00 and 08:00 Manila the two clocks differ by a day, so the release approval (UTC 10-29) came out earlier than the verify date taken from the table (local 10-30). Earlier stories ran before midnight, so they never hit it.
+- Harness fix: agent turns now run with `TZ="${AGENT_TZ:-UTC}"` (scripts/lib.sh run_turn env; scripts/agy-turn-loop.sh agy -p env), the same clock the run's kit uses for approval dates. Harness log times stay Asia/Manila. Backups *.bak-20261030-p2a-2; bash -n OK. H3 itself is unchanged.
+- Kit gap (fixed in kit-src working tree, NOT committed, not in this run's kit cca2773): templates/.agents-v0/scripts/sync-feature-state.sh now dates approvals with the local clock (`time.localtime()`), the same clock as the decision-table dates. Python block compiles. Needs Marlon's approval to commit.
+- Rollback: work/ moved to trash/work-p2a-failed-20261030-0246 (with results/ and status/ copies); restored S4-P1-E-END-KIT-cca2773 (SHA256 OK); main 22c944f clean, no MERGE_HEAD, no p2-a branch/worktree. Old tmux session renamed old-run1629-p2a-failed-2.
+- Rerun: --resume-from-story P2-A, reason harness-fix, env ~/launch-resume-p2a-fix2.env. If P2-A fails again, stop after rollback and wait for Marlon.

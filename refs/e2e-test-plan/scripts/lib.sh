@@ -140,6 +140,13 @@ classify(){ # <rc> <stderr> <jsonl> <stalled>
   elif grep -qiE 'not logged in|unauthori[sz]ed|authentication (failed|required)|\b401\b|\b403\b' "$2"; then echo AUTH
   elif [ "$4" = 1 ]; then echo STALL
   elif [ "$1" = 124 ] || [ "$1" = 137 ]; then echo CAP
+  # HARNESS-FIX 2026-10-30 (step 4, P2-A): an agent turn can end with rc=0 and a final "result" event whose text is
+  #   empty, right after a tool call (P2-A intake turn 2: the stream stopped just after "--approve intake", before the
+  #   kit's branch-authorisation question and feature-worktree.sh). It was classed NORMAL, the intake run ended
+  #   NORMAL-END with no feature/<feature> worktree, and design/build/release then ran on main (H2 FAIL). An empty
+  #   final result is a truncated turn, not an answer: it is now INFRA, so the gate-aware rule or a fresh retry from
+  #   the pre-run copy applies (same as a dropped stream). Only that exact case changes; any non-empty result is NORMAL.
+  elif [ "$1" = 0 ] && [ "$(jq -rs '[.[]|select(.type=="result")]|if length==0 then "x" else (last|.result // "x"|tostring) end' "$3" 2>/dev/null)" = "" ]; then echo INFRA
   elif [ "$1" = 0 ] && jq -e 'select(.type=="result" or .type=="PLANNER_RESPONSE")' "$3" >/dev/null 2>&1; then echo NORMAL
   elif grep -qiE 'Connection stalled|no progress|ECONNRESET|network error|503|502' "$2"; then echo INFRA
   # HARNESS-FIX 2026-10-29 (step 4): an agy turn whose model stream dropped ends with rc!=0 and the error only in the
@@ -153,7 +160,7 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   local k="$1" msg="$2" allow="$3" rem cap pid rc sz last=0 lastch st=0 mark drv
   rem=$(( RUN_DEADLINE - $(now) )); cap=$TURN_CAP; [ "$rem" -lt "$cap" ] && cap=$rem; [ "$cap" -gt 60 ] || { TURN_CLASS=CAP; return; }
   printf '%s\n' "$msg" > "$RUN/turn-$k.prompt"; printf '%s\n' "$allow" > "$RUN/turn-$k.allow"
-  local envv=(HOME="$HOME" USER="${USER:-tester}" LANG=C.UTF-8 TZ=Asia/Manila TERM=xterm
+  local envv=(HOME="$HOME" USER="${USER:-tester}" LANG=C.UTF-8 TZ="${AGENT_TZ:-UTC}" TERM=xterm
     PATH="${TOOLS_PATH:-}:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" JAVA_HOME="${JAVA_HOME:-}" PG_HOME="${PG_HOME:-}"
     TESTCONTAINERS_RYUK_DISABLED=true MAVEN_OPTS=-Xmx1536m TEST_ROOT="$TEST_ROOT" PLAN_DIR="$PLAN_DIR")
   [ -z "${CURSOR_API_KEY:-}" ] || envv+=(CURSOR_API_KEY="$CURSOR_API_KEY")

@@ -51,7 +51,7 @@ $MSG"
   log "turn start run=${RUN##*/} k=$K chat=$CHAT conv=${CONV:-new} ws=$WS allow=$ALLOW msg=$(head -c 120 <<<"$MSG" | tr '\n' ' ')"
   printf '%s\n' "$PROMPT" > "$RUN/turn-$K.agy.prompt"
   # own process group (setsid) so the runner can stop the whole agy turn via agy-turn.pid (HARNESS-FIX 2026-10-29)
-  ( cd "$WS" && exec env AGY_ALLOW_TOOLS="$ALLOW" setsid timeout -k 30 "$AGY_TURN_TIMEOUT" "$AGY" "${ARGS[@]}" -p "$PROMPT" ) > "$RUN/turn-$K.agy.jsonl" 2> "$RUN/turn-$K.agy.stderr" < /dev/null &
+  ( cd "$WS" && exec env AGY_ALLOW_TOOLS="$ALLOW" TZ="${AGENT_TZ:-UTC}" setsid timeout -k 30 "$AGY_TURN_TIMEOUT" "$AGY" "${ARGS[@]}" -p "$PROMPT" ) > "$RUN/turn-$K.agy.jsonl" 2> "$RUN/turn-$K.agy.stderr" < /dev/null &
   APID=$!; echo "$APID" > "$DRV/agy-turn.pid"
   wait "$APID"; rc=$?; rm -f "$DRV/agy-turn.pid"
   NEWCONV="$(jq -r 'select(.event=="init") | .conversation_id' "$RUN/turn-$K.agy.jsonl" 2>/dev/null | head -1)"
