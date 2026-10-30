@@ -150,6 +150,57 @@ if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
   fi
 fi
 
+# Feature-branch guard (kitfix-20261031-branch-guard). Design, Build, Verify and the pre-merge
+# Release work of a feature story happen only on feature/<feature>, in the worktree that
+# feature-worktree.sh created after the user authorised the branch (v0-intake step 7). Run
+# 20261029-1629 (P2-A): one truncated Intake turn skipped that step and design, build, verify and
+# release were all recorded and committed on main; prose in v0-design/v0-build did not stop it.
+# P0-A has no feature branch and works on the integration branch. Recording a blocked state is
+# allowed anywhere (it records a stop, it does no work). Maintenance notes are not checked here.
+# AGENTS_V0_SKIP_BRANCH_GUARD=1 skips the check (kit fixtures only; never in a real story).
+case "$art" in
+  docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
+    bg_phase=""
+    if [ "$set_active" = 1 ] && [ "$active_status" != blocked ]; then
+      case "$active_phase" in design|build|verify|release) bg_phase="$active_phase" ;; esac
+    fi
+    case "$approve_lc" in design|build|verify) bg_phase="$approve_lc" ;; esac
+    if [ -z "$bg_phase" ] && [ -n "$verify_passed" ] && [ "$approve_lc" != release ]; then
+      bg_phase="verify"
+    fi
+    if [ -n "$bg_phase" ] && [ "${AGENTS_V0_SKIP_BRANCH_GUARD:-0}" != 1 ] \
+       && command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      bg_current="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+      bg_p0a=0
+      case "$slug" in p0-a-*|p0-a) bg_p0a=1 ;; esac
+      grep -Eiq '^[[:space:]]*(\*\*)?Story(\*\*)?:[[:space:]]*(\*\*)?P0-A([^A-Za-z0-9]|$)' "$art" 2>/dev/null && bg_p0a=1
+      if [ "$bg_p0a" = 1 ]; then
+        bg_resolver="$(dirname "$0")/resolve-integration-branch.sh"
+        if [ -f "$bg_resolver" ]; then
+          bg_int="$(sh "$bg_resolver")"
+          bg_int="${bg_int#origin/}"
+          if [ "$bg_int" != HEAD ] && [ "$bg_current" != "$bg_int" ]; then
+            printf 'FAIL: P0-A %s runs only on the integration branch %s (current: %s).\n' \
+              "$bg_phase" "$bg_int" "${bg_current:-detached HEAD}" >&2
+            exit 1
+          fi
+        fi
+      elif [ "$bg_current" != "feature/$slug" ]; then
+        printf 'FAIL: %s for %s runs only on feature/%s (current: %s).\n' \
+          "$bg_phase" "$slug" "$slug" "${bg_current:-detached HEAD}" >&2
+        if git show-ref --verify --quiet "refs/heads/feature/$slug"; then
+          printf '  Open the feature/%s worktree (git worktree list) and run this there.\n' "$slug" >&2
+        else
+          printf '  No feature/%s branch exists: /v0-intake %s must finish its branch step first (ask the user to authorise the branch, then sh .agents-v0/scripts/feature-worktree.sh %s), then work in the folder it prints.\n' \
+            "$slug" "$slug" "$slug" >&2
+        fi
+        printf '  Do not set in_progress, approve, or commit this story on the integration branch.\n' >&2
+        exit 1
+      fi
+    fi
+    ;;
+esac
+
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
@@ -728,4 +779,15 @@ print(
     f"Wrote {out} (lastApproved={last_approved or '-'} "
     f"active={active_phase or '-'} status={active_status or '-'} tier={tier})"
 )
+# kitfix-20261031-branch-guard: the branch step is its own turn, after the Intake approval.
+_slug = os.environ.get("HOOK_SLUG", "")
+if (
+    cli_approve == "intake"
+    and not (onboarding or maintain_note or program_doc)
+    and not _slug.startswith("p0-a")
+):
+    print(
+        f"Next: ask the user to authorise branch feature/{_slug}, and stop. After that reply, run "
+        f"sh .agents-v0/scripts/feature-worktree.sh {_slug}. /v0-design refuses to start without it."
+    )
 PY

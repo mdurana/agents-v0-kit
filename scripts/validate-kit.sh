@@ -285,6 +285,13 @@ grep -Fq 'check-story-dependencies.sh' templates/.agents-v0/scripts/sync-feature
 grep -Fq 'check-database-runtime.sh' core/common/commands/v0-build.md || err "v0-build must run check-database-runtime.sh before DB-backed tests"
 grep -Fq 'check-database-runtime.sh' core/common/commands/v0-verify.md || err "v0-verify must run check-database-runtime.sh before DB-backed verify"
 grep -Fq 'check-release-evidence.sh' core/common/commands/v0-status.md || err "v0-status must cross-check release evidence before calling a story complete"
+# kitfix-20261031-branch-guard: the feature-branch rule is a script check, and every phase command says so.
+grep -Fq 'kitfix-20261031-branch-guard' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must refuse design/build/verify/release off feature/<feature> (kitfix-20261031-branch-guard)"
+for bgc in v0-design v0-build v0-verify; do
+  grep -Fq 'If no worktree has branch `feature/<feature>`' "core/common/commands/$bgc.md" || err "$bgc must stop when no feature/<feature> worktree exists"
+done
+grep -Fq 'kitfix-20261031-branch-guard' core/common/commands/v0-local-release.md || err "v0-local-release must stop when the story has no feature/<feature> branch"
+grep -Fq 'Do not run the script in the same turn as the Intake approval' core/common/commands/v0-intake.md || err "v0-intake must ask for branch authorisation in its own turn"
 grep -Eq '^\._\*$' templates/.gitignore || err "templates/.gitignore must ignore macOS AppleDouble files (._*)"
 [ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
 [ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"

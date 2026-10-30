@@ -114,6 +114,54 @@ grep -Fq '"lastApprovedPhase": "intake"' "$r/docs/agents-v0/requirements/orders.
   && pass "orders.state.json records lastApprovedPhase=intake" \
   || fail "orders.state.json records lastApprovedPhase=intake"
 
+expect_out "intake: --approve intake names the branch step as the next turn (kitfix-20261031-branch-guard)" \
+  'Next: ask the user to authorise branch feature/orders'
+
+# kitfix-20261031-branch-guard: after Intake, a feature story works only on feature/<feature>.
+expect_fail "branch guard: --active-phase design in_progress is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+expect_out "branch guard: the refusal names feature/orders and the branch step" \
+  'FAIL: design for orders runs only on feature/orders \(current: main\)'
+expect_out "branch guard: with no branch yet, the refusal points at /v0-intake" 'No feature/orders branch exists'
+expect_fail "branch guard: --active-phase build awaiting_approval is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase build --status awaiting_approval
+expect_fail "branch guard: --active-phase verify in_progress is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase verify --status in_progress
+expect_fail "branch guard: --active-phase release in_progress is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase release --status in_progress
+expect_fail "branch guard: --approve build is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --approve build
+expect_fail "branch guard: --verify-passed is refused on main" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --verify-passed true
+expect_pass "branch guard: recording blocked on main is allowed" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase build --status blocked --reason "Dependency P1-A not verified"
+expect_pass "branch guard: AGENTS_V0_SKIP_BRANCH_GUARD=1 skips the check (fixtures only)" "$r" \
+  env AGENTS_V0_SKIP_BRANCH_GUARD=1 sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+expect_pass "branch guard: clear the fixture's active phase" "$r" \
+  env AGENTS_V0_SKIP_BRANCH_GUARD=1 sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --clear-active
+git -C "$r" checkout -q -b feature/other
+expect_fail "branch guard: a different story branch is refused" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+expect_out "branch guard: an existing-but-elsewhere message is not printed for a missing branch" 'No feature/orders branch exists'
+git -C "$r" checkout -q main
+git -C "$r" branch -q feature/orders
+expect_fail "branch guard: still refused on main once feature/orders exists" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+expect_out "branch guard: with the branch present, the refusal points at its worktree" 'Open the feature/orders worktree'
+git -C "$r" checkout -q feature/orders
+expect_pass "branch guard: --active-phase design in_progress is allowed on feature/orders" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+P0="docs/agents-v0/requirements/p0-a-platform-skeleton.md"
+printf '# P0-A\nStory: P0-A\nMilestone: P0\n' > "$r/$P0"
+expect_fail "branch guard: P0-A verify is refused off the integration branch" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$P0" --active-phase verify --status in_progress
+expect_out "branch guard: the P0-A refusal names the integration branch" 'P0-A verify runs only on the integration branch main'
+git -C "$r" checkout -q main
+expect_pass "branch guard: P0-A verify is allowed on the integration branch" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$P0" --active-phase verify --status in_progress
+mv "$r/$P0" "$tmp/p0-a.md.moved"; mv "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.state.json" "$tmp/p0-a.state.moved"
+git -C "$r" checkout -q feature/orders
+
 mkdir -p "$r/docs/agents-v0/verify/orders" && printf '# Quality gate: orders\nCritical: 0\n' > "$r/docs/agents-v0/verify/orders/quality-gate.md"
 expect_pass "verify: sync-feature-state approves verify and sets verifyPassed=true" "$r" \
   sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --approve design --approve build --approve verify --verify-passed true --clear-active
