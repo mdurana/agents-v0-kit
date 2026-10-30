@@ -113,6 +113,13 @@ if git show-ref --verify --quiet "refs/heads/${branch}"; then
   fi
 fi
 
+# kitfix-20261031-gate-commit: a squash-released branch is never an ancestor of the integration branch;
+# its squash commit names it (Story-Branch trailer). Do not check it out again.
+if git show-ref --verify --quiet "refs/heads/${branch}" \
+   && git log --first-parent --format=%B "$base" 2>/dev/null | grep -Eq "^Story-Branch:[[:space:]]*${branch}[[:space:]]*\$"; then
+  printf 'FAIL: %s was already squash-merged into %s. Do not check it out. Start /v0-maintain for a fix or a small change.\n' "$branch" "$base" >&2
+  exit 1
+fi
 existing=""
 if git show-ref --verify --quiet "refs/heads/${branch}"; then
   existing="$(git worktree list --porcelain | awk -v want="branch refs/heads/${branch}" '

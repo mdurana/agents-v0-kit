@@ -50,3 +50,34 @@ Old P1-B finding (`fix-and-resume.md` §5.6), still open after run 20261029-1629
 - Checked by hand on 2026-10-31 03:18 Asia/Manila with JDK 21: the repacked skeleton plus a `SmokeIT` ran 10 Surefire + 1 Failsafe tests under `mvnw verify` and the check printed OK; with the old pom the same tree ran 10 tests, skipped `SmokeIT`, and the check failed naming `com.example.app.SmokeIT`.
 How to check: `sh scripts/test-tests-ran.sh` prints `ok: an *IT class with no report fails (P1-B: no Failsafe)` and `test-tests-ran: OK`.
 Not in this fix: a Vitest/Jest equivalent for the frontend (no standard report file to read).
+
+## kitfix-20261031-gate-commit
+
+Asked by Marlon (2026-10-31 03:05 Asia/Manila; replaces D10): commit on every approved gate. Found by e2e run 20261029-1629: the harness's "commit pending files" fallback (SEMI-SYNTHETIC) made most build gates, P1-C and P1-E design evidence included, and a failed phase could only be rolled back to the previous story's END snapshot, losing the story's earlier approved phases.
+- New `templates/.agents-v0/scripts/check-gate-commit.sh` (seeded by `scripts/install.sh`):
+  - default mode, run by `sync-feature-state.sh --active-phase X --status in_progress` when no phase is in flight: exit 1 when the last approved phase is not committed (state file untracked or its approval not in HEAD, or uncommitted changes; `*.lock` and `AGENTS_V0_COMMIT_CHECK_IGNORE` prefixes ignored). It names secret-looking paths (`.env`, keys) as never-to-commit and prints the gate commit.
+  - `--release`, run by `--approve release` for a non-P0-A feature story: the branch's committed state has Verify approved, `verifyPassed: true` and release awaiting approval, its worktree is clean, and the index holds the branch tip (after `git merge --squash`).
+  - `--message <phase>`: prints `git add -A && git commit -m "<story>: <phase> approved"` (story id from `Story:` or the milestone row); program and onboarding phases add `git tag -a <phase>-v<n>`; a feature release writes the squash message with trailers `Story-Branch: feature/<feature>` and `Story-Tip: <sha>` to the git dir and prints `git commit -F <file>`.
+  - `AGENTS_V0_SKIP_COMMIT_CHECK=1` skips it (fixtures only).
+- `sync-feature-state.sh`: runs the checks above and prints the gate commit after every `--approve` (Intake: "in the branch turn, in the new worktree").
+- `check-release-evidence.sh`: a squash release counts as merged when the integration branch has a `Story-Branch` commit whose `Story-Tip` is still the branch tip and that holds the branch's files outside `docs/agents-v0/`; commits after the squash fail as before.
+- `feature-worktree.sh`: refuses to check out a squash-released branch.
+- `core/common/hooks/hook-policy.py`: `git commit --amend` always asks ("gate commits are never amended").
+- Commands: v0-intake (intake commit in the branch turn), v0-design, v0-build, v0-verify (commit the gate on `feature/<feature>`), v0-local-release (release commit on the branch, then `git merge --squash`, one squash commit), v0-roadmap, v0-architecture, v0-plan, v0-onboard (one commit each on the integration branch, tag `<phase>-v<n>`, a revision bumps the tag). Also `local-release` skill, `release-manager`, `workflow-orchestration.mdc`, `agents-v0-kit.md`, `AGENTS.md`.
+- Tests: new `scripts/test-gate-commit.sh` (project phases with tags, intake in the branch turn, design/build/verify gates, release refusals, squash commit with trailers, check-release-evidence on a squash and on a moved branch, feature-worktree refusal, secrets, skip flag); `scripts/test-command-flows.sh` (refusal before the intake commit); `scripts/test-hooks.sh` (`--amend`, `-F`, `merge --squash` ask).
+How to check: `sh scripts/test-gate-commit.sh` prints `test-gate-commit: OK`; `sh scripts/validate-kit.sh` runs it.
+Not in this fix: maintenance notes keep `git merge --no-ff maintain/<id>`; remote `/v0-release` (MR) is unchanged.
+
+## kitfix-20261031-traceability
+
+Asked by Marlon (2026-10-31 03:12 Asia/Manila, part of fix 5): cheap, deterministic gate-to-gate consistency checks at each approval. Found by e2e run 20261029-1629: P2-F and P2-P wrote 7 ACs where the plan said 8, and nothing tied ACs to the design, the contract to code and tests, or ACs to passing tests.
+- New `templates/.agents-v0/scripts/check-traceability.sh <design|build|verify> <requirements>` (seeded by `scripts/install.sh`), run by `sync-feature-state.sh --approve design|build|verify`:
+  - T1 every `### AC-<n>` in design.md (blames design); T2 AC count vs milestone `Size` (blames intake; a `## Proposed split` or `Plan deviation:` line excuses it; this is the H6 check); T3 no unknown AC ids in design.md (design);
+  - T4 every `operationId` / path of the design `openapi.yaml` has code under `app/`; T5 and a test that names it or calls the path (both blame build);
+  - T6 every AC has a passing row in `quality-gate.md`; blame = design (not traced), build (no test names it) or verify.
+  - Output `TRACE <WARN|FAIL> <check> gate=<gate> earliest_bad_phase=<phase> artifact=<file>: <detail>`, saved in `docs/agents-v0/requirements/<feature>.trace.json` (committed with the gate; the e2e harness reads it to pick the rollback gate).
+  - D8: `AGENTS_V0_TRACE_MODE=warn` by default (exit 0); `fail` refuses the approval.
+- Commands v0-design, v0-build, v0-verify: report every `TRACE WARN` line at the gate.
+- Tests: `scripts/test-gate-commit.sh` (T1–T6, warn and fail modes, trace.json earliest bad phase).
+How to check: `sh scripts/test-gate-commit.sh` prints `ok: T2: 2 ACs vs plan Size 3, blamed on intake` and `test-gate-commit: OK`.
+Not in this fix: event contracts (`asyncapi.yaml`) and UX specs are not traced; switch to `AGENTS_V0_TRACE_MODE=fail` after the V3 rerun (D8).

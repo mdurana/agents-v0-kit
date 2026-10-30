@@ -40,6 +40,8 @@ Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if ano
 6. **Stop** and present the Verify reports (`quality-gate.md`, `vapt-checklist.md`, `code-review.md`) to the user. After explicit user approval:
    - Update that phase-result file to `status: approved`.
    - Run `sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --approve verify <artifact>`.
+   - <!-- kitfix-20261031-traceability --> The approval runs `check-traceability.sh verify`: every `AC-<n>` needs a passing row in `quality-gate.md` (T6). A missing or failing AC is blamed on the earliest phase where it is lost (Design when `design.md` does not trace it, Build when no test names it, else Verify). Report each `TRACE WARN` line to the user.
+   - <!-- kitfix-20261031-gate-commit --> **Commit the gate on `feature/<feature>`** with the command the script prints (`git add -A && git commit -m "<story>: verify approved"`), one commit, never `--amend`. `/v0-local-release` does not start while Verify work is uncommitted.
    - Next command: `/v0-local-release` (primary local workflow) or `/v0-release` (optional remote MR workflow).
 
 ## Rules

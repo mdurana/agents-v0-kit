@@ -201,6 +201,43 @@ case "$art" in
     ;;
 esac
 
+# Gate commits (kitfix-20261031-gate-commit). Every approved gate is one commit (check-gate-commit.sh):
+# a new phase does not start while the last approved phase is uncommitted, and a feature story's release
+# is approved only after feature/<feature> is committed and squash-staged in the integration checkout.
+# AGENTS_V0_SKIP_COMMIT_CHECK=1 skips both (kit fixtures only).
+gc_script="$(dirname "$0")/check-gate-commit.sh"
+if [ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" != 1 ] && [ -f "$gc_script" ]; then
+  if [ "$set_active" = 1 ] && [ "$active_status" = in_progress ]; then
+    gc_prev_active="$(python3 -c 'import json,sys
+try: print((json.load(open(sys.argv[1])).get("activePhase") or ""))
+except Exception: print("")' "$state" 2>/dev/null || true)"
+    if [ -z "$gc_prev_active" ]; then
+      sh "$gc_script" "$art" >/dev/null || exit 1
+    fi
+  fi
+  case "$art" in
+    docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
+      if [ "$approve_lc" = release ]; then
+        sh "$gc_script" --release "$art" >/dev/null || exit 1
+      fi
+      ;;
+  esac
+fi
+
+# Gate-to-gate consistency (kitfix-20261031-traceability): at the Design, Build and Verify approvals,
+# check-traceability.sh checks the ids the earlier gates approved (warn first; AGENTS_V0_TRACE_MODE=fail
+# makes a failure refuse the approval) and records them in <feature>.trace.json for this gate's commit.
+case "$art" in
+  docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
+    case "$approve_lc" in
+      design|build|verify)
+        tr_script="$(dirname "$0")/check-traceability.sh"
+        if [ -f "$tr_script" ]; then sh "$tr_script" "$approve_lc" "$art" || exit 1; fi
+        ;;
+    esac
+    ;;
+esac
+
 base_commit=""
 if command -v git >/dev/null 2>&1; then
   base_commit="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
@@ -890,3 +927,19 @@ if (
         f"sh .agents-v0/scripts/feature-worktree.sh {_slug}. /v0-design refuses to start without it."
     )
 PY
+
+# kitfix-20261031-gate-commit: say how to commit the gate that was just approved.
+if [ -n "$approve_lc" ] && [ -f "$gc_script" ]; then
+  gc_cmd="$(sh "$gc_script" --message "$approve_lc" "$art" 2>/dev/null || true)"
+  if [ -n "$gc_cmd" ]; then
+    gc_p0a=0
+    case "$slug" in p0-a-*|p0-a) gc_p0a=1 ;; esac
+    grep -Eiq '^[[:space:]]*(\*\*)?Story(\*\*)?:[[:space:]]*(\*\*)?P0-A([^A-Za-z0-9]|$)' "$art" 2>/dev/null && gc_p0a=1
+    case "$art:$approve_lc:$gc_p0a" in
+      *docs/agents-v0/requirements/*:intake:0)
+        printf 'Commit the Intake gate in the branch turn, in the new worktree after feature-worktree.sh: %s\n' "$gc_cmd" ;;
+      *)
+        printf 'Next: commit this gate (one commit, never amend): %s\n' "$gc_cmd" ;;
+    esac
+  fi
+fi

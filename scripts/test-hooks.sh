@@ -48,6 +48,9 @@ shell_case 'git push origin main --force' block
 shell_case 'git -c credential.helper= push --force' block
 shell_case 'echo $(git push --force)' block
 shell_case 'git commit -m x' ask
+shell_case 'git commit --amend --no-edit docs/agents-v0/verify/x/quality-gate.md' ask   # kitfix-20261031-gate-commit: never amend a gate
+shell_case 'git commit -F .git/agents-v0-gate-msg.txt' ask
+shell_case 'git merge --squash feature/orders' ask
 shell_case 'cat .env' block
 shell_case 'cat .env.example' allow
 shell_case 'rm -rf dir' block

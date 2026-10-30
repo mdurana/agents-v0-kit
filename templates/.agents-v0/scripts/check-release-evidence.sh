@@ -13,6 +13,8 @@
 #         Also exit 1 when feature/<feature> still exists and is not fully merged into the
 #         integration branch (resolve-integration-branch.sh): commits were made on the feature
 #         branch after the merge (kitfix-20261029-step4-p1e). Report it; the human decides how to reconcile.
+#         A squash merge (kitfix-20261031-gate-commit: trailers Story-Branch / Story-Tip on the integration
+#         branch) counts as merged when the branch still ends at Story-Tip and the squash holds its files.
 set -eu
 
 art="${1:-}"
@@ -73,6 +75,39 @@ if git("rev-parse", "--is-inside-work-tree").returncode == 0 \
         print(f"FAIL: {resolver} is missing; cannot check that {branch} is merged", file=sys.stderr)
         raise SystemExit(1)
     integration = subprocess.run(["sh", resolver], capture_output=True, text=True, check=False).stdout.strip() or "HEAD"
+    # kitfix-20261031-gate-commit: the kit squash-merges. A squash commit on the integration branch carries
+    # "Story-Branch: feature/<feature>" and "Story-Tip: <sha>"; the branch must still end at that tip and the
+    # squash commit must hold the branch's files (outside docs/agents-v0/, which the release approval edits).
+    tip = git("rev-parse", branch).stdout.strip()
+    squash = None
+    for rec in git("log", "--first-parent", "--format=%H%x1f%B%x1e", integration).stdout.split("\x1e"):
+        if "\x1f" not in rec: continue
+        sha, body = rec.strip("\n").split("\x1f", 1)
+        if re.search(rf"^Story-Branch:\s*{re.escape(branch)}\s*$", body, re.M):
+            m = re.search(r"^Story-Tip:\s*([0-9a-f]{7,40})\s*$", body, re.M)
+            squash = (sha, m.group(1) if m else "")
+            break
+    if squash and git("merge-base", "--is-ancestor", branch, integration).returncode != 0:
+        sha, stip = squash
+        if not stip or not tip.startswith(stip):
+            ahead = git("rev-list", "--oneline", f"{stip}..{branch}").stdout.strip().splitlines() if stip else []
+            print(f"FAIL: {slug} was squash-merged at {sha[:12]} from {branch}@{(stip or '?')[:12]}, but {branch} now ends at "
+                  f"{tip[:12]} ({len(ahead)} commit(s) after the squash):", file=sys.stderr)
+            for line in ahead[:10]:
+                print(f"  - {line}", file=sys.stderr)
+            print(f"Do not commit to {branch} after the release, do not merge it again, and do not name the next story; "
+                  f"the human decides how to reconcile it.", file=sys.stderr)
+            raise SystemExit(1)
+        base = git("merge-base", f"{sha}^", tip).stdout.strip()
+        differ = [p for p in git("diff", "--name-only", base, tip).stdout.splitlines()
+                  if p and not p.startswith("docs/agents-v0/")
+                  and git("diff", "--quiet", sha, tip, "--", p).returncode != 0]
+        if differ:
+            print(f"FAIL: squash commit {sha[:12]} of {branch} does not hold the branch's version of: "
+                  + ", ".join(differ[:10]), file=sys.stderr)
+            raise SystemExit(1)
+        print(f"OK: release evidence present for {slug} (squash-merged at {sha[:12]})")
+        raise SystemExit(0)
     if git("merge-base", "--is-ancestor", branch, integration).returncode != 0:
         ahead = git("rev-list", "--oneline", f"{integration}..{branch}").stdout.strip().splitlines()
         print(f"FAIL: {slug} is released, but {branch} is not fully merged into {integration} "

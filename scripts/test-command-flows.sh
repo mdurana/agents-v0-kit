@@ -149,8 +149,16 @@ expect_fail "branch guard: still refused on main once feature/orders exists" "$r
   sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
 expect_out "branch guard: with the branch present, the refusal points at its worktree" 'Open the feature/orders worktree'
 git -C "$r" checkout -q feature/orders
+# kitfix-20261031-gate-commit: the next phase does not start until the last approved gate is committed.
+expect_fail "gate commit: design in_progress is refused while the intake gate is uncommitted" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+expect_out "gate commit: the refusal names the gate and the commit to make" \
+  'FAIL: intake was approved for orders, but its work is not committed'
+expect_out "gate commit: the refusal prints the gate commit command" 'git commit -m "orders: intake approved"'
+git -C "$r" add -A && git -C "$r" -c user.name=t -c user.email=t@example.invalid commit -qm "orders: intake approved"
 expect_pass "branch guard: --active-phase design in_progress is allowed on feature/orders" "$r" \
   sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --active-phase design --status in_progress
+git -C "$r" add -A && git -C "$r" -c user.name=t -c user.email=t@example.invalid commit -qm "orders: design in progress (fixture)"
 P0="docs/agents-v0/requirements/p0-a-platform-skeleton.md"
 printf '# P0-A\nStory: P0-A\nMilestone: P0\n' > "$r/$P0"
 expect_fail "branch guard: P0-A verify is refused off the integration branch" "$r" \

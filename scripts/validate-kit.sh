@@ -276,7 +276,7 @@ grep -Fq 'host-tools-macports.sh' scripts/install.sh || err "install.sh must see
 grep -Fq 'openjdk21' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document MacPorts openjdk21 for Intel Macs"
 grep -Fq 'host-tools-macports.sh' core/common/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
 # kitfix 2026-10-22: deterministic gates and no-root database runtime discovery.
-for ks in check-story-dependencies.sh check-release-evidence.sh check-database-runtime.sh check-tests-ran.sh; do
+for ks in check-story-dependencies.sh check-release-evidence.sh check-database-runtime.sh check-tests-ran.sh check-gate-commit.sh check-traceability.sh; do
   [ -x "templates/.agents-v0/scripts/$ks" ] || err "templates/.agents-v0/scripts/$ks missing or not executable"
   grep -Fq ".agents-v0/scripts/$ks" scripts/install.sh || err "install.sh must seed .agents-v0/scripts/$ks"
 done
@@ -323,6 +323,20 @@ grep -Fq 'check-tests-ran.sh' core/common/commands/v0-verify.md || err "v0-verif
 grep -Fq 'maven-failsafe-plugin' templates/app/backend/pom.xml || err "the P0 skeleton pom must run *IT tests with maven-failsafe-plugin"
 grep -Fq 'maven-failsafe-plugin' core/java/starters/maven/quality-plugins.xml || err "the Java quality-plugins starter must include maven-failsafe-plugin"
 sh scripts/test-tests-ran.sh || err "scripts/test-tests-ran.sh failed"
+# kitfix-20261031-gate-commit / -traceability: one commit per approved gate, squash release, gate-to-gate checks.
+grep -Fq 'check-gate-commit.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must run check-gate-commit.sh (kitfix-20261031-gate-commit)"
+grep -Fq 'check-traceability.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must run check-traceability.sh at design/build/verify approval"
+grep -Fq 'Story-Branch' templates/.agents-v0/scripts/check-release-evidence.sh || err "check-release-evidence must accept a squash release (Story-Branch trailer)"
+grep -Fq 'already squash-merged' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must refuse a squash-released branch"
+for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-roadmap v0-architecture v0-plan v0-onboard; do
+  grep -Fq 'kitfix-20261031-gate-commit' "core/common/commands/$c.md" || err "$c.md must state the gate commit (kitfix-20261031-gate-commit)"
+done
+for c in v0-design v0-build v0-verify; do
+  grep -Fq 'kitfix-20261031-traceability' "core/common/commands/$c.md" || err "$c.md must state its traceability check (kitfix-20261031-traceability)"
+done
+grep -Fq 'git merge --squash feature/<feature>' core/common/commands/v0-local-release.md || err "v0-local-release must squash-merge a feature story"
+[ -f scripts/test-gate-commit.sh ] || err "scripts/test-gate-commit.sh missing"
+sh scripts/test-gate-commit.sh || err "scripts/test-gate-commit.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"

@@ -43,7 +43,8 @@ Before editing shared files or source code, check `git status` (`workflow-orches
 9. **Stop** and present the Build report and `file:line` citations to the user. After explicit user approval:
    - Update `<feature>.phase-result.md` to `status: approved`.
    - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/<feature>.md`.
-   - Commit the changes only when the user authorizes `git commit`. Do not advance to `/v0-verify` without Build approval.
+   - <!-- kitfix-20261031-traceability --> The approval runs `check-traceability.sh build`: every `operationId` / path of `docs/agents-v0/design/<feature>/openapi.yaml` must have code under `app/` (T4) and at least one test that names it or calls the path (T5). Report each `TRACE WARN` line (check, earliest bad phase) to the user.
+   - <!-- kitfix-20261031-gate-commit --> **Commit the gate on `feature/<feature>`** (P0-A: on the integration branch) with the command the script prints (`git add -A && git commit -m "<story>: build approved"`), only when the user authorizes `git commit`. One commit for the gate, never `--amend`. Do not advance to `/v0-verify` without Build approval; `--active-phase verify --status in_progress` refuses while Build work is uncommitted.
 
 ## Rules
 `workflow-orchestration.mdc`, `backend.mdc`, `frontend-web.mdc`, `vapt.mdc`, `vapt-webapp.mdc`, `api-and-events.mdc`, `security-baseline.mdc`, `quality-and-testing.mdc`.

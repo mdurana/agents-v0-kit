@@ -18,7 +18,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | `docs/agents-v0/design/<feature>/` (contracts, ADR, diagrams, UX spec, mockups, `review.md`); ARC record when `Material: yes` |
 | Build | `/v0-build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/agents-v0/build/<feature>/plan.md` & `build-report.md` |
 | Verify | `/v0-verify` | test-engineer, then security-reviewer and code-reviewer together | quality-gate, vapt-review, pr-review | `docs/agents-v0/verify/<feature>/` (`quality-gate.md`, `vapt-checklist.md`, `code-review.md`) + `verifyPassed` in `<feature>.state.json` |
-| Local release (primary) | `/v0-local-release` | release-manager | local-release | Native stack verify + user-authorized local branch merge (`git merge --no-ff`) + `release` in `<feature>.state.json` |
+| Local release (primary) | `/v0-local-release` | release-manager | local-release | Native stack verify + user-authorized local squash merge (`git merge --squash`; one commit per approved gate before it) + `release` in `<feature>.state.json` |
 | Remote release (optional) | `/v0-release` | release-manager | release-pr | Merge request ready (GitLab); completion after human-authorized merge |
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` & `state.json`; routes to Verify |
 | Trivial fixes | `/v0-triage` | maintenance-engineer | doc-sync, dependency-upgrade | User-confirmed doc/version fix (`tier: "trivial"`); abbreviated Verify |

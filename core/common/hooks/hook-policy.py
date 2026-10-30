@@ -460,6 +460,9 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
                     return "block", "git force-push is not allowed (ai-agent-conduct.mdc)."
             return "ask", "git push requires explicit user approval."
         if sub == "commit":
+            # kitfix-20261031-gate-commit: one commit per approved gate; a gate commit is never amended.
+            if "--amend" in parts[sub_idx + 1 :]:
+                return "ask", "git commit --amend rewrites a commit; gate commits are never amended (make a new commit)."
             if _commit_paths_are_evidence(parts):
                 return "allow", ""
             return "ask", "git commit requires explicit user approval."
