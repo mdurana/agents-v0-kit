@@ -306,13 +306,36 @@ gate_pending(){ local g; gfile="$(comm -13 "$RUN/state-before-$1.tsv" "$RUN/stat
 # Sets RUN (evidence dir), RUN_END (NORMAL-END|GATE-HELD|CAP|STALL|INFRA|USAGE|AUTH|AGENT-ERROR|MAX-TURNS), GATES_SENT.
 drive_run(){
   local name="$1" ws="$2" prompt="$3" ctx="$4" allowed="$5" tmo="$6" n=1 try=0 k gate gfile line text allow answers sent
+  local pg="${IN_STORY_GATE:-}" pgf="${IN_STORY_GATE_FILE:-}" mfile   # STAGED HARNESS-FIX 2026-10-30 (in-story resume)
   while :; do
     while [ -d "$EVID/$name-$n" ]; do n=$((n+1)); done; RUN="$EVID/$name-$n"; mkdir -p "$RUN"; WS="$ws"
     printf 'name=%s\nworkspace=%s\ncontext=%s\nallowed=%s\nkit_ref=%s\nkit_label=%s\nstart=%s Asia/Manila\n' "$name" "$ws" "$ctx" "$allowed" "${KIT_FIX_REF:-$KIT_REF}" "${KIT_LABEL:-?}" "$(ts)" > "$RUN/run.meta"
     tar -C "$TEST_ROOT" --exclude=node_modules --exclude=target -czf "$RUN/pre.tgz" work
     CHAT="$(create_agent_chat "$ws" 2>>"$RUN/create-chat.err")"; echo "$CHAT" > "$RUN/chat.id"
     RUN_DEADLINE=$(( $(now) + tmo )); GATES_SENT=""; answers=0; sent=""
-    run_turn 1 "$prompt" -; k=1
+    if [ -n "$pg" ]; then
+      # STAGED HARNESS-FIX 2026-10-30 (in-story resume, approved by Sensei 21:14 Asia/Manila; not yet applied): the run
+      #   started with the gate already awaiting_approval (the earlier attempt stopped after the agent asked for approval
+      #   and before the harness sent it). Turn 1 sends that gate's scripted approval (approval_for, same allowlist, same
+      #   approvals.log row, same harness_complete and release post-merge step as below), plus one context line because
+      #   this is a new chat. The loop below then handles turn k as usual (USAGE/AUTH -> HALT, STALL/INFRA -> fresh
+      #   retry from pre.tgz, which sends the approval again). Only drive_story sets IN_STORY_GATE, only on the first
+      #   run of the in-story resume story.
+      line="$(approval_for "$pg")"; text="${line%%$'\t'*}"; allow="${line#*$'\t'}"
+      sent="|$pgf:$pg|"; GATES_SENT=" $pg"
+      printf '%s\tturn-1\tSENT\tgate=%s\tstate=%s\ttext=%s\tallow=%s\tin-story-resume\n' "$(ts)" "$pg" "$pgf" "$text" "$allow" >> "$RUN/approvals.log"
+      post IN-STORY-GATE "run=${RUN##*/} $pg was awaiting approval at resume start: turn 1 sends the scripted approval"
+      run_turn 1 "$text"$'\n\n'"(Harness note: this is a new chat after a harness resume. Story ${STORY_SLUG:-?}: the $pg gate in ${pgf#"$ws"/} is awaiting approval; the line above is that approval.)" "$allow"; k=1
+      harness_complete "$pg" "$allow" "$pgf"
+      if [ "$pg" = release ] && [ "$SEMI" = 1 ] && [ -n "${STORY_SLUG:-}" ] && [ "$k" -lt "$MAX_TURNS" ]; then
+        mfile="$MAIN/docs/agents-v0/requirements/$STORY_SLUG.state.json"
+        if ! has_appr "$mfile" release; then
+          WS="$MAIN"
+          printf '%s\tturn-%s\tSENT\tgate=release-post-merge\tstate=%s\ttext=%s\tallow=%s\n' "$(ts)" "$((k+1))" "$mfile" "$text" "$allow" >> "$RUN/approvals.log"
+          sleep "${TURN_PAUSE_SEC:-5}"; k=$((k+1)); run_turn "$k" "$text" "$allow"; harness_complete "$pg" "$allow" "$mfile"
+        fi
+      fi
+    else run_turn 1 "$prompt" -; k=1; fi
     while :; do
       # HARNESS-FIX 2026-10-29 (gate-aware end of turn): last run, P1-A build tries 4 and 5 had already set the story
       #   state to build/awaiting_approval when the agy stream dropped and the turn was classed STALL. The harness
@@ -449,6 +472,14 @@ next_cmd(){ # <state file> <kind> <is_p0a>  -> phase command word or DONE / STUC
                   echo "STUCK:awaiting_approval($ap) at run start"; return;; esac
   if [ "$kind" = maintain ]; then case "$la" in ""|null) echo maintain;; maintain) echo verify;; verify) echo local-release;; *) echo "STUCK:$la";; esac
   else case "$la" in ""|null) [ "$p0a" = 1 ] && echo build || echo intake;; intake) echo design;; design) echo build;; build) echo verify;; verify) echo local-release;; *) echo "STUCK:$la";; esac; fi; }
+# in_story_pending_gate <state file> (STAGED HARNESS-FIX 2026-10-30, in-story resume): prints the phase whose gate is
+#   awaiting_approval, when it is a gate drive_story allows and is not yet in approvedPhases; else returns 1.
+in_story_pending_gate(){ local f="$1" ap
+  [ -f "$f" ] && [ "$(jq -r '.activeStatus//""' "$f" 2>/dev/null)" = awaiting_approval ] || return 1
+  ap="$(jq -r '.activePhase//""' "$f")"
+  case " intake design build verify maintain release " in *" $ap "*) ;; *) return 1;; esac
+  ! has_appr "$f" "$ap" || return 1
+  echo "$ap"; }
 # drive_story <step> <kind feature|maintain> <slug-or-id> <is_p0a 0|1> [<extra text for the first prompt>]
 drive_story(){
   local step="$1" kind="$2" slug="$3" p0a="$4" extra="${5:-}" runs=0 f cmd ws prev="" prev_ws="" cur same=0 tmo prompt
@@ -458,6 +489,16 @@ drive_story(){
     if [ "$kind" = maintain ]; then f="$(maint_state "$slug")"; ws="$(wt_for_branch "maintain/$slug")"; else f="$(story_state "$slug")"; ws="$(wt_for_branch "feature/$slug")"; fi
     [ -n "$ws" ] || ws="$MAIN"
     cmd="$(next_cmd "$f" "$kind" "$p0a")"
+    # STAGED HARNESS-FIX 2026-10-30 (in-story resume): on the first run of the story an in-story resume continues
+    #   (run-plan.sh sets CRS_IN_STORY_SLUG only after chain_resume_prepare passed), a gate that is already
+    #   awaiting_approval is approved with the scripted text instead of STUCK. One-shot: later runs use next_cmd as is.
+    IN_STORY_GATE=""; IN_STORY_GATE_FILE=""
+    if [ "$runs" = 0 ] && [ "$kind" = feature ] && [ "$p0a" = 0 ] && [ -n "${CRS_IN_STORY_SLUG:-}" ] && [ "$slug" = "$CRS_IN_STORY_SLUG" ]; then
+      case "$cmd" in STUCK:awaiting_approval*)
+        if IN_STORY_GATE="$(in_story_pending_gate "$f")"; then IN_STORY_GATE_FILE="$f"; cmd="$IN_STORY_GATE"; [ "$cmd" = release ] && cmd=local-release
+        else IN_STORY_GATE=""; fi;; esac
+      CRS_IN_STORY_SLUG=""
+    fi
     case "$cmd" in DONE) return 0;; STUCK:*) post STUCK "$slug $cmd"; echo "$cmd" > "$EVID/$step-$slug.stuck"; return 1;; esac
     if [ "$cmd" = local-release ] && [ "$p0a" = 0 ]; then
       local br="feature/$slug"; [ "$kind" = maintain ] && br="maintain/$slug"
@@ -471,6 +512,7 @@ drive_story(){
     tmo=$RUN_TIMEOUT; [ "$p0a" = 1 ] && tmo=$RUN_TIMEOUT_P0A
     drive_run "$step-$slug-$cmd" "$ws" "$prompt" "$( [ "$cmd" = local-release ] && echo release || echo "$cmd")" \
       "intake design build verify maintain release branch" "$tmo"
+    IN_STORY_GATE=""; IN_STORY_GATE_FILE=""
     echo "${RUN##*/} $RUN_END gates:${GATES_SENT:- none}" >> "$EVID/$step-$slug.runs"
     runs=$((runs+1))
   done; post STUCK "$slug MAX_RUNS_PER_STORY reached"; return 1; }

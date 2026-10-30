@@ -51,6 +51,16 @@ if [ -n "$CRS" ]; then
   [ "$RESUME_REASON" != kit-fix ] || { echo "--resume-from-story is refused with --reason kit-fix (resume step 4 from its first story instead)" >&2; exit 3; }
   case "$CRS_NOTE" in *$'\t'*|*$'\n'*) echo "CHAIN_RESUME_NOTE must be one line without tabs" >&2; exit 3;; esac
 fi
+# STAGED HARNESS-FIX 2026-10-30 (in-story chain resume after ANY failure; approved by Sensei 21:14 Asia/Manila; not yet
+#   applied): CHAIN_RESUME_IN_STORY=1 keeps the resume story's feature branch, worktree and approved phases instead of
+#   requiring them to be absent; drive_story then continues at the phase the story's state file names (next_cmd), in a
+#   new agent chat. If that phase is already awaiting_approval, the first run sends the scripted approval
+#   (lib.sh in_story_pending_gate / drive_run). Works with every resume reason that --resume-from-story accepts
+#   (harness-fix, env-fix, agent-retry; kit-fix is refused there). Off by default; every resume env file sets it.
+#   Set without CHAIN_RESUME_FROM_STORY it is ignored (warning), so it is safe in any resume env file.
+CRS_IN_STORY="${CHAIN_RESUME_IN_STORY:-0}"; CRS_IN_STORY_SLUG=""
+case "$CRS_IN_STORY" in 0) ;; 1) [ -n "$CRS" ] || { echo "CHAIN_RESUME_IN_STORY=1 ignored: no CHAIN_RESUME_FROM_STORY" >&2; CRS_IN_STORY=0; };;
+  *) echo "CHAIN_RESUME_IN_STORY must be 0 or 1" >&2; exit 3;; esac
 mkdir -p "$TEST_ROOT"/{status,evidence,snapshots,results,trash,calib}
 exec 2> >(tee -a "$TEST_ROOT/status/runner-console.log" >&2)   # runner errors, read by triage.sh
 . "$HERE/lib.sh"
@@ -209,6 +219,10 @@ story_run(){
   printf -v "$var" '%s' "$id"; printf -v "${var}_SLUG" '%s' "$slug"; export "$var" "${var}_SLUG"
   before="$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)"
   STORY_H0="$(git -C "$MAIN" rev-parse HEAD)"
+  # STAGED HARNESS-FIX 2026-10-30 (in-story resume): if the kept branch is already merged (resume at local-release),
+  #   F1's "changed files since the story started" base is main before that merge, not main now.
+  if [ "$slug" = "${CRS_IN_STORY_SLUG:-}" ] && merged_into_main "feature/$slug"; then local mc; mc="$(main_merge_of "feature/$slug")"
+    [ -z "$mc" ] || STORY_H0="$(git -C "$MAIN" rev-parse "$mc^1")"; fi
   post STORY "step $st story $id ($slug)"
   drive_story "S$st" feature "$slug" 0
   chk "$st" "$id" H1 "$id released: intake design build verify release approved, verifyPassed, evidence, state committed" -- released_ok "$slug" 0 || ok=0
@@ -363,8 +377,10 @@ write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
 #   existing work/ is used as is and must pass the checks below); then every kept story must pass the harness's own
 #   released_ok + merged_into_main, main must be clean and not mid-merge, and the resume story must have no branch or
 #   worktree yet. Details in <attempt dir>/chain-resume-check.log.
-chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cslug
+chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cslug wtd nc pg cbr
   awk -F'\t' -v keep="$CRS_SKIP_IDS" 'index(" " keep, " " $2 " ")' "$A/story-ids.tsv" > "$RES/story-ids.tsv"
+  # STAGED HARNESS-FIX 2026-10-30 (in-story): restoring S4-<prev>-END would drop the story's work; refuse instead.
+  if [ "$CRS_IN_STORY" = 1 ] && [ ! -e "$WORK" ]; then echo "$(ts) FAIL in-story resume needs work/ in place (it would be restored from S4-$CRS_PREV-END and the story's work lost)" >> "$L"; return 1; fi
   if [ ! -e "$WORK" ]; then restore "S4-$CRS_PREV-END" || return 1
   else post RESUME-FROM-STORY "work/ present: used as is (must be the post-$CRS_PREV state), not restored"; fi
   cslug="$(awk -F'\t' -v id="$CRS" '$2==id{print $3; exit}' "$RES/chain.tsv")"
@@ -373,8 +389,20 @@ chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cs
       if released_ok "$sl" 0 && merged_into_main "feature/$sl"; then echo "OK   $id $sl released_ok + merged_into_main"; else echo "FAIL $id $sl"; ok=1; fi; done
     if clean_main; then echo "OK   main clean"; else echo "FAIL main not clean"; ok=1; fi
     if git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then echo "FAIL main has MERGE_HEAD"; ok=1; else echo "OK   no MERGE_HEAD"; fi
-    if git -C "$MAIN" rev-parse -q --verify "feature/$cslug" >/dev/null || [ -n "$(wt_for_branch "feature/$cslug")" ]; then echo "FAIL feature/$cslug branch or worktree exists"; ok=1; else echo "OK   no feature/$cslug branch or worktree"; fi
+    if [ "$CRS_IN_STORY" = 1 ]; then   # STAGED HARNESS-FIX 2026-10-30 (in-story chain resume, any failure)
+      wtd="$(wt_for_branch "feature/$cslug")"; nc="$(STORY_SLUG="$cslug" next_cmd "$(story_state "$cslug")" feature 0)"
+      cbr="$(git -C "$MAIN" rev-parse -q --short --verify "feature/$cslug" 2>/dev/null || echo absent)"
+      echo "IN-STORY $cslug branch=$cbr worktree=${wtd:-none} state=$(state_sem "$(story_state "$cslug")") next=$nc"
+      pg=""; case "$nc" in STUCK:awaiting_approval*) pg="$(in_story_pending_gate "$(story_state "$cslug")")" || pg="";; esac
+      if [ -n "$pg" ]; then echo "OK   in-story resume: $pg already awaiting approval; first run sends the scripted $pg approval (then /v0-<next phase>)"
+      else case "$nc" in DONE|STUCK:*) echo "FAIL in-story resume: next phase is '$nc' (released or stuck; see in-story-resume-procedure.md)"; ok=1;; *) echo "OK   in-story resume continues at /v0-$nc";; esac; fi
+      if [ -n "$wtd" ] && git -C "$wtd" rev-parse -q --verify MERGE_HEAD >/dev/null; then echo "FAIL worktree $wtd has MERGE_HEAD"; ok=1; fi
+      if [ "$cbr" != absent ] && merged_into_main "feature/$cslug" && [ "$nc" != local-release ]; then echo "FAIL feature/$cslug already merged into main"; ok=1; fi
+      if [ "$cbr" != absent ] && [ -z "$wtd" ] && ! merged_into_main "feature/$cslug"; then echo "FAIL feature/$cslug exists but has no worktree"; ok=1; fi
+      [ "$cbr" != absent ] || [ -n "$wtd" ] || echo "NOTE no feature/$cslug branch or worktree yet: the story starts from its state on main (nothing to keep)"
+    elif git -C "$MAIN" rev-parse -q --verify "feature/$cslug" >/dev/null || [ -n "$(wt_for_branch "feature/$cslug")" ]; then echo "FAIL feature/$cslug branch or worktree exists"; ok=1; else echo "OK   no feature/$cslug branch or worktree"; fi
     echo "main HEAD $(git -C "$MAIN" log -1 --format='%h %s')"; } >> "$L" 2>&1
+  [ "$ok" != 0 ] || [ "$CRS_IN_STORY" != 1 ] || CRS_IN_STORY_SLUG="$cslug"   # STAGED HARNESS-FIX 2026-10-30: read by drive_story / story_run
   return "$ok"; }
 failed_checks_of(){ awk -F'\t' -v s="$1" '$2==s && $5=="FAIL"{print $3"/"$4}' "$RES/checks.tsv" | sort -u | tr '\n' ' '; }
 stop_resume(){ printf '%s Asia/Manila %s\n' "$(ts)" "$*" >> "$RES/stop.txt"; post STOP "$*"; write_summary; exit 3; }
@@ -495,10 +523,10 @@ if [ -n "$RESUME_FROM" ]; then
       mv "$WORK" "$TEST_ROOT/trash/work.restart-$k"; mv "$KIT" "$TEST_ROOT/trash/kit.restart-$k"
     fi
   fi
-  printf 'resume_%s=%s step=%s%s reason=%s old_kit=%s new_kit=%s harness_sha=%s%s\n' "$k" "$(ts)" "$RESUME_STEP" "${RESUME_SCEN:+.$RESUME_SCEN}" "$RESUME_REASON" "$OLD_KIT_LABEL" "${KIT_LABEL:-?}" "$(cat "$HERE"/*.sh "$HERE"/*.py | sha256_cmd | cut -c1-12)" "${CRS:+ from_story=$CRS kept=\"$CRS_SKIP_IDS\" note=\"$CRS_NOTE\"}" >> "$RES/run.meta"
+  printf 'resume_%s=%s step=%s%s reason=%s old_kit=%s new_kit=%s harness_sha=%s%s\n' "$k" "$(ts)" "$RESUME_STEP" "${RESUME_SCEN:+.$RESUME_SCEN}" "$RESUME_REASON" "$OLD_KIT_LABEL" "${KIT_LABEL:-?}" "$(cat "$HERE"/*.sh "$HERE"/*.py | sha256_cmd | cut -c1-12)" "${CRS:+ from_story=$CRS kept=\"$CRS_SKIP_IDS\" note=\"$CRS_NOTE\"}${CRS_IN_STORY_SLUG:+ in_story=$CRS_IN_STORY_SLUG}" >> "$RES/run.meta"
   printf '%s\t%s\t%s\t%s\t%s\t\t\n' "$(ts)" "$k" "$RESUME_STEP" "$RESUME_REASON${CRS:+ (from story $CRS: $CRS_NOTE)}" "${KIT_LABEL:-?}" >> "$RES/fix-attempts.tsv"
   START=$RESUME_STEP; post RESUME "attempt $k from step $RESUME_STEP${RESUME_SCEN:+.$RESUME_SCEN} reason=$RESUME_REASON kit $OLD_KIT_LABEL -> ${KIT_LABEL:-?}"
-  [ -z "$CRS" ] || post RESUME-FROM-STORY "attempt $k step 4 chain resumes at $CRS; skipping released ${CRS_SKIP_IDS% } (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-$CRS_PREV-END; reason: $CRS_NOTE"
+  [ -z "$CRS" ] || post RESUME-FROM-STORY "attempt $k step 4 chain resumes at $CRS; skipping released ${CRS_SKIP_IDS% } (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-$CRS_PREV-END$( [ -n "$CRS_IN_STORY_SLUG" ] && echo " + $CRS in-story (branch, worktree and approved phases kept)"); reason: $CRS_NOTE"
 fi
 
 : > "$TEST_ROOT/RUNNING"; trap 'rm -f "$TEST_ROOT/RUNNING"' EXIT

@@ -219,3 +219,27 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - Kit gap (fixed in kit-src working tree, NOT committed, not in this run's kit cca2773): templates/.agents-v0/scripts/sync-feature-state.sh now dates approvals with the local clock (`time.localtime()`), the same clock as the decision-table dates. Python block compiles. Needs Marlon's approval to commit.
 - Rollback: work/ moved to trash/work-p2a-failed-20261030-0246 (with results/ and status/ copies); restored S4-P1-E-END-KIT-cca2773 (SHA256 OK); main 22c944f clean, no MERGE_HEAD, no p2-a branch/worktree. Old tmux session renamed old-run1629-p2a-failed-2.
 - Rerun: --resume-from-story P2-A, reason harness-fix, env ~/launch-resume-p2a-fix2.env. If P2-A fails again, stop after rollback and wait for Marlon.
+
+
+## 2026-10-30 21:30 Asia/Manila — in-story resume (committed on kitfix-20261031, 2026-10-31, opt-in): in-story resume of a failed chain story after ANY failure, approved by Sensei
+
+- Approval: Sensei (mdurana), voice, 2026-10-30 21:14 Asia/Manila: every rerun of a failed story resumes from the phase that stopped, keeping the story's branch, worktree and approved phases, instead of rolling back and restarting from intake; for any failure type, not only quota. USAGE (lasting quota) stays HALT and stops the run.
+- Status: STAGED only. It was prepared while attempt 10 was running (runner PID 723589), so scripts/run-plan.sh and scripts/lib.sh were NOT changed. Apply only when no runner is alive, per in-story-resume-procedure.md §7: backups `scripts/run-plan.sh.bak-20261030-instory` and `scripts/lib.sh.bak-20261030-instory`, hash checks. NOT committed; a commit needs Sensei's approval.
+- Diff: `/root/in-story-resume/in-story-resume-any-failure.diff` (VM) = `/workspace/kit-eval/linode-e2e-20261029/in-story-resume-any-failure.diff` (box). Base: run-plan.sh 6a6a22b2…f7b4 → 8b1eea21…815f; lib.sh 667df2e2…b202 → f7cbc305…324d. It supersedes harness-in-story-resume.diff (run-plan.sh only, opt-in quota case), which is kept.
+- run-plan.sh:
+  - flag `CHAIN_RESUME_IN_STORY=1` (ignored with a warning without CHAIN_RESUME_FROM_STORY), for any resume reason --resume-from-story accepts;
+  - `chain_resume_prepare` keeps the story's branch and worktree, and refuses on: work/ missing (no snapshot restore), main dirty or mid-merge, worktree mid-merge, branch without worktree, branch merged but next phase not local-release, next phase DONE/STUCK (except a pending gate). On success it sets CRS_IN_STORY_SLUG;
+  - run.meta ` in_story=<slug>`; the RESUME-FROM-STORY line notes "in-story";
+  - `story_run`: F1 base is main before the merge if the kept branch is already merged.
+- lib.sh:
+  - new `in_story_pending_gate`;
+  - `drive_story`: on the first run of the in-story story only, a gate already awaiting_approval (allowed, not yet approved) is approved instead of `STUCK:awaiting_approval(<phase>) at run start`;
+  - `drive_run`: turn 1 sends approval_for(<gate>) text plus one context line, with the gate's allowlist, an approvals.log row tagged in-story-resume, harness_complete, and the release post-merge step.
+- Unchanged: classify, USAGE/AUTH → HALT, the gate-aware rule, the INFRA retry from pre.tgz, fix-attempts.tsv row format and limits, agy-turn-loop.sh, start-tmux.sh.
+- Tests (VM /root/in-story-resume; box in-story-resume/tests):
+  - `bash -n` OK on both files;
+  - `patch --dry-run` against the live files clean; applied copies equal the staged files;
+  - apply-in-story-diff.sh on copies: pristine/old-diff/already-applied OK, refuses while the live runner is alive;
+  - read-only probe of live P2-P at 21:21 → `OK in-story resume would continue at /v0-build`;
+  - sandbox simulation: 21/21 PASS (staged), 2/2 PASS (live files, old behaviour).
+- Committed 2026-10-31 on kitfix-20261031 as the staged diff, unchanged (it applied cleanly to 33cbd7f: run-plan.sh 6a6a22b2…f7b4, lib.sh 667df2e2…b202). Flag stays opt-in (D6). The sandbox simulation is now `tests/sim-in-story-resume.sh` (21/21 PASS on the box). The procedure is `in-story-resume-procedure.md`; the behaviour is in `fix-and-resume.md` §5.8.

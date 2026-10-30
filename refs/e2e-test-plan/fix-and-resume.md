@@ -241,6 +241,17 @@ Known risks:
 
 Note (Naruto): the image does not contain the run folder (`/home/e2e/agents-v0-e2e/run-20261029-1629`). That folder holds the portal repo, with P1-A to P1-E released on main, plus the evidence, the story END snapshots, the status files and the memory logs. Before step 3, copy it off the VM, checking it against SHA256SUMS. After step 5, put it back in place. Without it, resuming at the next story after P1-E (P2-A) isn't possible, and the chain would have to restart from step 0.
 
+### 5.8 In-story resume of a failed chain story (`CHAIN_RESUME_IN_STORY=1`, HARNESS-FIX 2026-10-30, committed 2026-10-31)
+
+Approved by Marlon by voice on 2026-10-30 at 21:14 Asia/Manila: a rerun of a failed story resumes from the phase that stopped, keeping the story's branch, worktree and approved phases, instead of rolling back and restarting from Intake. It applies to any failure, not only quota. It is **opt-in** (decision D6, 2026-10-31): set `CHAIN_RESUME_IN_STORY=1` together with `CHAIN_RESUME_FROM_STORY=<ID>` in the resume env file. The step-by-step VM procedure is `in-story-resume-procedure.md` (next to this file).
+
+- **Accepted reasons:** every reason that `--resume-from-story` accepts (harness-fix, env-fix, agent-retry). kit-fix is still refused for story resumes. Without `CHAIN_RESUME_FROM_STORY` the flag is ignored with a warning.
+- **`chain_resume_prepare`** (run-plan.sh) keeps the story's branch, worktree and approved phases. It refuses the resume (exit 3, `results/stop.txt`, details in `results/attempt-<k>/chain-resume-check.log`) when: work/ is missing (a snapshot restore would wipe the story); main is dirty or mid-merge; the worktree is mid-merge; the branch exists without a worktree; the branch is already merged but the next phase is not local-release; the next phase is DONE or STUCK, except a pending gate.
+- **Pending gate** (lib.sh `in_story_pending_gate`, `drive_story`, `drive_run`): if the story's state is `awaiting_approval` for a gate the harness allows (intake, design, build, verify or release) that is not yet in approvedPhases, the first run sends that gate's scripted approval as turn 1 (text and allowlist from `fixtures/approvals.tsv`, an approvals.log row tagged `in-story-resume`, the same `harness_complete` and release post-merge step as a normal gate, plus one context line because it is a new chat). Otherwise the first run is `/v0-<phase that stopped> <slug>` in a new chat, in the story's worktree. Without the flag a pending gate is still `STUCK:awaiting_approval(<phase>) at run start`.
+- **Bookkeeping:** fix-attempts.tsv rows keep their format, so the resume limits count the same way; run.meta gets ` in_story=<slug>`; the RESUME-FROM-STORY line ends with `+ <ID> in-story (branch, worktree and approved phases kept)`. Evidence dirs of the resumed story are still archived to `evidence/attempt-<k>/`. H1–H4 read main and git; H5's scan covers only the runs after the resume. F1's base is main before the merge when the kept branch is already merged.
+- **Unchanged:** USAGE and AUTH write HALT and stop the run (exit 2); the gate-aware STALL/INFRA/CAP rule; the INFRA fresh retry from pre.tgz (a retry of an in-story approval run sends the approval again).
+- **Test:** `bash tests/sim-in-story-resume.sh` (offline sandbox, stub agent turns, 21 cases) must end `21 passed, 0 failed`.
+
 ## 6. When a fix is too big to resume
 
 The runner decides this from files; you do not override it to save time.
@@ -297,6 +308,7 @@ Report to the owner, in this order: final exit code and the summary table; each 
 | `KIT_UPDATE_QUICK` | `1` | `1` = `install.sh --update --quick` when moving the workspace to a new kit |
 | `RESUME_FALLBACK_TO_2` | `1` | `1` = restart from step 2 automatically when the compatibility check fails; `0` = stop |
 | `MAX_FIX_ATTEMPTS_PER_STEP`, `MAX_FIX_ATTEMPTS_TOTAL`, `MAX_AGENT_RETRY_PER_STEP`, `MAX_RESUMES_TOTAL` | 2, 5, 1, 8 | §7 |
+| `CHAIN_RESUME_IN_STORY` | `0` | `1` = resume the `--resume-from-story` story in-story (branch, worktree and approved phases kept), §5.8 |
 
 All variables of `test-plan.md` §4 keep their meaning. Never put tokens or passwords in these files; a push uses the git credentials already set up on the box.
 
