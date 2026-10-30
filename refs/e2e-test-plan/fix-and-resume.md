@@ -275,7 +275,7 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `MAX_FIX_ATTEMPTS_PER_STEP` | 2 | kit fixes for the same step (`kit-fix.sh start` and `--reason kit-fix`) |
 | `MAX_FIX_ATTEMPTS_TOTAL` | 5 | kit fixes in one run |
 | `MAX_AGENT_RETRY_PER_STEP` | 1 | `--reason agent-retry` resumes of the same step |
-| `MAX_RESUMES_TOTAL` | 8 | resumes of any reason in one run |
+| `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):
 - **FIX-LIMIT**: any limit above is reached.

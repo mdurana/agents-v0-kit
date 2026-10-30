@@ -417,9 +417,12 @@ if [ -n "$RESUME_FROM" ]; then
   [ -z "$RESUME_SCEN" ] || case "$RESUME_STEP" in 7|8) ;; *) stop_resume "resume refused: a scenario id is only valid for step 7 or 8";; esac
   # limits
   nres=$(cat "$RES/fix-attempts.tsv" 2>/dev/null | grep -c .)
+  # HARNESS-FIX 2026-10-31 (D7): MAX_RESUMES_TOTAL counts failure resumes only. Rows written for a planned kit update
+  #   (reason "kit-update ...", rows 2 and 6 of run 20261029-1629) do not use up the budget. nres still numbers the attempt.
+  nfail=$(awk -F'\t' 'NF && $4 !~ /^kit-update/' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
   nstep=$(awk -F'\t' -v s="$RESUME_STEP" -v r="$RESUME_REASON" '$3==s && ($4==r || index($4, r " (")==1)' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
   nfix=$(awk -F'\t' '$4=="kit-fix"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
-  [ "$nres" -lt "$MAX_RESUMES_TOTAL" ] || stop_resume "FIX-LIMIT: $nres resumes already (MAX_RESUMES_TOTAL=$MAX_RESUMES_TOTAL)"
+  [ "$nfail" -lt "$MAX_RESUMES_TOTAL" ] || stop_resume "FIX-LIMIT: $nfail failure resumes already (MAX_RESUMES_TOTAL=$MAX_RESUMES_TOTAL; kit-update rows not counted)"
   case "$RESUME_REASON" in
     kit-fix) [ "$nstep" -lt "$MAX_FIX_ATTEMPTS_PER_STEP" ] || stop_resume "FIX-LIMIT: step $RESUME_STEP already had $nstep kit fixes (MAX_FIX_ATTEMPTS_PER_STEP=$MAX_FIX_ATTEMPTS_PER_STEP)"
              [ "$nfix" -lt "$MAX_FIX_ATTEMPTS_TOTAL" ] || stop_resume "FIX-LIMIT: $nfix kit fixes in this run (MAX_FIX_ATTEMPTS_TOTAL=$MAX_FIX_ATTEMPTS_TOTAL)"

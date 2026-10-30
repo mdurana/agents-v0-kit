@@ -43,7 +43,7 @@ Short names: `T=/home/e2e/agents-v0-e2e/run-20261029-1629`, `H=/home/e2e/kit-src
 - Unchanged: USAGE/AUTH, which still write HALT and stop the run (exit 2); `classify`; the gate-aware STALL/INFRA/CAP rule; the INFRA fresh retry from pre.tgz (a retry of an in-story approval run sends the approval again); agy-turn-loop.sh and start-tmux.sh.
 
 **Limits.**
-- `nres` = rows in `$T/results/fix-attempts.tsv`. `MAX_RESUMES_TOTAL` must be greater than that (10 rows now, so 11 for the next resume).
+- `nres` = rows in `$T/results/fix-attempts.tsv` (it numbers the attempt). Since kitfix-20261031 (D7) the limit counts failure rows only (`kit-update` rows excluded): 8 of the 10 rows now, so the default `MAX_RESUMES_TOTAL=8` refuses the next resume and Marlon must raise it explicitly.
 - `agent-retry` is limited to `MAX_AGENT_RETRY_PER_STEP=1` per step. All chain story resumes are step 4, so only one agent-retry is possible in this run without Marlon raising that limit.
 - harness-fix and env-fix have no per-step limit.
 

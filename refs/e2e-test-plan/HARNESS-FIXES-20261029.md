@@ -243,3 +243,12 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
   - read-only probe of live P2-P at 21:21 → `OK in-story resume would continue at /v0-build`;
   - sandbox simulation: 21/21 PASS (staged), 2/2 PASS (live files, old behaviour).
 - Committed 2026-10-31 on kitfix-20261031 as the staged diff, unchanged (it applied cleanly to 33cbd7f: run-plan.sh 6a6a22b2…f7b4, lib.sh 667df2e2…b202). Flag stays opt-in (D6). The sandbox simulation is now `tests/sim-in-story-resume.sh` (21/21 PASS on the box). The procedure is `in-story-resume-procedure.md`; the behaviour is in `fix-and-resume.md` §5.8.
+
+## 2026-10-31 — classify by outcome (kitfix-20261031, fix 3)
+
+- Source: review of run 20261029-1629. P2-P build (run 8) and release (run 9) reached their gate after a 429/503 that agy recovered from, yet agy reported status ERROR, the turn became AGENT-ERROR, the run STUCK, and the work was thrown away. The P2-P design ran 3 times in 77 s against a lasting quota.
+- lib.sh `drive_run`: AGENT-ERROR joins the gate-aware rule. If the state reached an allowed, unsent gate, the scripted approval is sent (GATE-AWARE) and a FINDING keeps the error visible.
+- lib.sh `classify`: the lasting-quota regex also matches a reset in minutes (`Resets in 45m`), "try again in/after N min/hours" and daily/weekly/monthly limits. "quota will reset after 0s" stays transient.
+- lib.sh `drive_story`: 2 AGENT-ERROR runs in a row → STUCK, even when the state still changed (one retry instead of two).
+- run-plan.sh (D7): `MAX_RESUMES_TOTAL` counts failure resumes only; `kit-update` rows do not count. `nres` still numbers the attempt.
+- Test: `tests/test-classify.sh` (synthetic cases, drive_story stubs, replay of the saved P2-A intake / P2-P build / P2-P release turns and fix-attempts.tsv from the results branch; skips the replay when that branch is not reachable).

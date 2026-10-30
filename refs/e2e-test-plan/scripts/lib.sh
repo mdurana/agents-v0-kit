@@ -163,7 +163,11 @@ agy_api_error_kind(){
   python3 - "$1" "$2" "$3" <<'PY' 2>/dev/null || echo none
 import json, re, sys
 aj, ae, tj = sys.argv[1:4]
-PERS = re.compile(r'individual quota reached|resets in \d+\s*[hd]|quota (reached|exceeded)|usage limit|out of (credits|requests)|upgrade your subscription', re.I)
+# HARNESS-FIX 2026-10-31 (kitfix-20261031, review of run 20261029-1629): a reset given in minutes, "try again in N
+#   min/hours" and daily/monthly limits are lasting limits too (USAGE, HALT on the first turn). "quota will reset after
+#   0s" stays transient (the P2-P build turn recovered from it).
+PERS = re.compile(r'individual quota reached|resets? in \d+\s*(h|d|m(in(ute)?s?)?)\b|try again (in|after) \d+\s*(min|minute|hour|h\b)'
+                  r'|(daily|weekly|monthly) (quota|limit)|quota (reached|exceeded)|usage limit|out of (credits|requests)|upgrade your subscription', re.I)
 TRANS = re.compile(r'RESOURCE_EXHAUSTED|code 429|\b429\b|exhausted your capacity|rate.?limit'
                    r'|\bUNAVAILABLE\b|\bINTERNAL \(code 500\)|DEADLINE_EXCEEDED|\bcode 50[0234]\b|overloaded'
                    r'|\b50[0234] (service unavailable|internal server error|bad gateway|gateway time-?out)', re.I)
@@ -344,6 +348,12 @@ drive_run(){
       #   the turn is treated like a normal one and the scripted approval is sent (same rules as below).
       case "$TURN_CLASS" in
         STALL|INFRA|CAP) if gate_pending "$k"; then post GATE-AWARE "run=${RUN##*/} turn=$k class=$TURN_CLASS but $(jq -r .activePhase "$gfile") is awaiting approval: sending the scripted approval"; TURN_CLASS=NORMAL; fi;;
+        # HARNESS-FIX 2026-10-31 (kitfix-20261031): classify by outcome. P2-P build (run 8) and release (run 9) reached
+        #   their gate after an error agy recovered from, but agy reported status ERROR -> AGENT-ERROR -> STUCK, and
+        #   ~107 min of correct work was thrown away. An AGENT-ERROR turn whose state reached an allowed, unsent gate is
+        #   now handled like the STALL/INFRA/CAP case, with a FINDING so the error stays visible.
+        AGENT-ERROR) if gate_pending "$k"; then post GATE-AWARE "run=${RUN##*/} turn=$k class=AGENT-ERROR but $(jq -r .activePhase "$gfile") is awaiting approval: sending the scripted approval"
+                       post FINDING "run=${RUN##*/} turn=$k ended AGENT-ERROR after reaching its gate; see turn-$k.agy.jsonl / turn-$k.stderr"; TURN_CLASS=NORMAL; fi;;
       esac
       case "$TURN_CLASS" in
         USAGE|AUTH) halt "$TURN_CLASS in ${RUN##*/}"; RUN_END=$TURN_CLASS; return 0;;
@@ -482,7 +492,7 @@ in_story_pending_gate(){ local f="$1" ap
   echo "$ap"; }
 # drive_story <step> <kind feature|maintain> <slug-or-id> <is_p0a 0|1> [<extra text for the first prompt>]
 drive_story(){
-  local step="$1" kind="$2" slug="$3" p0a="$4" extra="${5:-}" runs=0 f cmd ws prev="" prev_ws="" cur same=0 tmo prompt
+  local step="$1" kind="$2" slug="$3" p0a="$4" extra="${5:-}" ae_runs=0 runs=0 f cmd ws prev="" prev_ws="" cur same=0 tmo prompt
   STORY_SLUG="$slug"; STORY_KIND="$kind"; SEMI=0
   while [ "$runs" -lt "$MAX_RUNS_PER_STORY" ]; do
     [ ! -e "$TEST_ROOT/HALT" ] || return 1
@@ -508,12 +518,15 @@ drive_story(){
     if [ "$cur" = "$prev" ] && [ "$ws" = "$prev_ws" ]; then same=$((same+1)); else same=0; fi
     prev="$cur"; prev_ws="$ws"
     [ "$same" -lt 2 ] || { post STUCK "$slug no state progress in 2 runs at $cmd"; echo "no progress at $cmd" > "$EVID/$step-$slug.stuck"; return 1; }
+    # HARNESS-FIX 2026-10-31 (kitfix-20261031): an AGENT-ERROR run gets one retry, not two (P2-P design ran 3 times in 77 s).
+    [ "$ae_runs" -lt 2 ] || { post STUCK "$slug AGENT-ERROR in 2 runs in a row at $cmd"; echo "agent error twice at $cmd" > "$EVID/$step-$slug.stuck"; return 1; }
     prompt="/v0-$cmd $slug"; { [ "$runs" = 0 ] || [ "$cmd" = maintain ]; } && [ -n "$extra" ] && prompt="$prompt"$'\n\n'"$extra"
     tmo=$RUN_TIMEOUT; [ "$p0a" = 1 ] && tmo=$RUN_TIMEOUT_P0A
     drive_run "$step-$slug-$cmd" "$ws" "$prompt" "$( [ "$cmd" = local-release ] && echo release || echo "$cmd")" \
       "intake design build verify maintain release branch" "$tmo"
     IN_STORY_GATE=""; IN_STORY_GATE_FILE=""
     echo "${RUN##*/} $RUN_END gates:${GATES_SENT:- none}" >> "$EVID/$step-$slug.runs"
+    if [ "$RUN_END" = AGENT-ERROR ]; then ae_runs=$((ae_runs+1)); else ae_runs=0; fi
     runs=$((runs+1))
   done; post STUCK "$slug MAX_RUNS_PER_STORY reached"; return 1; }
 
