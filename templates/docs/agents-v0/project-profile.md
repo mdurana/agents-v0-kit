@@ -70,6 +70,7 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 | Version file | <!-- e.g. pom.xml (project.version) or package.json; blank when the tag is the version --> |
 | Tag format | <!-- e.g. v{version} --> |
 | Changelog | <!-- e.g. CHANGELOG.md; blank when none --> |
+| Timezone | <!-- IANA zone for approval dates and times, e.g. Asia/Manila; blank uses the system zone (sync-feature-state.sh, kitfix-20261031-single-clock) --> |
 | Integration branch | <!-- local branch the next story builds on after /v0-local-release, e.g. main; blank uses origin's local branch, else main --> |
 
 ## Brownfield exceptions

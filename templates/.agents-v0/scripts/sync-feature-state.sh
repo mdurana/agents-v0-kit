@@ -296,8 +296,55 @@ if prev_last in phases and prev_last not in approved_list:
         if p not in approved_list:
             approved_list.append(p)
 
-today_iso = time.strftime("%Y-%m-%d", time.localtime())  # same clock as the decision-table dates the agent writes (P2-A H3, 2026-10-30)
+# kitfix-20261031-single-clock: one clock for every date this script writes (phaseDates, phaseTimes,
+# the Date cell of the approved Delivery approvals row, updatedAt). The project time zone comes from
+# AGENTS_V0_TZ, else the `Timezone` row of docs/agents-v0/project-profile.md, else the system zone.
+# Run 20261029-1629 (P2-A H3): the script dated approvals in UTC while the agent typed local dates
+# (or `date -u`), so phaseDates went backwards across midnight Asia/Manila.
+# AGENTS_V0_NOW=<ISO time with offset> pins the clock (kit tests only).
+import datetime as _dt
+
+
+def _project_tz():
+    name = os.environ.get("AGENTS_V0_TZ", "").strip()
+    if not name:
+        prof = "docs/agents-v0/project-profile.md"
+        try:
+            for line in open(prof, encoding="utf-8"):
+                cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                if len(cells) >= 2 and cells[0].lower() in ("timezone", "time zone"):
+                    v = re.sub(r"<!--.*?-->", "", cells[1]).strip()
+                    if v and not v.startswith("<") and " " not in v:
+                        name = v
+                    break
+        except OSError:
+            pass
+    if name:
+        try:
+            from zoneinfo import ZoneInfo
+            return ZoneInfo(name)
+        except Exception:
+            print(f"WARN: unknown time zone {name!r}; using the system zone", file=sys.stderr)
+    return None
+
+
+def kit_now():
+    pinned = os.environ.get("AGENTS_V0_NOW", "").strip()
+    tz = _project_tz()
+    if pinned:
+        t = _dt.datetime.fromisoformat(pinned)
+        if t.tzinfo is None:
+            t = t.astimezone()
+    else:
+        t = _dt.datetime.now().astimezone()
+    return t.astimezone(tz) if tz is not None else t.astimezone()
+
+
+now_dt = kit_now()
+today_iso = now_dt.date().isoformat()
+now_iso = now_dt.isoformat(timespec="seconds")
 phase_dates = {k.lower(): v for k, v in (prev.get("phaseDates") or {}).items() if k.lower() in phases and isinstance(v, str)}
+phase_times = {k.lower(): v for k, v in (prev.get("phaseTimes") or {}).items() if k.lower() in phases and isinstance(v, str)}
 
 # Merge Markdown table rows with state.json approvals (union positive rows; withdraw on Re-opened or non-positive row)
 first_reopened = ""
@@ -316,7 +363,15 @@ if rows:
                 approved_list.append(phase)
             d_cell = rows[phase][4][:10] if len(rows[phase]) >= 5 else ""
             if re.match(r"^\d{4}-\d{2}-\d{2}$", d_cell):
-                phase_dates[phase] = d_cell
+                # The recorded approval date wins; a table cell only fills a phase with no date yet.
+                if phase not in phase_dates:
+                    phase_dates[phase] = d_cell
+                elif phase_dates[phase] != d_cell:
+                    print(
+                        f"WARN: Delivery approvals date for {phase} ({d_cell}) differs from the recorded "
+                        f"approval date ({phase_dates[phase]}); the state keeps {phase_dates[phase]}.",
+                        file=sys.stderr,
+                    )
         else:
             cut_idx = idx
             break
@@ -324,6 +379,7 @@ if rows:
     if cut_idx is not None:
         approved_list = [p for p in approved_list if phases.index(p) < cut_idx]
         phase_dates = {k: v for k, v in phase_dates.items() if k in approved_list}
+        phase_times = {k: v for k, v in phase_times.items() if k in approved_list}
 
 cli_approve = os.environ.get("HOOK_APPROVE_PHASE", "").strip().lower()
 if cli_approve:
@@ -362,7 +418,33 @@ if cli_approve:
             approved_list.append(p)
         if p not in phase_dates:
             phase_dates[p] = today_iso
+        if p not in phase_times:
+            phase_times[p] = now_iso
     phase_dates[cli_approve] = today_iso
+    phase_times[cli_approve] = now_iso
+    # D2: the script, not the agent, writes the Date cell of the approved row (same clock).
+    try:
+        lines = raw_text.splitlines(keepends=True)
+        in_sec, hit = False, None
+        for i, line in enumerate(lines):
+            if re.match(r"^#+\s*delivery approvals", line, re.I):
+                in_sec = True
+                continue
+            if in_sec and re.match(r"^#+\s+\S", line):
+                break
+            if in_sec and line.strip().startswith("|"):
+                c = [x.strip() for x in line.strip().strip("|").split("|")]
+                if len(c) >= 5 and c[0].lower() == cli_approve and positive.match(c[3]):
+                    hit = (i, c)
+        if hit is not None and hit[1][4][:10] != today_iso:
+            i, c = hit
+            c[4] = today_iso
+            nl = "\n" if lines[i].endswith("\n") else ""
+            lines[i] = "| " + " | ".join(c) + " |" + nl
+            with open(art, "w", encoding="utf-8") as fh:
+                fh.write("".join(lines))
+    except OSError as exc:
+        print(f"WARN: could not write the approval date into {art}: {exc}", file=sys.stderr)
     approved_list = [p for p in phases if p in approved_list]
     first_reopened = ""
 
@@ -396,6 +478,7 @@ if cli_reopen:
         idx = phases.index(cli_reopen)
         approved_list = [p for p in approved_list if phases.index(p) < idx]
         phase_dates = {k: v for k, v in phase_dates.items() if k in approved_list}
+        phase_times = {k: v for k, v in phase_times.items() if k in approved_list}
 
 reopen_exceeded = reopen_count > 3
 
@@ -744,6 +827,7 @@ data = {
     "lastApprovedPhase": last_approved,
     "approvedPhases": approved_list,
     "phaseDates": {p: phase_dates.get(p, today_iso) for p in approved_list},
+    "phaseTimes": {p: phase_times[p] for p in approved_list if p in phase_times},
     "activePhase": active_phase,
     "activeStatus": active_status,
     "blockedReason": blocked_reason,
@@ -752,7 +836,7 @@ data = {
     "helperBriefHashes": prior_hashes,
     "artifact": art,
     "baseCommit": base_commit,
-    "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "updatedAt": now_iso,
     "artifacts": artifacts_map,
     "evidence": {
         "build": build_ev,

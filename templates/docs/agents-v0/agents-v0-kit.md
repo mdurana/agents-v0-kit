@@ -120,7 +120,7 @@ Workflow state, artifact pointers, and human approvals live in structured JSON s
   "helperBriefHashes": [],
   "artifact": "docs/agents-v0/requirements/order-cancellation.md",
   "baseCommit": "a1b2c3d4e5f6...",
-  "updatedAt": "2026-10-21T08:30:00Z",
+  "updatedAt": "2026-10-21T16:30:00+08:00",
   "artifacts": {
     "primary": "docs/agents-v0/requirements/order-cancellation.md",
     "design": "docs/agents-v0/design/order-cancellation/design.md",
