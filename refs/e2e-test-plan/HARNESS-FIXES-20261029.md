@@ -280,3 +280,12 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - tests/fixtures/p2p-quota-20261030: the two real P2-P design turns that hit "Individual quota reached … Resets in 53h" (30 Oct 17:54 and 17:55 Asia/Manila), sanitized by `sanitize.py` (ids, host paths, tool parameters and the prompt preamble removed; about 3.5 KB). `tests/test-classify.sh` section D replays them: USAGE with rc 0 and 1, `agy_api_error_kind` persistent.
 - Kit hooks (same commit, kitfix-20261031-no-amend): the unattended allowlist never allows `git commit --amend`.
 - Tests: `tests/test-checks.sh` (30 cases), `tests/test-classify.sh` (32 cases).
+
+## 2026-10-31 04:43 Asia/Manila — guard override and gate-chain checks, keep story branches (kitfix-20261031, second review of dd980e6, approved by Marlon; keep-branches 04:47)
+
+- lib.sh `guard_override_scan` (run after every turn): an `AGENTS_V0_*` assignment (`PAT_GUARD_OVERRIDE`, the same rule as the kit hook) in the turn's `commands-<k>.txt` or in a non-markdown file the turn added or changed in the workspace → `guard-override.txt` + FINDING. New check **H8** "no guard override" (FAIL; `H8_MODE=warn`). The harness's own settings are not seen: it sets them in its own process, outside the agent's turn.
+- lib.sh `gate_chain` / `gate_chain_check` (before and after every turn) / `gate_chain_ok`: the story's gate commits on `feature/<slug>` must survive each turn and be in order → `GATE-CHAIN-BROKEN` + FINDING. New check **H9** "gate commits intact and in order" (FAIL; `H9_MODE=warn`); the end-of-story chain is saved in `results/gate-chain-<slug>.tsv`.
+- Kit hooks (same commit): `AGENTS_V0_*` assignments blocked, `git tag -f` blocked, `git reset <commit>` / `update-ref` ask, story-branch deletion blocked, every segment of an unattended compound command must match the allowlist (the printed gate command `git add -A && git commit ...` now passes; it was denied before, which would have forced the harness fallback and an H7 FAIL in the V3 rerun).
+- Keep-branches (Marlon 04:47): no harness or kit step deletes a story branch (checked); story branches are kept after release.
+- Tests: new `tests/test-guards.sh` (21 cases; mutation checks: without the ancestry test 3 cases fail, without the pattern 8 fail).
+

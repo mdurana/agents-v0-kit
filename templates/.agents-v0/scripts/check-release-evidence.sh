@@ -63,7 +63,7 @@ if missing:
     raise SystemExit(1)
 
 # kitfix-20261029-step4-p1e: a released story's branch must be fully contained in the integration branch.
-# P0-A (no feature branch) and a branch deleted after the merge have nothing to check.
+# P0-A (no feature branch) has nothing to check; a deleted branch (not allowed: kitfix-20261031-keep-branches) only WARNs.
 def git(*args):
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
 
@@ -118,5 +118,14 @@ if git("rev-parse", "--is-inside-work-tree").returncode == 0 \
               f"do not merge it again, and do not name the next story; the human decides how to "
               f"reconcile {branch} with {integration}.", file=sys.stderr)
         raise SystemExit(1)
+# kitfix-20261031-keep-branches: story branches are kept after release. When feature/<feature> is gone the
+#   squash/merge cross-check above cannot run; say so (exit code unchanged, so old projects that deleted
+#   their branches still pass).
+if git("rev-parse", "--is-inside-work-tree").returncode == 0 \
+        and git("show-ref", "--verify", "--quiet", f"refs/heads/{branch}").returncode != 0 \
+        and art.parent.name == "requirements" and not slug.startswith("p0-a") \
+        and not re.search(r"^Story:\s*P0-A\b", art.read_text(encoding="utf-8", errors="replace"), re.M):
+    print(f"WARN: {branch} not found: the squash/merge cross-check was skipped. Story branches are kept after "
+          f"release (never delete them); restore the branch from its Story-Tip if it was deleted.", file=sys.stderr)
 print(f"OK: release evidence present for {slug}")
 PY

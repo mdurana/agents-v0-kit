@@ -48,6 +48,26 @@ PIPE_TO_INTERPRETER_RE = re.compile(
     r"|\b(?:sh|bash|zsh|dash|ksh)\s+<\(\s*(?:curl|wget)\b"
 )
 # sudo/doas in command position, directly or as the body of sh -c.
+# kitfix-20261031-guard-override: the kit scripts read AGENTS_V0_* variables (AGENTS_V0_SKIP_BRANCH_GUARD,
+#   AGENTS_V0_SKIP_COMMIT_CHECK, AGENTS_V0_NOW, AGENTS_V0_TRACE_MODE, ...). They are for kit fixtures and for the
+#   person's own environment, never for an agent: any agent command that sets, exports or unsets one is blocked
+#   (attended and unattended): a prefix assignment, export/declare/typeset/readonly/local/unset/setenv, env NAME=,
+#   ${NAME:=...}, os.environ / putenv, also inside sh -c / bash -c, after && ; | or in $(...). Reading one
+#   ($AGENTS_V0_X, ${AGENTS_V0_X:-}) is allowed.
+GUARD_OVERRIDE_RE = re.compile(
+    r"(?:^|[^A-Za-z0-9_$])AGENTS_V0_[A-Za-z0-9_]*(?:\+?=|:=|:\?=)"
+    r"|\b(?:export|declare|typeset|readonly|local|unset|setenv|unsetenv)\b[^;&|\n]*\bAGENTS_V0_"
+    r"|\b(?:environ|putenv|setdefault)\b[^;&|\n]{0,60}AGENTS_V0_"
+)
+GUARD_OVERRIDE_MSG = (
+    "setting AGENTS_V0_* variables is not allowed for an agent: they switch kit guards and checks off "
+    "(branch guard, gate-commit check, clock, traceability mode). Run the kit script without them; if a guard "
+    "refuses, fix the cause it names or ask the user."
+)
+KEEP_BRANCH_MSG = (
+    "story branches (feature/*, maintain/*) are kept after release for reference and backtracking; "
+    "do not delete or rename them (git worktree remove only removes the folder and keeps the branch)."
+)
 SUDO_RE = re.compile(
     r"(?:^|[;&|(`]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:sudo|doas)\b"
     r"|\b(?:sh|bash|zsh|dash|ksh)\s+-l?c\s+[\"']\s*(?:sudo|doas)\b"
@@ -453,6 +473,11 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             if "--no-verify" in sub_args or (sub == "commit" and any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", a) for a in sub_args)):
                 return "block", "--no-verify skips the delivery gate hooks; fix the failing gate instead (ai-agent-conduct.mdc)."
         if sub == "push":
+            p_args = parts[parts.index(sub) + 1 :] if sub in parts else []
+            deleting = any(a in ("-d", "--delete") for a in p_args)
+            if any((deleting and re.match(r"^(?:refs/heads/)?(?:feature|maintain)/", a))
+                   or re.match(r"^\+?:(?:refs/heads/)?(?:feature|maintain)/", a) for a in p_args):
+                return "block", KEEP_BRANCH_MSG
             for tok in parts[parts.index(sub) + 1 :] if sub in parts else []:
                 if tok in ("--force", "-f", "--force-with-lease") or tok.startswith(
                     "+"
@@ -467,6 +492,18 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             if _commit_paths_are_evidence(parts):
                 return "allow", ""
             return "ask", "git commit requires explicit user approval."
+        # kitfix-20261031-guard-override: moving a branch rewrites committed gates (a soft/mixed reset to an
+        #   earlier commit followed by a commit is an amend). Unstaging (git reset, git reset [HEAD] -- <path>) is fine.
+        if sub == "reset" and "--hard" not in parts:
+            r_args = parts[sub_idx + 1 :]
+            pre = r_args[: r_args.index("--")] if "--" in r_args else r_args
+            if any(a in ("--soft", "--mixed", "--keep", "--merge") for a in pre) or any(
+                not a.startswith("-") and a != "HEAD" and (re.search(r"[~^]|@\{", a) or re.fullmatch(r"[0-9a-fA-F]{7,40}", a) or a in ("ORIG_HEAD", "FETCH_HEAD"))
+                for a in pre
+            ):
+                return "ask", "git reset to another commit moves the branch and can rewrite committed gates; requires explicit user approval."
+        if sub in ("update-ref", "filter-branch", "filter-repo", "replace"):
+            return "ask", f"git {sub} rewrites refs or history; requires explicit user approval."
         if sub == "reset" and "--hard" in parts:
             return "block", "git reset --hard is not allowed."
         if sub == "clean" and any(
@@ -478,6 +515,9 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
         if sub == "tag":
             args = parts[parts.index("tag") + 1:] if "tag" in parts else []
             listing = not [a for a in args if not a.startswith("-")] or any(a in ("-l", "--list") for a in args)
+            # kitfix-20261031-guard-override: a phase tag (<phase>-v<n>) is never moved; a revision gets a new tag.
+            if any(a in ("-f", "--force") or (re.fullmatch(r"-[a-zA-Z]*f[a-zA-Z]*", a) and not a.startswith("--")) for a in args):
+                return "block", "git tag -f/--force moves an existing tag; phase tags are never moved (tag the revision <phase>-v<n+1>)."
             if not listing:
                 return "ask", "creating, moving, or deleting a git tag requires explicit user approval."
         if sub == "restore":
@@ -491,6 +531,11 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             args = parts[parts.index("branch") + 1 :] if "branch" in parts else []
             flags = [a for a in args if a.startswith("-")]
             positional = [a for a in args if not a.startswith("-")]
+            # kitfix-20261031-keep-branches: story branches (feature/*, maintain/*) are kept after release for
+            #   reference and backtracking; the agent never deletes or renames one (a person can, in their own terminal).
+            if any(f in ("-d", "-D", "--delete", "-m", "-M", "--move") or re.fullmatch(r"-[a-zA-Z]*[dDmM][a-zA-Z]*", f) for f in flags) \
+                    and any(re.match(r"^(?:refs/heads/)?(?:feature|maintain)/", a) for a in positional):
+                return "block", KEEP_BRANCH_MSG
             if any(f in ("-d", "-D", "--delete", "-m", "-M", "--move", "-c", "-C", "--copy") for f in flags):
                 return "ask", "deleting, renaming, or copying a branch requires explicit user approval."
             tracking = any(
@@ -612,6 +657,8 @@ def _cd_target(seg: str) -> Optional[str]:
 def classify_command(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
+    if GUARD_OVERRIDE_RE.search(cmd):
+        return "block", GUARD_OVERRIDE_MSG
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"

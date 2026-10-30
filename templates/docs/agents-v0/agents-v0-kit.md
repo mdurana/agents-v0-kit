@@ -234,7 +234,8 @@ Two lightweight, deterministic guardrails protect local development without slow
 1. **Shell & Edit Guardrail (`pre-shell.sh` / `hook-policy.py` & `pre-edit.sh`):**
    - Blocks destructive shell commands (`git push --force`, `git reset --hard`, `rm -rf`, `glab mr merge`, `glab mr approve`), secret/credential file reads (`.env`, `*.pem`, `*.key`, SSH/cloud keys), and environment variable dumps (`env`, `printenv`, `export -p`).
    - Protects kit scripts and hook configurations (`.cursor/hooks/*`, `.agents-v0/scripts/*`, `.agents-v0/packs/*`) from agent modification.
-   - Requires interactive user confirmation (`ask`) before `git commit`, `git merge`, `git push`, `git rebase`, `git tag`, or branch deletion.
+   - Requires interactive user confirmation (`ask`) before `git commit`, `git merge`, `git push`, `git rebase`, `git tag`, `git reset <commit>`, `git update-ref`, or branch deletion.
+   - <!-- kitfix-20261031-guard-override --> Blocks any agent command that sets, exports or unsets an `AGENTS_V0_*` variable (the kit's fixture skip flags, clock pin and trace mode), `git commit --amend` in unattended mode, `git tag -f`, and deleting or renaming a story branch (`feature/*`, `maintain/*`: story branches are kept after release). In unattended mode a compound command is allowed only when every segment that needs approval matches the turn's allowlist.
 2. **Optional Git Pre-Push Hook (`.agents-v0/hooks/pre-push`):**
    - A lightweight, IDE-agnostic Git hook (`sh scripts/install.sh --git-hooks <repo>`) that verifies any active `<feature>.state.json` on the branch has `"verifyPassed": true` (or `lastApprovedPhase` in `verify`/`release`) before pushing.
 

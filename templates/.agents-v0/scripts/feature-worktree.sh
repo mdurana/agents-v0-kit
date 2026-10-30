@@ -17,7 +17,8 @@
 # A branch already contained in the integration ref (tip differs) is not checked out.
 # Untracked docs/agents-v0/requirements/<feature>.* or docs/agents-v0/maintain/<id>/
 # in the primary checkout move into the worktree. Tracked files stay where they are.
-# Remove the worktree after the merge: git worktree remove <path>
+# Remove the worktree after the merge: git worktree remove <path>. The branch itself is kept for reference and
+# backtracking (kitfix-20261031-keep-branches): never delete feature/<feature> or maintain/<id>.
 
 set -eu
 

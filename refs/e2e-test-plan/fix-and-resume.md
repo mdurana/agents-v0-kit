@@ -290,6 +290,8 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `MAX_AGENT_RETRY_PER_STEP` | 1 | `--reason agent-retry` resumes of the same step |
 | `CHAIN_RESUME_ROLLBACK` | 1 | in-story resume first resets the story branch to its last clean gate commit (§5.6); `0` keeps the branch as it is |
 | `H7_MODE` | `fail` | `warn` makes a harness gate-commit fallback (H7) a FINDING only |
+| `H8_MODE` | `fail` | `warn` makes an agent `AGENTS_V0_*` assignment (H8, guard override) a FINDING only |
+| `H9_MODE` | `fail` | `warn` makes a rewritten or out-of-order story gate commit (H9) a FINDING only |
 | `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):

@@ -161,8 +161,9 @@ hook_shell_permission_ask() {
   user_message="$1"
   agent_message="$2"
   cmd_str="${3:-}"
-  HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" HOOK_CMD_STR="$cmd_str" python3 -c '
-import fnmatch, json, os, re, shlex, sys
+  HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" HOOK_CMD_STR="$cmd_str" \
+    HOOK_POLICY_PY="${HOOK_POLICY_PY:-$(dirname "$0")/hook-policy.py}" python3 -c '
+import fnmatch, importlib.util, json, os, re, shlex, sys
 
 user = os.environ.get("HOOK_USER_MESSAGE", "")
 agent = os.environ.get("HOOK_AGENT_MESSAGE", "")
@@ -218,7 +219,38 @@ if allow_spec:
         deny_msg = "Unattended mode denied git commit --amend: gate commits are never amended (make a new commit)."
         print(json.dumps({"permission": "deny", "decision": "deny", "reason": deny_msg, "user_message": deny_msg, "agent_message": "BLOCKED in unattended mode: " + deny_msg}))
         sys.exit(2)
-    if matches_allow(cmd, patterns):
+    # kitfix-20261031-guard-override: a compound command is allowed only when EVERY segment that needs approval
+    #   matches the allowlist. Before, only the first program was matched, so "git commit -m x && git reset --soft
+    #   HEAD~1" passed Shell(git:commit*) while the gate command "git add -A && git commit -F ..." was denied.
+    #   Segments are split and judged by hook-policy.py (sh -c bodies and $(...) included); allow-level segments
+    #   (git add, cd, ...) pass, ask-level ones must match, a block-level one denies. When the ask came only from a
+    #   whole-command rule (a download piped into an interpreter), no segment matches and it is denied.
+    #   If hook-policy.py cannot be loaded the command is denied (fail closed).
+    def every_ask_segment_allowed(command_text, pats):
+        if not command_text or not pats:
+            return False
+        try:
+            sys.dont_write_bytecode = True   # never leave __pycache__ in the project
+            spec = importlib.util.spec_from_file_location("kit_hook_policy", os.environ.get("HOOK_POLICY_PY", ""))
+            hp = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(hp)
+            segs = hp.split_segments(command_text)
+        except Exception:
+            return False
+        asks = 0
+        for seg in segs:
+            if hp._cd_target(seg):
+                continue
+            action, _msg = hp.classify_segment(seg)
+            if action == "block":
+                return False
+            if action == "ask":
+                asks += 1
+                if not matches_allow(hp._strip_env_prefix(seg.strip()), pats):
+                    return False
+        return asks > 0
+
+    if every_ask_segment_allowed(cmd, patterns):
         print(json.dumps({"permission": "allow", "decision": "allow", "reason": "Allowed by per-turn unattended allowlist"}))
         sys.exit(0)
     deny_msg = f"Unattended mode denied ask-level command (allow={allow_spec}): {user}"

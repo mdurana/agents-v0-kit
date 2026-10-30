@@ -132,6 +132,11 @@ expect_out "the refusal says it was squash-merged" 'already squash-merged'
 G "$w" commit -q --allow-empty -m "late commit after release"
 expect_fail "check-release-evidence fails when the branch moved after the squash" "$r" sh $S/check-release-evidence.sh "$ORD"
 expect_out "it lists the commit after the squash" 'late commit after release'
+# kitfix-20261031-keep-branches: a deleted story branch only WARNs (the cross-check cannot run); branches are kept
+G "$r" branch -m feature/orders keep-orders-ref
+expect_pass "check-release-evidence still passes when feature/orders is gone" "$r" sh $S/check-release-evidence.sh "$ORD"
+expect_out "but warns that the branch is missing and must be kept" 'WARN: feature/orders not found: the squash/merge cross-check was skipped'
+G "$r" branch -m keep-orders-ref feature/orders
 
 # ---- secrets are named, never suggested for a commit ---------------------------------------------
 s="$tmp/sec"; mkdir -p "$s/docs/agents-v0/roadmap"; git -C "$s" init -q -b main
