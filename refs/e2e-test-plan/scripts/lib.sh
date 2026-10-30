@@ -234,7 +234,7 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   local k="$1" msg="$2" allow="$3" rem cap pid rc sz last=0 lastch st=0 mark drv
   rem=$(( RUN_DEADLINE - $(now) )); cap=$TURN_CAP; [ "$rem" -lt "$cap" ] && cap=$rem; [ "$cap" -gt 60 ] || { TURN_CLASS=CAP; return; }
   printf '%s\n' "$msg" > "$RUN/turn-$k.prompt"; printf '%s\n' "$allow" > "$RUN/turn-$k.allow"
-  local envv=(HOME="$HOME" USER="${USER:-tester}" LANG=C.UTF-8 TZ="${AGENT_TZ:-UTC}" TERM=xterm
+  local envv=(HOME="$HOME" USER="${USER:-tester}" LANG=C.UTF-8 TZ="${AGENT_TZ:-Asia/Manila}" TERM=xterm
     PATH="${TOOLS_PATH:-}:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" JAVA_HOME="${JAVA_HOME:-}" PG_HOME="${PG_HOME:-}"
     TESTCONTAINERS_RYUK_DISABLED=true MAVEN_OPTS=-Xmx1536m TEST_ROOT="$TEST_ROOT" PLAN_DIR="$PLAN_DIR")
   [ -z "${CURSOR_API_KEY:-}" ] || envv+=(CURSOR_API_KEY="$CURSOR_API_KEY")
@@ -497,8 +497,12 @@ drive_story(){
   while [ "$runs" -lt "$MAX_RUNS_PER_STORY" ]; do
     [ ! -e "$TEST_ROOT/HALT" ] || return 1
     if [ "$kind" = maintain ]; then f="$(maint_state "$slug")"; ws="$(wt_for_branch "maintain/$slug")"; else f="$(story_state "$slug")"; ws="$(wt_for_branch "feature/$slug")"; fi
-    [ -n "$ws" ] || ws="$MAIN"
     cmd="$(next_cmd "$f" "$kind" "$p0a")"
+    # HARNESS-FIX 2026-10-31 (kitfix-20261031 fix 1e): a non-P0-A feature story past intake must have its
+    #   feature/<slug> worktree. Run 3 (P2-A) fell back to $MAIN here and ran design/build/release on main.
+    if [ -z "$ws" ] && [ "$kind" = feature ] && [ "$p0a" = 0 ]; then case "$cmd" in design|build|verify)
+      post STUCK "$slug intake approved but no feature/$slug worktree (next: $cmd)"; echo "no feature/$slug worktree at $cmd" > "$EVID/$step-$slug.stuck"; return 1;; esac; fi
+    [ -n "$ws" ] || ws="$MAIN"
     # STAGED HARNESS-FIX 2026-10-30 (in-story resume): on the first run of the story an in-story resume continues
     #   (run-plan.sh sets CRS_IN_STORY_SLUG only after chain_resume_prepare passed), a gate that is already
     #   awaiting_approval is approved with the scripted text instead of STUCK. One-shot: later runs use next_cmd as is.
@@ -536,14 +540,76 @@ no_forbidden(){ ! cat "$EVID"/"$1"*/forbidden-commands.txt 2>/dev/null | grep -q
 no_self_approval(){ ! ls "$EVID"/"$1"*/self-approval.txt >/dev/null 2>&1; }
 real_dirs_fp(){ local d; for d in $REAL_DIRS; do printf '%s %s %s\n' "$d" "$(git -C "$d" rev-parse HEAD 2>/dev/null)" "$(GIT_OPTIONAL_LOCKS=0 git -C "$d" status --porcelain 2>/dev/null | sha256_cmd | cut -c1-16)"; done; }
 real_dirs_same(){ diff <(real_dirs_fp) "$TEST_ROOT/status/real-dirs.baseline" >/dev/null; }
+# story_on_branch <slug> (HARNESS-FIX 2026-10-31, kitfix-20261031 fix 4c): the story's work reached main through
+#   feature/<slug>: the branch exists, main holds its merge, and no commit on main's first-parent line since the story
+#   started (STORY_H0, when set) touches app/ except the merge itself. Run 3 (P2-A) built on main and passed H1.
+story_on_branch(){ local b="feature/$1" mc stray
+  git -C "$MAIN" rev-parse -q --verify "$b" >/dev/null || { echo "story_on_branch: no branch $b"; return 1; }
+  mc="$(main_merge_of "$b")"; [ -n "$mc" ] || { echo "story_on_branch: main has no merge of $b"; return 1; }
+  [ -n "${STORY_H0:-}" ] || return 0
+  stray="$(git -C "$MAIN" rev-list --first-parent --no-merges "$STORY_H0..HEAD" -- app/ 2>/dev/null | grep -v "^$mc\$" | head -3)"
+  [ -z "$stray" ] || { echo "story_on_branch: commits on main touch app/ outside the merge of $b: $stray"; return 1; }; }
 released_ok(){ # <slug> <is_p0a>: state, evidence, git
   local f; f="$(story_state "$1")"
   for p in build verify release; do has_appr "$f" "$p" || return 1; done
-  [ "$2" = 1 ] || { has_appr "$f" intake && has_appr "$f" design; } || return 1
+  [ "$2" = 1 ] || { has_appr "$f" intake && has_appr "$f" design && story_on_branch "$1"; } || return 1
   [ "$(jq -r .verifyPassed "$f")" = true ] && [ "$(jq -r '.activePhase//""' "$f")" = "" ] || return 1
   [ -s "$MAIN/docs/agents-v0/verify/$1/quality-gate.md" ] || return 1
   git -C "$MAIN" ls-files --error-unmatch "docs/agents-v0/requirements/$1.state.json" >/dev/null 2>&1 || return 1
   if [ -f "$MAIN/.agents-v0/scripts/check-release-evidence.sh" ]; then (cd "$MAIN" && sh .agents-v0/scripts/check-release-evidence.sh "docs/agents-v0/requirements/$1.md"); fi; }
+# phases_in_order <state file> [<evidence glob prefix>] (HARNESS-FIX 2026-10-31, fix 4d): phaseTimes (ISO with offset,
+#   written by --approve since kitfix-20261031) must be non-decreasing intake <= design <= build <= verify <= release;
+#   without phaseTimes the phaseDates day check is used. With an evidence prefix, every gate's approvals.log SENT time
+#   (Asia/Manila) must also be non-decreasing in the same order.
+phases_in_order(){ python3 - "$1" "${2:-}" <<'PYX'
+import datetime as dt, glob, json, re, sys
+f, pre = sys.argv[1], sys.argv[2]
+s = json.load(open(f)); order = ["intake", "design", "build", "verify", "release"]
+t = s.get("phaseTimes") or {}
+if all(p in t for p in order):
+    v = [dt.datetime.fromisoformat(t[p]) for p in order]
+    bad = [f"{a}>{b}" for a, b, x, y in zip(order, order[1:], v, v[1:]) if x > y]
+else:
+    d = s.get("phaseDates") or {}
+    v = [d.get(p, "") for p in order]
+    bad = [f"{a}>{b}" for a, b, x, y in zip(order, order[1:], v, v[1:]) if not x or not y or x > y]
+if pre:
+    sent = {}
+    for lf in sorted(glob.glob(pre + "*/approvals.log")):
+        for l in open(lf, encoding="utf-8", errors="replace"):
+            c = l.rstrip("\n").split("\t")
+            m = re.match(r"gate=(\w+)", c[3]) if len(c) > 3 and c[2] == "SENT" else None
+            if m and m.group(1) in order:
+                sent.setdefault(m.group(1), c[0])  # first SENT of each gate
+    seen = [sent[p] for p in order if p in sent]
+    bad += [f"approvals.log SENT out of order: {x} > {y}" for x, y in zip(seen, seen[1:]) if x > y]
+if bad:
+    print("phases_in_order:", "; ".join(bad)); sys.exit(1)
+PYX
+}
+# ac_count_matches <slug> <planned count> (HARNESS-FIX 2026-10-31, fix 4a / H6): '### AC-<n>' headings in the
+#   requirements doc vs the milestone Size column. An approved '## Proposed split' or 'Plan deviation:' line excuses it.
+ac_count_matches(){ local doc="$MAIN/docs/agents-v0/requirements/$1.md" n
+  [ -f "$doc" ] || { echo "ac_count: no $doc"; return 1; }
+  n="$(grep -cE '^### AC-[0-9]+' "$doc")"
+  case "$2" in ''|*[!0-9]*) echo "ac_count: plan Size '$2' is not a number"; return 0;; esac
+  [ "$n" = "$2" ] && return 0
+  grep -qE '^## Proposed split|Plan deviation:' "$doc" && { echo "ac_count: $n ACs vs plan $2, deviation recorded"; return 0; }
+  echo "ac_count: $1 has $n ACs, the milestone plan says $2"; return 1; }
+# native_verify <slug> <surface> (HARNESS-FIX 2026-10-31, fix 4b / V1): re-run the project's own verify in $MAIN after
+#   the release instead of trusting the agent's evidence. NATIVE_VERIFY=0 skips it (the check then passes with a note).
+native_verify(){ local slug="$1" surf="${2:-}" log="$RES/native-verify-$1.log" cmd rc=0 tmo="${NATIVE_VERIFY_TIMEOUT:-1800}"
+  [ "${NATIVE_VERIFY:-1}" = 1 ] || { echo "native_verify: skipped (NATIVE_VERIFY=${NATIVE_VERIFY:-})"; return 0; }
+  : > "$log"
+  if [ -d "$MAIN/app/backend" ]; then
+    cmd="$(cd "$MAIN" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" 2>/dev/null)"; [ -n "$cmd" ] || cmd="cd app/backend && ./mvnw -q verify"
+    echo "$(ts) backend: $cmd" >> "$log"; (cd "$MAIN" && timeout "$tmo" sh -c "$cmd") >> "$log" 2>&1 || rc=1
+    if [ -f "$MAIN/.agents-v0/scripts/check-tests-ran.sh" ]; then (cd "$MAIN" && sh .agents-v0/scripts/check-tests-ran.sh) >> "$log" 2>&1 || rc=1; fi
+  fi
+  case "$surf" in *frontend*|*vertical*) if [ -f "$MAIN/app/frontend/package.json" ]; then
+    cmd="$(cd "$MAIN" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" 2>/dev/null)"; [ -n "$cmd" ] || cmd="cd app/frontend && npm run verify"
+    echo "$(ts) frontend: $cmd" >> "$log"; (cd "$MAIN" && timeout "$tmo" sh -c "$cmd") >> "$log" 2>&1 || rc=1; fi;; esac
+  echo "$(ts) native_verify rc=$rc" >> "$log"; echo "native_verify $slug rc=$rc (log $log)"; [ "$rc" = 0 ]; }
 merged_into_main(){ git -C "$MAIN" rev-parse -q --verify "$1" >/dev/null && git -C "$MAIN" merge-base --is-ancestor "$1" HEAD &&
                     git -C "$MAIN" log --merges --format=%s | grep -qF "$1"; }
 fp_paths(){ (cd "$MAIN" && find "$@" -type f 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do sha256_cmd "$p"; done); }

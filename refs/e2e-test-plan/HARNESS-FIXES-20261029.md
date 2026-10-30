@@ -252,3 +252,14 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - lib.sh `drive_story`: 2 AGENT-ERROR runs in a row → STUCK, even when the state still changed (one retry instead of two).
 - run-plan.sh (D7): `MAX_RESUMES_TOTAL` counts failure resumes only; `kit-update` rows do not count. `nres` still numbers the attempt.
 - Test: `tests/test-classify.sh` (synthetic cases, drive_story stubs, replay of the saved P2-A intake / P2-P build / P2-P release turns and fix-attempts.tsv from the results branch; skips the replay when that branch is not reachable).
+
+## 2026-10-31 — discriminating checks (kitfix-20261031, fixes 1e, 4a–4e, 2d)
+
+- H1 (`released_ok`): new `story_on_branch` — `feature/<slug>` exists, `main` has its merge, and no first-parent `main` commit since `STORY_H0` touches `app/` apart from that merge. Run 3 (P2-A) built on `main` and still passed H1.
+- H3: `phases_in_order` compares `phaseTimes` as instants (fallback: `phaseDates`) and checks the gates' approvals.log SENT order.
+- H6 (new, D8 warn first): `### AC-<n>` count vs the milestone `Size` (next-story.py column 5); a recorded `Plan deviation:` or `## Proposed split` excuses it; FINDING by default, FAIL with `H6_MODE=fail`.
+- V1 (new): `native_verify` re-runs the project's verify in `$MAIN` after release (plus `check-tests-ran.sh`); `NATIVE_VERIFY=0` skips.
+- drive_story: a non-P0-A story past intake with no `feature/<slug>` worktree is STUCK before design/build/verify instead of running on `main`.
+- summary.md: Validity block; `results/story-versions.tsv` records kit and harness version per story.
+- `AGENT_TZ` default `Asia/Manila` (lib.sh run_turn, agy-turn-loop.sh).
+- Test: `tests/test-checks.sh` (25 cases).

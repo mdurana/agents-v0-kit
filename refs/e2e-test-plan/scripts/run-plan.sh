@@ -227,10 +227,15 @@ story_run(){
   drive_story "S$st" feature "$slug" 0
   chk "$st" "$id" H1 "$id released: intake design build verify release approved, verifyPassed, evidence, state committed" -- released_ok "$slug" 0 || ok=0
   chk "$st" "$id" H2 "feature/$slug merged into main with a merge commit" -- merged_into_main "feature/$slug" || ok=0
-  chk "$st" "$id" H3 "phases approved in order (phaseDates non-decreasing)" -- jq -e '.phaseDates as $d | ($d.intake<=$d.design) and ($d.design<=$d.build) and ($d.build<=$d.verify) and ($d.verify<=$d.release)' "$(story_state "$slug")" || ok=0
+  chk "$st" "$id" H3 "phases approved in order (phaseTimes, else phaseDates; approvals.log SENT order)" -- phases_in_order "$(story_state "$slug")" "$EVID/S$st-$slug-" || ok=0
   chk "$st" "$id" H4 "earlier released stories unchanged" -- test "$before" = "$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)" || ok=0
   chk "$st" "$id" H5 "main clean, no self-approval, no forbidden command" -- bash -c "test -z \"\$(git -C '$MAIN' status --porcelain)\" && ! ls '$EVID'/S$st-*/self-approval.txt >/dev/null 2>&1 && ! cat '$EVID'/S$st-*/forbidden-commands.txt 2>/dev/null | grep -q ." || ok=0
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031 fix 4a, D8): H6 warns first. H6_MODE=fail makes a mismatch fail the story.
+  if ! chk "$st" "$id" H6 "AC count in requirements matches the milestone plan (Size)" -- ac_count_matches "$slug" "$(story_field "$row" 5)"; then
+    post FINDING "H6 $id: AC count differs from the milestone plan (see results/check-output.log)"; [ "${H6_MODE:-warn}" = fail ] && ok=0; fi
+  chk "$st" "$id" V1 "native verify re-run passes on main after release (NATIVE_VERIFY=0 skips)" -- native_verify "$slug" "$(story_field "$row" 6)" || ok=0
   lessons_chk "$st" "$id" "$slug" 0 || ok=0
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(ts)" "$id" "$slug" "${KIT_LABEL:-?}" "$(cat "$HERE"/*.sh "$HERE"/*.py | sha256_cmd | cut -c1-12)" "$([ "$ok" = 1 ] && echo PASS || echo FAIL)" >> "$RES/story-versions.tsv"
   [ "$ok" = 1 ] && snap "$sname"; [ "$ok" = 1 ]; }
 # lessons_chk <step> <story id> <slug> <is_p0a>: check L1 (HARNESS-FIX 2026-10-29). Runs only when LESSONS_CHECK=1.
 #   Plain words: after a story is released, the kit's lessons memory (docs/agents-v0/lessons.md) must be well-formed
@@ -355,6 +360,20 @@ s8(){ local ok=1 row
   [ "$ok" = 1 ]; }
 
 # ================= driver =================
+# validity_block (HARNESS-FIX 2026-10-31, kitfix-20261031 fix 4e): what limits how far the run can be trusted. Copy it
+#   into the results README. DEGRADED prereqs, SEMI-SYNTHETIC labels by kind, H6 warnings, the kit and harness versions
+#   the run used and the limits in force (values only).
+validity_block(){ local kits
+  echo "## Validity"; echo
+  echo "- DEGRADED prereqs: $(awk '$3=="DEGRADED"{printf "%s ",$2}' "$RES/preflight.txt" 2>/dev/null | sed 's/ $//;s/^$/none/')"
+  echo "- SEMI-SYNTHETIC labels: $(find "$EVID" -name SEMI-SYNTHETIC 2>/dev/null | xargs -r cat | sed -E 's/^[0-9-]+ [0-9:]+ //;s/:.*//' | sort | uniq -c | awk '{printf "%s x%s, ",$2,$1}' | sed 's/, $//;s/^$/none/')"
+  echo "- H6 AC-count warnings: $(awk -F'\t' '$4=="H6" && $5=="FAIL"{printf "%s ",$3}' "$RES/checks.tsv" 2>/dev/null | sed 's/ $//;s/^$/none/')"
+  kits="$( { grep '^kit_label=' "$RES/run.meta" 2>/dev/null | cut -d= -f2; grep -o 'new_kit=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2; } | sort -u)"
+  echo "- Kit versions used: $(echo "$kits" | paste -sd' ' -) · harness: $(grep -o 'harness_sha=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2 | sort -u | paste -sd' ' -)"
+  echo "- Single version: $([ "$(echo "$kits" | grep -c .)" -le 1 ] && echo yes || echo no)"
+  echo "- Limits: MAX_RESUMES_TOTAL=${MAX_RESUMES_TOTAL:-?} MAX_RUNS_PER_STORY=${MAX_RUNS_PER_STORY:-?} H6_MODE=${H6_MODE:-warn} NATIVE_VERIFY=${NATIVE_VERIFY:-1} AGENT_TZ=${AGENT_TZ:-Asia/Manila}"
+  if [ -s "$RES/story-versions.tsv" ]; then echo; echo "| Story | Slug | Kit | Harness | Checks |"; echo "|---|---|---|---|---|"
+    awk -F'\t' '{printf "| %s | %s | %s | %s | %s |\n",$2,$3,$4,$5,$6}' "$RES/story-versions.tsv"; fi; echo; }
 write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   echo "Run: \`$TEST_ROOT\` · kit source \`$KIT_URL\` @ \`$KIT_REF\` · current kit \`${KIT_LABEL:-?}\` · model \`$AGENT_MODEL\` · ask_mode \`${ASK_MODE}\` · written $(ts) Asia/Manila"; echo
   [ -z "$TARGET_SURFACE" ] || { echo "Scope: chain to the first \`$TARGET_SURFACE\` story, stop after step ${STOP_AFTER_STEP:-4} (steps 5-8 out of scope) · lessons check L1 \`$LESSONS_CHECK\`"; echo; }   # HARNESS-FIX 2026-10-29
@@ -371,6 +390,7 @@ write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   grep -h ' RESUME-FROM-STORY ' "$STATUS_LOG" 2>/dev/null | sed 's/^/- /'; grep -q ' RESUME-FROM-STORY ' "$STATUS_LOG" 2>/dev/null && echo   # HARNESS-FIX 2026-10-29
   [ -s "$RES/stop.txt" ] && { echo "## Stop condition"; echo; cat "$RES/stop.txt"; echo; }
   echo "## Labels"; echo; find "$EVID" -maxdepth 2 -name SEMI-SYNTHETIC -not -path '*/attempt-*' 2>/dev/null | sed 's/^/- SEMI-SYNTHETIC: /'; grep -h DEGRADED "$STATUS_LOG" | sed 's/^/- /'
+  echo; validity_block
   } > "$RES/summary.md"; post SUMMARY "$RES/summary.md"; }
 # chain_resume_prepare <attempt dir> (HARNESS-FIX 2026-10-29, chain resume from a story): story-ids rows of the kept
 #   stories; work/ = S4-<previous story>-END (restored with the usual checksum + trash rules when work/ is absent; an
