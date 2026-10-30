@@ -292,6 +292,11 @@ for bgc in v0-design v0-build v0-verify; do
 done
 grep -Fq 'kitfix-20261031-branch-guard' core/common/commands/v0-local-release.md || err "v0-local-release must stop when the story has no feature/<feature> branch"
 grep -Fq 'Do not run the script in the same turn as the Intake approval' core/common/commands/v0-intake.md || err "v0-intake must ask for branch authorisation in its own turn"
+# kitfix-20261031-skeleton: the P0 archive must hold no macOS AppleDouble (._*) entries.
+if tar tzf templates/app/p0-platform-skeleton.tar.gz 2>/dev/null | grep -Eq '(^|/)\._'; then
+  err "templates/app/p0-platform-skeleton.tar.gz holds macOS ._* entries; repack with scripts/pack-app-template.sh"
+fi
+grep -Fq "exclude '._*'" scripts/pack-app-template.sh || err "pack-app-template.sh must exclude macOS ._* files"
 grep -Eq '^\._\*$' templates/.gitignore || err "templates/.gitignore must ignore macOS AppleDouble files (._*)"
 [ -f templates/.cursor/model-config.json ] || err "templates/.cursor/model-config.json missing"
 [ -x templates/.agents-v0/scripts/update-agents-model.sh ] || err "templates/.agents-v0/scripts/update-agents-model.sh missing or not executable"

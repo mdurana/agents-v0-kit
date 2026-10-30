@@ -161,6 +161,9 @@ expect_pass "branch guard: P0-A verify is allowed on the integration branch" "$r
   sh .agents-v0/scripts/sync-feature-state.sh "$P0" --active-phase verify --status in_progress
 mv "$r/$P0" "$tmp/p0-a.md.moved"; mv "$r/docs/agents-v0/requirements/p0-a-platform-skeleton.state.json" "$tmp/p0-a.state.moved"
 git -C "$r" checkout -q feature/orders
+expect_fail "design evidence: --approve design is refused without design/orders/design.md (kitfix-20261031-skeleton)" "$r" \
+  sh .agents-v0/scripts/sync-feature-state.sh "$ORD" --approve design
+expect_out "design evidence: the refusal names the missing design.md" 'FAIL: --approve design needs docs/agents-v0/design/orders/design.md'
 
 mkdir -p "$r/docs/agents-v0/verify/orders" && printf '# Quality gate: orders\nCritical: 0\n' > "$r/docs/agents-v0/verify/orders/quality-gate.md"
 expect_pass "verify: sync-feature-state approves verify and sets verifyPassed=true" "$r" \

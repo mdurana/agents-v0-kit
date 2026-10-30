@@ -34,7 +34,7 @@ Write only under `docs/agents-v0/design/<feature>/`, `docs/agents-v0/adr/`, and 
 8. **Stop** and present the design artifacts and `review.md` summary to the user. After explicit user approval:
    - Set the cited ADR's `Status` to `Accepted` (when an ADR was written).
    - Update `<feature>.phase-result.md` to `status: approved`.
-   - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/<feature>.md`.
+   - Run `sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/<feature>.md`. It refuses when `docs/agents-v0/design/<feature>/design.md` is missing or empty: you write the design evidence yourself; nothing fills it in for you (kitfix-20261031-skeleton).
 
 ## Amending an Approved Design
 If Build or Verify discovers that an approved contract or design must change:

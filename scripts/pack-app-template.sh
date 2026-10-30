@@ -14,16 +14,18 @@ trap 'rm -rf "$STAGE"' EXIT
   exit 1
 }
 
-mkdir -p "$STAGE/app"
-# Copy without build artifacts or the archive itself
-rsync -a \
-  --exclude 'node_modules/' --exclude 'dist/' --exclude 'target/' \
-  --exclude '.DS_Store' --exclude 'p0-platform-skeleton.tar.gz' \
-  "$APP/backend/" "$STAGE/app/backend/"
-rsync -a \
-  --exclude 'node_modules/' --exclude 'dist/' --exclude 'target/' \
-  --exclude '.DS_Store' --exclude 'p0-platform-skeleton.tar.gz' \
-  "$APP/frontend/" "$STAGE/app/frontend/"
+mkdir -p "$STAGE/app/backend" "$STAGE/app/frontend"
+# Copy without build artifacts, the archive itself, or macOS metadata. kitfix-20261031-skeleton:
+# the archive packed on macOS held 57 AppleDouble ._* files that broke Checkstyle and Vitest on Linux
+# (P0-A). COPYFILE_DISABLE stops macOS tar from writing them; the excludes drop any on disk.
+# tar is used instead of rsync so the script also runs where rsync is not installed.
+COPYFILE_DISABLE=1; export COPYFILE_DISABLE
+for part in backend frontend; do
+  tar -C "$APP/$part" \
+    --exclude 'node_modules' --exclude 'dist' --exclude 'target' \
+    --exclude '.DS_Store' --exclude '._*' --exclude 'p0-platform-skeleton.tar.gz' \
+    -cf - . | tar -C "$STAGE/app/$part" -xf -
+done
 cp "$APP/docker-compose.yml" "$STAGE/docker-compose.yml"
 
 # Guard against product-specific leftovers
@@ -37,5 +39,14 @@ if rg -n --hidden -g '!package-lock.json' -g '!mvnw*' \
   exit 1
 fi
 
-tar -C "$STAGE" -czf "$OUT" app docker-compose.yml
+if find "$STAGE" -name '._*' | grep -q .; then
+  printf 'error: macOS ._* files in the staged template\n' >&2
+  exit 1
+fi
+# No extended attributes or ACLs (GNU tar defaults; bsdtar needs --no-xattrs --no-acls).
+if tar --version 2>/dev/null | grep -qi bsdtar; then
+  tar --no-xattrs --no-acls -C "$STAGE" -czf "$OUT" app docker-compose.yml
+else
+  tar --sort=name --owner=0 --group=0 --numeric-owner -C "$STAGE" -czf "$OUT" app docker-compose.yml
+fi
 printf 'Wrote %s (%s bytes)\n' "$OUT" "$(wc -c <"$OUT" | tr -d ' ')"

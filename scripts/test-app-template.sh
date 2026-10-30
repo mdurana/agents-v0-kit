@@ -13,6 +13,11 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 tar -C "$STAGE" -xzf "$ARCHIVE"
+# kitfix-20261031-skeleton: AppleDouble ._* files broke Checkstyle and Vitest on Linux (P0-A).
+if find "$STAGE" -name '._*' | grep -q .; then
+  printf 'FAIL: %s holds macOS ._* files\n' "$ARCHIVE" >&2
+  exit 1
+fi
 # KitPresenceTest walks up for .agents-v0 and the P0 milestone.
 mkdir -p "$STAGE/.agents-v0" "$STAGE/.cursor" "$STAGE/docs/agents-v0/milestones"
 touch "$STAGE/docs/agents-v0/milestones/p0-platform-skeleton.md"

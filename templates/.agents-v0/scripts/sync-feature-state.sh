@@ -386,6 +386,21 @@ if cli_approve:
     if cli_approve not in phases:
         print(f"FAIL: --approve phase must be one of {', '.join(phases)}", file=sys.stderr)
         raise SystemExit(1)
+    # kitfix-20261031-skeleton (design evidence): --approve design on a feature story needs the
+    # agent's own design.md on disk. The harness never writes it (fix-and-resume.md 5.6, P1-C).
+    if (
+        not (onboarding or maintain_note or program_doc)
+        and cli_approve == "design"
+        and not os.environ.get("HOOK_SLUG", "").startswith("p0-a")
+    ):
+        dpath = os.path.join("docs", "agents-v0", "design", os.environ.get("HOOK_SLUG", ""), "design.md")
+        if not os.path.isfile(dpath) or not open(dpath, encoding="utf-8").read().strip():
+            print(
+                f"FAIL: --approve design needs {dpath} (written by /v0-design in this story's worktree). "
+                "Do not approve; finish /v0-design first.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
     # Preconditions (KD-02): on a feature story, --approve verify|release needs the Verify
     # evidence on disk, and --approve release needs verifyPassed already true (or set in this
     # call). A single call can no longer forge a complete, released story from nothing.

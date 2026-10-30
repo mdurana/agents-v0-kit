@@ -56,6 +56,7 @@ d="$(fixture across-midnight)"
 (cd "$d" && TZ=UTC AGENTS_V0_TZ=Asia/Manila AGENTS_V0_NOW=2026-10-29T23:50:00+08:00 \
   sh .agents-v0/scripts/sync-feature-state.sh --approve intake "$ART" >/dev/null 2>&1)
 printf '| Design | docs/agents-v0/design/orders/design.md | mdurana | Approved | - |\n' >> "$d/$ART"
+mkdir -p "$d/docs/agents-v0/design/orders" && printf '# Design: orders\n' > "$d/docs/agents-v0/design/orders/design.md"
 (cd "$d" && TZ=UTC AGENTS_V0_TZ=Asia/Manila AGENTS_V0_NOW=2026-10-29T16:30:00Z \
   sh .agents-v0/scripts/sync-feature-state.sh --approve design "$ART" >/dev/null 2>&1)
 check "across midnight: intake date" "$(jget "$d/$ST" phaseDates.intake)" 2026-10-29

@@ -32,3 +32,11 @@ Found by e2e run 20261029-1629 (P2-A run 4, 2026-10-30 02:11 Asia/Manila, H3 FAI
 - `scripts/test-clock.sh` (new, run by `validate-kit.sh`): approval at 00:30 Asia/Manila (16:30 UTC the day before) with the process in UTC, a `date -u` table cell, approvals across midnight, the profile row, the system zone, and an old state file.
 How to check: `sh scripts/test-clock.sh` prints `ok: midnight Asia/Manila: phaseDates.intake is the Manila date` and `test-clock: OK`.
 Not in this fix: the harness default `AGENT_TZ=UTC` is changed in the e2e harness commit (agents now run in Asia/Manila, as the real user does).
+
+## kitfix-20261031-skeleton
+
+Old P0-A finding (`fix-and-resume.md` §5.6), still open after run 20261029-1629: `templates/app/p0-platform-skeleton.tar.gz` held 57 macOS AppleDouble `._*` entries out of 114 (plus `LIBARCHIVE.xattr.com.apple.provenance` headers). They broke Checkstyle and Vitest on Linux.
+- `scripts/pack-app-template.sh`: copies with `tar` (rsync is not always installed) and excludes `._*`, sets `COPYFILE_DISABLE=1`, packs without xattrs/ACLs, refuses a staged `._*` file. The archive is repacked: 57 entries, the same content as `templates/app/{backend,frontend,docker-compose.yml}`.
+- `scripts/validate-kit.sh`: fails when the archive lists any `._*` entry and when the packer does not exclude them. `scripts/test-app-template.sh`: fails on an extracted `._*` file.
+- Design evidence (P1-C, §5.6): `sync-feature-state.sh --approve design` refuses a feature story (not P0-A) without a non-empty `docs/agents-v0/design/<feature>/design.md`; `v0-design.md` says the agent writes it. Run 20261029-1629 did not show the harness writing design evidence: the P1-C and P1-E SEMI-SYNTHETIC labels in their `design-1` runs are build-gate commits after the No-contract shortcut.
+How to check: `tar tzf templates/app/p0-platform-skeleton.tar.gz | grep -c '\._'` prints `0`; `sh scripts/test-command-flows.sh` prints `ok: design evidence: --approve design is refused without design/orders/design.md (kitfix-20261031-skeleton)`; `sh scripts/validate-kit.sh` prints `validate-kit: OK`.
