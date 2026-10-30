@@ -122,5 +122,21 @@ elif [ -z "$REF" ]; then echo "  SKIP D7 replay (results branch not reachable)";
 else RES="$SB/c/res"; mkdir -p "$RES"; git -C "$HERE" show "$REF:e2e-results/run-20261029-1629/results/fix-attempts.tsv" > "$RES/fix-attempts.tsv"
   eval "$NF_LINE"; [ "$nfail" = 8 ] && ok "D7: 10 rows, 2 kit-update -> 8 failure resumes counted" || ko "D7: nfail=$nfail"; fi
 grep -q '"$nfail" -lt "$MAX_RESUMES_TOTAL"' "$HERE/scripts/run-plan.sh" && ok "D7: the limit compares nfail" || ko "D7: the limit does not use nfail"
+# ---------- D. committed fixtures: the real P2-P persistent quota (kitfix-20261031-quota-fixture) ----------
+echo "-- D. P2-P persistent-quota fixtures (tests/fixtures/p2p-quota-20261030)"
+FX="$HERE/tests/fixtures/p2p-quota-20261030"
+for n in 1 3; do d="$FX/design-$n"
+  if [ ! -s "$d/turn-1.agy.jsonl" ]; then ko "fixture design-$n missing"; continue; fi
+  [ ! -s "$d/turn-1.stderr" ] && ! grep -qiE 'quota|usage limit' "$d/turn-1.stderr" \
+    && ok "design-$n: runner stderr is empty (the quota is only in the agy side files)" || ko "design-$n: fixture stderr not empty"
+  k="$(agy_api_error_kind "$d/turn-1.agy.jsonl" "$d/turn-1.agy.stderr" "$d/turn-1.jsonl")"
+  [ "$k" = persistent ] && ok "design-$n: agy_api_error_kind -> persistent" || ko "design-$n: agy_api_error_kind -> $k"
+  for rc in 1 0; do got="$(classify "$rc" "$d/turn-1.stderr" "$d/turn-1.jsonl" 0)"
+    [ "$got" = USAGE ] && ok "design-$n rc=$rc -> USAGE (was AGENT-ERROR in the run; not the empty-result INFRA rule)" || ko "design-$n rc=$rc: wanted USAGE, got $got"; done
+  # the "retryable":true flag agy prints must not make a lasting quota look transient
+  grep -q '"retryable":true' "$d/turn-1.agy.stderr" && ok "design-$n: agy says retryable, still USAGE" || ko "design-$n: fixture lost the retryable flag"
+done
+grep -rqE '/home/e2e|"error_id":"[0-9a-f]{8}-|"conversation_id":"[0-9a-f]{0,7}[1-9a-f]' "$FX" \
+  && ko "fixtures still hold host paths or real ids" || ok "fixtures hold no host paths or real ids"
 echo "== test-classify: $PASS passed, $FAILN failed, $SKIP skipped"
 [ "$FAILN" = 0 ]

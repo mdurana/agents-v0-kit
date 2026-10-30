@@ -79,7 +79,7 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | `/v0-design` | Contracts, ADR, and UX before code | `docs/agents-v0/design/<feature>/` |
 | `/v0-build` | Red-to-green implementation per unit | `docs/agents-v0/build/<feature>/plan.md`, `build-report.md` |
 | `/v0-verify` | Native test/coverage run + security & code review | `docs/agents-v0/verify/<feature>/quality-gate.md`, `vapt-checklist.md`, `code-review.md` |
-| `/v0-local-release` | Merge verified feature branch locally | Updates `<feature>.state.json` (`lastApprovedPhase: "release"`) + local merge commit |
+| `/v0-local-release` | Merge verified feature branch locally | Updates `<feature>.state.json` (`lastApprovedPhase: "release"`) + one local squash commit (a maintenance branch: a merge commit) |
 | `/v0-release` | Optional remote MR workflow | Merge request ready for human merge |
 | `/v0-maintain` | Bugfix, CVE, upgrade, refactor, doc sync | `docs/agents-v0/maintain/<id>/note.md`, `docs/agents-v0/maintain/<id>/state.json` |
 | `/v0-triage` | User-confirmed trivial doc/version fix | `docs/agents-v0/maintain/<id>/note.md` (`tier: "trivial"` in `state.json`) |

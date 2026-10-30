@@ -365,20 +365,44 @@ s8(){ local ok=1 row
   [ "$ok" = 1 ]; }
 
 # ================= driver =================
-# validity_block (HARNESS-FIX 2026-10-31, kitfix-20261031 fix 4e): what limits how far the run can be trusted. Copy it
-#   into the results README. DEGRADED prereqs, SEMI-SYNTHETIC labels by kind, H6 warnings, the kit and harness versions
+# validity_block (HARNESS-FIX 2026-10-31, kitfix-20261031 fix 4e): what limits how far the run can be trusted. write_run_readme
+#   puts it into the run README automatically. DEGRADED prereqs, SEMI-SYNTHETIC labels by kind, H6 warnings, the kit and harness versions
 #   the run used and the limits in force (values only).
+# orn: the piped value, or "none" when it is empty (sed 's/^$/none/' prints nothing for an empty stream).
+orn(){ local v; v="$(cat)"; [ -n "$v" ] && printf '%s\n' "$v" || echo none; }
 validity_block(){ local kits
   echo "## Validity"; echo
-  echo "- DEGRADED prereqs: $(awk '$3=="DEGRADED"{printf "%s ",$2}' "$RES/preflight.txt" 2>/dev/null | sed 's/ $//;s/^$/none/')"
-  echo "- SEMI-SYNTHETIC labels: $(find "$EVID" -name SEMI-SYNTHETIC 2>/dev/null | xargs -r cat | sed -E 's/^[0-9-]+ [0-9:]+ //;s/:.*//' | sort | uniq -c | awk '{printf "%s x%s, ",$2,$1}' | sed 's/, $//;s/^$/none/')"
-  echo "- H6 AC-count warnings: $(awk -F'\t' '$4=="H6" && $5=="FAIL"{printf "%s ",$3}' "$RES/checks.tsv" 2>/dev/null | sed 's/ $//;s/^$/none/')"
+  echo "- DEGRADED prereqs: $(awk '$3=="DEGRADED"{printf "%s ",$2}' "$RES/preflight.txt" 2>/dev/null | sed 's/ $//' | orn)"
+  echo "- SEMI-SYNTHETIC labels: $(find "$EVID" -name SEMI-SYNTHETIC 2>/dev/null | xargs -r cat | sed -E 's/^[0-9-]+ [0-9:]+ //;s/:.*//' | sort | uniq -c | awk '{printf "%s x%s, ",$2,$1}' | sed 's/, $//' | orn)"
+  echo "- H6 AC-count warnings: $(awk -F'\t' '$4=="H6" && $5=="FAIL"{printf "%s ",$3}' "$RES/checks.tsv" 2>/dev/null | sed 's/ $//' | orn)"
   kits="$( { grep '^kit_label=' "$RES/run.meta" 2>/dev/null | cut -d= -f2; grep -o 'new_kit=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2; } | sort -u)"
   echo "- Kit versions used: $(echo "$kits" | paste -sd' ' -) · harness: $(grep -o 'harness_sha=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2 | sort -u | paste -sd' ' -)"
   echo "- Single version: $([ "$(echo "$kits" | grep -c .)" -le 1 ] && echo yes || echo no)"
   echo "- Limits: MAX_RESUMES_TOTAL=${MAX_RESUMES_TOTAL:-?} MAX_RUNS_PER_STORY=${MAX_RUNS_PER_STORY:-?} H6_MODE=${H6_MODE:-warn} NATIVE_VERIFY=${NATIVE_VERIFY:-1} AGENT_TZ=${AGENT_TZ:-Asia/Manila}"
   if [ -s "$RES/story-versions.tsv" ]; then echo; echo "| Story | Slug | Kit | Harness | Checks |"; echo "|---|---|---|---|---|"
     awk -F'\t' '{printf "| %s | %s | %s | %s | %s |\n",$2,$3,$4,$5,$6}' "$RES/story-versions.tsv"; fi; echo; }
+# write_run_readme (kitfix-20261031-run-readme): the run README ($TEST_ROOT/README.md, published with the results)
+#   carries the same Validity block, written by the harness every time the summary is written, not copied by hand.
+#   The block sits between two marker lines and only that part is replaced; text outside the markers (a hand-written
+#   outcome, memory verdict, contents list) is kept. A README without markers gets the block appended; a missing
+#   README is created with a short header. Written to a temp file and moved into place (never a partial README).
+RUN_README_BEGIN='<!-- agents-v0-validity:begin (written by run-plan.sh write_run_readme; edits inside are replaced) -->'
+RUN_README_END='<!-- agents-v0-validity:end -->'
+write_run_readme(){ local r="$TEST_ROOT/README.md" tmp blk="$RES/validity-block.md"
+  tmp="$r.tmp.$$"
+  { echo "$RUN_README_BEGIN"; validity_block; echo "_Written $(ts) Asia/Manila from \`results/\` (see \`results/summary.md\`)._"; echo "$RUN_README_END"; } > "$blk"
+  if [ ! -f "$r" ]; then
+    { echo "# agents-v0 kit e2e results: run $(basename "$TEST_ROOT")"; echo
+      echo "Kit \`${KIT_LABEL:-?}\` · model \`${AGENT_MODEL:-?}\` · full results in \`results/summary.md\`."; echo; cat "$blk"; } > "$tmp"
+  elif grep -qF "$RUN_README_BEGIN" "$r" && grep -qF "$RUN_README_END" "$r"; then
+    awk -v b="$RUN_README_BEGIN" -v e="$RUN_README_END" -v f="$blk" '
+      $0==b {while ((getline l < f) > 0) print l; close(f); skip=1; next}
+      skip && $0==e {skip=0; next}
+      !skip {print}' "$r" > "$tmp"
+  else
+    { cat "$r"; echo; cat "$blk"; } > "$tmp"
+  fi
+  mv -f "$tmp" "$r"; }
 write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   echo "Run: \`$TEST_ROOT\` · kit source \`$KIT_URL\` @ \`$KIT_REF\` · current kit \`${KIT_LABEL:-?}\` · model \`$AGENT_MODEL\` · ask_mode \`${ASK_MODE}\` · written $(ts) Asia/Manila"; echo
   [ -z "$TARGET_SURFACE" ] || { echo "Scope: chain to the first \`$TARGET_SURFACE\` story, stop after step ${STOP_AFTER_STEP:-4} (steps 5-8 out of scope) · lessons check L1 \`$LESSONS_CHECK\`"; echo; }   # HARNESS-FIX 2026-10-29
@@ -396,7 +420,7 @@ write_summary(){ { echo "# Results — agents-v0 portal end-to-end plan"; echo
   [ -s "$RES/stop.txt" ] && { echo "## Stop condition"; echo; cat "$RES/stop.txt"; echo; }
   echo "## Labels"; echo; find "$EVID" -maxdepth 2 -name SEMI-SYNTHETIC -not -path '*/attempt-*' 2>/dev/null | sed 's/^/- SEMI-SYNTHETIC: /'; grep -h DEGRADED "$STATUS_LOG" | sed 's/^/- /'
   echo; validity_block
-  } > "$RES/summary.md"; post SUMMARY "$RES/summary.md"; }
+  } > "$RES/summary.md"; write_run_readme; post SUMMARY "$RES/summary.md"; }
 # chain_resume_prepare <attempt dir> (HARNESS-FIX 2026-10-29, chain resume from a story): story-ids rows of the kept
 #   stories; work/ = S4-<previous story>-END (restored with the usual checksum + trash rules when work/ is absent; an
 #   existing work/ is used as is and must pass the checks below); then every kept story must pass the harness's own

@@ -87,6 +87,9 @@ SHELL_CASES = [
     ("git clean -fdx", "block"),
     ("git push", "ask"),
     ("git commit -m x", "ask"),
+    # kitfix-20261031-no-amend: git's abbreviations of --amend ask too, and never count as an evidence-only commit
+    ("git commit --amen --no-edit", "ask"),
+    ("git commit --am -m x -- docs/agents-v0/build/orders/build-report.md", "ask"),
     ("git commit -m x -- docs/agents-v0/build/orders/build-report.md", "allow"),
     ("git commit -m x -- docs/agents-v0/build/orders/build-report.md docs/agents-v0/requirements/orders.state.json", "allow"),
     ("git commit -m x -- docs/agents-v0/build/p0-a-platform-skeleton docs/agents-v0/requirements/p0-a-platform-skeleton.md docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md docs/agents-v0/requirements/p0-a-platform-skeleton.state.json", "allow"),

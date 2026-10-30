@@ -74,7 +74,7 @@ drive_story S4 feature s1 0 >/dev/null 2>&1; rc=$?
   && ok "intake approved, no feature/s1 worktree -> STUCK before any run on main" || ko "rc=$rc calls=$(cat "$SB/ff.calls" 2>/dev/null)"
 
 echo "-- Validity block and AGENT_TZ"
-eval "$(sed -n '/^validity_block(){/,/^write_summary(){/p' "$HERE/scripts/run-plan.sh" | sed '$d')"
+eval "$(sed -n '/^orn(){/,/^write_summary(){/p' "$HERE/scripts/run-plan.sh" | sed '$d')"
 printf 'PREREQ os OK\nPREREQ container DEGRADED no docker\n' > "$RES/preflight.txt"
 mkdir -p "$EVID/S4-x-build-1"; echo "2026-10-30 10:00:00 build: committed pending files in /w" > "$EVID/S4-x-build-1/SEMI-SYNTHETIC"
 printf 'kit_label=kit-a\n' > "$RES/run.meta"; printf 'resume_2=t step=4 reason=r old_kit=kit-a new_kit=kit-b harness_sha=abc\n' >> "$RES/run.meta"
@@ -85,6 +85,31 @@ grep -q 'SEMI-SYNTHETIC labels: build x1' "$SB/v.md" && ok "SEMI-SYNTHETIC kinds
 grep -q 'H6 AC-count warnings: P2-F' "$SB/v.md" && ok "H6 warnings listed" || ko "no H6 line"
 grep -q 'Single version: no' "$SB/v.md" && ok "two kit versions -> single version: no" || ko "single-version wrong"
 grep -q '| P2-F | p2-f | kit-b | abc | PASS |' "$SB/v.md" && ok "story -> kit -> harness table" || ko "no story table"
+echo "-- run README gets the Validity block (kitfix-20261031-run-readme)"
+TEST_ROOT_SAVE="$TEST_ROOT"; TEST_ROOT="$SB/runA"; mkdir -p "$TEST_ROOT"; RR="$TEST_ROOT/README.md"
+write_run_readme
+[ -f "$RR" ] && head -1 "$RR" | grep -q '^# agents-v0 kit e2e results: run runA' && grep -q 'DEGRADED prereqs: container' "$RR" \
+  && grep -q 'SEMI-SYNTHETIC labels: build x1' "$RR" && grep -q '| P2-F | p2-f | kit-b | abc | PASS |' "$RR" \
+  && ok "missing README -> created with header + Validity block (DEGRADED, SEMI, story/kit/harness)" || ko "new README: $(cat "$RR" 2>/dev/null)"
+printf '# Hand-written outcome\n\n**Outcome: PASS.** memory 2.2 GB\n' > "$RR"
+write_run_readme
+grep -q 'Outcome: PASS.\*\* memory 2.2 GB' "$RR" && [ "$(grep -c 'agents-v0-validity:begin' "$RR")" = 1 ] && grep -q 'Single version: no' "$RR" \
+  && ok "hand-written README kept, block appended once" || ko "append: $(cat "$RR")"
+printf '\n## Contents\n\n- results/\n' >> "$RR"
+printf 'PREREQ os OK\n' > "$RES/preflight.txt"; printf 't\tP2-G\tp2-g\tkit-c\tdef\tPASS\n' >> "$RES/story-versions.tsv"
+write_run_readme
+[ "$(grep -c 'agents-v0-validity:begin' "$RR")" = 1 ] && [ "$(grep -c 'agents-v0-validity:end' "$RR")" = 1 ] \
+  && grep -q 'DEGRADED prereqs: none' "$RR" && ! grep -q 'DEGRADED prereqs: container' "$RR" && grep -q '| P2-G | p2-g | kit-c | def | PASS |' "$RR" \
+  && grep -q 'Outcome: PASS' "$RR" && tail -1 "$RR" | grep -q '^- results/' \
+  && ok "rerun replaces only the marked block (new values), text before and after kept" || ko "replace: $(cat "$RR")"
+ls "$TEST_ROOT" | grep -q 'README.md.tmp' && ko "temp README left behind" || ok "no temp README left behind"
+# write_summary writes the README too (the harness path, not a manual copy)
+eval "$(sed -n '/^write_summary(){/,/^# chain_resume_prepare/p' "$HERE/scripts/run-plan.sh" | sed '$d')"
+post(){ :; }; KIT_URL=u KIT_REF=r AGENT_MODEL=m ASK_MODE=allowlist TARGET_SURFACE=; : > "$RES/results.tsv"
+TEST_ROOT="$SB/runB"; mkdir -p "$TEST_ROOT"; write_summary
+[ -s "$RES/summary.md" ] && grep -q '## Validity' "$TEST_ROOT/README.md" && grep -q 'agents-v0-validity:end' "$TEST_ROOT/README.md" \
+  && ok "write_summary -> run README.md has the Validity block" || ko "write_summary did not write the run README"
+TEST_ROOT="$TEST_ROOT_SAVE"
 grep -q 'TZ="${AGENT_TZ:-Asia/Manila}"' "$HERE/scripts/lib.sh" && grep -q 'TZ="${AGENT_TZ:-Asia/Manila}"' "$HERE/scripts/agy-turn-loop.sh" \
   && ok "AGENT_TZ defaults to Asia/Manila in lib.sh and agy-turn-loop.sh" || ko "AGENT_TZ default"
 echo "== test-checks: $PASS passed, $FAILN failed"

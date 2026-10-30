@@ -461,7 +461,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             return "ask", "git push requires explicit user approval."
         if sub == "commit":
             # kitfix-20261031-gate-commit: one commit per approved gate; a gate commit is never amended.
-            if "--amend" in parts[sub_idx + 1 :]:
+            # kitfix-20261031-no-amend: git also accepts the abbreviations --am, --ame, --amen.
+            if any(a in ("--amend", "--am", "--ame", "--amen") for a in parts[sub_idx + 1 :]):
                 return "ask", "git commit --amend rewrites a commit; gate commits are never amended (make a new commit)."
             if _commit_paths_are_evidence(parts):
                 return "allow", ""
@@ -527,7 +528,7 @@ def _commit_paths_are_evidence(parts: List[str]) -> bool:
         return False
     sep_idx = parts.index("--")
     for tok in parts[2:sep_idx]:
-        if tok in ("-a", "--all", "-i", "--include", "--amend") or (
+        if tok in ("-a", "--all", "-i", "--include", "--amend", "--am", "--ame", "--amen") or (
             tok.startswith("-") and not tok.startswith("--") and ("a" in tok[1:] or "i" in tok[1:])
         ):
             return False

@@ -126,6 +126,27 @@ run_hook pre-shell.sh antigravity "{\"toolCall\":{\"name\":\"run_command\",\"arg
 AGY_ALLOW_TOOLS='Shell(echo:*)' run_hook pre-shell.sh cursor "{\"command\":$(json_str "$w"),\"cwd\":$(json_str "$scratch/shop-orders")}" block "unattended shell write lessons.md in story worktree"
 run_hook pre-shell.sh cursor "{\"command\":$(json_str "$w"),\"cwd\":$(json_str "$scratch/shop")}" ask "cursor shell write lessons.md in main (asks)"
 
+# kitfix-20261031-no-amend: the unattended allowlist Shell(git:commit*) allows a new commit but never --amend
+# (nor git's abbreviations --am/--ame/--amen), also after "&&", inside "sh -c", or with -C/-c options first.
+AL='Shell(git:commit*),Shell(git:merge*)'
+AGY_ALLOW_TOOLS="$AL" shell_case 'git commit -m "P1-A: design approved"' allow
+AGY_ALLOW_TOOLS="$AL" shell_case 'git commit -F .git/agents-v0-gate-msg.txt' allow
+AGY_ALLOW_TOOLS="$AL" agy_shell_case 'git commit -m "P1-A: build approved"' allow
+for c in 'git commit --amend --no-edit' 'git commit --amend -m "P1-A: design approved"' 'git commit --amen --no-edit' \
+         'git commit --am -m x' 'git -C app commit --amend' 'git -c user.name=x commit --amend --no-edit' \
+         'git commit -m x && git commit --amend --no-edit' 'sh -c "git commit --amend --no-edit"' \
+         'git commit --amend=x' 'git add -A && git commit --amend -m y'; do
+  AGY_ALLOW_TOOLS="$AL" shell_case "$c" block
+  AGY_ALLOW_TOOLS="$AL" agy_shell_case "$c" block
+done
+# the same through the unattended-allow file the harness writes (no AGY_ALLOW_TOOLS in the environment)
+mkdir -p "$scratch/ua/.agents/hooks"; printf '%s\n' "$AL" > "$scratch/ua/.agents/hooks/unattended-allow"
+( cd "$scratch/ua" && shell_case 'git commit -m "P1-A: verify approved"' allow && shell_case 'git commit --amend --no-edit' block ) || fail=1
+out="$(printf '%s' '{"command":"git commit --amend --no-edit"}' | AGY_ALLOW_TOOLS="$AL" KIT_HOOK_FLAVOR=cursor sh "$HOOKS/pre-shell.sh" 2>/dev/null || true)"
+printf '%s' "$out" | grep -q 'gate commits are never amended' || err "unattended --amend deny message missing: $out"
+# attended mode (no allowlist) still asks, as before
+shell_case 'git commit --amen --no-edit' ask
+
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then

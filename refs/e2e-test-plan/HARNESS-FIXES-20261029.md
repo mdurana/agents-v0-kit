@@ -273,3 +273,10 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - lib.sh `story_rollback` (+ `gate_commits`, `trace_bad_phase`) and its call in `chain_resume_prepare`: reset to the last clean gate commit of the current story; step back only when a consistency check of the failed phase names an earlier phase or the rerun fails the same way; otherwise stop (ROLLBACK-STOP) and wait for Marlon (fix-and-resume.md §5.6).
 - Kit side (same commit): `check-traceability.sh` honours `AGENTS_V0_TRACE_NO_WRITE=1` (print only) for the harness re-run.
 - Tests: new `tests/test-rollback.sh` (22 cases); `tests/sim-in-story-resume.sh` fixture commits are gate commits and T13 expects the squash fallback + GATE-COMMIT-MISSING (22 cases).
+
+## 2026-10-31 04:05 Asia/Manila — run README, real quota fixtures, no unattended --amend (kitfix-20261031 follow-up, approved by Marlon)
+
+- run-plan.sh `write_run_readme` (called by `write_summary`): the run `README.md` gets the Validity block (DEGRADED prereqs, SEMI-SYNTHETIC labels by kind, H6 warnings, kit and harness versions per story) between `agents-v0-validity` marker lines; only that part is replaced, hand-written text is kept, a missing README is created. Also fixed: an empty value in the Validity block printed nothing instead of `none` (`orn`).
+- tests/fixtures/p2p-quota-20261030: the two real P2-P design turns that hit "Individual quota reached … Resets in 53h" (30 Oct 17:54 and 17:55 Asia/Manila), sanitized by `sanitize.py` (ids, host paths, tool parameters and the prompt preamble removed; about 3.5 KB). `tests/test-classify.sh` section D replays them: USAGE with rc 0 and 1, `agy_api_error_kind` persistent.
+- Kit hooks (same commit, kitfix-20261031-no-amend): the unattended allowlist never allows `git commit --amend`.
+- Tests: `tests/test-checks.sh` (30 cases), `tests/test-classify.sh` (32 cases).

@@ -66,7 +66,7 @@ Asked by Marlon (2026-10-31 03:05 Asia/Manila; replaces D10): commit on every ap
 - Commands: v0-intake (intake commit in the branch turn), v0-design, v0-build, v0-verify (commit the gate on `feature/<feature>`), v0-local-release (release commit on the branch, then `git merge --squash`, one squash commit), v0-roadmap, v0-architecture, v0-plan, v0-onboard (one commit each on the integration branch, tag `<phase>-v<n>`, a revision bumps the tag). Also `local-release` skill, `release-manager`, `workflow-orchestration.mdc`, `agents-v0-kit.md`, `AGENTS.md`.
 - Tests: new `scripts/test-gate-commit.sh` (project phases with tags, intake in the branch turn, design/build/verify gates, release refusals, squash commit with trailers, check-release-evidence on a squash and on a moved branch, feature-worktree refusal, secrets, skip flag); `scripts/test-command-flows.sh` (refusal before the intake commit); `scripts/test-hooks.sh` (`--amend`, `-F`, `merge --squash` ask).
 How to check: `sh scripts/test-gate-commit.sh` prints `test-gate-commit: OK`; `sh scripts/validate-kit.sh` runs it.
-Not in this fix: maintenance notes keep `git merge --no-ff maintain/<id>`; remote `/v0-release` (MR) is unchanged.
+Not in this fix: maintenance-branch releases (`maintain/<id>`) and remote `/v0-release` (MR) are unchanged.
 
 ## kitfix-20261031-traceability
 
@@ -82,3 +82,11 @@ Asked by Marlon (2026-10-31 03:12 Asia/Manila, part of fix 5): cheap, determinis
 - Tests: `scripts/test-gate-commit.sh` (T1–T6, warn and fail modes, trace.json earliest bad phase).
 How to check: `sh scripts/test-gate-commit.sh` prints `ok: T2: 2 ACs vs plan Size 3, blamed on intake` and `test-gate-commit: OK`.
 Not in this fix: event contracts (`asyncapi.yaml`) and UX specs are not traced; switch to `AGENTS_V0_TRACE_MODE=fail` after the V3 rerun (D8).
+
+## kitfix-20261031-no-amend
+
+Approved by Marlon (2026-10-31 04:05 Asia/Manila), follow-up to kitfix-20261031-gate-commit: the unattended allowlist `Shell(git:commit*)` matched `git commit --amend` too, so an unattended agent could rewrite a gate commit.
+- `core/common/hooks/lib.sh` `hook_shell_permission_ask`: in unattended mode (`AGY_ALLOW_TOOLS` or `.agents/hooks/unattended-allow`) a git commit command with `--amend`, or an abbreviation git accepts (`--am`, `--ame`, `--amen`), is denied before the allowlist is matched, also after `&&`, inside `sh -c "…"`, and with `-C`/`-c` options first. Message: "gate commits are never amended (make a new commit)".
+- `core/common/hooks/hook-policy.py`: the abbreviations ask like `--amend`, and never count as an evidence-only commit.
+- Tests: `scripts/test-hooks.sh` (allowlisted new commits allowed; ten `--amend` forms blocked for Cursor and Antigravity, also through the `unattended-allow` file; attended mode still asks); `scripts/test-hook-policy.py` (two cases, 272 total).
+How to check: `sh scripts/test-hooks.sh` prints `test-hooks: OK`.

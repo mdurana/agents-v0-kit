@@ -162,7 +162,7 @@ hook_shell_permission_ask() {
   agent_message="$2"
   cmd_str="${3:-}"
   HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" HOOK_CMD_STR="$cmd_str" python3 -c '
-import fnmatch, json, os, shlex, sys
+import fnmatch, json, os, re, shlex, sys
 
 user = os.environ.get("HOOK_USER_MESSAGE", "")
 agent = os.environ.get("HOOK_AGENT_MESSAGE", "")
@@ -210,6 +210,14 @@ if allow_spec:
                 return True
         return False
 
+    # kitfix-20261031-no-amend: an allowlist entry such as Shell(git:commit*) never allows a commit that rewrites
+    #   history. "--amend" (or an abbreviation git accepts: --am, --ame, --amen) anywhere in the command is denied,
+    #   also after "&&" or inside a quoted "sh -c" string. Gate commits are never amended (make a new commit).
+    AMEND = re.compile(r"(?:^|[\s\"\x27;&|(])--am(?:e(?:nd?)?)?(?=$|[\s\"\x27;&|)=])")
+    if "git" in cmd and "commit" in cmd and AMEND.search(cmd):
+        deny_msg = "Unattended mode denied git commit --amend: gate commits are never amended (make a new commit)."
+        print(json.dumps({"permission": "deny", "decision": "deny", "reason": deny_msg, "user_message": deny_msg, "agent_message": "BLOCKED in unattended mode: " + deny_msg}))
+        sys.exit(2)
     if matches_allow(cmd, patterns):
         print(json.dumps({"permission": "allow", "decision": "allow", "reason": "Allowed by per-turn unattended allowlist"}))
         sys.exit(0)
