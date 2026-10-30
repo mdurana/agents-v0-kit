@@ -289,3 +289,4 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - Keep-branches (Marlon 04:47): no harness or kit step deletes a story branch (checked); story branches are kept after release.
 - Tests: new `tests/test-guards.sh` (21 cases; mutation checks: without the ancestry test 3 cases fail, without the pattern 8 fail).
 
+- V3 rerun procedure (P1-E, P2-A, P2-F, P2-P from the old run's END snapshots, main-only kit update with a hash check of the installed kit, `H6_MODE=fail`, `AGENTS_V0_TRACE_MODE=fail`, stop-after-story watcher, pass bar, single-version caveat, branches kept): `refs/e2e-test-plan/v3-rerun-procedure.md`.

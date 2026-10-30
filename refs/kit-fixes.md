@@ -112,3 +112,5 @@ Asked by Marlon (2026-10-31 04:47 Asia/Manila): story branches are kept after re
 - Tests: `scripts/test-hook-policy.py`, `scripts/test-hooks.sh`, `scripts/test-gate-commit.sh` (the WARN on a deleted branch).
 How to check: `HOOK_CMD='git branch -D feature/orders' python3 core/common/hooks/hook-policy.py shell` prints `"action": "block"`.
 
+
+The live check of these fixes (V3: P1-E, P2-A, P2-F, P2-P with the fail modes on; keep-branches included) is described in `refs/e2e-test-plan/v3-rerun-procedure.md`.
