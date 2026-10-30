@@ -263,3 +263,13 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - summary.md: Validity block; `results/story-versions.tsv` records kit and harness version per story.
 - `AGENT_TZ` default `Asia/Manila` (lib.sh run_turn, agy-turn-loop.sh).
 - Test: `tests/test-checks.sh` (25 cases).
+
+## 2026-10-31 — commit on every approved gate, squash release, rollback to the last clean gate commit (kitfix-20261031; Marlon 03:05, 03:08, 03:12 Asia/Manila)
+
+- fixtures/approvals.tsv: every gate's allowlist has `Shell(git:commit*)` (program phases also `Shell(git:tag*)`); gate texts say "commit it"; the branch text is "Branch authorized, commit the intake".
+- lib.sh `harness_complete`: the "commit pending files" fallback stays but now covers every gate (and the intake commit after the branch turn, `branch-commit`); when it triggers it writes `GATE-COMMIT-MISSING`, a SEMI label and a FINDING. Its release fallback squash-merges a feature branch (trailers `Story-Branch` / `Story-Tip`), `--no-ff` only for a maintenance branch; a failed squash is reset with `git reset --merge`.
+- run-plan.sh: new check **H7** "every approved gate committed by the agent" (FAIL by default, `H7_MODE=warn`); H2 accepts a squash commit.
+- lib.sh: `squash_of`, squash-aware `merged_into_main` (the branch must still end at `Story-Tip`) and `main_merge_of`, so H1/H2, the in-story F1 base and the release fallback understand squash releases.
+- lib.sh `story_rollback` (+ `gate_commits`, `trace_bad_phase`) and its call in `chain_resume_prepare`: reset to the last clean gate commit of the current story; step back only when a consistency check of the failed phase names an earlier phase or the rerun fails the same way; otherwise stop (ROLLBACK-STOP) and wait for Marlon (fix-and-resume.md §5.6).
+- Kit side (same commit): `check-traceability.sh` honours `AGENTS_V0_TRACE_NO_WRITE=1` (print only) for the harness re-run.
+- Tests: new `tests/test-rollback.sh` (22 cases); `tests/sim-in-story-resume.sh` fixture commits are gate commits and T13 expects the squash fallback + GATE-COMMIT-MISSING (22 cases).

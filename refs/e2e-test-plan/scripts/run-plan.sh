@@ -226,10 +226,15 @@ story_run(){
   post STORY "step $st story $id ($slug)"
   drive_story "S$st" feature "$slug" 0
   chk "$st" "$id" H1 "$id released: intake design build verify release approved, verifyPassed, evidence, state committed" -- released_ok "$slug" 0 || ok=0
-  chk "$st" "$id" H2 "feature/$slug merged into main with a merge commit" -- merged_into_main "feature/$slug" || ok=0
+  chk "$st" "$id" H2 "feature/$slug reached main (squash commit with Story-Branch/Story-Tip, or a merge commit)" -- merged_into_main "feature/$slug" || ok=0
   chk "$st" "$id" H3 "phases approved in order (phaseTimes, else phaseDates; approvals.log SENT order)" -- phases_in_order "$(story_state "$slug")" "$EVID/S$st-$slug-" || ok=0
   chk "$st" "$id" H4 "earlier released stories unchanged" -- test "$before" = "$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)" || ok=0
   chk "$st" "$id" H5 "main clean, no self-approval, no forbidden command" -- bash -c "test -z \"\$(git -C '$MAIN' status --porcelain)\" && ! ls '$EVID'/S$st-*/self-approval.txt >/dev/null 2>&1 && ! cat '$EVID'/S$st-*/forbidden-commands.txt 2>/dev/null | grep -q ." || ok=0
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031-gate-commit): H7 every approved gate was committed by the agent; a harness
+  #   fallback commit (GATE-COMMIT-MISSING) is a failure. H7_MODE=warn makes it a FINDING only.
+  if ! chk "$st" "$id" H7 "every approved gate committed by the agent (no harness gate-commit fallback)" -- \
+       bash -c '! ls "$1"/S"$2"-"$3"-*/GATE-COMMIT-MISSING >/dev/null 2>&1' _ "$EVID" "$st" "$slug"; then
+    post FINDING "H7 $id: harness committed a gate the agent did not (see evidence/S$st-$slug-*/GATE-COMMIT-MISSING)"; [ "${H7_MODE:-fail}" = warn ] || ok=0; fi
   # HARNESS-FIX 2026-10-31 (kitfix-20261031 fix 4a, D8): H6 warns first. H6_MODE=fail makes a mismatch fail the story.
   if ! chk "$st" "$id" H6 "AC count in requirements matches the milestone plan (Size)" -- ac_count_matches "$slug" "$(story_field "$row" 5)"; then
     post FINDING "H6 $id: AC count differs from the milestone plan (see results/check-output.log)"; [ "${H6_MODE:-warn}" = fail ] && ok=0; fi
@@ -422,6 +427,13 @@ chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cs
       [ "$cbr" != absent ] || [ -n "$wtd" ] || echo "NOTE no feature/$cslug branch or worktree yet: the story starts from its state on main (nothing to keep)"
     elif git -C "$MAIN" rev-parse -q --verify "feature/$cslug" >/dev/null || [ -n "$(wt_for_branch "feature/$cslug")" ]; then echo "FAIL feature/$cslug branch or worktree exists"; ok=1; else echo "OK   no feature/$cslug branch or worktree"; fi
     echo "main HEAD $(git -C "$MAIN" log -1 --format='%h %s')"; } >> "$L" 2>&1
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031, fix-and-resume.md 5.6): an in-story resume first resets the story branch
+  #   to its last clean gate commit (story_rollback), unless a gate is already awaiting approval (the phase finished; the
+  #   harness, not the phase, failed) or CHAIN_RESUME_ROLLBACK=0. A stop waits for Marlon.
+  if [ "$ok" = 0 ] && [ "$CRS_IN_STORY" = 1 ] && [ "${CHAIN_RESUME_ROLLBACK:-1}" = 1 ] && [ -n "$wtd" ] && [ -z "$pg" ]; then
+    if story_rollback "$cslug" "$CRS" "$A" "$EVID/attempt-${A##*attempt-}" >> "$L" 2>&1; then :
+    else echo "$(ts) FAIL rollback: $ROLLBACK_STOP" >> "$L"; post ROLLBACK-STOP "$CRS ($cslug): $ROLLBACK_STOP"; ok=1; fi
+  fi
   [ "$ok" != 0 ] || [ "$CRS_IN_STORY" != 1 ] || CRS_IN_STORY_SLUG="$cslug"   # STAGED HARNESS-FIX 2026-10-30: read by drive_story / story_run
   return "$ok"; }
 failed_checks_of(){ awk -F'\t' -v s="$1" '$2==s && $5=="FAIL"{print $3"/"$4}' "$RES/checks.tsv" | sort -u | tr '\n' ' '; }

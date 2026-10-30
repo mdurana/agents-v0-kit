@@ -202,6 +202,17 @@ CHAIN_RESUME_NOTE="manual-resume-from-story approved by <owner>, after harness-f
 
 ### 5.6 Standing rule for story failures (set by Marlon, 2026-10-29 21:46 Asia/Manila)
 
+**Updated by Marlon, 2026-10-31 03:08 and 03:12 Asia/Manila (kitfix-20261031): roll back to the last clean gate commit.** The kit now commits every approved gate (`<story>: <phase> approved` on `feature/<feature>`; the release is one squash commit on `main`). On a story failure:
+
+- **Default:** reset ONLY the current story's branch to its **last clean gate commit** (the newest `<story>: <phase> approved` commit whose committed state has that phase approved), keep the branch, the worktree and the earlier approved phases, and rerun only the failed phase. Example: Verify fails → `feature/<feature>` goes back to the `build approved` commit and `/v0-verify` reruns. The discarded work is kept (`results/attempt-<k>/rollback-discarded.patch`, `rollback-discarded-commits.txt`, untracked files moved to `trash/rollback-<k>/`), never deleted.
+- **Step back to an earlier gate automatically ONLY when** (a) the failed phase's gate-to-gate consistency checks (`check-traceability.sh`, re-run print-only) name an earlier phase as the earliest bad phase → reset to the gate before that phase; or (b) the rerun of the failed phase fails the same way (same failed phase, same failed checks, same stuck reason) → step back one gate. Both stay within the 2-attempt limit per story.
+- **Stop and wait for Marlon** when there is no clear cause: the rerun fails differently, the checks blame Intake (Intake reruns on `main`), two rollbacks were already made, or the needed gate commit does not exist.
+- **Fall back to the previous story's `S4-<story>-END` snapshot** (the rule below) only when the story branch itself is broken (no clean gate commit, a mid-merge worktree, a branch without a worktree): rerun with `CHAIN_RESUME_IN_STORY=0`.
+- **A gate already awaiting approval is not a failed phase:** the in-story resume sends the scripted approval instead of rolling back (the P2-P build and release cases).
+- Harness: `story_rollback` in `scripts/lib.sh`, called by `chain_resume_prepare` for an in-story resume (`CHAIN_RESUME_IN_STORY=1`, §5.8); `CHAIN_RESUME_ROLLBACK=0` turns it off. Log: `results/attempt-<k>/chain-resume-check.log`, `rollback.txt`, progress lines `ROLLBACK` / `ROLLBACK-STOP`. Tests: `tests/test-rollback.sh`.
+
+The earlier rule (below) still applies when the story branch is broken or the in-story resume is not used.
+
 On any story failure in the step-4 chain (or any later story step):
 
 1. **Roll back first.** Before anything else, return `main` to the previous clean release commit, the last story that passed all its checks. Prefer restoring that story's `S4-<story>-END` snapshot, which brings back the whole workspace. Move the failed tree to `trash/` (never delete), and remove the failed story's worktree and feature branch from the live repo.
@@ -243,6 +254,8 @@ Note (Naruto): the image does not contain the run folder (`/home/e2e/agents-v0-e
 
 ### 5.8 In-story resume of a failed chain story (`CHAIN_RESUME_IN_STORY=1`, HARNESS-FIX 2026-10-30, committed 2026-10-31)
 
+**2026-10-31 (kitfix-20261031):** before the first run, the in-story resume resets the story branch to its last clean gate commit (§5.6, `story_rollback`), unless a gate is already awaiting approval or `CHAIN_RESUME_ROLLBACK=0`. The flag itself stays opt-in (D6).
+
 Approved by Marlon by voice on 2026-10-30 at 21:14 Asia/Manila: a rerun of a failed story resumes from the phase that stopped, keeping the story's branch, worktree and approved phases, instead of rolling back and restarting from Intake. It applies to any failure, not only quota. It is **opt-in** (decision D6, 2026-10-31): set `CHAIN_RESUME_IN_STORY=1` together with `CHAIN_RESUME_FROM_STORY=<ID>` in the resume env file. The step-by-step VM procedure is `in-story-resume-procedure.md` (next to this file).
 
 - **Accepted reasons:** every reason that `--resume-from-story` accepts (harness-fix, env-fix, agent-retry). kit-fix is still refused for story resumes. Without `CHAIN_RESUME_FROM_STORY` the flag is ignored with a warning.
@@ -275,6 +288,8 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `MAX_FIX_ATTEMPTS_PER_STEP` | 2 | kit fixes for the same step (`kit-fix.sh start` and `--reason kit-fix`) |
 | `MAX_FIX_ATTEMPTS_TOTAL` | 5 | kit fixes in one run |
 | `MAX_AGENT_RETRY_PER_STEP` | 1 | `--reason agent-retry` resumes of the same step |
+| `CHAIN_RESUME_ROLLBACK` | 1 | in-story resume first resets the story branch to its last clean gate commit (§5.6); `0` keeps the branch as it is |
+| `H7_MODE` | `fail` | `warn` makes a harness gate-commit fallback (H7) a FINDING only |
 | `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):

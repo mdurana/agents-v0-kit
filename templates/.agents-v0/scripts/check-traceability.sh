@@ -17,6 +17,7 @@
 #   TRACE <WARN|FAIL> <check> gate=<gate> earliest_bad_phase=<phase> artifact=<file>: <detail>
 # and the result is written to docs/agents-v0/requirements/<feature>.trace.json (committed with the gate),
 # which the e2e harness reads to choose its rollback gate.
+# AGENTS_V0_TRACE_NO_WRITE=1 prints only (the e2e harness re-runs a failed phase's checks this way).
 # Mode: AGENTS_V0_TRACE_MODE=warn (default, D8: warn first; exit 0) or fail (exit 1 on any failure).
 # P0-A: design checks are skipped (no design gate); build/verify checks run when their inputs exist.
 set -eu
@@ -138,8 +139,9 @@ try: data = json.load(open(tp, encoding="utf-8"))
 except (OSError, ValueError): data = {}
 data[gate] = {"result": ("fail" if mode == "fail" else "warn") if fails else "ok", "mode": mode,
               "earliestBadPhase": earliest, "failures": fails, "acCount": len(acs)}
-with open(tp, "w", encoding="utf-8") as fh:
-    json.dump(data, fh, indent=2); fh.write("\n")
+if os.environ.get("AGENTS_V0_TRACE_NO_WRITE", "0") != "1":
+    with open(tp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2); fh.write("\n")
 if not fails:
     print(f"TRACE OK gate={gate} {slug}: {len(acs)} ACs")
 elif mode == "fail":

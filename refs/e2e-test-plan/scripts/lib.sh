@@ -392,7 +392,7 @@ drive_run(){
          grep -qiE 'branch|worktree' "$RUN/final-$k.md" && grep -qiE 'authori[sz]' "$RUN/final-$k.md"; then
         line="$(approval_for branch)"; text="${line%%$'\t'*}"; allow="${line#*$'\t'}"; sent="$sent|branch|"; GATES_SENT="$GATES_SENT branch"
         printf '%s\tturn-%s\tSENT\tgate=branch\ttext=%s\tallow=%s\n' "$(ts)" "$((k+1))" "$text" "$allow" >> "$RUN/approvals.log"
-        sleep "${TURN_PAUSE_SEC:-5}"; k=$((k+1)); run_turn "$k" "$text" "$allow"; harness_complete branch "$allow" ""; continue
+        sleep "${TURN_PAUSE_SEC:-5}"; k=$((k+1)); run_turn "$k" "$text" "$allow"; harness_complete branch "$allow" ""; harness_complete branch-commit "$allow" ""; continue
       fi
       # question: final message asks something and nothing else happened
       if [ "$answers" -lt "$MAX_ANSWERS" ] && tail -n 25 "$RUN/final-$k.md" | grep -q '?' && text="$(answer_for "$ctx" "$RUN/final-$k.md")"; then
@@ -420,14 +420,28 @@ harness_complete(){ # <gate> <allow> <state file>
             else [ -n "$(wt_for_branch "feature/$slug")" ] && return 0
               (cd "$MAIN" && sh .agents-v0/scripts/feature-worktree.sh "$slug") >> "$RUN/harness-complete.log" 2>&1; fi
             SEMI=1; echo "$(ts) branch: ran feature-worktree.sh for $slug" >> "$RUN/SEMI-SYNTHETIC";;
-    build|maintain|release|release-p0a)
+    branch-commit) # HARNESS-FIX 2026-10-31: after the branch turn the intake gate must be committed in the new worktree.
+            slug="${STORY_SLUG:-}"; [ -n "$slug" ] && [ "${STORY_KIND:-feature}" = feature ] || return 0
+            w="$(wt_for_branch "feature/$slug")"; [ -n "$w" ] || return 0
+            if [ -n "$(git -C "$w" status --porcelain)" ]; then
+              git -C "$w" add -A && git -C "$w" commit -q -m "chore($slug): intake evidence [harness-complete]" &&
+              { SEMI=1; echo "$(ts) intake: committed pending files in $w" >> "$RUN/SEMI-SYNTHETIC"
+                echo "$(ts) intake gate: the agent did not commit the intake gate in the branch turn; harness committed $w" >> "$RUN/GATE-COMMIT-MISSING"
+                post FINDING "gate-commit missing: $slug intake not committed in the branch turn (harness fallback, ${RUN##*/})"; }; fi;;
+    intake|design|build|verify|maintain|release|release-p0a|roadmap|architecture|plan|onboard)
+            # HARNESS-FIX 2026-10-31 (kitfix-20261031-gate-commit): the agent commits every approved gate itself, so this
+            #   fallback should never trigger. Kept as a safety net; when it does, it is a FAILURE of the gate commit: SEMI
+            #   label, FINDING, and a GATE-COMMIT-MISSING file that check H7 counts. Intake is committed in the branch turn.
+            [ "$g" != intake ] || return 0
             w="$(cd "$(dirname "$f")" && git rev-parse --show-toplevel 2>/dev/null)"; [ -n "$w" ] || return 0
             if [ -n "$(git -C "$w" status --porcelain)" ] && [ "$(git -C "$w" rev-parse HEAD)" = "$(cat "$RUN/head-before-$((k))" 2>/dev/null)" ]; then
               git -C "$w" add -A && git -C "$w" commit -q -m "chore(${STORY_SLUG:-story}): $g evidence [harness-complete]" &&
-              { SEMI=1; echo "$(ts) $g: committed pending files in $w" >> "$RUN/SEMI-SYNTHETIC"; }; fi
+              { SEMI=1; echo "$(ts) $g: committed pending files in $w" >> "$RUN/SEMI-SYNTHETIC"
+                echo "$(ts) $g gate: the agent did not commit the approved gate; harness committed pending files in $w" >> "$RUN/GATE-COMMIT-MISSING"
+                post FINDING "gate-commit missing: ${STORY_SLUG:-?} $g approved but not committed by the agent (harness fallback, ${RUN##*/})"; }; fi
             if [ "$g" = release ] && [ -n "${STORY_SLUG:-}" ]; then
               local br="feature/$STORY_SLUG"; [ "${STORY_KIND:-feature}" = maintain ] && br="maintain/$STORY_SLUG"
-              if git -C "$MAIN" rev-parse -q --verify "$br" >/dev/null && ! git -C "$MAIN" merge-base --is-ancestor "$br" HEAD; then
+              if git -C "$MAIN" rev-parse -q --verify "$br" >/dev/null && ! merged_into_main "$br" && ! git -C "$MAIN" merge-base --is-ancestor "$br" HEAD; then
                 # HARNESS-FIX 2026-10-29 (P1-E double merge): last run, the agent merged feature/<slug> into main itself,
                 #   then made one more commit on the feature branch (98fa7a9). The branch tip was then no longer an
                 #   ancestor of main, so this step ran a SECOND `git merge --no-ff`, which conflicted in the story's
@@ -442,11 +456,21 @@ harness_complete(){ # <gate> <allow> <state file>
                   { echo "$(ts) FINDING release: main already has merge commit ${mc:0:12} of $br, but the branch tip $(git -C "$MAIN" rev-parse --short "$br") is not an ancestor of main; NOT merging again. Branch commits not on main:"
                     git -C "$MAIN" log --oneline "HEAD..$br" 2>&1 | sed 's/^/    /'; } >> "$RUN/harness-complete.log"
                   post FINDING "harness-complete: $br already merged into main (${mc:0:12}) but has later commits; no second merge (see ${RUN##*/}/harness-complete.log)"
-                elif git -C "$MAIN" merge -q --no-ff -m "Merge branch '$br'" "$br" >> "$RUN/harness-complete.log" 2>&1; then
+                elif [ "${STORY_KIND:-feature}" = feature ] && git -C "$MAIN" merge -q --squash "$br" >> "$RUN/harness-complete.log" 2>&1 &&
+                     git -C "$MAIN" commit -q -m "${STORY_SLUG}: release approved (squash-merge of $br) [harness-complete]" -m "Story-Branch: $br
+Story-Tip: $(git -C "$MAIN" rev-parse "$br")" >> "$RUN/harness-complete.log" 2>&1; then
+                  # HARNESS-FIX 2026-10-31 (kitfix-20261031-gate-commit): the kit squash-merges a feature story; a harness
+                  #   squash is a gate-commit failure (H7), like every other fallback.
+                  SEMI=1; echo "$(ts) release: squash-merged $br into $(git -C "$MAIN" branch --show-current)" >> "$RUN/SEMI-SYNTHETIC"
+                  echo "$(ts) release gate: the agent did not squash-merge $br; harness did" >> "$RUN/GATE-COMMIT-MISSING"
+                  post FINDING "gate-commit missing: $br not squash-merged by the agent (harness fallback, ${RUN##*/})"
+                elif [ "${STORY_KIND:-feature}" != feature ] && git -C "$MAIN" merge -q --no-ff -m "Merge branch '$br'" "$br" >> "$RUN/harness-complete.log" 2>&1; then
                   SEMI=1; echo "$(ts) release: merged $br into $(git -C "$MAIN" branch --show-current)" >> "$RUN/SEMI-SYNTHETIC"
                 else
                   echo "$(ts) FINDING release: git merge of $br into main failed; running git merge --abort" >> "$RUN/harness-complete.log"
-                  if ! git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                  if [ "${STORY_KIND:-feature}" = feature ] && ! git -C "$MAIN" diff --cached --quiet; then
+                    git -C "$MAIN" reset -q --merge >> "$RUN/harness-complete.log" 2>&1 && echo "$(ts) release: squash not committed; index reset (reset --merge)" >> "$RUN/harness-complete.log"
+                  elif ! git -C "$MAIN" rev-parse -q --verify MERGE_HEAD >/dev/null; then
                     echo "$(ts) release: no merge in progress (git merge stopped before starting); nothing to abort" >> "$RUN/harness-complete.log"
                   elif git -C "$MAIN" merge --abort >> "$RUN/harness-complete.log" 2>&1; then
                     echo "$(ts) release: git merge --abort done; main back at $(git -C "$MAIN" rev-parse --short HEAD)" >> "$RUN/harness-complete.log"
@@ -461,6 +485,9 @@ harness_complete(){ # <gate> <allow> <state file>
 #   <branch> (one of its later parents is an ancestor of <branch>), or one whose subject names the branch; empty if none.
 #   HARNESS-FIX 2026-10-29 (P1-E double merge).
 main_merge_of(){ local b="$1" base line c p
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031-gate-commit): the kit squash-merges; the squash commit on main's first-parent
+  #   line carries "Story-Branch: <branch>" (first match, newest first).
+  c="$(squash_of "$b")"; [ -z "$c" ] || { echo "${c%% *}"; return 0; }
   base="$(git -C "$MAIN" merge-base HEAD "$b" 2>/dev/null)" || return 0
   while read -r line; do set -- $line; c="$1"; shift 2
     for p in "$@"; do git -C "$MAIN" merge-base --is-ancestor "$p" "$b" 2>/dev/null && { echo "$c"; return 0; }; done
@@ -490,6 +517,73 @@ in_story_pending_gate(){ local f="$1" ap
   case " intake design build verify maintain release " in *" $ap "*) ;; *) return 1;; esac
   ! has_appr "$f" "$ap" || return 1
   echo "$ap"; }
+# ---------- rollback to the last clean gate commit (HARNESS-FIX 2026-10-31, kitfix-20261031; fix-and-resume.md 5.6) ----------
+PHASE_ORDER="intake design build verify release"
+phase_idx(){ local i=0 p; for p in $PHASE_ORDER; do [ "$p" = "$1" ] && { echo "$i"; return; }; i=$((i+1)); done; echo 99; }
+phase_prev(){ local prev="" p; for p in $PHASE_ORDER; do [ "$p" = "$1" ] && { echo "$prev"; return; }; prev="$p"; done; }
+phase_next(){ local seen=0 p; for p in $PHASE_ORDER; do [ "$seen" = 1 ] && { echo "$p"; return; }; [ "$p" = "$1" ] && seen=1; done; echo release; }
+# gate_commits <worktree> <slug>: "<phase> <sha>", oldest first, for every CLEAN gate commit on the story branch since it
+#   left main: subject "<story>: <phase> approved" whose committed state has that phase as lastApprovedPhase (the branch's
+#   "release approved" commit: activePhase release). [harness-complete] fallback commits are never clean gates.
+gate_commits(){ local w="$1" slug="$2" base sha subj ph st sf="docs/agents-v0/requirements/$2.state.json"
+  base="$(git -C "$w" merge-base HEAD "$(git -C "$MAIN" rev-parse HEAD)" 2>/dev/null)" || return 0
+  while IFS=$'\t' read -r sha subj; do
+    ph="$(sed -nE 's/^[^:]+: (intake|design|build|verify|release) approved$/\1/p' <<<"$subj")"; [ -n "$ph" ] || continue
+    if [ "$ph" = release ]; then st="$(git -C "$w" show "$sha:$sf" 2>/dev/null | jq -r '.activePhase//""')"
+    else st="$(git -C "$w" show "$sha:$sf" 2>/dev/null | jq -r '.lastApprovedPhase//""')"; fi
+    [ "$st" = "$ph" ] && echo "$ph $sha"
+  done < <(git -C "$w" log --reverse --first-parent --format='%H%x09%s' "$base..HEAD" 2>/dev/null); }
+# trace_bad_phase <worktree> <slug> <phase>: re-run the kit's gate-to-gate checks of <phase> (print only) and echo the
+#   earliest phase they blame, if it is earlier than <phase>.
+trace_bad_phase(){ local w="$1" slug="$2" ph="$3" out bad="" b
+  case "$ph" in design|build|verify) ;; *) return 0;; esac
+  [ -f "$w/.agents-v0/scripts/check-traceability.sh" ] || return 0
+  out="$(cd "$w" && AGENTS_V0_TRACE_NO_WRITE=1 AGENTS_V0_TRACE_MODE=warn sh .agents-v0/scripts/check-traceability.sh "$ph" "docs/agents-v0/requirements/$slug.md" 2>/dev/null)" || true
+  for b in $(grep -o 'earliest_bad_phase=[a-z]*' <<<"$out" | cut -d= -f2 | sort -u); do
+    [ "$(phase_idx "$b")" -lt "$(phase_idx "$ph")" ] || continue
+    if [ -z "$bad" ] || [ "$(phase_idx "$b")" -lt "$(phase_idx "$bad")" ]; then bad="$b"; fi; done
+  echo "$bad"; }
+# story_rollback <slug> <story id> <attempt results dir> <attempt evidence dir>: before an in-story rerun, reset the
+#   story branch to the last clean gate commit of the CURRENT story (the failed phase reruns from there; the branch,
+#   worktree and earlier phases stay). Step back to an earlier gate ONLY when (a) the failed phase's consistency checks
+#   name an earlier phase, or (b) this story's previous rollback failed the same way (same signature). A second failure
+#   that differs, two rollbacks already, an intake blame, or a branch with no clean gate commit: stop (ROLLBACK_STOP set,
+#   return 1) and wait for Marlon. The discarded work is kept: rollback-discarded.patch, untracked files moved to trash/.
+story_rollback(){ local slug="$1" id="$2" A="$3" EA="$4" w gates g last lastsha F sig prev_sig="" n=0 f tph target reason bad k
+  ROLLBACK_STOP=""; ROLLBACK_TO=""
+  w="$(wt_for_branch "feature/$slug")"; [ -n "$w" ] || { ROLLBACK_STOP="no feature/$slug worktree"; return 1; }
+  if merged_into_main "feature/$slug"; then echo "ROLLBACK none: feature/$slug already reached main"; return 0; fi
+  mapfile -t gates < <(gate_commits "$w" "$slug")
+  [ "${#gates[@]}" -gt 0 ] || { ROLLBACK_STOP="feature/$slug has no clean gate commit (story branch broken): rerun with CHAIN_RESUME_IN_STORY=0 to restore the previous story's END snapshot"; return 1; }
+  g="${gates[${#gates[@]}-1]}"; last="${g%% *}"; lastsha="${g#* }"
+  F="$(phase_next "$last")"; [ "$last" = release ] && F=release
+  sig="$F|$(awk -F'\t' -v s="$id" '$3==s && $5=="FAIL"{print $4}' "$A/checks.tsv" 2>/dev/null | sort -u | paste -sd, -)|$(cat "$EA/"*"-$slug.stuck" 2>/dev/null | sed -E 's/[0-9]+//g' | sort -u | paste -sd, -)"
+  for f in "$(dirname "$A")"/attempt-*/rollback.txt; do [ -f "$f" ] && [ "$f" != "$A/rollback.txt" ] || continue
+    grep -q "^slug=$slug " "$f" || continue; n=$((n+1)); prev_sig="$(sed -n 's/.* sig=//p' "$f" | tail -1)"; done
+  [ "$n" -lt 2 ] || { ROLLBACK_STOP="$slug was already rolled back twice (2-attempt limit)"; return 1; }
+  bad="$(trace_bad_phase "$w" "$slug" "$F")"
+  if [ -n "$bad" ]; then
+    [ "$bad" != intake ] || { ROLLBACK_STOP="the $F consistency checks blame intake: intake reruns on main; waiting for Marlon"; return 1; }
+    tph="$(phase_prev "$bad")"; reason="consistency check names $bad"
+  elif [ "$n" -ge 1 ] && [ "$prev_sig" = "$sig" ]; then
+    [ "$last" != intake ] || { ROLLBACK_STOP="$F failed the same way after the rollback to the intake gate; waiting for Marlon"; return 1; }
+    tph="$(phase_prev "$last")"; [ "$last" = release ] && tph=verify; reason="same failure after the rerun ($sig)"
+  elif [ "$n" -ge 1 ]; then
+    ROLLBACK_STOP="the rerun of $F failed differently (was: $prev_sig; now: $sig): no clear cause; waiting for Marlon"; return 1
+  else tph="$last"; reason="default: last clean gate"; fi
+  target=""; for g in "${gates[@]}"; do [ "${g%% *}" = "$tph" ] && target="${g#* }"; done
+  [ -n "$target" ] || { ROLLBACK_STOP="no clean $tph gate commit on feature/$slug for the step back ($reason)"; return 1; }
+  k="${A##*attempt-}"
+  git -C "$w" rev-parse HEAD > "$A/rollback-old-tip"
+  git -C "$w" diff --binary "$target" > "$A/rollback-discarded.patch" 2>/dev/null
+  git -C "$w" log --oneline "$target..HEAD" > "$A/rollback-discarded-commits.txt" 2>/dev/null
+  while IFS= read -r f; do [ -n "$f" ] || continue; mkdir -p "$TEST_ROOT/trash/rollback-$k/$(dirname "$f")"; mv "$w/$f" "$TEST_ROOT/trash/rollback-$k/$f"
+  done < <(git -C "$w" ls-files --others --exclude-standard)
+  git -C "$w" reset -q --hard "$target" || { ROLLBACK_STOP="git reset to $target failed"; return 1; }
+  ROLLBACK_TO="$tph"
+  printf 'slug=%s id=%s from=%s to=%s gate=%s reason=%s sig=%s\n' "$slug" "$id" "$(cat "$A/rollback-old-tip")" "$target" "$tph" "$reason" "$sig" > "$A/rollback.txt"
+  post ROLLBACK "$id ($slug): feature/$slug reset to its $tph gate commit ${target:0:12} ($reason); failed phase $F reruns; discarded work kept in ${A##*/}/rollback-discarded.patch and trash/rollback-$k"
+  echo "ROLLBACK $slug to $tph gate ${target:0:12}: $reason"; }
 # drive_story <step> <kind feature|maintain> <slug-or-id> <is_p0a 0|1> [<extra text for the first prompt>]
 drive_story(){
   local step="$1" kind="$2" slug="$3" p0a="$4" extra="${5:-}" ae_runs=0 runs=0 f cmd ws prev="" prev_ws="" cur same=0 tmo prompt
@@ -610,6 +704,21 @@ native_verify(){ local slug="$1" surf="${2:-}" log="$RES/native-verify-$1.log" c
     cmd="$(cd "$MAIN" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" 2>/dev/null)"; [ -n "$cmd" ] || cmd="cd app/frontend && npm run verify"
     echo "$(ts) frontend: $cmd" >> "$log"; (cd "$MAIN" && timeout "$tmo" sh -c "$cmd") >> "$log" 2>&1 || rc=1; fi;; esac
   echo "$(ts) native_verify rc=$rc" >> "$log"; echo "native_verify $slug rc=$rc (log $log)"; [ "$rc" = 0 ]; }
-merged_into_main(){ git -C "$MAIN" rev-parse -q --verify "$1" >/dev/null && git -C "$MAIN" merge-base --is-ancestor "$1" HEAD &&
-                    git -C "$MAIN" log --merges --format=%s | grep -qF "$1"; }
+# squash_of <branch>: "<squash sha> <Story-Tip>" of the newest first-parent commit on main whose message has
+#   "Story-Branch: <branch>"; empty if none (HARNESS-FIX 2026-10-31, kitfix-20261031-gate-commit).
+squash_of(){ git -C "$MAIN" log --first-parent --format='%H%x1f%B%x1e' HEAD 2>/dev/null | python3 -c '
+import re, sys
+b = sys.argv[1]
+for rec in sys.stdin.read().split("\x1e"):
+    if "\x1f" not in rec: continue
+    sha, body = rec.strip("\n").split("\x1f", 1)
+    if re.search(r"^Story-Branch:\s*" + re.escape(b) + r"\s*$", body, re.M):
+        m = re.search(r"^Story-Tip:\s*([0-9a-f]{7,40})\s*$", body, re.M)
+        print(sha, m.group(1) if m else "-"); break' "$1"; }
+# merged_into_main <branch>: merged with a merge commit that names it, or squash-merged from its current tip.
+merged_into_main(){ local sq
+  git -C "$MAIN" rev-parse -q --verify "$1" >/dev/null || return 1
+  sq="$(squash_of "$1")"
+  if [ -n "$sq" ]; then case "$(git -C "$MAIN" rev-parse "$1")" in "${sq#* }"*) return 0;; *) return 1;; esac; fi
+  git -C "$MAIN" merge-base --is-ancestor "$1" HEAD && git -C "$MAIN" log --merges --format=%s | grep -qF "$1"; }
 fp_paths(){ (cd "$MAIN" && find "$@" -type f 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do sha256_cmd "$p"; done); }

@@ -24,7 +24,8 @@ setup(){ # <name> <state json for the worktree>
   echo base > "$MAIN/docs/agents-v0/requirements/README.md"; git -C "$MAIN" add -A; git -C "$MAIN" commit -qm base
   git -C "$MAIN" worktree add -q -b "feature/$SLUG" "$WORK/portal-$SLUG"
   printf '%s\n' "$2" > "$WORK/portal-$SLUG/docs/agents-v0/requirements/$SLUG.state.json"
-  git -C "$WORK/portal-$SLUG" add -A; git -C "$WORK/portal-$SLUG" commit -qm "state"
+  # HARNESS-FIX 2026-10-31: the kit commits every approved gate, so the fixture's state commit is the last gate commit.
+  git -C "$WORK/portal-$SLUG" add -A; git -C "$WORK/portal-$SLUG" commit -qm "SIM: $(jq -r '.lastApprovedPhase' <<<"$2") approved"
   : > "$S/turns.log"; SIM_CLASS_ONCE=""; SIM_CLASS=NORMAL; SEMI=0; }
 
 . "$LIBDIR/lib.sh"
@@ -108,7 +109,8 @@ echo "-- T13 in-story pending release gate (branch not merged) -> release approv
 ST_REL_AW='{"approvedPhases":["intake","design","build","verify"],"lastApprovedPhase":"verify","activePhase":"release","activeStatus":"awaiting_approval","verifyPassed":true}'
 setup t13 "$ST_REL_AW"; CRS_IN_STORY_SLUG="$SLUG"; drive_story S4 feature "$SLUG" 0; rc=$?; sed 's/^/    /' "$S/turns.log"
   head -1 "$S/turns.log" | grep -q 'run=S4-sim-x-local-release-1 class=NORMAL allow=Shell(git:commit\*),Shell(git:merge\*) .*prompt1=Approved by mdurana. Accept P-1' && ok "turn 1 = release approval text + release allowlist" || ko "turn 1 wrong"
-  git -C "$MAIN" log -1 --format=%s | grep -q "Merge branch 'feature/$SLUG'" && [ "$rc" = 0 ] && ok "harness_complete merged feature/$SLUG into main, story DONE" || ko "rc=$rc main=$(git -C "$MAIN" log -1 --format=%s)"
+  git -C "$MAIN" log -1 --format=%B | grep -q "^Story-Branch: feature/$SLUG$" && [ "$rc" = 0 ] && ok "harness_complete squash-merged feature/$SLUG into main (Story-Branch trailer), story DONE" || ko "rc=$rc main=$(git -C "$MAIN" log -1 --format=%s)"
+  [ -s "$EVID/S4-$SLUG-local-release-1/GATE-COMMIT-MISSING" ] && grep -q 'FINDING gate-commit missing' "$STATUS_LOG" && ok "the harness squash is labelled a gate-commit failure (H7)" || ko "no GATE-COMMIT-MISSING"
 fi
 echo "== $LABEL: $PASS passed, $FAILN failed"
 [ "$FAILN" = 0 ]

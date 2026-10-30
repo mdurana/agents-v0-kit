@@ -1,6 +1,7 @@
 # Procedure: resume a failed chain story IN-STORY (from the phase that stopped), after ANY failure
 
 STATUS: committed on kitfix-20261031 (2026-10-31, opt-in, fix-and-resume.md §5.8). Written as STAGED, NOT APPLIED for run-20261029-1629; the VM paths and hashes below are from that run. Approved by Marlon ("Sensei") by voice on 2026-10-30 at 21:14 Asia/Manila: every rerun of a failed story resumes from the phase that stopped, keeping the story's branch, worktree and approved phases, instead of rolling back and restarting from intake. This applies to any failure, not only quota.
+UPDATE 2026-10-31 (kitfix-20261031, Marlon 03:08 Asia/Manila): the in-story resume now first resets the story branch to its LAST CLEAN GATE COMMIT (`story_rollback`, fix-and-resume.md §5.6), steps back only when a consistency check names an earlier phase or the rerun fails the same way, and otherwise stops for Marlon. A gate already awaiting approval is approved, not rolled back. `CHAIN_RESUME_ROLLBACK=0` restores the behaviour described below.
 Written 2026-10-30, 21:15–21:45 Asia/Manila, for run-20261029-1629 (Linode VM, user e2e, agy 1.4.11). While it was written, the live run (attempt 10, runner PID 723589, agy loop PID 723587, story P2-P) was only read. The live scripts were not touched.
 Supersedes the generic parts of `quota-switch-procedure.md`, which now points here. The quota/credits case is §6 below.
 

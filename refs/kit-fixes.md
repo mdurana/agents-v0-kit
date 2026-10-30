@@ -77,6 +77,7 @@ Asked by Marlon (2026-10-31 03:12 Asia/Manila, part of fix 5): cheap, determinis
   - T6 every AC has a passing row in `quality-gate.md`; blame = design (not traced), build (no test names it) or verify.
   - Output `TRACE <WARN|FAIL> <check> gate=<gate> earliest_bad_phase=<phase> artifact=<file>: <detail>`, saved in `docs/agents-v0/requirements/<feature>.trace.json` (committed with the gate; the e2e harness reads it to pick the rollback gate).
   - D8: `AGENTS_V0_TRACE_MODE=warn` by default (exit 0); `fail` refuses the approval.
+  - `AGENTS_V0_TRACE_NO_WRITE=1` prints only (added with the harness rollback commit: the e2e harness re-runs the failed phase's checks to choose the rollback gate).
 - Commands v0-design, v0-build, v0-verify: report every `TRACE WARN` line at the gate.
 - Tests: `scripts/test-gate-commit.sh` (T1–T6, warn and fail modes, trace.json earliest bad phase).
 How to check: `sh scripts/test-gate-commit.sh` prints `ok: T2: 2 ACs vs plan Size 3, blamed on intake` and `test-gate-commit: OK`.

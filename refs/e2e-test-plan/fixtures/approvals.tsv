@@ -1,16 +1,18 @@
 # approvals.tsv — the ONLY texts the runner sends at a gate. Tab-separated: gate <TAB> exact text <TAB> per-turn CLI allowlist (comma-separated, or -)
 # gate = the activePhase of the one state file that went to "awaiting_approval" in the turn that just ended,
 #        or "branch" (agent asked to authorise the feature/maintain branch after an Intake or Maintain step).
+# HARNESS-FIX 2026-10-31 (kitfix-20261031-gate-commit): every gate is committed by the agent, so every gate's allowlist has
+#   Shell(git:commit*) (program phases also Shell(git:tag*)); intake is committed in the branch turn, release squash-merges.
 # release-p0a applies to story P0-A only. The text "Approved by mdurana" is sent ONLY by an unattended run.
-roadmap	Approved by mdurana	-
-architecture	Approved by mdurana	-
-plan	Approved by mdurana	-
-onboard	Approved by mdurana	-
+roadmap	Approved by mdurana, commit it	Shell(git:commit*),Shell(git:tag*)
+architecture	Approved by mdurana, commit it	Shell(git:commit*),Shell(git:tag*)
+plan	Approved by mdurana, commit it	Shell(git:commit*),Shell(git:tag*)
+onboard	Approved by mdurana, commit it	Shell(git:commit*),Shell(git:tag*)
 intake	Approved by mdurana	-
-design	Approved by mdurana	-
+design	Approved by mdurana, commit it	Shell(git:commit*)
 build	Approved by mdurana, commit it	Shell(git:commit*)
-verify	Approved by mdurana	-
+verify	Approved by mdurana, commit it	Shell(git:commit*)
 maintain	Approved by mdurana, commit it	Shell(git:commit*)
 release	Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	Shell(git:commit*),Shell(git:merge*)
 release-p0a	Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	Shell(git:commit*)
-branch	Branch authorized	Shell(sh:.agents-v0/scripts/feature-worktree.sh*)
+branch	Branch authorized, commit the intake	Shell(sh:.agents-v0/scripts/feature-worktree.sh*),Shell(git:commit*)
