@@ -135,8 +135,76 @@ mkcfg(){ # <dir> <allow csv or ->
     printf '{"version":1,"editor":{"vimMode":false},"permissions":{"allow":[],"deny":[]}}\n' > "$1/cli-config.json"
   fi
   [ "$2" = - ] || python3 -c 'import json,sys;p=sys.argv[1];d=json.load(open(p));a=d.setdefault("permissions",{}).setdefault("allow",[]);[a.append(x) for x in sys.argv[2].split(",") if x and x not in a];json.dump(d,open(p,"w"),indent=2)' "$1/cli-config.json" "$2"; }
+# HARNESS-FIX 2026-10-30 (P2-P, approved by Sensei 19:14 Asia/Manila; findings HF-F1 and HF-F3): agy quota / 429.
+#   With the agy driver the agy errors are only in the agy side files next to the runner's turn files
+#   (turn-<k>.agy.jsonl result.error, turn-<k>.agy.stderr) and in the transcript (ERROR_MESSAGE entries of
+#   turn-<k>.jsonl), never in turn-<k>.stderr, so classify missed them. Two failures in this run:
+#   - P2-P design 17:54-17:56: "RESOURCE_EXHAUSTED (code 429): Individual quota reached ... Resets in 53h19m58s"
+#     (persistent) was classed AGENT-ERROR, not USAGE (test-plan.md USAGE row: write HALT, stop the run).
+#   - P2-P build 18:42-19:07: one "RESOURCE_EXHAUSTED (code 429) ... quota will reset after 0s" at 18:48, agy carried on
+#     for 19 minutes and reached the build gate, but its result status stayed ERROR, agy-turn-loop.sh passed rc=1, and
+#     the turn was classed AGENT-ERROR (then STUCK awaiting_approval(build)).
+# HARNESS-FIX 2026-10-30 (P2-P, approved by Sensei 20:41 Asia/Manila; finding HF-F4): transient agy 5xx, same gap as
+#   HF-F3. P2-P local-release 20:15-20:19 wrote the approval request (release awaiting_approval) and a final answer
+#   after one "API error (attempt 1): UNAVAILABLE (code 503): The service is currently unavailable." (transcript
+#   step 1, as the string "1"), but agy's result status stayed ERROR -> rc=1 -> AGENT-ERROR -> STUCK. Transient server
+#   errors (503 UNAVAILABLE, 500 INTERNAL, 502, 504 DEADLINE_EXCEEDED, overloaded) are now handled like a transient 429;
+#   step_index is read as int or digit string; agy stderr lines that are not error lines ("root agent idle; waiting
+#   ... for 2 background task(s)") are ignored. Helper renamed agy_quota_kind -> agy_api_error_kind.
+#   agy_api_error_kind <agy jsonl> <agy stderr> <turn jsonl> prints one word:
+#     persistent  a real usage limit ("Individual quota reached", "Resets in <N>h", usage limit ...) -> USAGE (HALT)
+#     recovered   every error of the turn is a transient 429/RESOURCE_EXHAUSTED or transient 5xx, agy went on after the
+#                 last one (a later agent response in the transcript and later agy steps) and the turn ended with a
+#                 non-empty answer -> NORMAL, like a turn that recovered from a dropped stream
+#     transient   only transient errors but no recovery seen -> INFRA (gate-aware rule or fresh retry with backoff)
+#     none        anything else (no agy files, no such error, or other errors mixed in) -> the rules as before
+agy_api_error_kind(){
+  [ -s "$1" ] || [ -s "$2" ] || { echo none; return 0; }
+  python3 - "$1" "$2" "$3" <<'PY' 2>/dev/null || echo none
+import json, re, sys
+aj, ae, tj = sys.argv[1:4]
+PERS = re.compile(r'individual quota reached|resets in \d+\s*[hd]|quota (reached|exceeded)|usage limit|out of (credits|requests)|upgrade your subscription', re.I)
+TRANS = re.compile(r'RESOURCE_EXHAUSTED|code 429|\b429\b|exhausted your capacity|rate.?limit'
+                   r'|\bUNAVAILABLE\b|\bINTERNAL \(code 500\)|DEADLINE_EXCEEDED|\bcode 50[0234]\b|overloaded'
+                   r'|\b50[0234] (service unavailable|internal server error|bad gateway|gateway time-?out)', re.I)
+ERRLINE = re.compile(r'error|exception|fail|fatal|panic|denied|unauthori|quota|limit|exhausted|unavailable|overloaded'
+                     r'|deadline|timed? ?out|\bcode \d{3}\b', re.I)
+def si(o):
+    v = o.get("step_index"); return int(v) if isinstance(v, int) or (isinstance(v, str) and v.isdigit()) else None
+def jl(p):
+    out = []
+    try:
+        for l in open(p, encoding="utf-8", errors="replace"):
+            try: out.append(json.loads(l))
+            except Exception: pass
+    except OSError: pass
+    return out
+agy = jl(aj); tr = jl(tj); errs = []
+res = [o for o in agy if o.get("event") == "result"]
+if res and isinstance(res[-1].get("result"), dict) and res[-1]["result"].get("error"):
+    errs.append(str(res[-1]["result"]["error"]))
+try:
+    blob = "\n".join(l for l in open(ae, encoding="utf-8", errors="replace").read().splitlines() if ERRLINE.search(l))
+    if blob.strip(): errs.append(blob)
+except OSError: pass
+emsg = [o for o in tr if o.get("type") == "ERROR_MESSAGE"]
+errs += [str(o.get("error") or o.get("content") or "") for o in emsg]
+if not errs: print("none"); sys.exit(0)
+if any(PERS.search(e) for e in errs): print("persistent"); sys.exit(0)
+if not all(TRANS.search(e) for e in errs): print("none"); sys.exit(0)
+idx = [si(o) for o in emsg if si(o) is not None]
+last = max(idx) if idx else None
+final = [o for o in tr if o.get("type") == "result"]
+ftxt = final[-1].get("result") if final else ""
+later_resp = last is not None and any(o.get("type") == "PLANNER_RESPONSE" and (si(o) or -1) > last for o in tr)
+later_agy = last is not None and any((si(o.get("step_update") or {}) or -1) > last for o in agy if o.get("event") == "step_update")
+print("recovered" if later_resp and later_agy and isinstance(ftxt, str) and ftxt.strip() else "transient")
+PY
+}
 classify(){ # <rc> <stderr> <jsonl> <stalled>
+  local aq; aq="$(agy_api_error_kind "${3%.jsonl}.agy.jsonl" "${2%.stderr}.agy.stderr" "$3")"   # HARNESS-FIX 2026-10-30, above
   if grep -qiE 'usage limit|quota|rate.?limit|out of (credits|requests)' "$2"; then echo USAGE
+  elif [ "$aq" = persistent ]; then echo USAGE
   elif grep -qiE 'not logged in|unauthori[sz]ed|authentication (failed|required)|\b401\b|\b403\b' "$2"; then echo AUTH
   elif [ "$4" = 1 ]; then echo STALL
   elif [ "$1" = 124 ] || [ "$1" = 137 ]; then echo CAP
@@ -148,6 +216,8 @@ classify(){ # <rc> <stderr> <jsonl> <stalled>
   #   the pre-run copy applies (same as a dropped stream). Only that exact case changes; any non-empty result is NORMAL.
   elif [ "$1" = 0 ] && [ "$(jq -rs '[.[]|select(.type=="result")]|if length==0 then "x" else (last|.result // "x"|tostring) end' "$3" 2>/dev/null)" = "" ]; then echo INFRA
   elif [ "$1" = 0 ] && jq -e 'select(.type=="result" or .type=="PLANNER_RESPONSE")' "$3" >/dev/null 2>&1; then echo NORMAL
+  elif [ "$aq" = recovered ]; then echo NORMAL      # HARNESS-FIX 2026-10-30: recovered transient agy 429/5xx (P2-P build, release)
+  elif [ "$aq" = transient ]; then echo INFRA       # HARNESS-FIX 2026-10-30: transient agy 429/5xx, no recovery seen
   elif grep -qiE 'Connection stalled|no progress|ECONNRESET|network error|503|502' "$2"; then echo INFRA
   # HARNESS-FIX 2026-10-29 (step 4): an agy turn whose model stream dropped ends with rc!=0 and the error only in the
   #   stream (turn-<k>.jsonl), not in stderr, so it used to be AGENT-ERROR (the run ended, no retry). Last run, P1-A
