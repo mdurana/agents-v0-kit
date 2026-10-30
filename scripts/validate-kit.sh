@@ -276,7 +276,7 @@ grep -Fq 'host-tools-macports.sh' scripts/install.sh || err "install.sh must see
 grep -Fq 'openjdk21' templates/docs/agents-v0/gold-standards.md || err "gold-standards must document MacPorts openjdk21 for Intel Macs"
 grep -Fq 'host-tools-macports.sh' core/common/commands/v0-build.md || err "v0-build must run host-tools-macports.sh on Intel Macs"
 # kitfix 2026-10-22: deterministic gates and no-root database runtime discovery.
-for ks in check-story-dependencies.sh check-release-evidence.sh check-database-runtime.sh; do
+for ks in check-story-dependencies.sh check-release-evidence.sh check-database-runtime.sh check-tests-ran.sh; do
   [ -x "templates/.agents-v0/scripts/$ks" ] || err "templates/.agents-v0/scripts/$ks missing or not executable"
   grep -Fq ".agents-v0/scripts/$ks" scripts/install.sh || err "install.sh must seed .agents-v0/scripts/$ks"
 done
@@ -318,6 +318,11 @@ sh scripts/test-onboard.sh || err "scripts/test-onboard.sh failed"
 [ -f scripts/test-clock.sh ] || err "scripts/test-clock.sh missing (kitfix-20261031-single-clock)"
 sh scripts/test-clock.sh || err "scripts/test-clock.sh failed"
 grep -Fq 'kitfix-20261031-single-clock' core/common/rules/workflow-orchestration.mdc || err "workflow-orchestration must state the one-clock rule"
+grep -Fq 'check-tests-ran.sh' core/common/commands/v0-build.md || err "v0-build must run check-tests-ran.sh after the native verify (kitfix-20261031-tests-ran)"
+grep -Fq 'check-tests-ran.sh' core/common/commands/v0-verify.md || err "v0-verify must run check-tests-ran.sh after the native verify"
+grep -Fq 'maven-failsafe-plugin' templates/app/backend/pom.xml || err "the P0 skeleton pom must run *IT tests with maven-failsafe-plugin"
+grep -Fq 'maven-failsafe-plugin' core/java/starters/maven/quality-plugins.xml || err "the Java quality-plugins starter must include maven-failsafe-plugin"
+sh scripts/test-tests-ran.sh || err "scripts/test-tests-ran.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"

@@ -18,6 +18,23 @@
       <properties><kit.maven.dir>${project.basedir}/../../maven</kit.maven.dir></properties>
   Change ../../ to match the depth of the module.
 -->
+<!-- kitfix-20261031-tests-ran: run *IT.java integration tests in `mvn verify`. Without Failsafe,
+     Maven skips *IT classes silently (P1-B). Under spring-boot-starter-parent the version and
+     executions are managed; outside it keep the version and executions below.
+     Then run `sh .agents-v0/scripts/check-tests-ran.sh` after verify. -->
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-failsafe-plugin</artifactId>
+  <version>3.5.2</version>
+  <executions>
+    <execution>
+      <goals>
+        <goal>integration-test</goal>
+        <goal>verify</goal>
+      </goals>
+    </execution>
+  </executions>
+</plugin>
 <plugin>
   <groupId>org.jacoco</groupId>
   <artifactId>jacoco-maven-plugin</artifactId>

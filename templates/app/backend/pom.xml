@@ -118,6 +118,12 @@
         </executions>
       </plugin>
       <plugin>
+        <!-- kitfix-20261031-tests-ran: *IT.java integration tests run in `mvnw verify` (P1-B: without
+             Failsafe, Maven skipped them silently). Version and executions come from the Spring Boot parent. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.5.0</version>

@@ -257,6 +257,7 @@ install_templates() {
 .agents-v0/scripts/check-story-dependencies.sh
 .agents-v0/scripts/check-release-evidence.sh
 .agents-v0/scripts/check-database-runtime.sh
+.agents-v0/scripts/check-tests-ran.sh
 .agents-v0/scripts/discover-codebase.sh
 .agents-v0/scripts/check-onboarding-docs.sh
 .agents-v0/scripts/audit-brownfield-baseline.sh
@@ -322,7 +323,7 @@ docs/agents-v0/brownfield-onboarding.md
       for always in $always_on_update \
         .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \
         .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/check-story-dependencies.sh \
-        .agents-v0/scripts/check-release-evidence.sh .agents-v0/scripts/check-database-runtime.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
+        .agents-v0/scripts/check-release-evidence.sh .agents-v0/scripts/check-database-runtime.sh .agents-v0/scripts/check-tests-ran.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
         .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \

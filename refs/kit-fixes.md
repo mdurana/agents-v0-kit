@@ -40,3 +40,13 @@ Old P0-A finding (`fix-and-resume.md` §5.6), still open after run 20261029-1629
 - `scripts/validate-kit.sh`: fails when the archive lists any `._*` entry and when the packer does not exclude them. `scripts/test-app-template.sh`: fails on an extracted `._*` file.
 - Design evidence (P1-C, §5.6): `sync-feature-state.sh --approve design` refuses a feature story (not P0-A) without a non-empty `docs/agents-v0/design/<feature>/design.md`; `v0-design.md` says the agent writes it. Run 20261029-1629 did not show the harness writing design evidence: the P1-C and P1-E SEMI-SYNTHETIC labels in their `design-1` runs are build-gate commits after the No-contract shortcut.
 How to check: `tar tzf templates/app/p0-platform-skeleton.tar.gz | grep -c '\._'` prints `0`; `sh scripts/test-command-flows.sh` prints `ok: design evidence: --approve design is refused without design/orders/design.md (kitfix-20261031-skeleton)`; `sh scripts/validate-kit.sh` prints `validate-kit: OK`.
+
+## kitfix-20261031-tests-ran
+
+Old P1-B finding (`fix-and-resume.md` §5.6), still open after run 20261029-1629: the PostgreSQL integration tests were named `*IT.java`, the pom had no Failsafe, and Maven skipped them without a word. Nothing checked that tests exist but none ran.
+- `templates/app/backend/pom.xml` (skeleton; archive repacked) and `core/java/starters/maven/quality-plugins.xml`: `maven-failsafe-plugin`, so `*IT.java` runs in `mvnw verify` (decision D9).
+- `templates/.agents-v0/scripts/check-tests-ran.sh` (new, seeded by `install.sh`): reads `target/surefire-reports` and `target/failsafe-reports`; exit 1 when test classes exist but no non-skipped test ran, or when an `*IT.java` class has no report. `v0-build` step 6 and `v0-verify` step 1 run it after the native Maven verify.
+- `scripts/test-tests-ran.sh` (new, run by `validate-kit.sh`): synthetic reports for all-ran, IT skipped, none ran, all skipped, no tests, no Maven.
+- Checked by hand on 2026-10-31 03:18 Asia/Manila with JDK 21: the repacked skeleton plus a `SmokeIT` ran 10 Surefire + 1 Failsafe tests under `mvnw verify` and the check printed OK; with the old pom the same tree ran 10 tests, skipped `SmokeIT`, and the check failed naming `com.example.app.SmokeIT`.
+How to check: `sh scripts/test-tests-ran.sh` prints `ok: an *IT class with no report fails (P1-B: no Failsafe)` and `test-tests-ran: OK`.
+Not in this fix: a Vitest/Jest equivalent for the frontend (no standard report file to read).
