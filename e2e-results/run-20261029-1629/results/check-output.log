@@ -1,0 +1,238 @@
+1	P0-A	p0-a-platform-skeleton	-	4	vertical slice	p0-platform-skeleton.md
+2	P1-A	p1-a-openapi-v1-contract-catalog	P0-A	6	backend	p1-contracts-and-data-models.md
+3	P1-B	p1-b-iam-and-audit-persistence	P1-A	7	backend	p1-contracts-and-data-models.md
+4	P1-C	p1-c-configuration-and-seeded-definitions-persistence	P1-B	7	backend	p1-contracts-and-data-models.md
+5	P1-D	p1-d-execution-and-governance-persistence	P1-C	6	backend	p1-contracts-and-data-models.md
+6	P1-E	p1-e-redis-s3-sap-infrastructure-adapters	P1-D	6	backend	p1-contracts-and-data-models.md
+7	P2-A	p2-a-bff-oidc-fail-closed-session-auth	P1-B,P1-E	7	bff	p2-mvp-core-features.md
+8	P2-B	p2-b-iam-rbac-sod-and-view-as	P2-A	8	backend	p2-mvp-core-features.md
+9	P2-C	p2-c-iam-user-directory-onboarding-exports	P2-B	8	backend	p2-mvp-core-features.md
+10	P2-D	p2-d-configuration-definitions-recipes-schedules	P1-C,P2-B	8	backend	p2-mvp-core-features.md
+11	P2-E	p2-e-configuration-reference-lookup-tables	P2-D	7	backend	p2-mvp-core-features.md
+12	P2-F	p2-f-execution-upload-and-run-lifecycle	P1-D,P1-E,P2-D	8	backend	p2-mvp-core-features.md
+13	P2-G	p2-g-execution-recipe-engine-and-artifacts	P2-E,P2-F	8	backend	p2-mvp-core-features.md
+14	P2-H	p2-h-governance-ticketing-queues-and-actions	P1-D,P1-E,P2-B	8	backend	p2-mvp-core-features.md
+15	P2-I	p2-i-audit-logs-notifications-and-dashboard-apis	P1-B,P1-E,P2-B	8	backend	p2-mvp-core-features.md
+16	P2-J	p2-j-integration-execution-configuration-snapshot	P2-E,P2-G	6	backend	p2-mvp-core-features.md
+17	P2-K	p2-k-integration-governance-execution-freeze-archive	P2-G,P2-H	7	backend	p2-mvp-core-features.md
+18	P2-L	p2-l-integration-governance-configuration-cutover	P2-E,P2-H,P2-K	7	backend	p2-mvp-core-features.md
+19	P2-M	p2-m-integration-governance-iam-sod-and-provisioning	P2-C,P2-H	6	backend	p2-mvp-core-features.md
+20	P2-N	p2-n-integration-iam-cross-context-authorization-guard	P2-C,P2-G,P2-L	6	backend	p2-mvp-core-features.md
+21	P2-O	p2-o-integration-audit-cross-context-events-and-widgets	P2-I,P2-L,P2-M,P2-N	7	backend	p2-mvp-core-features.md
+22	P2-P	p2-p-frontend-shell-dashboard-and-notifications	P2-A,P2-O	8	frontend	p2-mvp-core-features.md
+23	P2-Q	p2-q-frontend-report-execution-and-preview	P2-J,P2-K,P2-P	8	frontend	p2-mvp-core-features.md
+24	P2-R	p2-r-frontend-reference-tables-and-schedules	P2-L,P2-P	8	frontend	p2-mvp-core-features.md
+25	P2-S	p2-s-frontend-governance-queues-and-ticket-actions	P2-K,P2-L,P2-M,P2-P	8	frontend	p2-mvp-core-features.md
+26	P2-T	p2-t-frontend-iam-admin-view-as-and-audit-explorer	P2-M,P2-N,P2-O,P2-P	8	frontend	p2-mvp-core-features.md
+27	P3-A	p3-a-s3-poll-and-minute-scheduler-activation	P2-J,P2-L	7	backend	p3-feature-expansion.md
+28	P3-B	p3-b-declarative-expression-engine-and-recipe-compiler	P2-J	8	backend	p3-feature-expansion.md
+29	P3-C	p3-c-preflight-sandbox-and-custom-report-onboarding	P2-L,P3-B	8	backend	p3-feature-expansion.md
+30	P3-D	p3-d-frontend-visual-schema-and-formula-builder	P2-R,P3-B	8	frontend	p3-feature-expansion.md
+31	P3-E	p3-e-frontend-preflight-sandbox-and-builder-publishing	P2-Q,P2-S,P3-A,P3-C,P3-D	8	frontend	p3-feature-expansion.md
+32	P4-A	p4-a-pipeline-and-api-slo-verification	P3-A,P3-C,P3-E	6	backend	p4-hardening.md
+33	P4-B	p4-b-auth-audit-slo-and-rpo-rto-evidence	P4-A	7	backend	p4-hardening.md
+34	P4-C	p4-c-vapt-security-retest	P3-E,P4-B	7	backend	p4-hardening.md
+35	P4-D	p4-d-rollback-and-fault-injection-verification	P4-B,P4-C	7	backend	p4-hardening.md
+36	P5-A	p5-a-observability-and-runbooks	P4-D	6	backend	p5-release-readiness.md
+37	P5-B	p5-b-resilience-and-release-readiness	P5-A	6	backend	p5-release-readiness.md
+OK: release evidence present for p0-a-platform-skeleton
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p0-a-platform-skeleton)
+check-lessons: OK (1 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p1-a-openapi-v1-contract-catalog)
+check-lessons: OK (1 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-b-iam-and-audit-persistence
+true
+check-lessons: approval matches (P-1 accepted, 2 rejected, 1 lesson(s) for p1-b-iam-and-audit-persistence)
+check-lessons: OK (2 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p1-c-configuration-and-seeded-definitions-persistence)
+check-lessons: OK (2 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-d-execution-and-governance-persistence
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p1-d-execution-and-governance-persistence)
+check-lessons: OK (2 active, 0 archived, 1 phase-result file(s) checked)
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 353, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 27 column 1 (char 661)
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p1-e-redis-s3-sap-infrastructure-adapters)
+check-lessons: OK (2 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+true
+check-lessons: approval matches (P-1 accepted, 1 rejected, 1 lesson(s) for p1-e-redis-s3-sap-infrastructure-adapters)
+check-lessons: OK (3 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p2-a-bff-oidc-fail-closed-session-auth)
+check-lessons: OK (3 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+false
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p2-a-bff-oidc-fail-closed-session-auth)
+check-lessons: OK (3 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p2-a-bff-oidc-fail-closed-session-auth)
+check-lessons: OK (3 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-b-iam-rbac-sod-and-view-as)
+check-lessons: OK (4 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p2-c-iam-user-directory-onboarding-exports)
+check-lessons: OK (4 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-d-configuration-definitions-recipes-schedules)
+check-lessons: OK (5 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules
+OK: release evidence present for p2-e-configuration-reference-lookup-tables
+true
+check-lessons: approval matches (P-1 accepted, 1 rejected, 1 lesson(s) for p2-e-configuration-reference-lookup-tables)
+check-lessons: OK (6 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-f-execution-upload-and-run-lifecycle
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-f-execution-upload-and-run-lifecycle)
+check-lessons: OK (7 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-g-execution-recipe-engine-and-artifacts
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-g-execution-recipe-engine-and-artifacts)
+check-lessons: OK (8 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-h-governance-ticketing-queues-and-actions
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-h-governance-ticketing-queues-and-actions)
+check-lessons: OK (9 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-i-audit-logs-notifications-and-dashboard-apis
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-i-audit-logs-notifications-and-dashboard-apis)
+check-lessons: OK (10 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-k-integration-governance-execution-freeze-archive
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-k-integration-governance-execution-freeze-archive)
+check-lessons: OK (11 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-l-integration-governance-configuration-cutover
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-l-integration-governance-configuration-cutover)
+check-lessons: OK (12 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-m-integration-governance-iam-sod-and-provisioning
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-m-integration-governance-iam-sod-and-provisioning)
+check-lessons: OK (13 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-n-integration-iam-cross-context-authorization-guard
+true
+check-lessons: approval matches (P-1 accepted, 0 rejected, 1 lesson(s) for p2-n-integration-iam-cross-context-authorization-guard)
+check-lessons: OK (14 active, 0 archived, 1 phase-result file(s) checked)
+OK: release evidence present for p2-o-integration-audit-cross-context-events-and-widgets
+true
+check-lessons: approval matches (P-1 accepted, 1 rejected, 1 lesson(s) for p2-o-integration-audit-cross-context-events-and-widgets)
+check-lessons: OK (15 active, 0 archived, 1 phase-result file(s) checked)
+false
+FAIL: docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.phase-result.md: phase-result file not found
+check-lessons: 1 problem(s)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules
+OK: release evidence present for p2-e-configuration-reference-lookup-tables
+OK: release evidence present for p2-f-execution-upload-and-run-lifecycle
+OK: release evidence present for p2-g-execution-recipe-engine-and-artifacts
+OK: release evidence present for p2-h-governance-ticketing-queues-and-actions
+OK: release evidence present for p2-i-audit-logs-notifications-and-dashboard-apis
+OK: release evidence present for p2-k-integration-governance-execution-freeze-archive
+OK: release evidence present for p2-l-integration-governance-configuration-cutover
+OK: release evidence present for p2-m-integration-governance-iam-sod-and-provisioning
+OK: release evidence present for p2-n-integration-iam-cross-context-authorization-guard
+OK: release evidence present for p2-o-integration-audit-cross-context-events-and-widgets
+false
+FAIL: docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.phase-result.md: phase-result file not found
+check-lessons: 1 problem(s)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules
+OK: release evidence present for p2-e-configuration-reference-lookup-tables
+OK: release evidence present for p2-f-execution-upload-and-run-lifecycle
+OK: release evidence present for p2-g-execution-recipe-engine-and-artifacts
+OK: release evidence present for p2-h-governance-ticketing-queues-and-actions
+OK: release evidence present for p2-i-audit-logs-notifications-and-dashboard-apis
+OK: release evidence present for p2-k-integration-governance-execution-freeze-archive
+OK: release evidence present for p2-l-integration-governance-configuration-cutover
+OK: release evidence present for p2-m-integration-governance-iam-sod-and-provisioning
+OK: release evidence present for p2-n-integration-iam-cross-context-authorization-guard
+OK: release evidence present for p2-o-integration-audit-cross-context-events-and-widgets
+false
+FAIL: docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.phase-result.md: phase-result file not found
+check-lessons: 1 problem(s)
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules
+OK: release evidence present for p2-e-configuration-reference-lookup-tables
+OK: release evidence present for p2-f-execution-upload-and-run-lifecycle
+OK: release evidence present for p2-g-execution-recipe-engine-and-artifacts
+OK: release evidence present for p2-h-governance-ticketing-queues-and-actions
+OK: release evidence present for p2-i-audit-logs-notifications-and-dashboard-apis
+OK: release evidence present for p2-k-integration-governance-execution-freeze-archive
+OK: release evidence present for p2-l-integration-governance-configuration-cutover
+OK: release evidence present for p2-m-integration-governance-iam-sod-and-provisioning
+OK: release evidence present for p2-n-integration-iam-cross-context-authorization-guard
+OK: release evidence present for p2-o-integration-audit-cross-context-events-and-widgets
+OK: release evidence present for p2-p-frontend-shell-dashboard-and-notifications
+true
+check-lessons: approval matches (none accepted, 0 rejected, 0 lesson(s) for p2-p-frontend-shell-dashboard-and-notifications)
+check-lessons: OK (15 active, 0 archived, 1 phase-result file(s) checked)
+check-lessons: OK (15 active, 0 archived, 21 phase-result file(s) checked)

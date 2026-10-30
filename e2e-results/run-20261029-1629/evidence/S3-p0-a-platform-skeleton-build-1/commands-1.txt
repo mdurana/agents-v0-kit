@@ -1,0 +1,40 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/resolve-integration-branch.sh && git status --short --branch'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la && ls -la app/ app/backend/ app/frontend/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find docs/agents-v0 .agents-v0 -maxdepth 3 | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .cursor/hooks/ .agents-v0/packs/java/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p0-a-platform-skeleton.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p0-a-platform-skeleton/build-report.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && (test -d node_modules || npm ci) && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git ls-files "*/._*" "._*"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git ls-files | grep "\._" && git rm -f $(git ls-files | grep "\._")'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git ls-files | grep "/\._" && git rm -f $(git ls-files | grep "/\._")'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app -name "._*" -type f && rm -f $(find app -name "._*" -type f)'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD && python3 -c "import xml.etree.ElementTree as ET; root = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\").getroot(); print([(c.attrib[\"type\"], c.attrib[\"covered\"], c.attrib[\"missed\"]) for c in root.findall(\"counter\")])"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md && sh .agents-v0/scripts/resolve-layout.sh'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase release --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/release-notes.sh docs/agents-v0/requirements/p0-a-platform-skeleton.md --include-unreleased --insert CHANGELOG.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-lessons.sh --unchanged-since main --phase-result docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase release --status awaiting_approval docs/agents-v0/requirements/p0-a-platform-skeleton.md'
+sh .agents-v0/scripts/resolve-integration-branch.sh && git status --short --branch
+ls -la && ls -la app/ app/backend/ app/frontend/
+find docs/agents-v0 .agents-v0 -maxdepth 3 | sort
+ls -la .cursor/hooks/ .agents-v0/packs/java/hooks/
+sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p0-a-platform-skeleton.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md
+find app -type f | sort
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p0-a-platform-skeleton/build-report.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"
+cd app/backend && ./mvnw -B clean verify -Pci-security
+cd app/frontend && (test -d node_modules || npm ci) && npm run verify
+git ls-files "*/._*" "._*"
+git ls-files | grep "\._" && git rm -f $(git ls-files | grep "\._")
+git ls-files | grep "/\._" && git rm -f $(git ls-files | grep "/\._")
+find app -name "._*" -type f && rm -f $(find app -name "._*" -type f)
+git status --short
+cd app/frontend && npm run verify
+git rev-parse HEAD && python3 -c "import xml.etree.ElementTree as ET; root = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\").getroot(); print([(c.attrib[\"type\"], c.attrib[\"covered\"], c.attrib[\"missed\"]) for c in root.findall(\"counter\")])"
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md && sh .agents-v0/scripts/resolve-layout.sh
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase release --status in_progress docs/agents-v0/requirements/p0-a-platform-skeleton.md
+sh .agents-v0/scripts/release-notes.sh docs/agents-v0/requirements/p0-a-platform-skeleton.md --include-unreleased --insert CHANGELOG.md
+sh .agents-v0/scripts/check-lessons.sh --unchanged-since main --phase-result docs/agents-v0/requirements/p0-a-platform-skeleton.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase release --status awaiting_approval docs/agents-v0/requirements/p0-a-platform-skeleton.md

@@ -1,0 +1,10 @@
+{
+  "chat": "33d0a07b-bf78-4afa-ab04-747a193eec7d",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-intake p2-m-integration-governance-iam-sod-and-provisioning",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1",
+  "turn": 1,
+  "requested_at": 1793340784
+}

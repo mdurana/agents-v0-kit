@@ -1,0 +1,8 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/execution -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md
+find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort
+find app/backend/src/main/java/com/example/app/execution -type f | sort
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md

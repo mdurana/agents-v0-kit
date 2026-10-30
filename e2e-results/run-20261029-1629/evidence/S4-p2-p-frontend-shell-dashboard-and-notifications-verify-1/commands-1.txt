@@ -1,0 +1,15 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short --branch'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat 7aaafe2a7b325bca38248cdc242ce4d3c43491fe...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm ls --depth=0'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"
+cd app/frontend && npm run verify
+git diff --stat 7aaafe2a7b325bca38248cdc242ce4d3c43491fe...HEAD
+cd app/frontend && npm ls --depth=0
+git rev-parse HEAD
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

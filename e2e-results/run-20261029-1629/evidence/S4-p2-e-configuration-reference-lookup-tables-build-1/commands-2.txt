@@ -1,0 +1,10 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build --approved-by "mdurana" --active-phase verify --status not_started docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build --active-phase verify --status not_started docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A && git commit -m "feat(configuration): implement P2-E reference lookup tables, versions, and CSV/Grid editing"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git commit -m "feat(configuration): implement P2-E reference lookup tables, versions, and CSV/Grid editing"'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build --approved-by "mdurana" --active-phase verify --status not_started docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && git status --short
+sh .agents-v0/scripts/sync-feature-state.sh --approve build --active-phase verify --status not_started docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && git status --short
+git add -A && git commit -m "feat(configuration): implement P2-E reference lookup tables, versions, and CSV/Grid editing"
+git add -A
+git commit -m "feat(configuration): implement P2-E reference lookup tables, versions, and CSV/Grid editing"

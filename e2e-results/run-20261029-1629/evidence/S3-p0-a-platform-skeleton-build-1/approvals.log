@@ -1,0 +1,1 @@
+2026-10-29 17:18:10	turn-2	SENT	gate=release-p0a	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal/docs/agents-v0/requirements/p0-a-platform-skeleton.state.json	text=Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	allow=Shell(git:commit*)

@@ -1,0 +1,54 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -n 5 --stat'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git show f4b7b5801453f0ca8294783447ca3beb662e5b03 -- openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -p -n 5 -- app/backend/src/test/java/com/example/app/api/OpenApiContractCatalogTest.java'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/hooks/ .cursor/hooks/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ci/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "Catalog must declare" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/execution app/backend/src/main/java/com/example/app/governance -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "jackson" app/backend/src/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java -name "*Controller.java"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "jackson" app/backend/src/main/java/ || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls app/backend/src/main/java/com/example/app/governance/service/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "AuditLogService" app/backend/src/ || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls app/backend/src/main/java/com/example/app/iam/security/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest,OpenApiContractCatalogTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest,OpenApiContractCatalogTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "mutationPayloadJson" app/backend/src/test/ || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-output.txt 2>&1'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'tail -n 25 docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md'
+git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && git status --short
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+find app/backend/src -type f | sort
+git log -n 5 --stat
+git show f4b7b5801453f0ca8294783447ca3beb662e5b03 -- openapi/api-v1.yaml
+git log -p -n 5 -- app/backend/src/test/java/com/example/app/api/OpenApiContractCatalogTest.java
+ls -la .agents-v0/scripts/
+ls -la .agents/hooks/ .cursor/hooks/ 2>/dev/null || true
+ls -la .agents-v0/ci/
+grep -rn "Catalog must declare" app/backend/src/test/
+find app/backend/src/main/java/com/example/app/execution app/backend/src/main/java/com/example/app/governance -type f | sort
+cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml
+cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest
+grep -rn "jackson" app/backend/src/
+find app/backend/src/main/java -name "*Controller.java"
+grep -rn "jackson" app/backend/src/main/java/ || true
+ls app/backend/src/main/java/com/example/app/governance/service/
+grep -rn "AuditLogService" app/backend/src/ || true
+ls app/backend/src/main/java/com/example/app/iam/security/
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md
+cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest,OpenApiContractCatalogTest
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B test -Dtest=AuditLogsNotificationsAndDashboardApisTest,OpenApiContractCatalogTest
+grep -rn "mutationPayloadJson" app/backend/src/test/ || true
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-report.md && cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-output.txt 2>&1
+tail -n 25 docs/agents-v0/build/p2-i-audit-logs-notifications-and-dashboard-apis/build-output.txt
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md

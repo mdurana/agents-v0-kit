@@ -1,0 +1,48 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short --branch'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat c10081d26c7458c3ba33f6e7a110a54dc7893f10...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"TOTAL {t}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+targets = [
+    \"AuditJsonAndFilterSupport\", \"AuditLogService\", \"NotificationBellService\",
+    \"DashboardWidgetAggregator\", \"AsyncSmtpDispatchWorker\",
+    \"ReportRunArtifactAndEndorsementService\", \"ReportRunWorkerService\",
+    \"GovernanceTicketSubmissionService\", \"GovernanceTicketValidationAndMappingSupport\",
+    \"GovernanceTicketWorkflowService\", \"IamAdminController\",
+    \"RbacManagementService\", \"RbacValidationAndMappingSupport\"
+]
+cov_sum = 0
+tot_sum = 0
+for pkg in root.findall(\"package\"):
+    for cls in pkg.findall(\"class\"):
+        name = cls.attrib[\"name\"].split(\"/\")[-1]
+        if name in targets:
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot = m + cov
+                    cov_sum += cov
+                    tot_sum += tot
+                    print(f\"CLASS {name}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+print(f\"CHANGED_AGGREGATE: {cov_sum}/{tot_sum} ({cov_sum*100.0/tot_sum:.2f}%)\")
+" && git rev-parse HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+git worktree list && git status --short --branch
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md
+git diff --stat c10081d26c7458c3ba33f6e7a110a54dc7893f10...HEAD
+cd app/backend && ./mvnw -B clean verify -Pci-security
+python3 -c "
+    \"DashboardWidgetAggregator\", \"AsyncSmtpDispatchWo
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md

@@ -1,0 +1,10 @@
+{
+  "chat": "e87560c8-576b-4b99-9d7d-ff09ec542bc0",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-local-release p2-f-execution-upload-and-run-lifecycle",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-f-execution-upload-and-run-lifecycle-local-release-1",
+  "turn": 1,
+  "requested_at": 1793320734
+}

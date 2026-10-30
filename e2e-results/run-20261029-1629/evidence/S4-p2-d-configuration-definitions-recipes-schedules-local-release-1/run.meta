@@ -1,0 +1,7 @@
+name=S4-p2-d-configuration-definitions-recipes-schedules-local-release
+workspace=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules
+context=release
+allowed=intake design build verify maintain release branch
+kit_ref=cca27739dde420f6a0f77eac37563288721bbef0
+kit_label=cca27739dde4
+start=2026-10-30 06:28:34 Asia/Manila

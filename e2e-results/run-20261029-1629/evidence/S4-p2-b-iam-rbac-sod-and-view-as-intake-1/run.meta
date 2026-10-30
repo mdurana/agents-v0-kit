@@ -1,0 +1,7 @@
+name=S4-p2-b-iam-rbac-sod-and-view-as-intake
+workspace=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+context=intake
+allowed=intake design build verify maintain release branch
+kit_ref=cca27739dde420f6a0f77eac37563288721bbef0
+kit_label=cca27739dde4
+start=2026-10-30 03:34:58 Asia/Manila

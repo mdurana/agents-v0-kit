@@ -1,0 +1,5 @@
+S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 NORMAL-END gates: intake branch
+S4-p2-g-execution-recipe-engine-and-artifacts-design-1 NORMAL-END gates: design
+S4-p2-g-execution-recipe-engine-and-artifacts-build-1 NORMAL-END gates: build
+S4-p2-g-execution-recipe-engine-and-artifacts-verify-1 NORMAL-END gates: verify
+S4-p2-g-execution-recipe-engine-and-artifacts-local-release-1 NORMAL-END gates: release

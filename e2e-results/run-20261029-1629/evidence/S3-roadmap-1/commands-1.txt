@@ -1,0 +1,22 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sha256sum user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md && ls -la docs/agents-v0/roadmap/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ .agents/rules/org/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/ docs/agents-v0/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "docs/agents-v0/roadmap" .agents/ .agents-v0/ docs/agents-v0/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cp docs/agents-v0/roadmap/_template.md docs/agents-v0/roadmap/finance-back-office-portal.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status in_progress docs/agents-v0/roadmap/finance-back-office-portal.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-lessons.sh'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status awaiting_approval docs/agents-v0/roadmap/finance-back-office-portal.md'
+sha256sum user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md && ls -la docs/agents-v0/roadmap/
+ls -la .agents-v0/scripts/
+ls -la .agents-v0/ .agents/rules/org/
+ls -la .agents-v0/hooks/
+ls -la .agents/ docs/agents-v0/
+ls -la .agents/hooks/
+ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/
+grep -rn "docs/agents-v0/roadmap" .agents/ .agents-v0/ docs/agents-v0/
+cp docs/agents-v0/roadmap/_template.md docs/agents-v0/roadmap/finance-back-office-portal.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status in_progress docs/agents-v0/roadmap/finance-back-office-portal.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status awaiting_approval docs/agents-v0/roadmap/finance-back-office-portal.md
+sh .agents-v0/scripts/check-lessons.sh

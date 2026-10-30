@@ -1,0 +1,10 @@
+{
+  "chat": "de93c19f-0ab9-4967-8c91-25c0831d7ed2",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "Branch authorized",
+  "allow": "Shell(sh:.agents-v0/scripts/feature-worktree.sh*)",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1",
+  "turn": 3,
+  "requested_at": 1793294788
+}

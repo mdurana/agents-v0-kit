@@ -1,0 +1,10 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr docs/agents-v0/design docs/agents-v0/diagrams/sequences'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/rules/ 2>/dev/null || ls -la .cursor/rules/org/ 2>/dev/null'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status -s'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+ls -la docs/agents-v0/adr docs/agents-v0/design docs/agents-v0/diagrams/sequences
+find app/backend/src/main/java -type f | sort
+ls -la .agents/rules/ 2>/dev/null || ls -la .cursor/rules/org/ 2>/dev/null
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status -s

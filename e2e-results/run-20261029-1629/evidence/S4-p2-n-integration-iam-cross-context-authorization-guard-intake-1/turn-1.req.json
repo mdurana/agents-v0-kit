@@ -1,0 +1,10 @@
+{
+  "chat": "f0a838d0-2069-43e7-b20a-8b08e920dd2b",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-intake p2-n-integration-iam-cross-context-authorization-guard",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1",
+  "turn": 1,
+  "requested_at": 1793344010
+}

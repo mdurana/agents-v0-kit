@@ -1,0 +1,12 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.md && git status'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && sh .agents-v0/scripts/resolve-integration-branch.sh'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm install --no-audit --no-fund && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-lessons.sh --unchanged-since main --phase-result docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status in_progress docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.md && git status
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && sh .agents-v0/scripts/resolve-integration-branch.sh
+cd app/backend && ./mvnw -B clean verify -Pci-security
+cd app/frontend && npm run verify
+cd app/frontend && npm install --no-audit --no-fund && npm run verify
+sh .agents-v0/scripts/check-lessons.sh --unchanged-since main --phase-result docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase release --status awaiting_approval docs/agents-v0/requirements/p1-e-redis-s3-sap-infrastructure-adapters.md

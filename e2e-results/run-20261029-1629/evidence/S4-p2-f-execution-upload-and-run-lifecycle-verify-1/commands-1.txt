@@ -1,0 +1,45 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short --branch'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat 4d4b05424ff0483b779dd87adbb26800c62d8bf8...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"BUNDLE {t}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+print(\"---\")
+changed_cov = 0
+changed_tot = 0
+for pkg in root.findall(\"package\"):
+    pname = pkg.attrib[\"name\"]
+    for cls in pkg.findall(\"class\"):
+        cname = cls.attrib[\"name\"]
+        if any(k in cname for k in [\"execution/api\", \"execution/service\", \"execution/repository/ReportRunRepository\", \"configuration/port/ConfigurationReadPort\", \"configuration/service/ConfigurationManagementService\", \"configuration/service/RecipeValidatorAndSandboxEvaluator\", \"iam/service/RbacManagementService\", \"iam/service/ViewAsOverlayService\"]):
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot = m + cov
+                    changed_cov += cov
+                    changed_tot += tot
+                    print(f\"{cname}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+print(f\"CHANGED CLASSES TOTAL LINES: {changed_cov}/{changed_tot} ({changed_cov*100/changed_tot:.2f}%)\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md'
+git worktree list && git status --short --branch
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md
+git diff --stat 4d4b05424ff0483b779dd87adbb26800c62d8bf8...HEAD
+cd app/backend && ./mvnw -B clean verify -Pci-security
+python3 -c "
+    for cls in pkg.findall(\"class\"
+        cname = cls.attrib[\"n
+git rev-parse HEAD
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-f-execution-upload-and-run-lifecycle.md

@@ -1,0 +1,20 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && git rev-parse --abbrev-ref HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && git show main:docs/agents-v0/lessons.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --name-status bfebddac69b7f5e86e209e6ef69537152a182ee7...HEAD && echo "---" && sh .agents-v0/scripts/resolve-layout.sh && echo "---" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "slo-evidence" .agents-v0/ .agents/ || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/ && git rev-parse HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ci/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.phase-result.md'
+git worktree list && git status --short && git rev-parse --abbrev-ref HEAD
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && git show main:docs/agents-v0/lessons.md
+git diff --name-status bfebddac69b7f5e86e209e6ef69537152a182ee7...HEAD && echo "---" && sh .agents-v0/scripts/resolve-layout.sh && echo "---" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+grep -rn "slo-evidence" .agents-v0/ .agents/ || true
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && cd app/backend && ./mvnw -B clean verify -Pci-security
+ls -la .agents-v0/scripts/ && git rev-parse HEAD
+ls -la .agents/hooks/
+ls -la .agents-v0/hooks/
+ls -la .agents-v0/ci/
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.phase-result.md

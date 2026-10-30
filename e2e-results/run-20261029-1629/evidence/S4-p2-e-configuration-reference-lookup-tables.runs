@@ -1,0 +1,5 @@
+S4-p2-e-configuration-reference-lookup-tables-intake-1 NORMAL-END gates: intake branch
+S4-p2-e-configuration-reference-lookup-tables-design-1 NORMAL-END gates: design
+S4-p2-e-configuration-reference-lookup-tables-build-1 NORMAL-END gates: build
+S4-p2-e-configuration-reference-lookup-tables-verify-1 NORMAL-END gates: verify
+S4-p2-e-configuration-reference-lookup-tables-local-release-1 NORMAL-END gates: release

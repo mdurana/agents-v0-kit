@@ -1,0 +1,7 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/ docs/agents-v0/adr/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/system/components/ docs/agents-v0/diagrams/sequences/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

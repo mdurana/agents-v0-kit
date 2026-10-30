@@ -1,0 +1,10 @@
+{
+  "chat": "12663c6e-78a2-4897-9de3-f38da6b3e854",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-local-release p1-e-redis-s3-sap-infrastructure-adapters",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1",
+  "turn": 1,
+  "requested_at": 1793284298
+}

@@ -1,0 +1,10 @@
+{
+  "chat": "60f13a38-1a0c-4bc4-9462-a66ccd8823b8",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-build p2-a-bff-oidc-fail-closed-session-auth",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-a-bff-oidc-fail-closed-session-auth-build-1",
+  "turn": 1,
+  "requested_at": 1793300708
+}

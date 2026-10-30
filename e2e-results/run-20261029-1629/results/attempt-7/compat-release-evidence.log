@@ -1,0 +1,10 @@
+OK: release evidence present for p0-a-platform-skeleton
+OK: release evidence present for p1-a-openapi-v1-contract-catalog
+OK: release evidence present for p1-b-iam-and-audit-persistence
+OK: release evidence present for p1-c-configuration-and-seeded-definitions-persistence
+OK: release evidence present for p1-d-execution-and-governance-persistence
+OK: release evidence present for p1-e-redis-s3-sap-infrastructure-adapters
+OK: release evidence present for p2-a-bff-oidc-fail-closed-session-auth
+OK: release evidence present for p2-b-iam-rbac-sod-and-view-as
+OK: release evidence present for p2-c-iam-user-directory-onboarding-exports
+OK: release evidence present for p2-d-configuration-definitions-recipes-schedules

@@ -1,0 +1,5 @@
+S4-p2-b-iam-rbac-sod-and-view-as-intake-1 NORMAL-END gates: intake branch
+S4-p2-b-iam-rbac-sod-and-view-as-design-1 NORMAL-END gates: design
+S4-p2-b-iam-rbac-sod-and-view-as-build-1 NORMAL-END gates: build
+S4-p2-b-iam-rbac-sod-and-view-as-verify-1 NORMAL-END gates: verify
+S4-p2-b-iam-rbac-sod-and-view-as-local-release-1 NORMAL-END gates: release

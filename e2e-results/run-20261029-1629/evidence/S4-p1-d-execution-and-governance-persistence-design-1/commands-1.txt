@@ -1,0 +1,24 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git rev-parse --abbrev-ref HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -n 6 --oneline'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log --all --grep="p1-c" -n 10 --oneline && git show b8db13b --stat'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-output.txt 2>&1'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md'
+git worktree list && git rev-parse --abbrev-ref HEAD
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md
+git log -n 6 --oneline
+git log --all --grep="p1-c" -n 10 --oneline && git show b8db13b --stat
+ls -la docs/agents-v0/adr/
+sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md
+git status --short && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p1-d-execution-and-governance-persistence/build-output.txt 2>&1
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.md

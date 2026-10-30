@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/ .agents/rules/ .agents/agents/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/execution -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/backend/src/main/java/com/example/app/iam/service/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/backend/src/main/resources/db/migration/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/
+ls -la .agents/ .agents/rules/ .agents/agents/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md
+find app/backend/src/main/java/com/example/app/execution -type f | sort
+ls -la app/backend/src/main/java/com/example/app/iam/service/
+ls -la app/backend/src/main/resources/db/migration/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md

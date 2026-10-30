@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p1-c-configuration-and-seeded-definitions-persistence.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A && git commit -m "feat(p1-c): implement configuration persistence schema, MVP Funding Cost seeds, and immutability triggers" && git status --short'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p1-c-configuration-and-seeded-definitions-persistence.md && git status --short
+git add -A && git commit -m "feat(p1-c): implement configuration persistence schema, MVP Funding Cost seeds, and immutability triggers" && git status --short

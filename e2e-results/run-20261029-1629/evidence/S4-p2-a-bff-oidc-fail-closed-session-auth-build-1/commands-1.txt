@@ -1,0 +1,22 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'PYTHONPATH=.agents-v0/scripts python3 -c "import endpoint_scan, sys; sys.exit(endpoint_scan.main([\"22c944f3122a6eaba08086e94908e79d0defb16a\"]))"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+find app/backend/src -type f | sort
+cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+ls -1 .agents-v0/scripts/
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+PYTHONPATH=.agents-v0/scripts python3 -c "import endpoint_scan, sys; sys.exit(endpoint_scan.main([\"22c944f3122a6eaba08086e94908e79d0defb16a\"]))"
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md

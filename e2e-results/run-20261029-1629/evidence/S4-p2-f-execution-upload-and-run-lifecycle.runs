@@ -1,0 +1,5 @@
+S4-p2-f-execution-upload-and-run-lifecycle-intake-1 NORMAL-END gates: intake branch
+S4-p2-f-execution-upload-and-run-lifecycle-design-1 NORMAL-END gates: design
+S4-p2-f-execution-upload-and-run-lifecycle-build-1 NORMAL-END gates: build
+S4-p2-f-execution-upload-and-run-lifecycle-verify-1 NORMAL-END gates: verify
+S4-p2-f-execution-upload-and-run-lifecycle-local-release-1 NORMAL-END gates: release

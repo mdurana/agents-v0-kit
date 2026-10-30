@@ -1,0 +1,10 @@
+{
+  "chat": "3818f892-ee09-417f-820a-a86b4425c6f7",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-build p2-c-iam-user-directory-onboarding-exports",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-c-iam-user-directory-onboarding-exports-build-1",
+  "turn": 1,
+  "requested_at": 1793307451
+}

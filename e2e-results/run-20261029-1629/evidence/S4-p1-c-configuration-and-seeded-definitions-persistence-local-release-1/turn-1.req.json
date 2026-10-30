@@ -1,0 +1,10 @@
+{
+  "chat": "65021545-2a1e-4806-b37c-5a58ef3601e6",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-local-release p1-c-configuration-and-seeded-definitions-persistence",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-c-configuration-and-seeded-definitions-persistence-local-release-1",
+  "turn": 1,
+  "requested_at": 1793273799
+}

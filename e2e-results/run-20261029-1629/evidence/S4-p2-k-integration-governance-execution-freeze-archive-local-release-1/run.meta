@@ -1,0 +1,7 @@
+name=S4-p2-k-integration-governance-execution-freeze-archive-local-release
+workspace=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive
+context=release
+allowed=intake design build verify maintain release branch
+kit_ref=fc4b642cb947cf38b5fea7cc1005e22d58e17eef
+kit_label=fc4b642cb947
+start=2026-10-30 12:57:36 Asia/Manila

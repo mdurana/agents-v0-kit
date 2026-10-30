@@ -1,0 +1,5 @@
+S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 NORMAL-END gates: intake branch
+S4-p2-n-integration-iam-cross-context-authorization-guard-design-1 NORMAL-END gates: design
+S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 NORMAL-END gates: build branch
+S4-p2-n-integration-iam-cross-context-authorization-guard-verify-1 NORMAL-END gates: verify
+S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 NORMAL-END gates: release branch

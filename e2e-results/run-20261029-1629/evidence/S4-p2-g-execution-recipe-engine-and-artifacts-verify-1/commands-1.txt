@@ -1,0 +1,25 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat 8ad1e0dff8fdafde3700dbc4458d8b7a1d069abc...HEAD && ls -la docs/agents-v0/verify/'
+"bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD && python3 -c \"\nimport xml.etree.ElementTree as ET\ntree = ET.parse(\\\"app/backend/target/site/jacoco/jacoco.xml\\\")\nroot = tree.getroot()\nfor c in root.findall(\\\"counter\\\"):\n    t = c.attrib[\\\"type\\\"]\n    m = int(c.attrib[\\\"missed\\\"])\n    cov = int(c.attrib[\\\"covered\\\"])\n    tot = m + cov\n    print(f\\\"BUNDLE {t}: {cov}/{tot} ({cov*100/tot:.2f}%)\\\")\ntargets = [\n    \\\"com/example/app/execution/api/ReportRunController\\\",\n    \\\"com/example/app/execution/service/ReportRunArtifactAndEndorsementService\\\",\n    \\\"com/example/app/execution/service/ReportRunArtifactBuilder\\\",\n    \\\"com/example/app/execution/service/ReportRunOrchestratorService\\\",\n    \\\"com/example/app/execution/service/ReportRunWorkerService\\\",\n    \\\"com/example/app/execution/service/RunArtifactStorageService\\\",\n    \\\"com/example/app/execution/repository/ReportRunRepository\\\",\n    \\\"com/example/app/execution/repository/RunArtifactRepository\\\",\n    \\\"com/example/app/governance/service/GovernanceTicketSubmissionService\\\",\n    \\\"com/example/app/governance/repository/GovernanceTicketRepository\\\",\n    \\\"com/example/app/configuration/service/ConfigurationManagementService\\\",\n    \\\"com/example/app/iam/service/RbacManagementService\\\",\n    \\\"com/example/app/iam/service/ViewAsOverlayService\\\",\n    \\\"com/example/app/api/contract/ContractProblemException\\\",\n    \\\"com/example/app/api/contract/ContractErrorCode\\\",\n    \\\"com/example/app/execution/api/dto/GovernanceTicketResponse\\\",\n    \\\"com/example/app/execution/api/dto/ReportRunEndorseRequest\\\",\n    \\\"com/example/app/execution/api/dto/RunArtifactPreviewResponse\\\",\n    \\\"com/example/app/execution/api/dto/SapPostingApproveRequest\\\",\n    \\\"com/example/app/governance/port/SapPostingTicketApproveCommand\\\",\n    \\\"com/example/app/governance/port/SapPosting
+<truncated 749 bytes>
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md
+sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md
+cd app/backend && ./mvnw -B clean verify -Pci-security
+git diff --stat 8ad1e0dff8fdafde3700dbc4458d8b7a1d069abc...HEAD && ls -la docs/agents-v0/verify/
+git rev-parse HEAD && python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"BUNDLE {t}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+targets = [
+    \"com/example/app/execution/api/ReportRunController\",
+    \"com/example/app/execution/service/ReportRunArtifactAndE
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md

@@ -1,0 +1,19 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/frontend /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal/app/frontend'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm ci'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -n "operationId:" openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+cd app/frontend && npm ci
+cd app/frontend && npm run verify
+cd app/frontend && npm test
+cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1 && cat ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt
+cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1
+cd app/frontend && npx tsc --noEmit
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

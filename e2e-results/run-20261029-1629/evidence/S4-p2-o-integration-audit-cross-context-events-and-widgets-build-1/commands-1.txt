@@ -1,0 +1,30 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 app/backend/src/main/java/com/example/app/iam/api app/backend/src/test/java/com/example/app/audit docs/agents-v0/build/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/build/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend -name "*OpenApi*" -o -name "api-v1.yaml"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/backend/src/test/java/com/example/app/execution/ app/backend/src/test/java/com/example/app/governance/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-o-integration-audit-cross-context-events-and-widgets/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "GovernanceDashboardReadPort" app/backend/src/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-o-integration-audit-cross-context-events-and-widgets/build-output.txt 2>&1'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "<error\|<failure\|<BugInstance" app/backend/target/checkstyle-result.xml app/backend/target/spotbugsXml.xml app/backend/target/surefire-reports/*.xml 2>/dev/null | head -n 40'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "<error\|<failure\|<BugInstance" app/backend/target/checkstyle-result.xml app/backend/target/spotbugsXml.xml app/backend/target/surefire-reports/*.xml 2>/dev/null; ls -lt app/backend/target/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status -s'
+git worktree list && git status --short && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md
+cd app/backend && ./mvnw -B clean verify -Pci-security
+ls -1 app/backend/src/main/java/com/example/app/iam/api app/backend/src/test/java/com/example/app/audit docs/agents-v0/build/
+ls -la docs/agents-v0/build/
+find app/backend -name "*OpenApi*" -o -name "api-v1.yaml"
+ls -la app/backend/src/test/java/com/example/app/execution/ app/backend/src/test/java/com/example/app/governance/
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-o-integration-audit-cross-context-events-and-widgets/build-report.md
+cd app/backend && ./mvnw -B clean verify -P!ci-security
+grep -rn "GovernanceDashboardReadPort" app/backend/src/
+cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-o-integration-audit-cross-context-events-and-widgets/build-output.txt 2>&1
+grep -rn "<error\|<failure\|<BugInstance" app/backend/target/checkstyle-result.xml app/backend/target/spotbugsXml.xml app/backend/target/surefire-reports/*.xml 2>/dev/null | head -n 40
+grep -rn "<error\|<failure\|<BugInstance" app/backend/target/checkstyle-result.xml app/backend/target/spotbugsXml.xml app/backend/target/surefire-reports/*.xml 2>/dev/null; ls -lt app/backend/target/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-o-integration-audit-cross-context-events-and-widgets.md
+git status -s

@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'date +%Y-%m-%d'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && cat docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.state.json'
+date +%Y-%m-%d
+sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.md && cat docs/agents-v0/requirements/p2-e-configuration-reference-lookup-tables.state.json

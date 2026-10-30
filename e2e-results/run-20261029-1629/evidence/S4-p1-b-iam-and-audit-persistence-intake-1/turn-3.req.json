@@ -1,0 +1,10 @@
+{
+  "chat": "148d1781-520a-46a6-8323-850dca008942",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "Branch authorized",
+  "allow": "Shell(sh:.agents-v0/scripts/feature-worktree.sh*)",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-b-iam-and-audit-persistence-intake-1",
+  "turn": 3,
+  "requested_at": 1793269424
+}

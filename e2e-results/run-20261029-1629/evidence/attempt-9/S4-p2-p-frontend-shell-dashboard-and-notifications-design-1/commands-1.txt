@@ -1,0 +1,26 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/ docs/agents-v0/design/ docs/agents-v0/design/system/components/ .cursor/rules/org/ app/frontend/src/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/ docs/agents-v0/diagrams/sequences/ docs/agents-v0/design/p2-i-audit-logs-notifications-and-dashboard-apis/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ .agents-v0/hooks/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ui/ .agents-v0/ui/react/ 2>/dev/null || true'
+"bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 - << '\\''PY'\\''\nimport re\nfrom pathlib import Path\nfrom html.parser import HTMLParser\n\nbase = Path(\"docs/agents-v0/design/p2-p-frontend-shell-dashboard-and-notifications\")\nux_text = (base / \"ux-spec.md\").read_text(encoding=\"utf-8\")\ndesign_text = (base / \"design.md\").read_text(encoding=\"utf-8\")\nopenapi_text = (base / \"openapi.yaml\").read_text(encoding=\"utf-8\")\nadr_text = Path(\"docs/agents-v0/adr/0021-frontend-shell-dashboard-and-notifications.md\").read_text(encoding=\"utf-8\")\n\n# 1. Extract operationIds from openapi.yaml\nop_ids = set(re.findall(r\"^\\s*operationId:\\s*(\\S+)\", openapi_text, re.M))\nprint(\"OpenAPI operationIds:\", sorted(op_ids))\nassert len(op_ids) == 10, f\"Expected 10 operationIds, got {len(op_ids)}\"\n\n# Verify every operationId is in design.md\nfor op in op_ids:\n    assert op in design_text, f\"Missing {op} in design.md\"\n\n# Verify AC-1..AC-8 in design.md\nfor i in range(1, 9):\n    assert f\"AC-{i}\" in design_text, f\"Missing AC-{i} in design.md\"\n\n# 2. Parse Component defaults table in ux-spec.md\nin_comp = False\ncomp_rows = {}\nfor line in ux_text.splitlines():\n    if line.strip().startswith(\"## Component defaults\"):\n        in_comp = True\n        continue\n    if in_comp and line.strip().startswith(\"## \"):\n        break\n    if in_comp and line.strip().startswith(\"|\"):\n        cells = [c.strip() for c in line.strip().strip(\"|\").split(\"|\")]\n        if len(cells) >= 5 and cells[0] not in (\"Component\", \"---\") and not cells[0].startswith(\"-\"):\n            comp_rows[cells[0]] = {\n                \"screen\": cells[1],\n                \"mockup\": cells[2],\n                \"operation\": cells[3],\n                \"behavior\": cells[4],\n            }\n\nprint(f\"Component rows in ux-spec.md: {len(comp_rows)}\")\n\n# Verify every component row mockup exists, contains data-component, and operation is valid
+<truncated 1830 bytes>
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+git worktree list
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+ls -la docs/agents-v0/adr/ docs/agents-v0/design/ docs/agents-v0/design/system/components/ .cursor/rules/org/ app/frontend/src/
+ls -la .agents-v0/scripts/ docs/agents-v0/diagrams/sequences/ docs/agents-v0/design/p2-i-audit-logs-notifications-and-dashboard-apis/
+ls -la .agents-v0/ .agents-v0/hooks/ 2>/dev/null || true
+ls -la .agents-v0/ui/ .agents-v0/ui/react/ 2>/dev/null || true
+python3 - << 'PY'
+import re
+from pathlib import Path
+from html.parser import HTMLParser
+base = Path("docs/agents-v0/design/p2-p-frontend-shell-dashboard-and-notifications")
+ux_text = (base / "ux-spec.md").read_text(encoding="utf-8")
+design_text = (base / "design.md").read_text(encoding="utf-8")
+openapi_text = (base / "openapi.yaml").read_text(encoding="utf-8")
+adr_text = Path("docs/agents-v0/adr/0021-frontend-shell-dashboard-and-notifications.md").read_text(encoding="utf-8")
+# 1. Extract opera
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

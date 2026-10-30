@@ -1,0 +1,2 @@
+2026-10-30 04:40:11	turn-2	SENT	gate=intake	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal/docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.state.json	text=Approved by mdurana	allow=-
+2026-10-30 04:42:17	turn-3	SENT	gate=branch	text=Branch authorized	allow=Shell(sh:.agents-v0/scripts/feature-worktree.sh*)

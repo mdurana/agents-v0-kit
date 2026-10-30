@@ -1,0 +1,1 @@
+2026-10-30 11:56:37	turn-2	SENT	gate=release	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis/docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.state.json	text=Approved by mdurana. Accept P-1 if proposed; reject any other proposed lessons.	allow=Shell(git:commit*),Shell(git:merge*)

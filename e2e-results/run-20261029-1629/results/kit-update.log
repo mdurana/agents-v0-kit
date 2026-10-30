@@ -1,0 +1,2456 @@
+2026-10-29 23:27:55 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:29:18 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:30:40 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick --allow-in-flight /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:31:58 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick --allow-in-flight /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:33:14 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick --allow-in-flight /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:34:36 kit update (kit cca2773 before resume from story P2-A, approved by mdurana) --update --quick --allow-in-flight /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-29 23:53:59 kit update (kit cca2773 on main only (Option A, released P1 worktrees set aside), approved by mdurana) --update --quick /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.
+2026-10-30 06:38:17 kit update (kit fc4b642 on main only (Option A, released P2-A..P2-D worktrees set aside), approved by mdurana) --update --quick /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Quick update: validate-kit skips the app-template build test (needs Maven and network).
+model-config.json matches the routing matrix
+update-agents-model.sh ok
+test-hook-policy: OK (270 cases)
+test-hooks: OK
+ok: resolve-layout detects services/*/ modules
+ok: resolve-layout reads the Service roots row
+ok: resolve-layout leaves Backend root empty with Service roots
+ok: resolve-layout rejects a Service root outside the repo
+ok: attempt budget: 2 failed of 3 allows another attempt
+ok: attempt budget: 2 failed of 2 is spent
+ok: state: a conditional design approval leaves lastApprovedPhase at intake
+ok: state: a later Re-opened row withdraws an earlier Approved design
+ok: state: sync-feature-state records baseCommit SHA
+ok: state: blocked verify with Re-opened build routes activePhase to build
+ok: activate-stack-pack activates dotnet pack
+ok: activate-stack-pack updates project-profile.md Pack row to dotnet
+test-ci-checks: OK
+ok: discover-codebase runs on the fixture
+ok: endpoints: annotated POST with the class base path
+ok: endpoints: GET without an annotation is flagged
+ok: endpoints: a method before an annotated method is not credited with its annotation
+ok: endpoints: an annotation above the mapping is attributed to it
+ok: entities: class and table
+ok: migrations: Flyway file listed
+ok: messaging: Kafka listener
+ok: scheduled: @Scheduled
+ok: outbound: WebClient
+ok: config: key path
+ok: config: literal secret is classified
+ok: config: environment reference name
+ok: config: no secret value is printed
+ok: security baseline: no secret value is printed
+ok: security baseline: permit-all finding
+ok: endpoint stacks: FastAPI row proposed
+ok: frontend: SvelteKit route
+ok: frontend: React route
+ok: frontend: API call
+ok: ci-deploy: Dockerfile
+ok: tests: per-root counts
+ok: baseline: unmeasured root is said so
+ok: every inventory carries the commit
+ok: a capped list says it was cut
+ok: baseline: coverage read from jacoco.xml
+ok: baseline: proposed coverage ratchet row
+ok: baseline: proposed known_failures row
+ok: generate-repo-map runs on the fixture
+ok: repo map: resolved service roots
+ok: repo map: Maven build file under a service root
+ok: repo map: controller found
+ok: repo map: commit stamped
+ok: dependency graphs: a failing root makes the script exit non-zero
+ok: dependency graphs: a working root writes its own graph
+ok: dependency graphs: the failing root is named
+ok: dependency graphs: dotnet list package writes a graph
+ok: dependency graphs: dotnet graph names the package
+ok: dependency graphs: go list writes a graph
+ok: dependency graphs: go graph names the module
+ok: dependency graphs: pip freeze writes a graph
+ok: dependency graphs: python graph names the package
+ok: onboarding docs: a real citation passes and hostnames are not citations
+ok: onboarding docs: a citation to a missing file fails
+ok: onboarding docs: a line past the end of the file fails
+ok: onboarding docs: a TEMPLATE: marker fails
+ok: onboarding docs: blockquote instruction lines with TEMPLATE: and example path/File.java:42 pass
+ok: onboarding docs: UNVERIFIED in headings and Owner column does not count against MAX_UNVERIFIED=0
+ok: onboarding docs: UNVERIFIED is counted, not failed, by default
+ok: onboarding docs: MAX_UNVERIFIED=0 fails on an unknown
+ok: onboarding docs: a module document needs a commit line
+ok: onboarding docs: module UNVERIFIED without an open question row in report.md fails
+ok: onboarding docs: module UNVERIFIED listed in report.md Open questions passes
+ok: onboarding docs: the default run needs the report
+ok: state: onboarding in progress
+ok: state: written beside the report
+ok: state: feature is onboarding
+ok: state: baseCommit pinned from report commit header
+ok: state: approval clears the active phase
+ok: state: last approved phase is onboard
+ok: state: baseCommit preserved across approval sync
+ok: state: artifacts map records primary report path
+ok: state: an intake phase is not valid for onboarding
+ok: discover-codebase runs with C# controller and placeholder config
+ok: endpoints: C# [controller] token resolved on class route
+ok: endpoints: C# [controller] and [action] tokens resolved with [Authorize]
+ok: endpoints: raw [controller] template token is not stored
+ok: config: CHANGEME placeholder classified as (placeholder)
+ok: security baseline: CHANGEME placeholder not flagged as LITERAL-IN-FILE
+ok: audit-brownfield-baseline: fails when dotnet test executes 0 tests
+ok: audit-brownfield-baseline: passes when dotnet test runs real tests
+test-onboard: OK
+ok: state: a note keeps docs/agents-v0/maintain/<id>/state.json with its tier
+ok: state: intake is not a phase of a maintenance note
+ok: state: release is a valid phase of a maintenance note
+ok: state: the maintain approval is derived
+ok: state: --approve verify --verify-passed true updates maintenance state.json
+ok: metrics: an emergency note past its follow-up date is OVERDUE
+ok: state: --approve release is refused on a story branch (kitfix-20261029-step4-p1e)
+ok: state: emergency --approve release does not backfill verify or set verifyPassed
+ok: state: standard --approve release still backfills verify and sets verifyPassed
+ok: state: emergency --approve release keeps verify when it was already approved
+test-maintain: OK
+ok: design-build: sync-feature-state approves intake and design
+ok: state: lastApprovedPhase is design
+ok: state: artifacts map indexes design.md
+ok: state: artifacts map indexes openapi.yaml
+ok: state: artifacts map indexes ux-spec.md
+ok: state: artifacts map indexes review.md
+ok: state: artifacts map indexes build plan.md
+ok: state: artifacts map indexes build-report.md
+ok: design-build: sync-feature-state approves build
+ok: state: lastApprovedPhase advances to build
+ok: reopen 1: allowed
+ok: reopen 1: reopenCount is 1
+ok: reopen 1: lastApprovedPhase falls back to design
+ok: reopen 2: allowed
+ok: reopen 2: trigger
+ok: reopen 3: allowed
+ok: reopen 3: trigger
+ok: reopen 3: reopenCount is 3
+ok: reopen 4: exceeds cap of 3 and exits non-zero
+ok: reopen 4: persists reopenCount 4
+ok: reopen 4: persists blocked status
+ok: reopen 4: build in_progress cannot clear blocked reopen budget
+ok: reopen 4: stays blocked after build in_progress attempt
+ok: reopen 4: clear-active unblocks after human escalation
+ok: non-primary artifact path is rejected
+ok: helper brief: first ask is recorded
+ok: helper brief: identical ask is blocked on next sync
+ok: helper brief: approve is not blocked by brief on disk
+ok: state: verifyPassed is true after verify approval
+ok: reopen clears verifyPassed when verify is withdrawn
+ok: state: verifyPassed is false after reopen build
+ok: failure brief: missing failure-brief.md fails after second red
+ok: failure brief: brief without outputs: fails (KD-04)
+ok: failure brief: valid failure-brief.md with file:line citation passes
+ok: failure brief: test name with spaces, commas, and semicolons fails safely
+ok: dep gate: build in_progress refused while P0-A has no state file
+ok: dep gate: blocked state can still be recorded
+ok: dep gate: P0-A state derived from a commented row
+ok: dep gate: a commented-out verify row is not a verified dependency
+ok: KD-02: --approve release without quality-gate.md or verifyPassed is refused
+ok: P0-A verify verdict recorded
+ok: P0-A --approve release with evidence
+ok: KD-01: release without an Approved row or approved phase-result is unsupported
+ok: dep gate: P1-A build in_progress allowed once P0-A is verified
+test-design-build: OK
+ok: mr body: Feature-Artifact line is set
+ok: mr body: exactly one Feature-Artifact line
+ok: mr body: summary is the user story
+ok: mr body: VAPT rows are copied verbatim
+ok: mr body: a report's commit stamp is listed
+ok: mr body: a missing report is marked MISSING
+ok: mr body: coverage lines come from the test report
+ok: mr body: the reviewer's checkboxes stay unticked
+ok: mr body: the placeholder path is gone
+ok: mr body (note): Maintain-Note line is set
+ok: mr body (note): no Feature-Artifact line
+ok: mr body (note): summary is the note title
+ok: mr body: a feature and a note together are rejected
+ok: mr body: no argument is rejected
+ok: release notes: versioned heading
+ok: release notes: a released story is listed with its sentence
+ok: release notes: acceptance criteria are listed
+ok: release notes: the release approver and date are listed
+ok: release notes: an unreleased story is left out
+ok: release notes: the skipped story is named on stderr
+ok: release notes: --include-unreleased lists the other story
+ok: release notes: Unreleased heading without a version
+ok: release notes: --insert adds the entry to the changelog
+ok: release notes: --insert keeps one Unreleased heading
+ok: release notes: a missing file is an error
+ok: local release: checkpoint keeps the release phase in flight
+ok: local release: clear-active leaves lastApprovedPhase on verify
+ok: local release: clear-active drops the phase in flight
+ok: local release: P0-A four approved rows advance lastApprovedPhase to verify
+ok: integration branch: profile row wins
+ok: integration branch: a placeholder falls through to HEAD
+ok: upgrade: announces project-profile.md -Pci-security migration
+ok: upgrade: stamps kit version with commit SHA
+ok: upgrade: preserves a custom context window on remapped agents
+ok: upgrade: remapped agents stay on reasoning_effort=high
+test-release: OK
+ok: install seeds AGENTS.md, sync-feature-state.sh, and an executable pre-push hook
+ok: install without --git-hooks leaves core.hooksPath unset
+ok: install --git-hooks sets core.hooksPath=.agents-v0/hooks
+ok: install --update refuses while a story is in progress
+ok: the refusal names the story and the override
+ok: install --update --allow-in-flight updates anyway
+ok: install --update proceeds once no story is in progress
+ok: an agent cannot skip git hooks with --no-verify
+ok: roadmap: sync-feature-state approves roadmap in program.state.json
+ok: program.state.json records lastApprovedPhase=roadmap
+ok: architecture: sync-feature-state approves architecture in program.state.json
+ok: program.state.json records lastApprovedPhase=architecture
+ok: plan: sync-feature-state approves plan in program.state.json
+ok: program.state.json records lastApprovedPhase=plan
+ok: intake: sync-feature-state approves intake
+ok: orders.state.json records lastApprovedPhase=intake
+ok: verify: sync-feature-state approves verify and sets verifyPassed=true
+ok: orders.state.json records verifyPassed=true
+test-command-flows: OK
+ok: stories-status: no worktrees
+ok: stories-status: lists program row
+ok: stories-status: lists P0-A row
+ok: stories-status: main + 2 feature + 1 maintain worktree, one malformed
+ok: stories-status: orders read from its worktree
+ok: stories-status: orders build in_progress
+ok: stories-status: stale main copy flagged
+ok: stories-status: malformed refunds reported
+ok: stories-status: maintain row
+ok: stories-status: blocked reason
+ok: stories-status: writes no files
+ok: stories-status --json
+ok: stories-status --json parses and lists every story (run from a worktree)
+ok: stories-status --all-copies
+ok: stories-status --all-copies shows both orders copies
+ok: stories-status: worktree folder removed by hand
+ok: stories-status: missing worktree folder reported
+ok: stories-status: not a git repository
+ok: stories-status: non-git note
+ok: stories-status: unknown option is a usage error
+ok: check-lessons: kit templates pass
+ok: check-lessons: --next-id on empty memory
+ok: check-lessons: first id is L-001
+ok: check-lessons: good active + archive
+ok: check-lessons: --next-id after L-003
+ok: check-lessons: next id is L-004
+ok: check-lessons: bad heading format
+ok: check-lessons: bad heading message
+ok: check-lessons: missing Do instead bullet
+ok: check-lessons: duplicate id
+ok: check-lessons: duplicate message
+ok: check-lessons: gap in ids
+ok: check-lessons: gap message
+ok: check-lessons: promoted entry without pointer
+ok: check-lessons: lessons.md holds only accepted entries
+ok: check-lessons: unknown trigger
+ok: check-lessons: entry over the size limit
+ok: check-lessons: fake GitLab token
+ok: check-lessons: secret message
+ok: check-lessons: password assignment
+ok: check-lessons: placeholder password is not a secret
+ok: check-lessons: 31 active entries over the default cap
+ok: check-lessons: cap message
+ok: check-lessons: --max-active 40 allows 31
+ok: check-lessons: LESSONS_MAX_ACTIVE=40 allows 31
+ok: check-lessons: 3 candidates in one phase
+ok: check-lessons: 4 candidates in one phase
+ok: check-lessons: max-3 message
+ok: check-lessons: candidate missing fields
+ok: check-lessons: unknown phase subsection
+ok: check-lessons: '- none' candidate
+ok: check-lessons: fake AWS key in a candidate
+ok: check-lessons: pending proposal before the gate
+ok: check-lessons: --decided refuses a pending proposal
+ok: check-lessons: --decided after the user decided
+ok: check-lessons: malformed proposal
+ok: check-lessons: maintain phase-result
+ok: check-lessons: --unchanged-since main on an untouched branch
+ok: check-lessons: uncommitted lessons.md edit on a story branch
+ok: check-lessons: committed lessons.md edit on a story branch
+ok: check-lessons: guard message
+ok: check-lessons: unknown ref
+ok: check-lessons: guard still fails after main gained lessons
+ok: check-lessons: hint restores from the merge-base
+ok: check-lessons: old hint (checkout main -- file) does not clear the guard
+ok: check-lessons: a committed edit needs the restore committed too
+ok: check-lessons: following the merge-base hint clears the guard (committed)
+ok: approval: e2e release text, only P-1 accepted and appended
+ok: approval: summary line
+ok: approval: --accepted P-1
+ok: approval: --accepted none while P-1 is accepted
+ok: approval: wrong accept (text accepts P-1 and P-3, P-3 marked rejected and missing)
+ok: approval: wrong mark message
+ok: approval: missing entry message
+ok: approval: P-2 marked accepted although not accepted
+ok: approval: rejected P-2 appended to lessons.md
+ok: approval: rejected-appended message
+ok: approval: accepted P-1 missing from lessons.md
+ok: approval: lessons.md entry content differs from accepted P-1
+ok: approval: mismatch message
+ok: approval: lessons.md entry has the wrong phase
+ok: approval: accepted P-1 appended twice
+ok: approval: accepting a P-n that is not proposed
+ok: approval: 'if proposed' tolerates a missing P-n
+ok: approval: P-1 both accepted and rejected
+ok: approval: 'Accept all, reject P-2 and P-3'
+ok: approval: needs exactly one --phase-result
+ok: approval: maintenance note (story id from maintain/<id>/)
+ok: install.sh installs .agents-v0/scripts/stories-status.sh (executable)
+ok: install.sh installs .agents-v0/scripts/check-lessons.sh (executable)
+ok: install.sh seeds docs/agents-v0/lessons.md
+ok: install.sh seeds docs/agents-v0/lessons-archive.md
+ok: check-lessons: passes in a fresh install
+ok: stories-status: runs in a fresh install
+ok: pre-push: untouched lessons.md on feature/orders passes
+ok: pre-push: story-branch edit to lessons.md fails
+ok: pre-push: story-branch guard message
+ok: pre-push: pushing feature/orders from main checkout catches committed lessons.md edit
+test-memory: OK
+SKIP: scripts/test-app-template.sh (KIT_SKIP_APP_TEMPLATE_TEST=1; the app build needs Maven and network)
+validate-kit: OK (Cursor model availability not checked)
+Updated 0 agent model(s).
+Installed agents-v0 into /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+Next: model routing per docs/agents-v0/model-routing-matrix.md. After editing .cursor/model-config.json, run sh .agents-v0/scripts/update-agents-model.sh.
+Greenfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/bootstrap-greenfield.sh — see docs/agents-v0/greenfield-onboarding.md. Brownfield: /home/e2e/agents-v0-e2e/run-20261029-1629/kit/scripts/audit-brownfield-baseline.sh — see docs/agents-v0/brownfield-onboarding.md.

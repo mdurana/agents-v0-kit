@@ -1,0 +1,12 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ .agents-v0/hooks/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/ docs/agents-v0/design/system/ docs/agents-v0/design/system/components/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh'
+ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/ 2>/dev/null || true
+ls -la .agents-v0/scripts/
+ls -la .agents-v0/ .agents-v0/hooks/ 2>/dev/null || true
+ls -la docs/agents-v0/ docs/agents-v0/design/system/ docs/agents-v0/design/system/components/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh

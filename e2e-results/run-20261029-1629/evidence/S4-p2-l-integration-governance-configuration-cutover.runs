@@ -1,0 +1,5 @@
+S4-p2-l-integration-governance-configuration-cutover-intake-1 NORMAL-END gates: intake branch
+S4-p2-l-integration-governance-configuration-cutover-design-1 NORMAL-END gates: design
+S4-p2-l-integration-governance-configuration-cutover-build-1 NORMAL-END gates: build
+S4-p2-l-integration-governance-configuration-cutover-verify-1 NORMAL-END gates: verify
+S4-p2-l-integration-governance-configuration-cutover-local-release-1 NORMAL-END gates: release

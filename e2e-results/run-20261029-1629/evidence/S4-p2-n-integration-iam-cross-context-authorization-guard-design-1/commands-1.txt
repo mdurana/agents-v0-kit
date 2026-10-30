@@ -1,0 +1,20 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 docs/agents-v0/adr/ && find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "governance:tickets:manage\|queueView\|reassign" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "governance:tickets:write\|GOVERNANCE_TICKETS_WRITE\|governance:tickets:manage\|GOVERNANCE_TICKETS_MANAGE" app/backend/src/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "/cancel" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "/approve\|/endorse\|/reject" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -n "operationId:\|^  /api/v1/" openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -n -A 5 "^  /api/v1/tickets" openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status -s'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md
+ls -1 docs/agents-v0/adr/ && find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort
+grep -rn "governance:tickets:manage\|queueView\|reassign" app/backend/src/test/
+grep -rn "governance:tickets:write\|GOVERNANCE_TICKETS_WRITE\|governance:tickets:manage\|GOVERNANCE_TICKETS_MANAGE" app/backend/src/
+grep -rn "/cancel" app/backend/src/test/
+grep -rn "/approve\|/endorse\|/reject" app/backend/src/test/
+grep -n "operationId:\|^  /api/v1/" openapi/api-v1.yaml
+grep -n -A 5 "^  /api/v1/tickets" openapi/api-v1.yaml
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md
+git status -s

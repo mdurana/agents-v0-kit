@@ -1,0 +1,10 @@
+{
+  "chat": "7731ee6a-34d4-4c42-9b5e-dc62f2acc8e3",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-verify p2-k-integration-governance-execution-freeze-archive",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-k-integration-governance-execution-freeze-archive-verify-1",
+  "turn": 1,
+  "requested_at": 1793335768
+}

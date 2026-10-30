@@ -1,0 +1,949 @@
+2026-10-29 16:29:39 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@0aa3a431ce06d9a46167f234ea1d71756c07026f start_step=0
+2026-10-29 16:29:39 Asia/Manila STEP-START 0 preflight kit=not-yet
+PREREQ os             PRESENT   Linux (x86_64)
+PREREQ git            PRESENT   /usr/bin/git
+PREREQ jq             PRESENT   /usr/bin/jq
+PREREQ python3        PRESENT   /usr/bin/python3
+PREREQ curl           PRESENT   /usr/bin/curl
+PREREQ tar            PRESENT   /usr/bin/tar
+PREREQ xz             PRESENT   /usr/bin/xz
+PREREQ sha256         PRESENT   /usr/bin/sha256sum
+PREREQ timeout        PRESENT   /usr/bin/timeout
+PREREQ setsid         PRESENT   /usr/bin/setsid
+PREREQ pyyaml         PRESENT   python3 -c 'import yaml' ok
+PREREQ python-docx    PRESENT   optional (report rendering only)
+PREREQ jdk21          PRESENT   /home/e2e/.local/agents-v0-tools/jdk-21
+PREREQ node22         PRESENT   /home/e2e/.local/agents-v0-tools/node-22 (v22.23.4)
+PREREQ postgres17     PRESENT   /home/e2e/.local/agents-v0-tools/postgresql-17 (postgres (PostgreSQL) 17.11)
+PREREQ odc-data       PRESENT   /home/e2e/.m2/repository/org/owasp/dependency-check-data/9.0/odc.mv.db (200M, 2026-10-29 15:56)
+PREREQ agent-driver   PRESENT   antigravity (AGENT_DRIVER=antigravity)
+PREREQ agent-cli      PRESENT   antigravity custom driver (bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ipc-turn.sh)
+PREREQ agy-bin        PRESENT   /home/e2e/.local/bin/agy 1.4.10
+PREREQ agent-auth     PRESENT   managed by Antigravity session / AGENT_TURN_CMD (proven by CAL-AUTH in step 1)
+PREREQ agent-model    PRESENT   gemini-4-argon-medium
+PREREQ container      DEGRADED  no working docker/podman; P0-A AC-4 (container run) is scored DEGRADED; installing one needs root
+PREREQ network        PRESENT   Maven Central + npm reachable
+PREREQ disk           PRESENT   294 GB free
+2026-10-29 16:29:41 Asia/Manila PREFLIGHT will-install: | needs-human: | degraded: container 
+2026-10-29 16:29:41 Asia/Manila RESULT step-0 preflight PASS kit=? 
+2026-10-29 16:29:41 Asia/Manila STEP-END 0 PASS
+2026-10-29 16:29:41 Asia/Manila STEP-START 1 prerequisites kit=not-yet
+PREREQ os             PRESENT   Linux (x86_64)
+PREREQ git            PRESENT   /usr/bin/git
+PREREQ jq             PRESENT   /usr/bin/jq
+PREREQ python3        PRESENT   /usr/bin/python3
+PREREQ curl           PRESENT   /usr/bin/curl
+PREREQ tar            PRESENT   /usr/bin/tar
+PREREQ xz             PRESENT   /usr/bin/xz
+PREREQ sha256         PRESENT   /usr/bin/sha256sum
+PREREQ timeout        PRESENT   /usr/bin/timeout
+PREREQ setsid         PRESENT   /usr/bin/setsid
+PREREQ pyyaml         PRESENT   python3 -c 'import yaml' ok
+PREREQ python-docx    PRESENT   optional (report rendering only)
+PREREQ jdk21          PRESENT   /home/e2e/.local/agents-v0-tools/jdk-21
+PREREQ node22         PRESENT   /home/e2e/.local/agents-v0-tools/node-22 (v22.23.4)
+PREREQ postgres17     PRESENT   /home/e2e/.local/agents-v0-tools/postgresql-17 (postgres (PostgreSQL) 17.11)
+PREREQ odc-data       PRESENT   /home/e2e/.m2/repository/org/owasp/dependency-check-data/9.0/odc.mv.db (200M, 2026-10-29 15:56)
+PREREQ agent-driver   PRESENT   antigravity (AGENT_DRIVER=antigravity)
+PREREQ agent-cli      PRESENT   antigravity custom driver (bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ipc-turn.sh)
+PREREQ agy-bin        PRESENT   /home/e2e/.local/bin/agy 1.4.10
+PREREQ agent-auth     PRESENT   managed by Antigravity session / AGENT_TURN_CMD (proven by CAL-AUTH in step 1)
+PREREQ agent-model    PRESENT   gemini-4-argon-medium
+PREREQ container      DEGRADED  no working docker/podman; P0-A AC-4 (container run) is scored DEGRADED; installing one needs root
+PREREQ network        PRESENT   Maven Central + npm reachable
+PREREQ disk           PRESENT   294 GB free
+PREREQ os             PRESENT   Linux (x86_64)
+PREREQ git            PRESENT   /usr/bin/git
+PREREQ jq             PRESENT   /usr/bin/jq
+PREREQ python3        PRESENT   /usr/bin/python3
+PREREQ curl           PRESENT   /usr/bin/curl
+PREREQ tar            PRESENT   /usr/bin/tar
+PREREQ xz             PRESENT   /usr/bin/xz
+PREREQ sha256         PRESENT   /usr/bin/sha256sum
+PREREQ timeout        PRESENT   /usr/bin/timeout
+PREREQ setsid         PRESENT   /usr/bin/setsid
+PREREQ pyyaml         PRESENT   python3 -c 'import yaml' ok
+PREREQ python-docx    PRESENT   optional (report rendering only)
+PREREQ jdk21          PRESENT   /home/e2e/.local/agents-v0-tools/jdk-21
+PREREQ node22         PRESENT   /home/e2e/.local/agents-v0-tools/node-22 (v22.23.4)
+PREREQ postgres17     PRESENT   /home/e2e/.local/agents-v0-tools/postgresql-17 (postgres (PostgreSQL) 17.11)
+PREREQ odc-data       PRESENT   /home/e2e/.m2/repository/org/owasp/dependency-check-data/9.0/odc.mv.db (200M, 2026-10-29 15:56)
+PREREQ agent-driver   PRESENT   antigravity (AGENT_DRIVER=antigravity)
+PREREQ agent-cli      PRESENT   antigravity custom driver (bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ipc-turn.sh)
+PREREQ agy-bin        PRESENT   /home/e2e/.local/bin/agy 1.4.10
+PREREQ agent-auth     PRESENT   managed by Antigravity session / AGENT_TURN_CMD (proven by CAL-AUTH in step 1)
+PREREQ agent-model    PRESENT   gemini-4-argon-medium
+PREREQ container      DEGRADED  no working docker/podman; P0-A AC-4 (container run) is scored DEGRADED; installing one needs root
+PREREQ network        PRESENT   Maven Central + npm reachable
+PREREQ disk           PRESENT   294 GB free
+Note: switching to '0aa3a431ce06d9a46167f234ea1d71756c07026f'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+2026-10-29 16:29:46 Asia/Manila TURN-START run=CAL-AUTH turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/calib/repo drv=antigravity
+2026-10-29 16:30:16 Asia/Manila TURN-END run=CAL-AUTH turn=1 class=NORMAL rc=0
+2026-10-29 16:30:16 Asia/Manila TURN-START run=CAL-STREAM turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/calib/repo drv=antigravity
+2026-10-29 16:30:46 Asia/Manila TURN-END run=CAL-STREAM turn=1 class=NORMAL rc=0
+2026-10-29 16:30:46 Asia/Manila TURN-START run=CAL-ASK-DENY turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/calib/repo drv=antigravity
+2026-10-29 16:31:16 Asia/Manila TURN-END run=CAL-ASK-DENY turn=1 class=NORMAL rc=0
+2026-10-29 16:31:16 Asia/Manila TURN-START run=CAL-ASK-ALLOW turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/calib/repo drv=antigravity
+2026-10-29 16:31:46 Asia/Manila TURN-END run=CAL-ASK-ALLOW turn=1 class=NORMAL rc=0
+config_mode=perturn
+stream_ok=1
+print_ask=denied
+allowlist_ok=1
+ask_mode=allowlist
+2026-10-29 16:31:46 Asia/Manila BEFORE-STEP-2 needs-human: none | degraded: container | ask_mode=allowlist
+2026-10-29 16:31:46 Asia/Manila RESULT step-1 prerequisites PASS kit=? 
+2026-10-29 16:31:46 Asia/Manila STEP-END 1 PASS
+2026-10-29 16:31:46 Asia/Manila SNAPSHOT BEFORE-2 (no workspace yet)
+2026-10-29 16:31:46 Asia/Manila STEP-START 2 workspace-and-onboard kit=not-yet
+Note: switching to '0aa3a431ce06d9a46167f234ea1d71756c07026f'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+2026-10-29 16:31:47 Asia/Manila KIT kit=0aa3a431ce06 from /home/e2e/kit-src 0aa3a431ce06d9a46167f234ea1d71756c07026f
+2026-10-29 16:31:50 Asia/Manila SNAPSHOT S2-WORKSPACE kit=0aa3a431ce06
+2026-10-29 16:31:50 Asia/Manila RESULT step-2 workspace-and-onboard PASS kit=0aa3a431ce06 
+2026-10-29 16:31:50 Asia/Manila STEP-END 2 PASS
+2026-10-29 16:31:50 Asia/Manila SNAPSHOT BEFORE-3 kit=0aa3a431ce06
+2026-10-29 16:31:50 Asia/Manila STEP-START 3 happy-1-program-and-P0-A kit=0aa3a431ce06
+2026-10-29 16:31:50 Asia/Manila TURN-START run=S3-roadmap-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 16:37:21 Asia/Manila TURN-END run=S3-roadmap-1 turn=1 class=NORMAL rc=0
+2026-10-29 16:37:26 Asia/Manila TURN-START run=S3-roadmap-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 16:38:26 Asia/Manila TURN-END run=S3-roadmap-1 turn=2 class=NORMAL rc=0
+2026-10-29 16:38:26 Asia/Manila TURN-START run=S3-architecture-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 16:53:57 Asia/Manila TURN-END run=S3-architecture-1 turn=1 class=NORMAL rc=0
+2026-10-29 16:54:02 Asia/Manila TURN-START run=S3-architecture-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 16:56:32 Asia/Manila TURN-END run=S3-architecture-1 turn=2 class=NORMAL rc=0
+2026-10-29 16:56:33 Asia/Manila TURN-START run=S3-plan-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:07:34 Asia/Manila TURN-END run=S3-plan-1 turn=1 class=NORMAL rc=0
+2026-10-29 17:07:39 Asia/Manila TURN-START run=S3-plan-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:09:09 Asia/Manila TURN-END run=S3-plan-1 turn=2 class=NORMAL rc=0
+2026-10-29 17:09:09 Asia/Manila SNAPSHOT S3-PLANNED kit=0aa3a431ce06
+2026-10-29 17:09:09 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:18:10 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-build-1 turn=1 class=NORMAL rc=0
+2026-10-29 17:18:15 Asia/Manila TURN-START run=S3-p0-a-platform-skeleton-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:20:16 Asia/Manila TURN-END run=S3-p0-a-platform-skeleton-build-1 turn=2 class=NORMAL rc=0
+2026-10-29 17:20:16 Asia/Manila SNAPSHOT S3-END kit=0aa3a431ce06
+2026-10-29 17:20:16 Asia/Manila RESULT step-3 happy-1-program-and-P0-A PASS-SEMI kit=0aa3a431ce06 
+2026-10-29 17:20:16 Asia/Manila STEP-END 3 PASS-SEMI
+2026-10-29 17:20:16 Asia/Manila SNAPSHOT BEFORE-4 kit=0aa3a431ce06
+2026-10-29 17:20:16 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=0aa3a431ce06
+2026-10-29 17:20:17 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-29 17:20:17 Asia/Manila STORY step 4 story P1-A (p1-a-openapi-v1-contract-catalog)
+2026-10-29 17:20:17 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:24:48 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 17:24:53 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:26:23 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 17:26:28 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 17:27:28 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 17:27:29 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 17:48:32 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 17:48:38 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 17:50:08 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 17:50:08 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:01:41 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-build-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:01:46 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:03:16 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-build-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:03:17 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:10:49 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:10:54 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:11:54 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:11:54 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:14:25 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:14:30 Asia/Manila TURN-START run=S4-p1-a-openapi-v1-contract-catalog-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog drv=antigravity
+2026-10-29 18:18:01 Asia/Manila TURN-END run=S4-p1-a-openapi-v1-contract-catalog-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:18:02 Asia/Manila SNAPSHOT S4-P1-A-END kit=0aa3a431ce06
+2026-10-29 18:18:02 Asia/Manila STORY step 4 story P1-B (p1-b-iam-and-audit-persistence)
+2026-10-29 18:18:02 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 18:22:33 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:22:38 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 18:23:38 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:23:44 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 18:24:14 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 18:24:15 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 18:45:17 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:45:22 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 18:47:23 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:47:24 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 18:53:55 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:54:00 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 18:55:00 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 18:55:01 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 18:58:01 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 18:58:07 Asia/Manila TURN-START run=S4-p1-b-iam-and-audit-persistence-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-b-iam-and-audit-persistence drv=antigravity
+2026-10-29 19:04:08 Asia/Manila TURN-END run=S4-p1-b-iam-and-audit-persistence-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:04:09 Asia/Manila SNAPSHOT S4-P1-B-END kit=0aa3a431ce06
+2026-10-29 19:04:09 Asia/Manila STORY step 4 story P1-C (p1-c-configuration-and-seeded-definitions-persistence)
+2026-10-29 19:04:09 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:11:11 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 19:11:16 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:12:16 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:12:21 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:12:51 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 19:12:52 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:28:55 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 19:29:01 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:30:31 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:30:32 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:35:33 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 19:35:38 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:36:38 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:36:39 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:39:40 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 19:39:45 Asia/Manila TURN-START run=S4-p1-c-configuration-and-seeded-definitions-persistence-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-c-configuration-and-seeded-definitions-persistence drv=antigravity
+2026-10-29 19:42:46 Asia/Manila TURN-END run=S4-p1-c-configuration-and-seeded-definitions-persistence-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:42:47 Asia/Manila SNAPSHOT S4-P1-C-END kit=0aa3a431ce06
+2026-10-29 19:42:47 Asia/Manila STORY step 4 story P1-D (p1-d-execution-and-governance-persistence)
+2026-10-29 19:42:48 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:47:49 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 19:47:54 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:48:55 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 19:49:00 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 19:49:30 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 19:49:31 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:09:05 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:09:11 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:11:11 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:11:12 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:16:14 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:16:19 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:17:50 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:17:51 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:20:52 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:20:57 Asia/Manila TURN-START run=S4-p1-d-execution-and-governance-persistence-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence drv=antigravity
+2026-10-29 20:23:58 Asia/Manila TURN-END run=S4-p1-d-execution-and-governance-persistence-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:23:59 Asia/Manila SNAPSHOT S4-P1-D-END kit=0aa3a431ce06
+2026-10-29 20:23:59 Asia/Manila STORY step 4 story P1-E (p1-e-redis-s3-sap-infrastructure-adapters)
+2026-10-29 20:24:01 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 20:28:32 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:28:38 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 20:29:39 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:29:44 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 20:30:15 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 20:30:16 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 20:51:20 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:51:25 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 20:53:26 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:53:28 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 20:58:29 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 20:58:35 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 20:59:35 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 20:59:36 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 21:02:37 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 21:02:42 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 21:06:43 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 21:06:44 Asia/Manila FAIL chain stopped at P1-E (5 of 20)
+2026-10-29 21:06:44 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=0aa3a431ce06 
+2026-10-29 21:06:44 Asia/Manila STEP-END 4 FAIL
+2026-10-29 21:06:44 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=0aa3a431ce06 after an earlier failure
+2026-10-29 21:06:44 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=0aa3a431ce06 after an earlier failure
+2026-10-29 21:06:44 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=0aa3a431ce06 after an earlier failure
+2026-10-29 21:06:44 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=0aa3a431ce06 after an earlier failure
+2026-10-29 21:06:44 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-29 21:06:44 Asia/Manila RUN-END exit=1
+2026-10-29 21:40:12 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P1-D state), not restored
+2026-10-29 21:42:00 Asia/Manila RESUME attempt 1 from step 4 reason=harness-fix kit 0aa3a431ce06 -> 0aa3a431ce06
+2026-10-29 21:42:00 Asia/Manila RESUME-FROM-STORY attempt 1 step 4 chain resumes at P1-E; skipping released P1-A P1-B P1-C P1-D (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P1-D-END; reason: manual-resume-from-story approved by mdurana, after harness-fix
+2026-10-29 21:42:00 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@0aa3a431ce06d9a46167f234ea1d71756c07026f start_step=4
+2026-10-29 21:42:00 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=0aa3a431ce06
+2026-10-29 21:42:00 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-29 21:42:00 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P1-E)
+2026-10-29 21:42:00 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P1-E)
+2026-10-29 21:42:01 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P1-E)
+2026-10-29 21:42:01 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P1-E)
+2026-10-29 21:42:01 Asia/Manila STORY step 4 story P1-E (p1-e-redis-s3-sap-infrastructure-adapters)
+2026-10-29 21:42:02 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 21:47:03 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=1 class=NORMAL rc=0
+2026-10-29 21:47:09 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 21:48:39 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=2 class=NORMAL rc=0
+2026-10-29 21:48:44 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-29 21:49:15 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 turn=3 class=NORMAL rc=0
+2026-10-29 21:49:16 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:14:19 Asia/Manila HEARTBEAT S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn 1 disk=293G
+2026-10-29 22:20:21 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=1 class=NORMAL rc=0
+2026-10-29 22:20:26 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:22:27 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 turn=2 class=NORMAL rc=0
+2026-10-29 22:22:28 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:30:30 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=1 class=NORMAL rc=0
+2026-10-29 22:30:35 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:31:36 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 turn=2 class=NORMAL rc=0
+2026-10-29 22:31:37 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:35:09 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-29 22:35:14 Asia/Manila TURN-START run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-e-redis-s3-sap-infrastructure-adapters drv=antigravity
+2026-10-29 22:38:45 Asia/Manila TURN-END run=S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-29 22:38:46 Asia/Manila SNAPSHOT S4-P1-E-END kit=0aa3a431ce06
+2026-10-29 22:38:47 Asia/Manila STORY step 4 story P2-A (p2-a-bff-oidc-fail-closed-session-auth)
+2026-10-29 22:38:48 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:00:05 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P1-E state), not restored
+2026-10-30 00:01:26 Asia/Manila RESUME attempt 3 from step 4 reason=harness-fix kit cca27739dde4 -> cca27739dde4
+2026-10-30 00:01:26 Asia/Manila RESUME-FROM-STORY attempt 3 step 4 chain resumes at P2-A; skipping released P1-A P1-B P1-C P1-D P1-E (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P1-E-END; reason: manual-resume-from-story approved by mdurana, after kit update to cca2773 (kitfix-20261029-step4-p1e)
+2026-10-30 00:01:26 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@cca27739dde420f6a0f77eac37563288721bbef0 start_step=4
+2026-10-30 00:01:26 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=cca27739dde4
+2026-10-30 00:01:26 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 00:01:26 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 00:01:26 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 00:01:27 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 00:01:27 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 00:01:27 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 00:01:27 Asia/Manila STORY step 4 story P2-A (p2-a-bff-oidc-fail-closed-session-auth)
+2026-10-30 00:01:27 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:08:28 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 00:08:33 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:11:03 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 00:11:04 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:19:04 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 00:19:09 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:21:09 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 00:21:10 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:42:41 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 00:42:46 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:44:46 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 00:44:46 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:55:17 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 00:55:22 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:56:22 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 00:56:23 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 00:59:23 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 00:59:28 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 01:01:28 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 01:01:29 Asia/Manila FAIL chain stopped at P2-A (6 of 20)
+2026-10-30 01:01:29 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=cca27739dde4 
+2026-10-30 01:01:29 Asia/Manila STEP-END 4 FAIL
+2026-10-30 01:01:29 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 01:01:29 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 01:01:29 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 01:01:29 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 01:01:29 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 01:01:29 Asia/Manila RUN-END exit=1
+2026-10-30 01:17:01 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P1-E state), not restored
+2026-10-30 01:18:17 Asia/Manila RESUME attempt 4 from step 4 reason=harness-fix kit cca27739dde4 -> cca27739dde4
+2026-10-30 01:18:17 Asia/Manila RESUME-FROM-STORY attempt 4 step 4 chain resumes at P2-A; skipping released P1-A P1-B P1-C P1-D P1-E (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P1-E-END; reason: auto fix-and-rerun 1 of 2 for P2-A per §5.6 (standing rule by mdurana): empty-result intake turn treated as INFRA
+2026-10-30 01:18:17 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@cca27739dde420f6a0f77eac37563288721bbef0 start_step=4
+2026-10-30 01:18:17 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=cca27739dde4
+2026-10-30 01:18:17 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 01:18:17 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 01:18:17 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 01:18:17 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 01:18:17 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 01:18:17 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 01:18:17 Asia/Manila STORY step 4 story P2-A (p2-a-bff-oidc-fail-closed-session-auth)
+2026-10-30 01:18:18 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 01:25:18 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 01:25:23 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 01:26:23 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 01:26:28 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 01:26:59 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 01:26:59 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 01:36:00 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 01:36:05 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 01:37:05 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 01:37:06 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 01:56:07 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 01:56:12 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 01:58:42 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 01:58:43 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 02:04:13 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 02:04:18 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 02:05:18 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 02:05:19 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 02:08:19 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 02:08:24 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 02:11:25 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 02:11:25 Asia/Manila FAIL chain stopped at P2-A (6 of 20)
+2026-10-30 02:11:25 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=cca27739dde4 
+2026-10-30 02:11:25 Asia/Manila STEP-END 4 FAIL
+2026-10-30 02:11:25 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 02:11:25 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 02:11:25 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 02:11:25 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=cca27739dde4 after an earlier failure
+2026-10-30 02:11:25 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 02:11:25 Asia/Manila RUN-END exit=1
+2026-10-30 02:47:31 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P1-E state), not restored
+2026-10-30 02:48:50 Asia/Manila RESUME attempt 5 from step 4 reason=harness-fix kit cca27739dde4 -> cca27739dde4
+2026-10-30 02:48:50 Asia/Manila RESUME-FROM-STORY attempt 5 step 4 chain resumes at P2-A; skipping released P1-A P1-B P1-C P1-D P1-E (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P1-E-END; reason: auto fix-and-rerun 2 of 2 for P2-A per §5.6 (standing rule by mdurana): agent turns run with TZ=UTC so phaseDates use one clock
+2026-10-30 02:48:50 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@cca27739dde420f6a0f77eac37563288721bbef0 start_step=4
+2026-10-30 02:48:50 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=cca27739dde4
+2026-10-30 02:48:50 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 02:48:50 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 02:48:50 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 02:48:50 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 02:48:50 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 02:48:50 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-A)
+2026-10-30 02:48:50 Asia/Manila STORY step 4 story P2-A (p2-a-bff-oidc-fail-closed-session-auth)
+2026-10-30 02:48:51 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 02:54:21 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 02:54:26 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 02:55:26 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 02:55:31 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 02:56:32 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 02:56:32 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:03:33 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:03:38 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:05:08 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:05:08 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:22:09 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:22:14 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:23:45 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:23:45 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:28:46 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:28:51 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:29:51 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:29:52 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:32:52 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:32:57 Asia/Manila TURN-START run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth drv=antigravity
+2026-10-30 03:34:57 Asia/Manila TURN-END run=S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:34:58 Asia/Manila SNAPSHOT S4-P2-A-END kit=cca27739dde4
+2026-10-30 03:34:58 Asia/Manila STORY step 4 story P2-B (p2-b-iam-rbac-sod-and-view-as)
+2026-10-30 03:34:59 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 03:40:29 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:40:34 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 03:42:04 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:42:10 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 03:42:40 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 03:42:41 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 03:54:11 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 03:54:17 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 03:55:17 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 03:55:18 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:20:20 Asia/Manila HEARTBEAT S4-p2-b-iam-rbac-sod-and-view-as-build-1 turn 1 disk=143G
+2026-10-30 04:20:50 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 04:20:55 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:22:25 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 04:22:26 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:27:57 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 04:28:02 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:29:02 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 04:29:03 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:32:03 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 04:32:08 Asia/Manila TURN-START run=S4-p2-b-iam-rbac-sod-and-view-as-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-b-iam-rbac-sod-and-view-as drv=antigravity
+2026-10-30 04:35:09 Asia/Manila TURN-END run=S4-p2-b-iam-rbac-sod-and-view-as-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 04:35:10 Asia/Manila SNAPSHOT S4-P2-B-END kit=cca27739dde4
+2026-10-30 04:35:10 Asia/Manila STORY step 4 story P2-C (p2-c-iam-user-directory-onboarding-exports)
+2026-10-30 04:35:11 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 04:40:11 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 04:40:16 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 04:42:17 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 04:42:22 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 04:43:22 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 04:43:23 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 04:55:55 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 04:56:00 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 04:57:30 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 04:57:31 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:21:34 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 05:21:39 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:22:39 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 05:22:41 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:28:11 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 05:28:17 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:29:17 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 05:29:18 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:32:18 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 05:32:24 Asia/Manila TURN-START run=S4-p2-c-iam-user-directory-onboarding-exports-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-c-iam-user-directory-onboarding-exports drv=antigravity
+2026-10-30 05:34:24 Asia/Manila TURN-END run=S4-p2-c-iam-user-directory-onboarding-exports-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 05:34:25 Asia/Manila SNAPSHOT S4-P2-C-END kit=cca27739dde4
+2026-10-30 05:34:25 Asia/Manila STORY step 4 story P2-D (p2-d-configuration-definitions-recipes-schedules)
+2026-10-30 05:34:26 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 05:39:57 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 05:40:02 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 05:41:03 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 05:41:08 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 05:41:38 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 05:41:39 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 05:55:11 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 05:55:16 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 05:56:16 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 05:56:18 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:18:50 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 06:18:55 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:20:25 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 06:20:27 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:26:58 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 06:27:03 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:28:34 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 06:28:36 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:31:36 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 06:31:42 Asia/Manila TURN-START run=S4-p2-d-configuration-definitions-recipes-schedules-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules drv=antigravity
+2026-10-30 06:35:12 Asia/Manila TURN-END run=S4-p2-d-configuration-definitions-recipes-schedules-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 06:35:13 Asia/Manila SNAPSHOT S4-P2-D-END kit=cca27739dde4
+2026-10-30 06:35:13 Asia/Manila STORY step 4 story P2-E (p2-e-configuration-reference-lookup-tables)
+2026-10-30 06:40:52 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P2-D state), not restored
+2026-10-30 06:42:06 Asia/Manila RESUME attempt 7 from step 4 reason=harness-fix kit fc4b642cb947 -> fc4b642cb947
+2026-10-30 06:42:06 Asia/Manila RESUME-FROM-STORY attempt 7 step 4 chain resumes at P2-E; skipping released P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P2-D-END; reason: manual-resume-from-story approved by mdurana (voice call 2026-10-30 06:25), after kit update to fc4b642 on main only
+2026-10-30 06:42:06 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@fc4b642cb947cf38b5fea7cc1005e22d58e17eef start_step=4
+2026-10-30 06:42:06 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=fc4b642cb947
+2026-10-30 06:42:06 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 06:42:06 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P2-A (p2-a-bff-oidc-fail-closed-session-auth) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P2-B (p2-b-iam-rbac-sod-and-view-as) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P2-C (p2-c-iam-user-directory-onboarding-exports) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila CHAIN-SKIP P2-D (p2-d-configuration-definitions-recipes-schedules) already released on main; kept from the earlier attempt (resume from P2-E)
+2026-10-30 06:42:07 Asia/Manila STORY step 4 story P2-E (p2-e-configuration-reference-lookup-tables)
+2026-10-30 06:42:08 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 06:49:08 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 06:49:13 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 06:50:44 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 06:50:49 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 06:51:19 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 06:51:20 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 06:59:50 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 06:59:56 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:00:56 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:00:56 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:25:58 Asia/Manila HEARTBEAT S4-p2-e-configuration-reference-lookup-tables-build-1 turn 1 disk=143G
+2026-10-30 07:25:58 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 07:26:03 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:27:34 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:27:34 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:33:05 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 07:33:10 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:34:10 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:34:11 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:37:11 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 07:37:17 Asia/Manila TURN-START run=S4-p2-e-configuration-reference-lookup-tables-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables drv=antigravity
+2026-10-30 07:39:47 Asia/Manila TURN-END run=S4-p2-e-configuration-reference-lookup-tables-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:39:48 Asia/Manila SNAPSHOT S4-P2-E-END kit=fc4b642cb947
+2026-10-30 07:39:48 Asia/Manila STORY step 4 story P2-F (p2-f-execution-upload-and-run-lifecycle)
+2026-10-30 07:39:49 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 07:46:19 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 07:46:24 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 07:47:55 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:48:00 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 07:49:30 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 07:49:31 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 07:57:02 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 07:57:07 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 07:58:07 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 07:58:08 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:23:10 Asia/Manila HEARTBEAT S4-p2-f-execution-upload-and-run-lifecycle-build-1 turn 1 disk=143G
+2026-10-30 08:26:40 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 08:26:46 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:28:46 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 08:28:47 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:37:48 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 08:37:53 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:38:53 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 08:38:54 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:41:55 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 08:42:00 Asia/Manila TURN-START run=S4-p2-f-execution-upload-and-run-lifecycle-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-f-execution-upload-and-run-lifecycle drv=antigravity
+2026-10-30 08:45:30 Asia/Manila TURN-END run=S4-p2-f-execution-upload-and-run-lifecycle-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 08:45:32 Asia/Manila SNAPSHOT S4-P2-F-END kit=fc4b642cb947
+2026-10-30 08:45:32 Asia/Manila STORY step 4 story P2-G (p2-g-execution-recipe-engine-and-artifacts)
+2026-10-30 08:45:33 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 08:52:04 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 08:52:09 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 08:53:09 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 08:53:14 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 08:53:45 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 08:53:46 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:04:17 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 09:04:23 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:05:53 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 09:05:54 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:30:57 Asia/Manila HEARTBEAT S4-p2-g-execution-recipe-engine-and-artifacts-build-1 turn 1 disk=143G
+2026-10-30 09:36:28 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 09:36:33 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:38:34 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 09:38:35 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:44:36 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 09:44:41 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:45:42 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 09:45:43 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:48:14 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 09:48:19 Asia/Manila TURN-START run=S4-p2-g-execution-recipe-engine-and-artifacts-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-g-execution-recipe-engine-and-artifacts drv=antigravity
+2026-10-30 09:50:49 Asia/Manila TURN-END run=S4-p2-g-execution-recipe-engine-and-artifacts-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 09:50:51 Asia/Manila SNAPSHOT S4-P2-G-END kit=fc4b642cb947
+2026-10-30 09:50:51 Asia/Manila STORY step 4 story P2-H (p2-h-governance-ticketing-queues-and-actions)
+2026-10-30 09:50:52 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 09:56:23 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 09:56:29 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 09:57:29 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 09:57:34 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 09:58:05 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 09:58:06 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:07:38 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 10:07:43 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:08:44 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 10:08:45 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:33:48 Asia/Manila HEARTBEAT S4-p2-h-governance-ticketing-queues-and-actions-build-1 turn 1 disk=143G
+2026-10-30 10:40:49 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 10:40:54 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:42:55 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 10:42:57 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:48:28 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 10:48:33 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:49:34 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 10:49:35 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:52:36 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 10:52:41 Asia/Manila TURN-START run=S4-p2-h-governance-ticketing-queues-and-actions-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions drv=antigravity
+2026-10-30 10:55:42 Asia/Manila TURN-END run=S4-p2-h-governance-ticketing-queues-and-actions-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 10:55:44 Asia/Manila SNAPSHOT S4-P2-H-END kit=fc4b642cb947
+2026-10-30 10:55:44 Asia/Manila STORY step 4 story P2-I (p2-i-audit-logs-notifications-and-dashboard-apis)
+2026-10-30 10:55:46 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 11:00:47 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 11:00:52 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 11:02:23 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 11:02:28 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 11:02:59 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 11:03:01 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:14:03 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 11:14:08 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:15:09 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 11:15:11 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:40:15 Asia/Manila HEARTBEAT S4-p2-i-audit-logs-notifications-and-dashboard-apis-build-1 turn 1 disk=142G
+2026-10-30 11:44:17 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 11:44:22 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:46:24 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 11:46:26 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:51:58 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 11:52:03 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:53:34 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 11:53:36 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 11:56:37 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 11:56:43 Asia/Manila TURN-START run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-i-audit-logs-notifications-and-dashboard-apis drv=antigravity
+2026-10-30 12:00:44 Asia/Manila TURN-END run=S4-p2-i-audit-logs-notifications-and-dashboard-apis-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 12:00:46 Asia/Manila SNAPSHOT S4-P2-I-END kit=fc4b642cb947
+2026-10-30 12:00:46 Asia/Manila STORY step 4 story P2-K (p2-k-integration-governance-execution-freeze-archive)
+2026-10-30 12:00:48 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 12:06:49 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 12:06:55 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 12:07:55 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 12:08:01 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 12:08:31 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 12:08:34 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:19:36 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 12:19:41 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:20:42 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 12:20:45 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:45:48 Asia/Manila HEARTBEAT S4-p2-k-integration-governance-execution-freeze-archive-build-1 turn 1 disk=142G
+2026-10-30 12:47:49 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 12:47:55 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:49:25 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 12:49:28 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:56:29 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 12:56:35 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 12:57:36 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 12:57:38 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 13:00:39 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 13:00:45 Asia/Manila TURN-START run=S4-p2-k-integration-governance-execution-freeze-archive-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-k-integration-governance-execution-freeze-archive drv=antigravity
+2026-10-30 13:04:16 Asia/Manila TURN-END run=S4-p2-k-integration-governance-execution-freeze-archive-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 13:04:20 Asia/Manila SNAPSHOT S4-P2-K-END kit=fc4b642cb947
+2026-10-30 13:04:20 Asia/Manila STORY step 4 story P2-L (p2-l-integration-governance-configuration-cutover)
+2026-10-30 13:04:23 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 13:08:54 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 13:09:00 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 13:10:00 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 13:10:06 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 13:10:37 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 13:10:40 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 13:19:12 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 13:19:17 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 13:20:18 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 13:20:21 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 13:45:25 Asia/Manila HEARTBEAT S4-p2-l-integration-governance-configuration-cutover-build-1 turn 1 disk=141G
+2026-10-30 13:52:57 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 13:53:03 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 13:54:34 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 13:54:37 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 14:06:10 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:06:15 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 14:07:17 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 14:07:20 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 14:10:21 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:10:27 Asia/Manila TURN-START run=S4-p2-l-integration-governance-configuration-cutover-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover drv=antigravity
+2026-10-30 14:12:58 Asia/Manila TURN-END run=S4-p2-l-integration-governance-configuration-cutover-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 14:13:01 Asia/Manila SNAPSHOT S4-P2-L-END kit=fc4b642cb947
+2026-10-30 14:13:01 Asia/Manila STORY step 4 story P2-M (p2-m-integration-governance-iam-sod-and-provisioning)
+2026-10-30 14:13:04 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 14:17:35 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:17:41 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 14:18:42 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 14:18:48 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 14:19:19 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 14:19:22 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 14:28:25 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:28:31 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 14:29:32 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 14:29:35 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 14:50:11 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:50:17 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 14:52:48 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 14:52:52 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 14:58:54 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 14:59:00 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 15:00:01 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 15:00:04 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 15:03:36 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 15:03:42 Asia/Manila TURN-START run=S4-p2-m-integration-governance-iam-sod-and-provisioning-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-m-integration-governance-iam-sod-and-provisioning drv=antigravity
+2026-10-30 15:06:43 Asia/Manila TURN-END run=S4-p2-m-integration-governance-iam-sod-and-provisioning-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 15:06:46 Asia/Manila SNAPSHOT S4-P2-M-END kit=fc4b642cb947
+2026-10-30 15:06:46 Asia/Manila STORY step 4 story P2-N (p2-n-integration-iam-cross-context-authorization-guard)
+2026-10-30 15:06:50 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 15:12:52 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 15:12:58 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 15:13:58 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 15:14:06 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 15:14:37 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 15:14:41 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:29:15 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 15:29:21 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:30:52 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 15:30:56 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:51:33 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 15:51:39 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:53:40 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 15:53:46 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:54:17 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-build-1 turn=3 class=NORMAL rc=0
+2026-10-30 15:54:21 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 15:59:53 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 15:59:59 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 16:01:00 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 16:01:04 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 16:05:06 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 16:05:12 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 16:08:13 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 16:08:19 Asia/Manila TURN-START run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard drv=antigravity
+2026-10-30 16:08:50 Asia/Manila TURN-END run=S4-p2-n-integration-iam-cross-context-authorization-guard-local-release-1 turn=3 class=NORMAL rc=0
+2026-10-30 16:08:54 Asia/Manila SNAPSHOT S4-P2-N-END kit=fc4b642cb947
+2026-10-30 16:08:54 Asia/Manila STORY step 4 story P2-O (p2-o-integration-audit-cross-context-events-and-widgets)
+2026-10-30 16:08:58 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 16:15:00 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 16:15:06 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 16:16:37 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 16:16:43 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 16:17:14 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 16:17:18 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 16:35:24 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 16:35:30 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 16:36:31 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 16:36:36 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:01:41 Asia/Manila HEARTBEAT S4-p2-o-integration-audit-cross-context-events-and-widgets-build-1 turn 1 disk=141G
+2026-10-30 17:20:16 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 17:20:22 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:21:53 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 17:21:58 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:28:00 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 17:28:06 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:29:07 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 17:29:12 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:33:14 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 17:33:20 Asia/Manila TURN-START run=S4-p2-o-integration-audit-cross-context-events-and-widgets-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets drv=antigravity
+2026-10-30 17:35:51 Asia/Manila TURN-END run=S4-p2-o-integration-audit-cross-context-events-and-widgets-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 17:35:55 Asia/Manila SNAPSHOT S4-P2-O-END kit=fc4b642cb947
+2026-10-30 17:35:55 Asia/Manila STORY step 4 story P2-P (p2-p-frontend-shell-dashboard-and-notifications)
+2026-10-30 17:36:00 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 17:42:33 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 17:42:39 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 17:43:40 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 17:43:46 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 17:44:17 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 17:44:22 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 17:54:56 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 class=AGENT-ERROR rc=3
+2026-10-30 17:55:03 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-2 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 17:55:35 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-2 turn=1 class=AGENT-ERROR rc=3
+2026-10-30 17:55:40 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-3 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 17:56:11 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-3 turn=1 class=AGENT-ERROR rc=3
+2026-10-30 17:56:11 Asia/Manila STUCK p2-p-frontend-shell-dashboard-and-notifications no state progress in 2 runs at design
+2026-10-30 17:56:11 Asia/Manila FAIL chain stopped at P2-P (20 of 20)
+2026-10-30 17:56:11 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=fc4b642cb947 
+2026-10-30 17:56:11 Asia/Manila STEP-END 4 FAIL
+2026-10-30 17:56:11 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 17:56:11 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 17:56:11 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 17:56:11 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 17:56:11 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 17:56:11 Asia/Manila RUN-END exit=1
+2026-10-30 18:16:12 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P2-O state), not restored
+2026-10-30 18:17:34 Asia/Manila RESUME attempt 8 from step 4 reason=harness-fix kit fc4b642cb947 -> fc4b642cb947
+2026-10-30 18:17:34 Asia/Manila RESUME-FROM-STORY attempt 8 step 4 chain resumes at P2-P; skipping released P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P2-O-END; reason: manual-resume-from-story approved by mdurana (chat 2026-10-30 18:10) after Antigravity quota upgrade; P2-P design failed 17:54-17:56 with agy 429 RESOURCE_EXHAUSTED (Individual quota reached), not a kit or harness bug
+2026-10-30 18:17:34 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@fc4b642cb947cf38b5fea7cc1005e22d58e17eef start_step=4
+2026-10-30 18:17:34 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=fc4b642cb947
+2026-10-30 18:17:34 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P2-A (p2-a-bff-oidc-fail-closed-session-auth) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P2-B (p2-b-iam-rbac-sod-and-view-as) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:35 Asia/Manila CHAIN-SKIP P2-C (p2-c-iam-user-directory-onboarding-exports) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-D (p2-d-configuration-definitions-recipes-schedules) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-E (p2-e-configuration-reference-lookup-tables) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-F (p2-f-execution-upload-and-run-lifecycle) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-G (p2-g-execution-recipe-engine-and-artifacts) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-H (p2-h-governance-ticketing-queues-and-actions) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-I (p2-i-audit-logs-notifications-and-dashboard-apis) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-K (p2-k-integration-governance-execution-freeze-archive) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:36 Asia/Manila CHAIN-SKIP P2-L (p2-l-integration-governance-configuration-cutover) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:37 Asia/Manila CHAIN-SKIP P2-M (p2-m-integration-governance-iam-sod-and-provisioning) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:37 Asia/Manila CHAIN-SKIP P2-N (p2-n-integration-iam-cross-context-authorization-guard) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:37 Asia/Manila CHAIN-SKIP P2-O (p2-o-integration-audit-cross-context-events-and-widgets) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 18:17:37 Asia/Manila STORY step 4 story P2-P (p2-p-frontend-shell-dashboard-and-notifications)
+2026-10-30 18:17:42 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 18:24:14 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 18:24:20 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 18:25:21 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 18:25:27 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 18:25:58 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 18:26:03 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 18:41:09 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 18:41:15 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 18:42:46 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 18:42:51 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 19:07:58 Asia/Manila HEARTBEAT S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn 1 disk=140G
+2026-10-30 19:07:59 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 class=AGENT-ERROR rc=1
+2026-10-30 19:07:59 Asia/Manila STUCK p2-p-frontend-shell-dashboard-and-notifications STUCK:awaiting_approval(build) at run start
+2026-10-30 19:07:59 Asia/Manila FAIL chain stopped at P2-P (20 of 20)
+2026-10-30 19:07:59 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=fc4b642cb947 
+2026-10-30 19:07:59 Asia/Manila STEP-END 4 FAIL
+2026-10-30 19:07:59 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 19:07:59 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 19:07:59 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 19:07:59 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 19:07:59 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 19:07:59 Asia/Manila RUN-END exit=1
+2026-10-30 19:22:06 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P2-O state), not restored
+2026-10-30 19:23:28 Asia/Manila RESUME attempt 9 from step 4 reason=harness-fix kit fc4b642cb947 -> fc4b642cb947
+2026-10-30 19:23:28 Asia/Manila RESUME-FROM-STORY attempt 9 step 4 chain resumes at P2-P; skipping released P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P2-O-END; reason: resume approved by mdurana (chat 2026-10-30 19:14) after driver fix for recovered transient agy 429 (P2-P build 18:42-19:07 reached gate but status ERROR); resume limit raised to 9
+2026-10-30 19:23:28 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@fc4b642cb947cf38b5fea7cc1005e22d58e17eef start_step=4
+2026-10-30 19:23:28 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=fc4b642cb947
+2026-10-30 19:23:28 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 19:23:28 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:28 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:28 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P2-A (p2-a-bff-oidc-fail-closed-session-auth) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P2-B (p2-b-iam-rbac-sod-and-view-as) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P2-C (p2-c-iam-user-directory-onboarding-exports) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P2-D (p2-d-configuration-definitions-recipes-schedules) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:29 Asia/Manila CHAIN-SKIP P2-E (p2-e-configuration-reference-lookup-tables) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-F (p2-f-execution-upload-and-run-lifecycle) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-G (p2-g-execution-recipe-engine-and-artifacts) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-H (p2-h-governance-ticketing-queues-and-actions) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-I (p2-i-audit-logs-notifications-and-dashboard-apis) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-K (p2-k-integration-governance-execution-freeze-archive) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-L (p2-l-integration-governance-configuration-cutover) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-M (p2-m-integration-governance-iam-sod-and-provisioning) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:30 Asia/Manila CHAIN-SKIP P2-N (p2-n-integration-iam-cross-context-authorization-guard) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:31 Asia/Manila CHAIN-SKIP P2-O (p2-o-integration-audit-cross-context-events-and-widgets) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 19:23:31 Asia/Manila STORY step 4 story P2-P (p2-p-frontend-shell-dashboard-and-notifications)
+2026-10-30 19:23:35 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 19:29:37 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 19:29:43 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 19:30:44 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 19:30:50 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 19:31:21 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 19:31:26 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 19:43:31 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 19:43:37 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 19:45:09 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 19:45:14 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 20:01:48 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 20:01:54 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 20:03:25 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 20:03:30 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 20:14:04 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 20:14:10 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 20:15:41 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 20:15:46 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 20:20:18 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=1 class=AGENT-ERROR rc=1
+2026-10-30 20:20:18 Asia/Manila STUCK p2-p-frontend-shell-dashboard-and-notifications STUCK:awaiting_approval(release) at run start
+2026-10-30 20:20:18 Asia/Manila FAIL chain stopped at P2-P (20 of 20)
+2026-10-30 20:20:18 Asia/Manila RESULT step-4 chain-to-first-frontend-story FAIL kit=fc4b642cb947 
+2026-10-30 20:20:18 Asia/Manila STEP-END 4 FAIL
+2026-10-30 20:20:18 Asia/Manila RESULT step-5 happy-3-story-N2 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 20:20:18 Asia/Manila RESULT step-6 reopen-story-N1 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 20:20:19 Asia/Manila RESULT step-7 negative-program-rerun NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 20:20:19 Asia/Manila RESULT step-8 edge-phase-skips-N3 NOT-RUN kit=fc4b642cb947 after an earlier failure
+2026-10-30 20:20:19 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 20:20:19 Asia/Manila RUN-END exit=1
+2026-10-30 20:49:06 Asia/Manila RESUME-FROM-STORY work/ present: used as is (must be the post-P2-O state), not restored
+2026-10-30 20:50:30 Asia/Manila RESUME attempt 10 from step 4 reason=harness-fix kit fc4b642cb947 -> fc4b642cb947
+2026-10-30 20:50:30 Asia/Manila RESUME-FROM-STORY attempt 10 step 4 chain resumes at P2-P; skipping released P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-P2-O-END; reason: resume approved by mdurana (chat 2026-10-30 20:41) after driver fix for recovered transient agy 5xx (P2-P local-release 20:15-20:19 reached gate after 503 UNAVAILABLE but status ERROR); resume limit raised to 10
+2026-10-30 20:50:30 Asia/Manila RUN-START test_root=/home/e2e/agents-v0-e2e/run-20261029-1629 kit=/home/e2e/kit-src@fc4b642cb947cf38b5fea7cc1005e22d58e17eef start_step=4
+2026-10-30 20:50:30 Asia/Manila STEP-START 4 chain-to-first-frontend-story kit=fc4b642cb947
+2026-10-30 20:50:31 Asia/Manila CHAIN target P2-P (Surface frontend), 20 stories: P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O P2-P 
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P1-A (p1-a-openapi-v1-contract-catalog) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P1-B (p1-b-iam-and-audit-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P1-C (p1-c-configuration-and-seeded-definitions-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P1-D (p1-d-execution-and-governance-persistence) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P1-E (p1-e-redis-s3-sap-infrastructure-adapters) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P2-A (p2-a-bff-oidc-fail-closed-session-auth) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:31 Asia/Manila CHAIN-SKIP P2-B (p2-b-iam-rbac-sod-and-view-as) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-C (p2-c-iam-user-directory-onboarding-exports) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-D (p2-d-configuration-definitions-recipes-schedules) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-E (p2-e-configuration-reference-lookup-tables) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-F (p2-f-execution-upload-and-run-lifecycle) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-G (p2-g-execution-recipe-engine-and-artifacts) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-H (p2-h-governance-ticketing-queues-and-actions) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:32 Asia/Manila CHAIN-SKIP P2-I (p2-i-audit-logs-notifications-and-dashboard-apis) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila CHAIN-SKIP P2-K (p2-k-integration-governance-execution-freeze-archive) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila CHAIN-SKIP P2-L (p2-l-integration-governance-configuration-cutover) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila CHAIN-SKIP P2-M (p2-m-integration-governance-iam-sod-and-provisioning) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila CHAIN-SKIP P2-N (p2-n-integration-iam-cross-context-authorization-guard) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila CHAIN-SKIP P2-O (p2-o-integration-audit-cross-context-events-and-widgets) already released on main; kept from the earlier attempt (resume from P2-P)
+2026-10-30 20:50:33 Asia/Manila STORY step 4 story P2-P (p2-p-frontend-shell-dashboard-and-notifications)
+2026-10-30 20:50:38 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 20:57:40 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=1 class=NORMAL rc=0
+2026-10-30 20:57:45 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 20:58:47 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=2 class=NORMAL rc=0
+2026-10-30 20:58:54 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal drv=antigravity
+2026-10-30 20:59:55 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 turn=3 class=NORMAL rc=0
+2026-10-30 21:00:00 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:17:34 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=1 class=NORMAL rc=0
+2026-10-30 21:17:40 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:20:12 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 turn=2 class=NORMAL rc=0
+2026-10-30 21:20:17 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:34:21 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=1 class=NORMAL rc=0
+2026-10-30 21:34:28 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:50:32 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 turn=2 class=NORMAL rc=0
+2026-10-30 21:50:37 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:58:40 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=1 class=NORMAL rc=0
+2026-10-30 21:58:46 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 21:59:48 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 turn=2 class=NORMAL rc=0
+2026-10-30 21:59:53 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=1 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 22:02:54 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=1 class=NORMAL rc=0
+2026-10-30 22:03:01 Asia/Manila TURN-START run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=2 ws=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications drv=antigravity
+2026-10-30 22:05:32 Asia/Manila TURN-END run=S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 turn=2 class=NORMAL rc=0
+2026-10-30 22:05:37 Asia/Manila SNAPSHOT S4-P2-P-END kit=fc4b642cb947
+2026-10-30 22:05:41 Asia/Manila SNAPSHOT S4-END kit=fc4b642cb947
+2026-10-30 22:05:41 Asia/Manila RESULT step-4 chain-to-first-frontend-story PASS-SEMI kit=fc4b642cb947 
+2026-10-30 22:05:41 Asia/Manila STEP-END 4 PASS-SEMI
+2026-10-30 22:05:45 Asia/Manila SNAPSHOT BEFORE-5 kit=fc4b642cb947
+2026-10-30 22:05:45 Asia/Manila STOP-AFTER reached STOP_AFTER_STEP=4 (saved BEFORE-5)
+2026-10-30 22:05:45 Asia/Manila SUMMARY /home/e2e/agents-v0-e2e/run-20261029-1629/results/summary.md
+2026-10-30 22:05:45 Asia/Manila RUN-END exit=0
+run-plan.sh exit=0

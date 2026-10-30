@@ -1,0 +1,10 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/ docs/agents-v0/diagrams/sequences/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app -maxdepth 4 -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md && git status --short'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+ls -la docs/agents-v0/adr/ docs/agents-v0/diagrams/sequences/
+find app/backend/src/main/java/com/example/app -maxdepth 4 -type f | sort
+find app/backend/src/main/java/com/example/app/configuration app/backend/src/main/java/com/example/app/governance -type f
+git status --short && ! grep -q "TEMPLATE:" docs/agents-v0/design/p2-d-configuration-definitions-recipes-schedules/design.md docs/agents-v0/adr/0010-configuration-definitions-recipes-and-schedules.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md && git status --short

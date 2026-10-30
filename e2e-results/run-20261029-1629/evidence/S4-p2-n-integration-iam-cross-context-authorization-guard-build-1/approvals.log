@@ -1,0 +1,2 @@
+2026-10-30 15:51:33	turn-2	SENT	gate=build	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard/docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.state.json	text=Approved by mdurana, commit it	allow=Shell(git:commit*)
+2026-10-30 15:53:40	turn-3	SENT	gate=branch	text=Branch authorized	allow=Shell(sh:.agents-v0/scripts/feature-worktree.sh*)

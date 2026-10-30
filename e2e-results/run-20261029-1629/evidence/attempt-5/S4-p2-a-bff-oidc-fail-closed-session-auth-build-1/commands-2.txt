@@ -1,0 +1,8 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A && git commit -m "feat(iam): implement P2-A BFF OIDC and fail-closed Redis session auth" && git status -s'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git commit -m "feat(iam): implement P2-A BFF OIDC and fail-closed Redis session auth"'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+git add -A && git commit -m "feat(iam): implement P2-A BFF OIDC and fail-closed Redis session auth" && git status -s
+git add -A
+git commit -m "feat(iam): implement P2-A BFF OIDC and fail-closed Redis session auth"

@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/ docs/agents-v0/design/ && find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/p2-g-execution-recipe-engine-and-artifacts/ docs/agents-v0/design/p2-f-execution-upload-and-run-lifecycle/ && grep -n "tickets" openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/system/components/ docs/agents-v0/diagrams/ docs/agents-v0/diagrams/sequences/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/test/java -name "*Arch*" -o -name "*Layer*"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -n 4 --stat'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md && git status --short'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+ls -la docs/agents-v0/adr/ docs/agents-v0/design/ && find app/backend/src/main/java/com/example/app -maxdepth 3 -type f | sort
+ls -la docs/agents-v0/design/p2-g-execution-recipe-engine-and-artifacts/ docs/agents-v0/design/p2-f-execution-upload-and-run-lifecycle/ && grep -n "tickets" openapi/api-v1.yaml
+ls -la docs/agents-v0/design/system/components/ docs/agents-v0/diagrams/ docs/agents-v0/diagrams/sequences/ 2>/dev/null || true
+find app/backend/src/test/java -name "*Arch*" -o -name "*Layer*"
+git log -n 4 --stat
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md && git status --short

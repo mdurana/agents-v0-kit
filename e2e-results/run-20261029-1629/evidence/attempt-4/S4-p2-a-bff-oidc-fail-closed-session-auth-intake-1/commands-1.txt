@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/ .cursor/rules/org/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app -maxdepth 4 -type f'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/ .agents/agents/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/hooks/ .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ .agents-v0/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.phase-result.md'
+ls -la docs/agents-v0/milestones/ docs/agents-v0/requirements/ .cursor/rules/org/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+find app/backend/src/main/java/com/example/app -maxdepth 4 -type f
+ls -la .agents/ .agents/agents/
+ls -la .agents/hooks/ .agents-v0/scripts/
+ls -la .agents-v0/ .agents-v0/hooks/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.phase-result.md

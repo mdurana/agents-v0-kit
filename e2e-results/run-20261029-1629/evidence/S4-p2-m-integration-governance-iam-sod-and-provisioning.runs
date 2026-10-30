@@ -1,0 +1,5 @@
+S4-p2-m-integration-governance-iam-sod-and-provisioning-intake-1 NORMAL-END gates: intake branch
+S4-p2-m-integration-governance-iam-sod-and-provisioning-design-1 NORMAL-END gates: design
+S4-p2-m-integration-governance-iam-sod-and-provisioning-build-1 NORMAL-END gates: build
+S4-p2-m-integration-governance-iam-sod-and-provisioning-verify-1 NORMAL-END gates: verify
+S4-p2-m-integration-governance-iam-sod-and-provisioning-local-release-1 NORMAL-END gates: release

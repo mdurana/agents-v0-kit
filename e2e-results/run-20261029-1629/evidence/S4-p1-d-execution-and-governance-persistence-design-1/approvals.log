@@ -1,0 +1,1 @@
+2026-10-29 20:09:06	turn-2	SENT	gate=build	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-d-execution-and-governance-persistence/docs/agents-v0/requirements/p1-d-execution-and-governance-persistence.state.json	text=Approved by mdurana, commit it	allow=Shell(git:commit*)

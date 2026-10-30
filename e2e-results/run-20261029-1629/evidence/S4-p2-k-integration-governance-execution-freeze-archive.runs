@@ -1,0 +1,5 @@
+S4-p2-k-integration-governance-execution-freeze-archive-intake-1 NORMAL-END gates: intake branch
+S4-p2-k-integration-governance-execution-freeze-archive-design-1 NORMAL-END gates: design
+S4-p2-k-integration-governance-execution-freeze-archive-build-1 NORMAL-END gates: build
+S4-p2-k-integration-governance-execution-freeze-archive-verify-1 NORMAL-END gates: verify
+S4-p2-k-integration-governance-execution-freeze-archive-local-release-1 NORMAL-END gates: release

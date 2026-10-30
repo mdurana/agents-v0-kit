@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md && git status --short -b'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A && git commit -m "feat(iam): build P2-C user directory, role assignments, onboarding, and CSV exports" && git status --short -b && git log -1 --oneline'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md && git status --short -b
+git add -A && git commit -m "feat(iam): build P2-C user directory, role assignments, onboarding, and CSV exports" && git status --short -b && git log -1 --oneline

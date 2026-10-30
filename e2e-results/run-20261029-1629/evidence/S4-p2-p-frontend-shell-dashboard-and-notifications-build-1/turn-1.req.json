@@ -1,0 +1,10 @@
+{
+  "chat": "25a517af-c673-4ecd-928c-1ce06192f7e2",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-p-frontend-shell-dashboard-and-notifications",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-build p2-p-frontend-shell-dashboard-and-notifications",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-p-frontend-shell-dashboard-and-notifications-build-1",
+  "turn": 1,
+  "requested_at": 1793366417
+}

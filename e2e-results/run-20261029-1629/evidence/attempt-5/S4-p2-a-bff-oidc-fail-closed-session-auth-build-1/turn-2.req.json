@@ -1,0 +1,10 @@
+{
+  "chat": "0a4778eb-7a92-4606-887c-59714439165d",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-a-bff-oidc-fail-closed-session-auth",
+  "model": "gemini-4-argon-medium",
+  "prompt": "Approved by mdurana, commit it",
+  "allow": "Shell(git:commit*)",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-a-bff-oidc-fail-closed-session-auth-build-1",
+  "turn": 2,
+  "requested_at": 1793296572
+}

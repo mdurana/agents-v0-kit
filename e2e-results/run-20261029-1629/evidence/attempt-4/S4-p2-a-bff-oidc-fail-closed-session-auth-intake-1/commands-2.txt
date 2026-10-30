@@ -1,0 +1,5 @@
+bash .agents-v0/scripts/stories-status.sh --json
+git log -n 15 --oneline
+git worktree list
+date -u +%Y-%m-%d
+sh .agents-v0/scripts/sync-feature-state.sh --approve intake docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md

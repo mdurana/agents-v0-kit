@@ -1,0 +1,5 @@
+S4-p2-d-configuration-definitions-recipes-schedules-intake-1 NORMAL-END gates: intake branch
+S4-p2-d-configuration-definitions-recipes-schedules-design-1 NORMAL-END gates: design
+S4-p2-d-configuration-definitions-recipes-schedules-build-1 NORMAL-END gates: build
+S4-p2-d-configuration-definitions-recipes-schedules-verify-1 NORMAL-END gates: verify
+S4-p2-d-configuration-definitions-recipes-schedules-local-release-1 NORMAL-END gates: release

@@ -1,0 +1,10 @@
+{
+  "chat": "0a16ec2a-45ff-45c6-b559-b9d5a84b425a",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p1-a-openapi-v1-contract-catalog",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-verify p1-a-openapi-v1-contract-catalog",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-a-openapi-v1-contract-catalog-verify-1",
+  "turn": 1,
+  "requested_at": 1793268197
+}

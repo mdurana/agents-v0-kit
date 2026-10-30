@@ -1,0 +1,37 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/build/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+for pkg in tree.findall(\".//package\"):
+    for cls in pkg.findall(\"class\"):
+        name = cls.get(\"name\")
+        if any(k in name for k in [\"Bff\", \"Oidc\", \"Session\", \"Audit\", \"MockLogin\", \"Principal\", \"SecurityConfig\", \"ApiProblem\"]):
+            for c in cls.findall(\"counter\"):
+                if c.get(\"type\") == \"LINE\":
+                    missed = int(c.get(\"missed\"))
+                    covered = int(c.get(\"covered\"))
+                    total = missed + covered
+                    pct = (covered / total * 100) if total else 100
+                    print(f\"{name}: {covered}/{total} ({pct:.1f}%)\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -n -E "Tests run:|Analyzed bundle|All coverage checks|Checkstyle violations|BugInstance size|Analysis Complete|BUILD SUCCESS" docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt | tail -n 15'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status --short
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+find app/backend/src -type f | sort
+ls -la docs/agents-v0/build/
+cd app/backend && ./mvnw -B clean verify -Pci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+python3 -c "
+                    missed = int(c.
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt
+grep -n -E "Tests run:|Analyzed bundle|All coverage checks|Checkstyle violations|BugInstance size|Analysis Complete|BUILD SUCCESS" docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt | tail -n 15
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md

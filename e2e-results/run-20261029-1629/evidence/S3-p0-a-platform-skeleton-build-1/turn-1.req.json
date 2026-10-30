@@ -1,0 +1,10 @@
+{
+  "chat": "6270361e-1a13-45fc-a100-4ef60ae51c5e",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-build p0-a-platform-skeleton",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S3-p0-a-platform-skeleton-build-1",
+  "turn": 1,
+  "requested_at": 1793264949
+}

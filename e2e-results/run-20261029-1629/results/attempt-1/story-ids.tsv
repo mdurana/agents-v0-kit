@@ -1,0 +1,5 @@
+C1	P1-A	p1-a-openapi-v1-contract-catalog
+C2	P1-B	p1-b-iam-and-audit-persistence
+C3	P1-C	p1-c-configuration-and-seeded-definitions-persistence
+C4	P1-D	p1-d-execution-and-governance-persistence
+C5	P1-E	p1-e-redis-s3-sap-infrastructure-adapters

@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status && ls -la docs/agents-v0/onboarding/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status in_progress docs/agents-v0/architecture.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/ docs/agents-v0/diagrams/ docs/agents-v0/design/system/ .agents-v0/packs/java/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/ app/backend/ app/frontend/ docs/agents-v0/diagrams/sequences/ 2>/dev/null || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status awaiting_approval docs/agents-v0/architecture.md'
+git status && ls -la docs/agents-v0/onboarding/ 2>/dev/null || true
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status in_progress docs/agents-v0/architecture.md
+ls -la docs/agents-v0/adr/ docs/agents-v0/diagrams/ docs/agents-v0/design/system/ .agents-v0/packs/java/
+ls -la app/ app/backend/ app/frontend/ docs/agents-v0/diagrams/sequences/ 2>/dev/null || true
+ls -la .agents-v0/scripts/
+find docs/agents-v0 openapi app -maxdepth 3 2>/dev/null
+find app/backend/src -type f ! -name "._*"
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status awaiting_approval docs/agents-v0/architecture.md

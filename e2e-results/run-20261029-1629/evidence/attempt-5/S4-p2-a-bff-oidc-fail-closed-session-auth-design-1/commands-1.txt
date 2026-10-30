@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/adr/ docs/agents-v0/design/ docs/agents-v0/diagrams/sequences/ 2>&1 || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/p2-a-bff-oidc-fail-closed-session-auth/ 2>&1 || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/*/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/requirements/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.phase-result.md && git status --short'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+ls -la docs/agents-v0/adr/ docs/agents-v0/design/ docs/agents-v0/diagrams/sequences/ 2>&1 || true
+find app/backend/src -type f | sort
+ls -la docs/agents-v0/design/p2-a-bff-oidc-fail-closed-session-auth/ 2>&1 || true
+ls -la docs/agents-v0/design/*/
+ls -la docs/agents-v0/requirements/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.phase-result.md && git status --short

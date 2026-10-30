@@ -1,0 +1,61 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD && git diff --stat c9c2c2dddd2d47d6c236ea40bfbc8e59f74dab97...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET, json
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"TOTAL {t}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+print(\"---Changed/Configuration classes---\")
+for pkg in root.findall(\"package\"):
+    pname = pkg.attrib[\"name\"]
+    if any(k in pname for k in [\"configuration\", \"governance\", \"iam\"]):
+        for cls in pkg.findall(\"class\"):
+            cname = cls.attrib[\"name\"].replace(\"/\", \".\")
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot = m + cov
+                    if any(x in cname for x in [\"configuration\", \"GovernanceTicket\", \"RbacManagementService\", \"ViewAsOverlayService\"]):
+                        print(f\"{cname}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+with open(\"app/backend/target/dependency-check-report.json\") as f:
+    dc = json.load(f)
+deps = dc.get(\"dependencies\", [])
+vulns = [v for d in deps for v in d.get(\"vulnerabilities\", [])]
+print(f\"OWASP deps={len(deps)}, vulns={len(vulns)}\")
+"'
+import xml.etree.ElementTree as ET, subprocess
+diff_files = subprocess.check_output([\"git\", \"diff\", \"--name-only\", \"c9c2c2dddd2d47d6c236ea40bfbc8e59f74dab97...HEAD\"]).decode().splitlines()
+prod_java = [f for f in diff_files if f.startswith(\"app/backend/src/main/java/\") and f.endswith(\".java\")]
+print(f\"Changed prod java files: {len(prod_java)}\")
+cov_sum = 0
+tot_sum = 0
+    for sf in pkg.findall(\"sourcefile\"):
+        full = \"app/backend/src/main/java/\" + pkg.attrib[\"name\"] + \"/\" + sf.attrib[\"name\"]
+        if full in prod_java:
+            for c in sf.findall(\"counter\"):
+                    cov_sum += cov
+                    tot_sum += (m + cov)
+print(f\"Changed-class LINE coverage: {cov_sum}/{tot_sum} ({cov_sum*100.0/tot_sum:.2f}%)\")
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.phase-result.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+git worktree list && git status --short
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+git rev-parse HEAD && git diff --stat c9c2c2dddd2d47d6c236ea40bfbc8e59f74dab97...HEAD
+cd app/backend && ./mvnw -B clean verify -Pci-security
+python3 -c "
+    if any(k in pname for k i
+for pkg in root.f
+ls -la .agents-v0/scripts/
+sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.phase-result.md
+sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.phase-result.md && sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md

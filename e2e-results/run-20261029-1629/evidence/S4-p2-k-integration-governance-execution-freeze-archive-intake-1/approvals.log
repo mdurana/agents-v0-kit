@@ -1,0 +1,2 @@
+2026-10-30 12:06:49	turn-2	SENT	gate=intake	state=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal/docs/agents-v0/requirements/p2-k-integration-governance-execution-freeze-archive.state.json	text=Approved by mdurana	allow=-
+2026-10-30 12:07:55	turn-3	SENT	gate=branch	text=Branch authorized	allow=Shell(sh:.agents-v0/scripts/feature-worktree.sh*)

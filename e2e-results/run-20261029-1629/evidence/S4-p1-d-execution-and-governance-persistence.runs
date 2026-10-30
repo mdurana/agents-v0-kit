@@ -1,0 +1,4 @@
+S4-p1-d-execution-and-governance-persistence-intake-1 NORMAL-END gates: intake branch
+S4-p1-d-execution-and-governance-persistence-design-1 NORMAL-END gates: build
+S4-p1-d-execution-and-governance-persistence-verify-1 NORMAL-END gates: verify
+S4-p1-d-execution-and-governance-persistence-local-release-1 NORMAL-END gates: release

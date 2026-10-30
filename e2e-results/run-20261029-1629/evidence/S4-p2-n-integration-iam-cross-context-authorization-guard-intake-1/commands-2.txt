@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve intake docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/feature-worktree.sh p2-n-integration-iam-cross-context-authorization-guard'
+sh .agents-v0/scripts/sync-feature-state.sh --approve intake docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md
+sh .agents-v0/scripts/feature-worktree.sh p2-n-integration-iam-cross-context-authorization-guard

@@ -1,0 +1,10 @@
+{
+  "chat": "1455d731-c007-47ab-a89b-42b16ecd911c",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-intake p1-d-execution-and-governance-persistence",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-d-execution-and-governance-persistence-intake-1",
+  "turn": 1,
+  "requested_at": 1793274168
+}

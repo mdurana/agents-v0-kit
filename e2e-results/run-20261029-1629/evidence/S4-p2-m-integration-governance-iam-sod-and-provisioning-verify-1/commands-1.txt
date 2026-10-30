@@ -1,0 +1,38 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && echo "BACKEND_ROOT=$BACKEND_ROOT FRONTEND_ROOT=$FRONTEND_ROOT" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD && git diff 315bcc35a1ad9966da2de80cdf8f57d278580131...HEAD --stat'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"OVERALL {t}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+targets = [\"GovernanceTicketWorkflowService\", \"GovernanceTicketSubmissionService\", \"UserAccessService\", \"SodConflictEvaluator\", \"RbacManagementService\", \"IamAdminController\"]
+tot_m = 0
+tot_c = 0
+for pkg in root.findall(\"package\"):
+    for cls in pkg.findall(\"class\"):
+        name = cls.attrib[\"name\"].split(\"/\")[-1]
+        if name in targets:
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot_m += m
+                    tot_c += cov
+                    print(f\"{name} LINE: {cov}/{m+cov} ({cov*100/(m+cov):.2f}%)\")
+print(f\"CHANGED CLASSES AGGREGATE LINE: {tot_c}/{tot_m+tot_c} ({tot_c*100/(tot_m+tot_c):.2f}%)\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.phase-result.md'
+git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && echo "BACKEND_ROOT=$BACKEND_ROOT FRONTEND_ROOT=$FRONTEND_ROOT" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md
+cd app/backend && ./mvnw -B clean verify -Pci-security
+git rev-parse HEAD && git diff 315bcc35a1ad9966da2de80cdf8f57d278580131...HEAD --stat
+python3 -c "
+targets = [\"GovernanceTicketWorkflowService\", \"GovernanceTicketSubmissionService\", \"UserAccessService\", \"SodConflictEvaluator\", \"RbacManagementS
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.md && sh .agents-v0/scripts/check-lessons.sh --phase-result docs/agents-v0/requirements/p2-m-integration-governance-iam-sod-and-provisioning.phase-result.md

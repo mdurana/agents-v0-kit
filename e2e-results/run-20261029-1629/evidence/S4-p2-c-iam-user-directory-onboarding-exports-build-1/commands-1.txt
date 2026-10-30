@@ -1,0 +1,16 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short -b && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/iam app/backend/src/main/java/com/example/app/governance -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md'
+git worktree list && git status --short -b && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+find app/backend/src/main/java/com/example/app/iam app/backend/src/main/java/com/example/app/governance -type f | sort
+find app/backend/src -type f | sort
+find app -name "._*" -delete && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md
+find app -name "._*" && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-c-iam-user-directory-onboarding-exports/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-c-iam-user-directory-onboarding-exports/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-c-iam-user-directory-onboarding-exports/build-output.txt 2>&1
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-c-iam-user-directory-onboarding-exports/build-report.md && git status -sb
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-c-iam-user-directory-onboarding-exports.md

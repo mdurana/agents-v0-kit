@@ -1,0 +1,5 @@
+config_mode=perturn
+stream_ok=1
+print_ask=denied
+allowlist_ok=1
+ask_mode=allowlist

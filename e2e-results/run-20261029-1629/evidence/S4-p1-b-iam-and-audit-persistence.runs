@@ -1,0 +1,4 @@
+S4-p1-b-iam-and-audit-persistence-intake-1 NORMAL-END gates: intake branch
+S4-p1-b-iam-and-audit-persistence-design-1 NORMAL-END gates: build
+S4-p1-b-iam-and-audit-persistence-verify-1 NORMAL-END gates: verify
+S4-p1-b-iam-and-audit-persistence-local-release-1 NORMAL-END gates: release

@@ -1,0 +1,5 @@
+S4-p2-p-frontend-shell-dashboard-and-notifications-intake-1 NORMAL-END gates: intake branch
+S4-p2-p-frontend-shell-dashboard-and-notifications-design-1 NORMAL-END gates: design
+S4-p2-p-frontend-shell-dashboard-and-notifications-build-1 NORMAL-END gates: build
+S4-p2-p-frontend-shell-dashboard-and-notifications-verify-1 NORMAL-END gates: verify
+S4-p2-p-frontend-shell-dashboard-and-notifications-local-release-1 NORMAL-END gates: release

@@ -1,0 +1,7 @@
+name=S3-p0-a-platform-skeleton-build
+workspace=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+context=build
+allowed=intake design build verify maintain release branch
+kit_ref=0aa3a431ce06d9a46167f234ea1d71756c07026f
+kit_label=0aa3a431ce06
+start=2026-10-29 17:09:09 Asia/Manila

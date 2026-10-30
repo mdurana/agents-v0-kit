@@ -1,0 +1,41 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && git rev-parse HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat 82b931a2d36b6ea66fc72b4b75463cd02a15801f...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"{t}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+targets = [\"RbacManagementService\", \"ReportRunOrchestratorService\", \"ReportRunArtifactAndEndorsementService\", \"GovernanceTicketWorkflowService\", \"FailClosedRoutePermissionGuard\", \"FailClosedRedisSessionFilter\", \"ViewAsOverlayService\"]
+tot_cov = 0
+tot_all = 0
+for pkg in root.findall(\"package\"):
+    for cls in pkg.findall(\"class\"):
+        name = cls.attrib[\"name\"].split(\"/\")[-1]
+        if name in targets:
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot = m + cov
+                    tot_cov += cov
+                    tot_all += tot
+                    print(f\"  {name}: {cov}/{tot} ({cov*100/tot:.2f}%)\")
+print(f\"Aggregate changed/key classes: {tot_cov}/{tot_all} ({tot_cov*100/tot_all:.2f}%)\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff 82b931a2d36b6ea66fc72b4b75463cd02a15801f...HEAD -- app/backend/src/main/ openapi/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+git worktree list && git status --short && git rev-parse HEAD
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md
+cd app/backend && ./mvnw -B clean verify -Pci-security
+git diff --stat 82b931a2d36b6ea66fc72b4b75463cd02a15801f...HEAD
+python3 -c "
+targets = [\"RbacManagementService\", \"ReportRunOrchestratorService\", \"ReportRunArtifactAndEndorsementService\", \"GovernanceTicketWorkflowService\", \"FailCl
+git diff 82b931a2d36b6ea66fc72b4b75463cd02a15801f...HEAD -- app/backend/src/main/ openapi/
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md

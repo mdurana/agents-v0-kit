@@ -1,0 +1,40 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/ .agents/rules/ .agents/agents/ docs/agents-v0/adr/ docs/agents-v0/diagrams/sequences/ 2>&1 || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/ docs/agents-v0/design/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/milestones/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ci/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/ .agents-v0/hooks/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import yaml
+with open(\"docs/agents-v0/design/p1-a-openapi-v1-contract-catalog/openapi.yaml\") as f:
+    spec = yaml.safe_load(f)
+print(\"openapi:\", spec.get(\"openapi\"))
+paths = spec.get(\"paths\", {})
+print(\"path count:\", len(paths))
+ops = []
+for p, methods in paths.items():
+    for m, details in methods.items():
+        if m in (\"get\",\"post\",\"put\",\"patch\",\"delete\"):
+            ops.append((details.get(\"operationId\"), m.upper(), p, details.get(\"tags\", [])))
+print(\"operation count:\", len(ops))
+for op_id, m, p, tags in ops:
+    print(f\"  {op_id}: {m} {p} [{tags[0] if tags else \"\"}]\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short && ls -la docs/agents-v0/diagrams/sequences/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'rm -f docs/agents-v0/diagrams/sequences/portal-backend.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md
+ls -la .agents/ .agents/rules/ .agents/agents/ docs/agents-v0/adr/ docs/agents-v0/diagrams/sequences/ 2>&1 || true
+ls -la .agents-v0/scripts/ docs/agents-v0/design/
+ls -la .agents/hooks/
+ls -la docs/agents-v0/milestones/
+ls -la .agents-v0/ci/
+ls -la .agents-v0/ .agents-v0/hooks/
+python3 -c "
+print
+git status --short && ls -la docs/agents-v0/diagrams/sequences/
+rm -f docs/agents-v0/diagrams/sequences/portal-backend.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p1-a-openapi-v1-contract-catalog.md && sh .agents-v0/scripts/check-lessons.sh
+git status --short

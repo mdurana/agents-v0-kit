@@ -1,0 +1,10 @@
+{
+  "chat": "313553bf-28ba-4003-8a9e-d22351e12c6d",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-d-configuration-definitions-recipes-schedules",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-verify p2-d-configuration-definitions-recipes-schedules",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-d-configuration-definitions-recipes-schedules-verify-1",
+  "turn": 1,
+  "requested_at": 1793312427
+}

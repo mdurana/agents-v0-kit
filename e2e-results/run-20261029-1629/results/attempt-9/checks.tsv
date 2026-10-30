@@ -1,0 +1,143 @@
+2026-10-29 16:29:43	1	-	P1	PASS	every prerequisite present (DEGRADED allowed)
+2026-10-29 16:30:16	1	-	CAL-AUTH	PASS	agent answers in print mode
+2026-10-29 16:31:50	2	-	W1	PASS	discovery file is byte-identical to the fixture
+2026-10-29 16:31:50	2	-	W2	PASS	kit installed: commands (.cursor + .agents), sync script, P0 manifest, app skeleton, profile
+2026-10-29 16:31:50	2	-	W3	PASS	no program state yet, only branch main, tree clean
+2026-10-29 16:31:50	2	-	W4	PASS	no git remote configured
+2026-10-29 16:38:26	3	roadmap	R1	PASS	roadmap approved in program.state.json
+2026-10-29 16:38:26	3	roadmap	R2	PASS	roadmap records the discovery path and its sha256
+2026-10-29 16:38:26	3	roadmap	R3	PASS	Approved roadmap row by mdurana
+2026-10-29 16:38:26	3	roadmap	R4	PASS	discovery text unchanged (approval rows may be appended)
+2026-10-29 16:56:33	3	architecture	A1	PASS	architecture approved
+2026-10-29 16:56:33	3	architecture	A2	PASS	an Accepted ADR records Pack: java
+2026-10-29 16:56:33	3	architecture	A3	PASS	pack bound: profile Pack cell and pack.json
+2026-10-29 16:56:33	3	architecture	A4	PASS	architecture-review.md and arc-record.md exist; Approved row
+2026-10-29 16:56:33	3	architecture	A5	PASS	Approved architecture row by mdurana
+2026-10-29 17:09:09	3	plan	L1	PASS	plan approved
+2026-10-29 17:09:09	3	plan	L2	PASS	story graph parses: unique ids, known deps (next-story.py map exit 0)
+2026-10-29 17:09:09	3	plan	L3	PASS	P0-A present and >= 3 stories after it
+2026-10-29 17:09:09	3	plan	L4	PASS	Approved plan row by mdurana in a milestone manifest
+2026-10-29 17:20:16	3	P0-A	P1	PASS	P0-A released: build+verify+release approved, verifyPassed, evidence, state committed
+2026-10-29 17:20:16	3	P0-A	P2	PASS	P0-A on main only: no feature branch, no extra worktree, no merge commit
+2026-10-29 17:20:16	3	P0-A	P3	PASS	tree clean, no self-approval, no forbidden command
+2026-10-29 17:20:16	3	P0-A	L1	PASS	check-lessons.sh passes for P0-A (phase-result + release approval text)
+2026-10-29 18:18:01	4	P1-A	H1	PASS	P1-A released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-29 18:18:01	4	P1-A	H2	PASS	feature/p1-a-openapi-v1-contract-catalog merged into main with a merge commit
+2026-10-29 18:18:01	4	P1-A	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-29 18:18:01	4	P1-A	H4	PASS	earlier released stories unchanged
+2026-10-29 18:18:01	4	P1-A	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-29 18:18:01	4	P1-A	L1	PASS	check-lessons.sh passes for P1-A (phase-result + release approval text)
+2026-10-29 19:04:08	4	P1-B	H1	PASS	P1-B released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-29 19:04:08	4	P1-B	H2	PASS	feature/p1-b-iam-and-audit-persistence merged into main with a merge commit
+2026-10-29 19:04:08	4	P1-B	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-29 19:04:08	4	P1-B	H4	PASS	earlier released stories unchanged
+2026-10-29 19:04:08	4	P1-B	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-29 19:04:08	4	P1-B	L1	PASS	check-lessons.sh passes for P1-B (phase-result + release approval text)
+2026-10-29 19:42:46	4	P1-C	H1	PASS	P1-C released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-29 19:42:46	4	P1-C	H2	PASS	feature/p1-c-configuration-and-seeded-definitions-persistence merged into main with a merge commit
+2026-10-29 19:42:46	4	P1-C	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-29 19:42:46	4	P1-C	H4	PASS	earlier released stories unchanged
+2026-10-29 19:42:46	4	P1-C	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-29 19:42:46	4	P1-C	L1	PASS	check-lessons.sh passes for P1-C (phase-result + release approval text)
+2026-10-29 20:23:58	4	P1-D	H1	PASS	P1-D released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-29 20:23:58	4	P1-D	H2	PASS	feature/p1-d-execution-and-governance-persistence merged into main with a merge commit
+2026-10-29 20:23:58	4	P1-D	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-29 20:23:58	4	P1-D	H4	PASS	earlier released stories unchanged
+2026-10-29 20:23:58	4	P1-D	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-29 20:23:58	4	P1-D	L1	PASS	check-lessons.sh passes for P1-D (phase-result + release approval text)
+2026-10-29 22:38:45	4	P1-E	H1	PASS	P1-E released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-29 22:38:45	4	P1-E	H2	PASS	feature/p1-e-redis-s3-sap-infrastructure-adapters merged into main with a merge commit
+2026-10-29 22:38:45	4	P1-E	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-29 22:38:45	4	P1-E	H4	PASS	earlier released stories unchanged
+2026-10-29 22:38:45	4	P1-E	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-29 22:38:45	4	P1-E	L1	PASS	check-lessons.sh passes for P1-E (phase-result + release approval text)
+2026-10-30 03:34:57	4	P2-A	H1	PASS	P2-A released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 03:34:57	4	P2-A	H2	PASS	feature/p2-a-bff-oidc-fail-closed-session-auth merged into main with a merge commit
+2026-10-30 03:34:58	4	P2-A	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 03:34:58	4	P2-A	H4	PASS	earlier released stories unchanged
+2026-10-30 03:34:58	4	P2-A	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 03:34:58	4	P2-A	L1	PASS	check-lessons.sh passes for P2-A (phase-result + release approval text)
+2026-10-30 04:35:09	4	P2-B	H1	PASS	P2-B released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 04:35:09	4	P2-B	H2	PASS	feature/p2-b-iam-rbac-sod-and-view-as merged into main with a merge commit
+2026-10-30 04:35:09	4	P2-B	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 04:35:09	4	P2-B	H4	PASS	earlier released stories unchanged
+2026-10-30 04:35:09	4	P2-B	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 04:35:09	4	P2-B	L1	PASS	check-lessons.sh passes for P2-B (phase-result + release approval text)
+2026-10-30 05:34:24	4	P2-C	H1	PASS	P2-C released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 05:34:24	4	P2-C	H2	PASS	feature/p2-c-iam-user-directory-onboarding-exports merged into main with a merge commit
+2026-10-30 05:34:24	4	P2-C	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 05:34:24	4	P2-C	H4	PASS	earlier released stories unchanged
+2026-10-30 05:34:24	4	P2-C	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 05:34:24	4	P2-C	L1	PASS	check-lessons.sh passes for P2-C (phase-result + release approval text)
+2026-10-30 06:35:12	4	P2-D	H1	PASS	P2-D released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 06:35:12	4	P2-D	H2	PASS	feature/p2-d-configuration-definitions-recipes-schedules merged into main with a merge commit
+2026-10-30 06:35:12	4	P2-D	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 06:35:12	4	P2-D	H4	PASS	earlier released stories unchanged
+2026-10-30 06:35:12	4	P2-D	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 06:35:12	4	P2-D	L1	PASS	check-lessons.sh passes for P2-D (phase-result + release approval text)
+2026-10-30 07:39:47	4	P2-E	H1	PASS	P2-E released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 07:39:47	4	P2-E	H2	PASS	feature/p2-e-configuration-reference-lookup-tables merged into main with a merge commit
+2026-10-30 07:39:47	4	P2-E	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 07:39:47	4	P2-E	H4	PASS	earlier released stories unchanged
+2026-10-30 07:39:47	4	P2-E	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 07:39:47	4	P2-E	L1	PASS	check-lessons.sh passes for P2-E (phase-result + release approval text)
+2026-10-30 08:45:31	4	P2-F	H1	PASS	P2-F released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 08:45:31	4	P2-F	H2	PASS	feature/p2-f-execution-upload-and-run-lifecycle merged into main with a merge commit
+2026-10-30 08:45:31	4	P2-F	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 08:45:31	4	P2-F	H4	PASS	earlier released stories unchanged
+2026-10-30 08:45:31	4	P2-F	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 08:45:31	4	P2-F	L1	PASS	check-lessons.sh passes for P2-F (phase-result + release approval text)
+2026-10-30 09:50:50	4	P2-G	H1	PASS	P2-G released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 09:50:50	4	P2-G	H2	PASS	feature/p2-g-execution-recipe-engine-and-artifacts merged into main with a merge commit
+2026-10-30 09:50:50	4	P2-G	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 09:50:50	4	P2-G	H4	PASS	earlier released stories unchanged
+2026-10-30 09:50:50	4	P2-G	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 09:50:50	4	P2-G	L1	PASS	check-lessons.sh passes for P2-G (phase-result + release approval text)
+2026-10-30 10:55:42	4	P2-H	H1	PASS	P2-H released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 10:55:42	4	P2-H	H2	PASS	feature/p2-h-governance-ticketing-queues-and-actions merged into main with a merge commit
+2026-10-30 10:55:42	4	P2-H	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 10:55:42	4	P2-H	H4	PASS	earlier released stories unchanged
+2026-10-30 10:55:42	4	P2-H	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 10:55:42	4	P2-H	L1	PASS	check-lessons.sh passes for P2-H (phase-result + release approval text)
+2026-10-30 12:00:44	4	P2-I	H1	PASS	P2-I released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 12:00:44	4	P2-I	H2	PASS	feature/p2-i-audit-logs-notifications-and-dashboard-apis merged into main with a merge commit
+2026-10-30 12:00:44	4	P2-I	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 12:00:44	4	P2-I	H4	PASS	earlier released stories unchanged
+2026-10-30 12:00:44	4	P2-I	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 12:00:44	4	P2-I	L1	PASS	check-lessons.sh passes for P2-I (phase-result + release approval text)
+2026-10-30 13:04:16	4	P2-K	H1	PASS	P2-K released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 13:04:16	4	P2-K	H2	PASS	feature/p2-k-integration-governance-execution-freeze-archive merged into main with a merge commit
+2026-10-30 13:04:16	4	P2-K	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 13:04:16	4	P2-K	H4	PASS	earlier released stories unchanged
+2026-10-30 13:04:16	4	P2-K	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 13:04:17	4	P2-K	L1	PASS	check-lessons.sh passes for P2-K (phase-result + release approval text)
+2026-10-30 14:12:58	4	P2-L	H1	PASS	P2-L released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 14:12:58	4	P2-L	H2	PASS	feature/p2-l-integration-governance-configuration-cutover merged into main with a merge commit
+2026-10-30 14:12:58	4	P2-L	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 14:12:58	4	P2-L	H4	PASS	earlier released stories unchanged
+2026-10-30 14:12:58	4	P2-L	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 14:12:58	4	P2-L	L1	PASS	check-lessons.sh passes for P2-L (phase-result + release approval text)
+2026-10-30 15:06:43	4	P2-M	H1	PASS	P2-M released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 15:06:43	4	P2-M	H2	PASS	feature/p2-m-integration-governance-iam-sod-and-provisioning merged into main with a merge commit
+2026-10-30 15:06:43	4	P2-M	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 15:06:43	4	P2-M	H4	PASS	earlier released stories unchanged
+2026-10-30 15:06:43	4	P2-M	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 15:06:43	4	P2-M	L1	PASS	check-lessons.sh passes for P2-M (phase-result + release approval text)
+2026-10-30 16:08:50	4	P2-N	H1	PASS	P2-N released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 16:08:50	4	P2-N	H2	PASS	feature/p2-n-integration-iam-cross-context-authorization-guard merged into main with a merge commit
+2026-10-30 16:08:50	4	P2-N	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 16:08:50	4	P2-N	H4	PASS	earlier released stories unchanged
+2026-10-30 16:08:51	4	P2-N	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 16:08:51	4	P2-N	L1	PASS	check-lessons.sh passes for P2-N (phase-result + release approval text)
+2026-10-30 17:35:51	4	P2-O	H1	PASS	P2-O released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 17:35:51	4	P2-O	H2	PASS	feature/p2-o-integration-audit-cross-context-events-and-widgets merged into main with a merge commit
+2026-10-30 17:35:51	4	P2-O	H3	PASS	phases approved in order (phaseDates non-decreasing)
+2026-10-30 17:35:51	4	P2-O	H4	PASS	earlier released stories unchanged
+2026-10-30 17:35:51	4	P2-O	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 17:35:51	4	P2-O	L1	PASS	check-lessons.sh passes for P2-O (phase-result + release approval text)
+2026-10-30 19:07:59	4	P2-P	H1	FAIL	P2-P released: intake design build verify release approved, verifyPassed, evidence, state committed
+2026-10-30 19:07:59	4	P2-P	H2	FAIL	feature/p2-p-frontend-shell-dashboard-and-notifications merged into main with a merge commit
+2026-10-30 19:07:59	4	P2-P	H3	FAIL	phases approved in order (phaseDates non-decreasing)
+2026-10-30 19:07:59	4	P2-P	H4	PASS	earlier released stories unchanged
+2026-10-30 19:07:59	4	P2-P	H5	PASS	main clean, no self-approval, no forbidden command
+2026-10-30 19:07:59	4	P2-P	L1	FAIL	check-lessons.sh passes for P2-P (phase-result + release approval text)

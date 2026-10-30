@@ -1,0 +1,14 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md && git status --short && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm ci && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm test'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md && git status --short && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify"
+cd app/frontend && npm run verify
+cd app/frontend && npm ci && npm run verify
+cd app/frontend && npm test
+cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

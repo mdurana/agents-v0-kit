@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A && git commit -m "feat(p2-l): implement governance-configuration ticket submission and atomic cutover"'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md
+git add -A && git commit -m "feat(p2-l): implement governance-configuration ticket submission and atomic cutover"

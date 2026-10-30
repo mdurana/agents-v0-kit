@@ -1,0 +1,5 @@
+S4-p2-c-iam-user-directory-onboarding-exports-intake-1 NORMAL-END gates: intake branch
+S4-p2-c-iam-user-directory-onboarding-exports-design-1 NORMAL-END gates: design
+S4-p2-c-iam-user-directory-onboarding-exports-build-1 NORMAL-END gates: build
+S4-p2-c-iam-user-directory-onboarding-exports-verify-1 NORMAL-END gates: verify
+S4-p2-c-iam-user-directory-onboarding-exports-local-release-1 NORMAL-END gates: release

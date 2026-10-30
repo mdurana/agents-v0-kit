@@ -1,0 +1,45 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short -b && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git rev-parse HEAD && git diff --stat 97030b32807c8f6bdd06dc784f37c4e8e1d215de...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    tot = m + cov
+    print(f\"TOTAL {t}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+targets = [
+    \"com/example/app/configuration/port/ConfigurationCutoverPort\",
+    \"com/example/app/configuration/port/ConfigurationCutoverRequest\",
+    \"com/example/app/configuration/service/ConfigurationManagementService\",
+    \"com/example/app/configuration/service/ReferenceTableManagementService\",
+    \"com/example/app/governance/service/GovernanceTicketSubmissionService\",
+    \"com/example/app/governance/service/GovernanceTicketWorkflowService\",
+]
+agg_cov = 0
+agg_tot = 0
+for pkg in root.findall(\"package\"):
+    for cls in pkg.findall(\"class\"):
+        name = cls.attrib[\"name\"]
+        if name in targets:
+            for c in cls.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    tot = m + cov
+                    agg_cov += cov
+                    agg_tot += tot
+                    print(f\"CLASS {name}: {cov}/{tot} ({cov*100.0/tot:.2f}%)\")
+print(f\"CHANGED_CLASSES_AGGREGATE_LINE: {agg_cov}/{agg_tot} ({agg_cov*100.0/agg_tot:.2f}%)\")
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md'
+git worktree list && git status --short -b && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md
+sh .agents-v0/scripts/resolve-layout.sh && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md
+git rev-parse HEAD && git diff --stat 97030b32807c8f6bdd06dc784f37c4e8e1d215de...HEAD
+cd app/backend && ./mvnw -B clean verify -Pci-security
+python3 -c "
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-l-integration-governance-configuration-cutover.md

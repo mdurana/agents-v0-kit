@@ -1,0 +1,8 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && git add -A && git commit -m "feat(p2-i): implement audit trail explorer, notifications, and dashboard APIs" && git status -sb'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git commit -m "feat(p2-i): implement audit trail explorer, notifications, and dashboard APIs"'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md && git add -A && git commit -m "feat(p2-i): implement audit trail explorer, notifications, and dashboard APIs" && git status -sb
+sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/p2-i-audit-logs-notifications-and-dashboard-apis.md
+git add -A
+git commit -m "feat(p2-i): implement audit trail explorer, notifications, and dashboard APIs"

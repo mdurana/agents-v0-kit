@@ -1,0 +1,41 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat e035646b9f16d0eacd291f530c0bdb9397d53ccf...HEAD'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse(\"app/backend/target/site/jacoco/jacoco.xml\")
+root = tree.getroot()
+for c in root.findall(\"counter\"):
+    t = c.attrib[\"type\"]
+    m = int(c.attrib[\"missed\"])
+    cov = int(c.attrib[\"covered\"])
+    print(f\"TOTAL {t}: {cov}/{m+cov} ({cov*100.0/(m+cov):.2f}%)\")
+print(\"--- governance package ---\")
+for pkg in root.findall(\"package\"):
+    if \"governance\" in pkg.attrib[\"name\"]:
+        print(\"Package:\", pkg.attrib[\"name\"])
+        for c in pkg.findall(\"counter\"):
+            t = c.attrib[\"type\"]
+            m = int(c.attrib[\"missed\"])
+            cov = int(c.attrib[\"covered\"])
+            print(f\"  {t}: {cov}/{m+cov} ({cov*100.0/(m+cov):.2f}%)\")
+        for sf in pkg.findall(\"sourcefile\"):
+            for c in sf.findall(\"counter\"):
+                if c.attrib[\"type\"] == \"LINE\":
+                    m = int(c.attrib[\"missed\"])
+                    cov = int(c.attrib[\"covered\"])
+                    print(f\"    {sf.attrib[\x27name\x27]}: {cov}/{m+cov} ({cov*100.0/(m+cov):.2f}%)\")
+"'
+    print(t, cov, m+cov, round(cov*100.0/(m+cov), 2))
+        print(\"PKG\", pkg.attrib[\"name\"])
+            name = sf.attrib[\"name\"]
+                    print(\"  FILE\", name, cov, m+cov, round(cov*100.0/(m+cov), 2))
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+git diff --stat e035646b9f16d0eacd291f530c0bdb9397d53ccf...HEAD
+cd app/backend && ./mvnw -B clean verify -Pci-security
+python3 -c "
+        print(\"Package:\", pkg.attrib[\"n
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md

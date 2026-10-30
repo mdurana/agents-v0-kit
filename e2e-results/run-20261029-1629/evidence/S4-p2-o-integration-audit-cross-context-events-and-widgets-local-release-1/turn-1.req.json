@@ -1,0 +1,10 @@
+{
+  "chat": "7950298a-d69f-4082-bfdd-67ec2cae8027",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-o-integration-audit-cross-context-events-and-widgets",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-local-release p2-o-integration-audit-cross-context-events-and-widgets",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-o-integration-audit-cross-context-events-and-widgets-local-release-1",
+  "turn": 1,
+  "requested_at": 1793352552
+}

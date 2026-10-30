@@ -1,0 +1,4 @@
+S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1 NORMAL-END gates: intake branch
+S4-p1-e-redis-s3-sap-infrastructure-adapters-design-1 NORMAL-END gates: build
+S4-p1-e-redis-s3-sap-infrastructure-adapters-verify-1 NORMAL-END gates: verify
+S4-p1-e-redis-s3-sap-infrastructure-adapters-local-release-1 NORMAL-END gates: release

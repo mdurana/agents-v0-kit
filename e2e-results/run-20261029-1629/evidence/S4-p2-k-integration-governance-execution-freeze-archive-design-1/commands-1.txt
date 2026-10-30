@@ -1,0 +1,18 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-k-integration-governance-execution-freeze-archive.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 docs/agents-v0/adr/ && ls -1 docs/agents-v0/design/ && find app/backend/src/main/java/com/example/app/governance app/backend/src/main/java/com/example/app/execution app/backend/src/main/java/com/example/app/configuration -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 .agents/agents/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/configuration -maxdepth 3 -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log --oneline -n 15 && ls -1 docs/agents-v0/requirements/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 /home/e2e/agents-v0-e2e/run-20261029-1629/work/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/design/p2-h-governance-ticketing-queues-and-actions/ docs/agents-v0/design/p2-i-audit-logs-notifications-and-dashboard-apis/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -1 .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-k-integration-governance-execution-freeze-archive.md && git status --short'
+git worktree list && sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status in_progress docs/agents-v0/requirements/p2-k-integration-governance-execution-freeze-archive.md
+ls -1 docs/agents-v0/adr/ && ls -1 docs/agents-v0/design/ && find app/backend/src/main/java/com/example/app/governance app/backend/src/main/java/com/example/app/execution app/backend/src/main/java/com/example/app/configuration -type f | sort
+ls -1 .agents/agents/
+find app/backend/src/main/java/com/example/app/configuration -maxdepth 3 -type f | sort
+git log --oneline -n 15 && ls -1 docs/agents-v0/requirements/
+ls -1 /home/e2e/agents-v0-e2e/run-20261029-1629/work/
+ls -la docs/agents-v0/design/p2-h-governance-ticketing-queues-and-actions/ docs/agents-v0/design/p2-i-audit-logs-notifications-and-dashboard-apis/
+ls -1 .agents-v0/scripts/
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase design --status awaiting_approval docs/agents-v0/requirements/p2-k-integration-governance-execution-freeze-archive.md && git status --short

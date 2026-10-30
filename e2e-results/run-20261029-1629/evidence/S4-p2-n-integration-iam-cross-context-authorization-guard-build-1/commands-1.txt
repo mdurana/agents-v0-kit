@@ -1,0 +1,20 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && git status'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify (fast, no OWASP)"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'diff -q openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-n-integration-iam-cross-context-authorization-guard/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "/reassign" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-n-integration-iam-cross-context-authorization-guard/build-output.txt 2>&1'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short'
+git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && git status
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify (fast, no OWASP)"
+cd app/backend && ./mvnw -B clean verify -Pci-security
+diff -q openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml
+cd app/backend && ./mvnw -B clean verify -P!ci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-n-integration-iam-cross-context-authorization-guard/build-report.md
+grep -rn "/reassign" app/backend/src/test/
+cd app/backend && ./mvnw -B clean verify -Pci-security > ../../docs/agents-v0/build/p2-n-integration-iam-cross-context-authorization-guard/build-output.txt 2>&1
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-n-integration-iam-cross-context-authorization-guard.md
+git status --short

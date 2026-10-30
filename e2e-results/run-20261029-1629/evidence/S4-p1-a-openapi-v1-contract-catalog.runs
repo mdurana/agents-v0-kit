@@ -1,0 +1,5 @@
+S4-p1-a-openapi-v1-contract-catalog-intake-1 NORMAL-END gates: intake branch
+S4-p1-a-openapi-v1-contract-catalog-design-1 NORMAL-END gates: design
+S4-p1-a-openapi-v1-contract-catalog-build-1 NORMAL-END gates: build
+S4-p1-a-openapi-v1-contract-catalog-verify-1 NORMAL-END gates: verify
+S4-p1-a-openapi-v1-contract-catalog-local-release-1 NORMAL-END gates: release

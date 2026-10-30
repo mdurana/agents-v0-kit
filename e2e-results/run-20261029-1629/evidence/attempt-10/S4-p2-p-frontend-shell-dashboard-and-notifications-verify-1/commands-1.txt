@@ -1,0 +1,20 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git diff --stat 7aaafe2a7b325bca38248cdc242ce4d3c43491fe...HEAD && cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npx vitest run --coverage'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/test -name "*OpenApi*"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'diff -u app/backend/src/main/resources/openapi/api-v1.yaml openapi/api-v1.yaml || true'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B test -Dtest=OpenApiContractCatalogTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1 && cat ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+git worktree list && git status --short && sh .agents-v0/scripts/sync-feature-state.sh --active-phase verify --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+eval "$(sh .agents-v0/scripts/resolve-layout.sh)" && sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+git diff --stat 7aaafe2a7b325bca38248cdc242ce4d3c43491fe...HEAD && cd app/frontend && npm run verify
+sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+cd app/frontend && npx vitest run --coverage
+find app/backend/src/test -name "*OpenApi*"
+diff -u app/backend/src/main/resources/openapi/api-v1.yaml openapi/api-v1.yaml || true
+cd app/backend && ./mvnw -B test -Dtest=OpenApiContractCatalogTest
+cd app/frontend && npm run verify > ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1 && cat ../../docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt
+sh .agents-v0/scripts/sync-feature-state.sh --verify-passed true --active-phase verify --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md

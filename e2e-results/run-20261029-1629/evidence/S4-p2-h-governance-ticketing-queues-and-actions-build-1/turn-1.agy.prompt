@@ -1,0 +1,7 @@
+[Unattended agents-v0 e2e run. You are the coding agent in the workspace /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions (your current directory). No person is watching and nobody will answer mid-turn.
+- The text after 'USER MESSAGE:' is the user's chat message to you. When it starts with a kit command such as /v0-roadmap or /v0-build, read that command's definition in .agents/commands/<command>.md and follow it exactly, together with AGENTS.md and the rules in .agents/rules (and any sub-agent or skill files they name).
+- Run EVERY shell command through the kit's pre-shell guard, never directly: bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 '<command>'  (it runs the command in /home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-h-governance-ticketing-queues-and-actions and applies the kit's hook policy with this turn's allowlist; use --ws <dir> only to run in another checkout the kit tells you to use). If it prints HOOK BLOCKED or HOOK DENIED, that is the kit guardrail's answer: do not retry the command another way.
+- When the kit command reaches an approval gate, needs a decision, or is finished, stop and end your turn with your message to the user.]
+
+USER MESSAGE:
+/v0-build p2-h-governance-ticketing-queues-and-actions

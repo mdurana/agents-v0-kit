@@ -1,0 +1,10 @@
+{
+  "chat": "563ee3ff-214c-4ca3-b308-4cfb62536e27",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal",
+  "model": "gemini-4-argon-medium",
+  "prompt": "Branch authorized",
+  "allow": "Shell(sh:.agents-v0/scripts/feature-worktree.sh*)",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p1-e-redis-s3-sap-infrastructure-adapters-intake-1",
+  "turn": 3,
+  "requested_at": 1793281725
+}

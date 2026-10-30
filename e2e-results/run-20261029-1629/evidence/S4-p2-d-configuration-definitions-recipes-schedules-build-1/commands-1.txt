@@ -1,0 +1,24 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -name "*Controller.java" -o -name "*RulesTest.java"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) 2>&1 | tee docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md'
+git worktree list && git status --short
+sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md
+cd app/backend && ./mvnw -B clean verify -Pci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md
+cd app/backend && ./mvnw -B clean verify -P!ci-security
+find app/backend/src -name "*Controller.java" -o -name "*RulesTest.java"
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) 2>&1 | tee docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-output.txt
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-d-configuration-definitions-recipes-schedules/build-report.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-d-configuration-definitions-recipes-schedules.md

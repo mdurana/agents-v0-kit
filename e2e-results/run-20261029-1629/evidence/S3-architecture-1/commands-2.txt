@@ -1,0 +1,4 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "Proposed" docs/agents-v0/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md && sh .agents-v0/scripts/activate-stack-pack.sh java'
+grep -rn "Proposed" docs/agents-v0/
+sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md && sh .agents-v0/scripts/activate-stack-pack.sh java

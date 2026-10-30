@@ -1,0 +1,24 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/backend && ./mvnw -B clean verify -Pci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la docs/agents-v0/build/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && (cd app/backend && ./mvnw -B clean verify -P!ci-security || true)'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 '(cd app/backend && ./mvnw -B clean verify -Pci-security) 2>&1 | tee docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'wc -l docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt && grep -n -E "Tests run: 50|All coverage checks have been met|0 Checkstyle violations|BugInstance size is 0|Analysis Complete|BUILD SUCCESS" docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md'
+git worktree list && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && git status --short
+sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md && find app/backend/src -type f | sort
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"
+cd app/backend && ./mvnw -B clean verify -Pci-security
+ls -la docs/agents-v0/build/
+cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && (cd app/backend && ./mvnw -B clean verify -P!ci-security || true)
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security
+(cd app/backend && ./mvnw -B clean verify -Pci-security) 2>&1 | tee docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt
+wc -l docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt && grep -n -E "Tests run: 50|All coverage checks have been met|0 Checkstyle violations|BugInstance size is 0|Analysis Complete|BUILD SUCCESS" docs/agents-v0/build/p2-a-bff-oidc-fail-closed-session-auth/build-output.txt
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-a-bff-oidc-fail-closed-session-auth.md

@@ -1,0 +1,38 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -n "^  /api/v1/tickets" openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -n 5 --stat'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git show 5fdbe77c1e08361476a1fcc1ef991b16bac7bf7e -- openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git log -p -- app/backend/src/test/java/com/example/app/api/OpenApiContractCatalogTest.java'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security -Dtest=GovernanceTicketingQueuesAndActionsTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B test -Dtest=GovernanceTicketingQueuesAndActionsTest'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'find app/backend/src/main/java/com/example/app/governance -type f | sort'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'grep -rn "RbacManagementService\|RbacValidationAndMappingSupport" app/backend/src/test/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/backend/src/main/resources/db/migration/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B verify -P!ci-security'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B compile checkstyle:check spotbugs:check'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-output.txt 2>&1 && tail -n 30 docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md'
+git worktree list && git status --short
+sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" && sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md
+find app/backend/src -type f | sort
+grep -n "^  /api/v1/tickets" openapi/api-v1.yaml
+git log -n 5 --stat
+git show 5fdbe77c1e08361476a1fcc1ef991b16bac7bf7e -- openapi/api-v1.yaml
+git log -p -- app/backend/src/test/java/com/example/app/api/OpenApiContractCatalogTest.java
+cp openapi/api-v1.yaml app/backend/src/main/resources/openapi/api-v1.yaml
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B clean verify -P!ci-security -Dtest=GovernanceTicketingQueuesAndActionsTest
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B test -Dtest=GovernanceTicketingQueuesAndActionsTest
+find app/backend/src/main/java/com/example/app/governance -type f | sort
+grep -rn "RbacManagementService\|RbacValidationAndMappingSupport" app/backend/src/test/
+ls -la app/backend/src/main/resources/db/migration/
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B verify -P!ci-security
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && cd app/backend && ./mvnw -B compile checkstyle:check spotbugs:check
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && (cd app/backend && ./mvnw -B clean verify -Pci-security) > docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-output.txt 2>&1 && tail -n 30 docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-output.txt
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-h-governance-ticketing-queues-and-actions/build-report.md && sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-h-governance-ticketing-queues-and-actions.md

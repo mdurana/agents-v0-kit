@@ -1,0 +1,10 @@
+{
+  "chat": "c75e1b1b-7b23-4ad5-b5e8-93b0b9427155",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover",
+  "model": "gemini-4-argon-medium",
+  "prompt": "Approved by mdurana",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-l-integration-governance-configuration-cutover-design-1",
+  "turn": 2,
+  "requested_at": 1793337557
+}

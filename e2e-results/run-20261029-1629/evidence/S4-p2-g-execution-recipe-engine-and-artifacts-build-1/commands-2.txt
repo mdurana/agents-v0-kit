@@ -1,0 +1,12 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build --by "mdurana" --note "Build approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md && git add -A && git commit -m "feat(p2-g): implement recipe engine, run artifacts, endorsement, and sap archival" && git status --short && git log -1 --oneline'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build --by "mdurana" --note "Build approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --approve build --reason "Approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git add -A'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git commit -m "feat(p2-g): implement recipe engine, run artifacts, endorsement, and sap archival"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git status --short'
+sh .agents-v0/scripts/sync-feature-state.sh --approve build --by "mdurana" --note "Build approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md && git add -A && git commit -m "feat(p2-g): implement recipe engine, run artifacts, endorsement, and sap archival" && git status --short && git log -1 --oneline
+sh .agents-v0/scripts/sync-feature-state.sh --approve build --by "mdurana" --note "Build approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md
+sh .agents-v0/scripts/sync-feature-state.sh --approve build --reason "Approved by mdurana" docs/agents-v0/requirements/p2-g-execution-recipe-engine-and-artifacts.md
+git add -A
+git commit -m "feat(p2-g): implement recipe engine, run artifacts, endorsement, and sap archival"
+git status --short

@@ -1,0 +1,10 @@
+{
+  "chat": "8085bd1a-24c4-40a7-9f3b-8773f779704d",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-n-integration-iam-cross-context-authorization-guard",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-design p2-n-integration-iam-cross-context-authorization-guard",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-n-integration-iam-cross-context-authorization-guard-design-1",
+  "turn": 1,
+  "requested_at": 1793344481
+}

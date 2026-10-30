@@ -1,0 +1,24 @@
+PREREQ os             PRESENT   Linux (x86_64)
+PREREQ git            PRESENT   /usr/bin/git
+PREREQ jq             PRESENT   /usr/bin/jq
+PREREQ python3        PRESENT   /usr/bin/python3
+PREREQ curl           PRESENT   /usr/bin/curl
+PREREQ tar            PRESENT   /usr/bin/tar
+PREREQ xz             PRESENT   /usr/bin/xz
+PREREQ sha256         PRESENT   /usr/bin/sha256sum
+PREREQ timeout        PRESENT   /usr/bin/timeout
+PREREQ setsid         PRESENT   /usr/bin/setsid
+PREREQ pyyaml         PRESENT   python3 -c 'import yaml' ok
+PREREQ python-docx    PRESENT   optional (report rendering only)
+PREREQ jdk21          PRESENT   /home/e2e/.local/agents-v0-tools/jdk-21
+PREREQ node22         PRESENT   /home/e2e/.local/agents-v0-tools/node-22 (v22.23.4)
+PREREQ postgres17     PRESENT   /home/e2e/.local/agents-v0-tools/postgresql-17 (postgres (PostgreSQL) 17.11)
+PREREQ odc-data       PRESENT   /home/e2e/.m2/repository/org/owasp/dependency-check-data/9.0/odc.mv.db (200M, 2026-10-29 15:56)
+PREREQ agent-driver   PRESENT   antigravity (AGENT_DRIVER=antigravity)
+PREREQ agent-cli      PRESENT   antigravity custom driver (bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ipc-turn.sh)
+PREREQ agy-bin        PRESENT   /home/e2e/.local/bin/agy 1.4.10
+PREREQ agent-auth     PRESENT   managed by Antigravity session / AGENT_TURN_CMD (proven by CAL-AUTH in step 1)
+PREREQ agent-model    PRESENT   gemini-4-argon-medium
+PREREQ container      DEGRADED  no working docker/podman; P0-A AC-4 (container run) is scored DEGRADED; installing one needs root
+PREREQ network        PRESENT   Maven Central + npm reachable
+PREREQ disk           PRESENT   294 GB free

@@ -1,0 +1,10 @@
+{
+  "chat": "febc0f49-21da-40e1-95a9-a15d5c20e72e",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-l-integration-governance-configuration-cutover",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-verify p2-l-integration-governance-configuration-cutover",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-l-integration-governance-configuration-cutover-verify-1",
+  "turn": 1,
+  "requested_at": 1793339677
+}

@@ -1,0 +1,10 @@
+{
+  "chat": "86d73ec5-ebae-4f98-aa94-ea76cc9728f2",
+  "workspace": "/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal-p2-e-configuration-reference-lookup-tables",
+  "model": "gemini-4-argon-medium",
+  "prompt": "/v0-build p2-e-configuration-reference-lookup-tables",
+  "allow": "-",
+  "run_dir": "/home/e2e/agents-v0-e2e/run-20261029-1629/evidence/S4-p2-e-configuration-reference-lookup-tables-build-1",
+  "turn": 1,
+  "requested_at": 1793314856
+}

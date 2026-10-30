@@ -1,0 +1,5 @@
+S4-p2-h-governance-ticketing-queues-and-actions-intake-1 NORMAL-END gates: intake branch
+S4-p2-h-governance-ticketing-queues-and-actions-design-1 NORMAL-END gates: design
+S4-p2-h-governance-ticketing-queues-and-actions-build-1 NORMAL-END gates: build
+S4-p2-h-governance-ticketing-queues-and-actions-verify-1 NORMAL-END gates: verify
+S4-p2-h-governance-ticketing-queues-and-actions-local-release-1 NORMAL-END gates: release

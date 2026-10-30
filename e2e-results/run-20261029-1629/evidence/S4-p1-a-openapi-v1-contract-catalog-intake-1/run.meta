@@ -1,0 +1,7 @@
+name=S4-p1-a-openapi-v1-contract-catalog-intake
+workspace=/home/e2e/agents-v0-e2e/run-20261029-1629/work/portal
+context=intake
+allowed=intake design build verify maintain release branch
+kit_ref=0aa3a431ce06d9a46167f234ea1d71756c07026f
+kit_label=0aa3a431ce06
+start=2026-10-29 17:20:17 Asia/Manila

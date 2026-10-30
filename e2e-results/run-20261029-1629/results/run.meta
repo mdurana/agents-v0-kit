@@ -1,0 +1,32 @@
+test_root=/home/e2e/agents-v0-e2e/run-20261029-1629
+kit_url=/home/e2e/kit-src
+kit_ref=0aa3a431ce06d9a46167f234ea1d71756c07026f
+agent_model=gemini-4-argon-medium
+started=2026-10-29 16:29:39 Asia/Manila
+target_surface=frontend
+stop_after_step=4
+lessons_check=1
+agent_driver=antigravity
+agy_model=gemini-4-argon-medium
+turn_cap=3600
+agy_turn_timeout=3540
+max_retry_infra=4
+kit_sha=0aa3a431ce06d9a46167f234ea1d71756c07026f
+kit_label=0aa3a431ce06
+kit_source=/home/e2e/kit-src 0aa3a431ce06d9a46167f234ea1d71756c07026f
+resume_1=2026-10-29 21:42:00 step=4 reason=harness-fix old_kit=0aa3a431ce06 new_kit=0aa3a431ce06 harness_sha=231ea5784582 from_story=P1-E kept="P1-A P1-B P1-C P1-D " note="manual-resume-from-story approved by mdurana, after harness-fix"
+kit_sha=cca27739dde420f6a0f77eac37563288721bbef0
+kit_label=cca27739dde4
+kit_source=/home/e2e/kit-cca2773.bundle refs/heads/e2eplan-20261029
+kit_update_2=2026-10-29 23:57:33 step=4 reason=kit-update old_kit=0aa3a431ce06 new_kit=cca27739dde4 main=22c944f snapshot=S4-P1-E-END-KIT-cca2773 worktrees_set_aside="P1-A P1-B P1-C P1-D P1-E" note="Option A approved by mdurana; before --resume-from-story P2-A"
+resume_3=2026-10-30 00:01:26 step=4 reason=harness-fix old_kit=cca27739dde4 new_kit=cca27739dde4 harness_sha=231ea5784582 from_story=P2-A kept="P1-A P1-B P1-C P1-D P1-E " note="manual-resume-from-story approved by mdurana, after kit update to cca2773 (kitfix-20261029-step4-p1e)"
+resume_4=2026-10-30 01:18:17 step=4 reason=harness-fix old_kit=cca27739dde4 new_kit=cca27739dde4 harness_sha=af4cf8bf3b82 from_story=P2-A kept="P1-A P1-B P1-C P1-D P1-E " note="auto fix-and-rerun 1 of 2 for P2-A per §5.6 (standing rule by mdurana): empty-result intake turn treated as INFRA"
+resume_5=2026-10-30 02:48:50 step=4 reason=harness-fix old_kit=cca27739dde4 new_kit=cca27739dde4 harness_sha=d194d8372ede from_story=P2-A kept="P1-A P1-B P1-C P1-D P1-E " note="auto fix-and-rerun 2 of 2 for P2-A per §5.6 (standing rule by mdurana): agent turns run with TZ=UTC so phaseDates use one clock"
+kit_sha=fc4b642cb947cf38b5fea7cc1005e22d58e17eef
+kit_label=fc4b642cb947
+kit_source=/home/e2e/kit-src fc4b642cb947cf38b5fea7cc1005e22d58e17eef
+kit_update_6=2026-10-30 06:39:32 step=4 reason=kit-update old_kit=cca27739dde4 new_kit=fc4b642cb947 main=7b38309 snapshot=S4-P2-D-END-KIT-fc4b642 worktrees_set_aside="P2-A P2-B P2-C P2-D" note="Option A (main only) approved by mdurana 2026-10-30 06:25; before --resume-from-story P2-E"
+resume_7=2026-10-30 06:42:06 step=4 reason=harness-fix old_kit=fc4b642cb947 new_kit=fc4b642cb947 harness_sha=d194d8372ede from_story=P2-E kept="P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D " note="manual-resume-from-story approved by mdurana (voice call 2026-10-30 06:25), after kit update to fc4b642 on main only"
+resume_8=2026-10-30 18:17:34 step=4 reason=harness-fix old_kit=fc4b642cb947 new_kit=fc4b642cb947 harness_sha=d194d8372ede from_story=P2-P kept="P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O " note="manual-resume-from-story approved by mdurana (chat 2026-10-30 18:10) after Antigravity quota upgrade; P2-P design failed 17:54-17:56 with agy 429 RESOURCE_EXHAUSTED (Individual quota reached), not a kit or harness bug"
+resume_9=2026-10-30 19:23:28 step=4 reason=harness-fix old_kit=fc4b642cb947 new_kit=fc4b642cb947 harness_sha=8f1f56cc8783 from_story=P2-P kept="P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O " note="resume approved by mdurana (chat 2026-10-30 19:14) after driver fix for recovered transient agy 429 (P2-P build 18:42-19:07 reached gate but status ERROR); resume limit raised to 9"
+resume_10=2026-10-30 20:50:30 step=4 reason=harness-fix old_kit=fc4b642cb947 new_kit=fc4b642cb947 harness_sha=87662bedad77 from_story=P2-P kept="P1-A P1-B P1-C P1-D P1-E P2-A P2-B P2-C P2-D P2-E P2-F P2-G P2-H P2-I P2-K P2-L P2-M P2-N P2-O " note="resume approved by mdurana (chat 2026-10-30 20:41) after driver fix for recovered transient agy 5xx (P2-P local-release 20:15-20:19 reached gate after 503 UNAVAILABLE but status ERROR); resume limit raised to 10"

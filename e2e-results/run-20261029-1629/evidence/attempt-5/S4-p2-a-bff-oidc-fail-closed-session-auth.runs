@@ -1,0 +1,5 @@
+S4-p2-a-bff-oidc-fail-closed-session-auth-intake-1 NORMAL-END gates: intake branch
+S4-p2-a-bff-oidc-fail-closed-session-auth-design-1 NORMAL-END gates: design
+S4-p2-a-bff-oidc-fail-closed-session-auth-build-1 NORMAL-END gates: build
+S4-p2-a-bff-oidc-fail-closed-session-auth-verify-1 NORMAL-END gates: verify
+S4-p2-a-bff-oidc-fail-closed-session-auth-local-release-1 NORMAL-END gates: release

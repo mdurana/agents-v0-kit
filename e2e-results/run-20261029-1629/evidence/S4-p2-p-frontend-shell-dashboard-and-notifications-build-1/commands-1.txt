@@ -1,0 +1,29 @@
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'git worktree list && git status --short && sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && cd app/frontend && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la app/frontend && ls -la ../portal/app/frontend'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'cd app/frontend && npm ci --prefer-offline && npm run verify'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'ls -la .agents-v0/scripts/'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'python3 -c "
+import yaml
+with open(\"docs/agents-v0/design/p2-p-frontend-shell-dashboard-and-notifications/openapi.yaml\") as f:
+    draft = yaml.safe_load(f)
+with open(\"openapi/api-v1.yaml\") as f:
+    cat = yaml.safe_load(f)
+print(\"Draft paths:\", list(draft.get(\"paths\", {}).keys()))
+missing_paths = [p for p in draft.get(\"paths\", {}) if p not in cat.get(\"paths\", {})]
+print(\"Missing paths in catalog:\", missing_paths)
+missing_schemas = [s for s in draft.get(\"components\", {}).get(\"schemas\", {}) if s not in cat.get(\"components\", {}).get(\"schemas\", {})]
+print(\"Missing schemas in catalog:\", missing_schemas)
+"'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md && cd app/frontend && npm test'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md && sh .agents-v0/scripts/check-failure-brief.sh p2-p-frontend-shell-dashboard-and-notifications && cd app/frontend && npm test'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && (cd app/frontend && npm run verify) > docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'wc -l app/frontend/src/styles/gcash-tokens.css app/frontend/src/services/api/*.ts app/frontend/src/store/slices/*.ts app/frontend/src/store/PortalStoreProvider.tsx app/frontend/src/components/common/* app/frontend/src/components/layout/* app/frontend/src/features/dashboard/* app/frontend/src/features/notifications/* app/frontend/src/pages/* app/frontend/src/App.tsx app/frontend/src/App.test.tsx app/frontend/vite.config.ts'
+bash /home/e2e/kit-src/refs/e2e-test-plan/scripts/agy-ws-exec.sh --test-root /home/e2e/agents-v0-e2e/run-20261029-1629 'sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md'
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status in_progress docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
+cd app/frontend && npm ci --prefer-offline && npm run verify
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md && cd app/frontend && npm test
+sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-report.md && sh .agents-v0/scripts/check-failure-brief.sh p2-p-frontend-shell-dashboard-and-notifications && cd app/frontend && npm test
+sh .agents-v0/scripts/run-backend-verify.sh "Frontend verify" && (cd app/frontend && npm run verify) > docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt 2>&1 && tail -n 35 docs/agents-v0/build/p2-p-frontend-shell-dashboard-and-notifications/build-output.txt
+sh .agents-v0/scripts/sync-feature-state.sh --active-phase build --status awaiting_approval docs/agents-v0/requirements/p2-p-frontend-shell-dashboard-and-notifications.md
