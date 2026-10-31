@@ -25,7 +25,13 @@ esac
 HOOK_POLICY_PY="$HOOK_DIR/hook-policy.py"
 PYTHONNOUSERSITE=1
 export PYTHONNOUSERSITE
-hook_py() { "$HOOK_PYTHON" -I -S "$@"; }
+# JN-7 (Jiraiya's N-1 review): -I -S does not stop a module loaded by path (hook-policy.py in
+#   hook_shell_permission_ask) from reading a planted __pycache__/hook-policy.cpython-*.pyc next to the hooks.
+#   -X pycache_prefix points every bytecode lookup at a folder that cannot exist (/dev/null is not a folder, for
+#   root too), so the source is always compiled, and -B never writes a cache (PYTHONDONTWRITEBYTECODE is ignored
+#   under -I). Python 3.7 and older ignore pycache_prefix.
+HOOK_PYCACHE_PREFIX=/dev/null/agents-v0
+hook_py() { "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
 
 # Read hook JSON from stdin; print a string field (supports nested keys with dots).
 # Tries common Cursor payload shapes when the top-level key is missing.
