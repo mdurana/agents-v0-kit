@@ -15,7 +15,7 @@ What V3 is (kitfix-plan V3, decision D5/D12): a short live rerun of the four cha
 
 **Story branches are kept** (Marlon, 2026-10-31 04:47, kitfix-20261031-keep-branches). No step below deletes or renames a `feature/*` or `maintain/*` branch, locally or on a remote. Setting a released worktree aside means moving its folder to trash and pruning the worktree record. The branch stays. The kit hooks block an agent from deleting one.
 
-Short names: box folder `B=/workspace/kit-eval/linode-e2e-20261029`, VM run root `T=/home/e2e/agents-v0-e2e/run-20261029-1629`, `KS=/home/e2e/kit-src` (the kit and harness clone on the VM), `H=$KS/refs/e2e-test-plan`, `MAIN=$T/work/portal`, `HV=/home/e2e/harness-v3` (the harness copy the run starts from once the kit source is locked, §4 step 7), `L=/root/kit-locked` (where the kit source goes, root only). VM commands run from the box with `cd $B && timeout 60 /workspace/tools/pyvenv/bin/python vm.py run "<cmd>"` (as root). Use `vm.py put <box file> <vm path>` to copy files. Run anything that uses git, tmux or agy as `su - e2e -c '...'`. All times are Asia/Manila.
+Short names: box folder `B=/workspace/kit-eval/linode-e2e-20261029`, VM run root `T=/home/e2e/agents-v0-e2e/run-20261029-1629`, `KS=/home/e2e/kit-src` (the kit and harness clone on the VM), `H=$KS/refs/e2e-test-plan`, `MAIN=$T/work/portal`, `HV=/opt/harness-v3` (the root-owned harness copy the run starts from once the kit source is locked, §4 step 7), `L=/root/kit-locked` (where the kit source goes, root only). VM commands run from the box with `cd $B && timeout 60 /workspace/tools/pyvenv/bin/python vm.py run "<cmd>"` (as root). Use `vm.py put <box file> <vm path>` to copy files. Run anything that uses git, tmux or agy as `su - e2e -c '...'`. All times are Asia/Manila.
 
 ## 0. Before you start (box, read-only)
 
@@ -78,7 +78,14 @@ su - e2e -c 'M=$HOME/agents-v0-e2e/run-20261029-1629/work/portal; sh $HOME/kit-s
 su - e2e -c 'T=$HOME/agents-v0-e2e/run-20261029-1629; bash $HOME/kit-src/refs/e2e-test-plan/scripts/kit-manifest.sh $T/work/portal $T/results/kit-manifest-<ID>.tsv $HOME/kit-src'
 ```
    It writes only after `check-installed-kit.sh` says `HASH-OK`, and prints `kit-manifest: <n> files -> …`. Anything else is a STOP.
-7. **Copy the harness out of the kit source** (as e2e). The harness (`refs/e2e-test-plan`) holds no kit script: `su - e2e -c '[ ! -e ~/harness-v3 ] || mv ~/harness-v3 ~/harness-v3.old-$(TZ=Asia/Manila date +%m%d-%H%M); cp -a ~/kit-src/refs/e2e-test-plan ~/harness-v3; git -C ~/kit-src rev-parse --short=12 HEAD > ~/harness-v3/HARNESS-FROM'`. The run starts from `$HV` (§6).
+7. **Copy the harness out of the kit source, owned by root** (as root; kitfix-20261031-harness-lock). The harness (`refs/e2e-test-plan`) holds no kit script. The runner and the agent both run as e2e, so a harness copy e2e owns could be edited by the agent (for example `fixtures/approvals.tsv`, `scripts/agy-ws-exec.sh` or `scripts/lib.sh`) and would take effect at the next turn or launch. So the copy goes to `/opt/harness-v3`, owned by root and not writable by e2e; e2e can still read and run it:
+```
+vm.py run 'set -eu; HV=/opt/harness-v3; [ ! -e $HV ] || mv $HV $HV.old-$(TZ=Asia/Manila date +%m%d-%H%M)
+  cp -r /home/e2e/kit-src/refs/e2e-test-plan $HV; git -C /home/e2e/kit-src rev-parse --short=12 HEAD > $HV/HARNESS-FROM
+  chown -R root:root $HV; chmod -R go-w,a+rX $HV; ls -ld /opt $HV $HV/scripts
+  su - e2e -c "test ! -w /opt/harness-v3/scripts/lib.sh && test ! -w /opt/harness-v3/fixtures && echo HARNESS-RO"'
+```
+   It must print `HARNESS-RO`. `/opt` must be owned by root and not writable by e2e (the default), so e2e cannot rename the copy away and put its own in its place. Old copies stay as `/opt/harness-v3.old-<time>` (nothing is deleted). The run starts from `$HV` (§6). The harness process itself still runs as e2e, not as root with the agent under `runuser -u e2e`: a root runner would run agent-written code (`./mvnw verify`, the kit scripts, `npm`) as root and leave root-owned files in the project, which needs its own audit and a VM test first (follow-up). So the runtime state under `$T` (`status/`, `results/`, `evidence/`, `run-*/`) stays writable by e2e; see the limits in §5.
 8. **Lock the kit source (as root).** Move every kit copy e2e could read into `$L` (mode 700, owned by root). Moving keeps everything and deletes nothing, and e2e cannot `chmod` it back:
 ```
 vm.py run 'set -eu; T=/home/e2e/agents-v0-e2e/run-20261029-1629; L=/root/kit-locked/$(TZ=Asia/Manila date +%Y%m%d-%H%M); install -d -m 700 -o root -g root /root/kit-locked "$L"
@@ -96,7 +103,7 @@ vm.py run 'set -eu; T=/home/e2e/agents-v0-e2e/run-20261029-1629; L=/root/kit-loc
    - **Anything that writes into the project** (install, update), so the files stay e2e's:
      1. stop the run (`HALT`, wait for `HALTED`);
      2. as root, move `$L/kit-src` back to `/home/e2e/kit-src`;
-     3. as e2e, do steps 2–7 again;
+     3. as e2e, do steps 2–6 again, and step 7 as root;
      4. as root, lock again (step 8);
      5. launch again. The preflight refuses if a copy is left readable.
    - **Never** give e2e read access to the locked folder while an agent can run.
@@ -109,14 +116,14 @@ export KIT_URL=$HOME/kit-src KIT_REF=<KITSHA>
 export RUN_ID=20261029-1629 TEST_ROOT=/home/e2e/agents-v0-e2e/run-20261029-1629
 export RESUME_FROM=4 RESUME_REASON=harness-fix CHAIN_RESUME_FROM_STORY=<ID>
 export CHAIN_RESUME_IN_STORY=0          # not an in-story resume: the story starts at intake on the new kit
-export MAX_RESUMES_TOTAL=<counted rows of results/fix-attempts.tsv, without kit-update rows, + 1>
+export MAX_RESUMES_TOTAL=<counted rows of results/fix-attempts.tsv, without kit-update and REFUSED rows, + 1>
 export AGENT_TZ=Asia/Manila
 # fail modes for V3 (item 3, Marlon 2026-10-31): mismatches fail the story instead of being findings
 export H6_MODE=fail
 export KIT_TRACE_MODE=fail          # the harness writes trace_mode=fail into .agents-v0/policy.conf (main + worktrees)
 export REQUIRE_FAIL_MODES=1         # refuse to start unless every mode is fail, the kit source is locked and main matches the manifest
 export KIT_MANIFEST=/home/e2e/agents-v0-e2e/run-20261029-1629/results/kit-manifest-<ID>.tsv   # §4 step 6
-export AGENT_USER=e2e               # the user the agent runs as; the lock is tested as that user
+export AGENT_USER=e2e               # the user the agent runs as; the lock and the harness lock are tested as that user
 # H7/H8/H9/H10 already default to fail; do not set H7_MODE/H8_MODE/H9_MODE/H10_MODE=warn
 # do NOT set AGENTS_V0_TRACE_MODE: installed scripts ignore it, and the preflight refuses it
 export CHAIN_RESUME_NOTE="V3 rerun of <ID> on kit <KITSHA short> after a main-only kit update, approved by mdurana <date time>"
@@ -132,6 +139,12 @@ export CHAIN_RESUME_NOTE="V3 rerun of <ID> on kit <KITSHA short> after a main-on
   **Scan roots:** `KIT_SCAN_ROOTS` (default `$HOME $TEST_ROOT /tmp`, i.e. `/home/e2e`, `$T` and `/tmp`). Set it only to add places (keep the defaults in the list), never to skip one. Set `KIT_SOURCE_PATHS` the same way. The scan is cheap: one `find` per root for each kind (build folders such as `node_modules`, `.m2`, `target` and `.npm` are skipped; at most 50 bundles and 500 git dirs), and two git calls per repository.
   
   With `KIT_MANIFEST` set, main and every worktree are compared with the manifest (`kit_installed_ok`), so the run needs no kit source. `KIT_URL` stays in the file for the record only. The run checks out no kit (`harness-fix`, not `kit-fix`).
+- **Harness lock (kitfix-20261031-harness-lock):** with `REQUIRE_FAIL_MODES=1` (or `HARNESS_LOCK=1` on its own), the preflight (`harness_locked`) refuses unless `AGENT_USER` can write no file or folder in the harness (`$PLAN_DIR`, i.e. `/opt/harness-v3`: `scripts/`, `fixtures/`, the turn wrapper and the allowlist code) and no parent folder up to `/` lets that user rename it away (`HARNESS WRITABLE by e2e: …` or `HARNESS REPLACEABLE by e2e: …`). When clean, the log has `HARNESS ok /opt/harness-v3 (owner root, not writable or replaceable by e2e)`. `HARNESS_LOCK_PATHS` replaces the folders checked (tests only; never set it in a launch env). On top of that:
+  - the runner hashes `scripts/` and `fixtures/` before and after every turn; any change is a `FINDING H10` and a `kit-tamper.txt` line;
+  - the turn wrapper (`agy-ws-exec.sh`) refuses a command when `status/pending-turn.json` holds a different allowlist from the one the turn loop started agy with, and `agy-ipc-turn.sh` records any change to that file during a turn (`run-<k>/pending-tamper-<k>.txt`, also H10);
+  - in unattended mode the hooks block agent writes to the harness (`/opt/harness-v3`, `~/harness-v3`, `$PLAN_DIR`), to `$T` outside `work/` (status and control files, results, evidence, run folders), and any setting or unsetting of `AGY_ALLOW_TOOLS` or `CURSOR_CONFIG_DIR` (a speed bump: the hooks only see commands they can parse).
+- **Limits of the harness lock:** the runtime state under `$T` (outside `work/`) is still writable by e2e, because the runner is e2e. An agent that gets past the hooks could still fake a turn reply (`run-*/turn-<k>.done` and its response), edit `results/` or `status/` files, or forge evidence. H10 and the hashes catch changes to the harness itself and to the control file, not those. Closing that needs the runner as root with the agent under `runuser -u e2e` (follow-up, see step 7).
+- **A refused launch is not counted (kitfix-20261031-preflight-first):** the modes, lock, harness-lock and manifest checks now run first (`MODES-EARLY … OK` in `progress.log`), before any resume bookkeeping. A launch they refuse writes no `fix-attempts.tsv` row, archives nothing and creates no `attempt-<n>` folder, so you can fix the env file and launch again without raising `MAX_RESUMES_TOTAL`. If a later check still refuses after the row was written, that row is marked `REFUSED` (column 6) and is not counted.
 - `kit-fix` is refused for a story resume, which is why the kit was updated by hand in §4 and the reason here is `harness-fix`, as in resume 7 of the old run.
 - Segment 2 (P2-A) only: start the launch so P2-A's approval turns cross 00:00 Asia/Manila, about 23:15.
 - Check the file (`grep -n '^export' <file>`): exactly one line for each name above, no secret.
@@ -139,14 +152,15 @@ export CHAIN_RESUME_NOTE="V3 rerun of <ID> on kit <KITSHA short> after a main-on
 ## 6. Launch, and stop after the story
 
 ```
-vm.py run "su - e2e -c 'cd ~/harness-v3 && set -a && . ~/.config/e2e-secrets.env && set +a && bash scripts/start-tmux.sh ~/launch-v3-<id>.env'"
+vm.py run "su - e2e -c 'cd /opt/harness-v3 && set -a && . ~/.config/e2e-secrets.env && set +a && bash scripts/start-tmux.sh ~/launch-v3-<id>.env'"
 ```
 Within 3 minutes, check (read-only):
 - `progress.log` has `RESUME attempt … reason=harness-fix`, `RESUME-FROM-STORY … <ID>`, `CHAIN-SKIP` for every story before `<ID>`, `STORY step 4 story <ID>`, then `TURN-START run=S4-<slug>-intake-1`;
-- **the modes were verified before anything ran:** `progress.log` has `MODES H6=fail H7=fail H8=fail H9=fail H10=fail trace=fail require_fail=1 lock=checked OK` before `RUN-START`. `results/modes-preflight.log` must have:
+- **the modes were verified before anything ran:** `progress.log` has `MODES-EARLY … OK (before any resume bookkeeping)` before the `RESUME attempt` line, and `MODES H6=fail H7=fail H8=fail H9=fail H10=fail trace=fail require_fail=1 lock=checked OK` before `RUN-START`. `results/modes-preflight.log` must have:
   - a `LOCK ok …` or `LOCK absent …` line for every kit source path;
   - `LOCK scan ok: …` and `LOCK git scan ok: …` (no `LOCK READABLE …` line);
-  - an `OK portal: MANIFEST-OK files=<n> trace_mode=fail kit=<KITSHA short> …` line for main, and one for any kept worktree. If the preflight refused, the run stopped with exit 3 and `STOP modes refused …` in `results/stop.txt`: read `modes-preflight.log`, fix the env file or the install, and launch again. Do not lower a mode;
+  - `HARNESS ok /opt/harness-v3 (owner root, not writable or replaceable by e2e)` (no `HARNESS WRITABLE` or `HARNESS REPLACEABLE` line);
+  - an `OK portal: MANIFEST-OK files=<n> trace_mode=fail kit=<KITSHA short> …` line for main, and one for any kept worktree. If the preflight refused, the run stopped with exit 3 and `STOP modes refused …` in `results/stop.txt`: read `modes-preflight.log`, fix the env file, the install or the harness copy, and launch again (the refused launch counted nothing). Do not lower a mode;
 - `POLICY trace_mode=fail in portal (…)` in `progress.log` at the first launch (later launches find the file already set), and `cat $MAIN/.agents-v0/policy.conf` shows `trace_mode=fail`. The summary's Limits line shows the modes at the end of the run.
 
 **Stop after the story.** The chain goes on to the next story after `<ID>`. The harness has no per-story stop; follow-up: a `CHAIN_STOP_AFTER_STORY` flag. It does check for a `HALT` file before every story and between runs. So for segments 1-3, start a watcher. It writes `HALT` only after `<ID>` has passed every check and its END snapshot is saved (line ` SNAPSHOT S4-<ID>-END `, posted after H1-H10), so `<ID>` itself is never cut short. Before the launch, record where the log ends: `wc -l < $T/status/progress.log > $T/status/v3-start-line`. Save this as `/home/e2e/v3-stop-after.sh` (no secrets):
@@ -171,11 +185,11 @@ Do not kill the runner or agy yourself. A USAGE or AUTH HALT, a refusal (exit 3,
 - No `SEMI-SYNTHETIC` build label, no `GATE-COMMIT-MISSING`, no `GATE-CHAIN-BROKEN`, no `kit-tamper.txt`, and no `FINDING H6`/`H8`/`H9`/`H10`. No `TRACE WARN`: in fail mode a traceability gap refuses the approval, so a refusal the agent then fixed is fine if it is explained.
 - `check-release-evidence.sh` for `<ID>` prints `OK` with no `WARN: feature/… not found`. `feature/<slug>` exists after the release and is never deleted.
 - P2-A: the phase dates survive the midnight crossing, and `/v0-design` before the branch step is refused by the branch guard.
-- `results/v3-kit-hash-<ID>.txt` says `HASH-OK`, `results/kit-manifest-<ID>.tsv` exists, and `modes-preflight.log` shows the lock (`LOCK ok`/`LOCK absent`, `LOCK scan ok`, `LOCK git scan ok`) and `MANIFEST-OK`. The README Validity block lists DEGRADED only for `container` (no Docker), and it lists the kits of the kept stories (expected: see the caveat).
+- `results/v3-kit-hash-<ID>.txt` says `HASH-OK`, `results/kit-manifest-<ID>.tsv` exists, and `modes-preflight.log` shows the lock (`LOCK ok`/`LOCK absent`, `LOCK scan ok`, `LOCK git scan ok`), `HARNESS ok` and `MANIFEST-OK`. The README Validity block lists DEGRADED only for `container` (no Docker), and it lists the kits of the kept stories (expected: see the caveat).
 
 ## 8. After each segment, and at the end
 
 - Copy `$T/results/`, `$T/evidence/S4-<slug>-*`, `$T/status/progress.log`, `/root/memlog-v3.tsv` and the kit-hash file to the box under `/workspace/kit-eval/v3-<date>/<ID>/`.
-- Before §3 of the next segment, as root, move `$L/<time>/kit-src` back to `/home/e2e/kit-src` (owner e2e: `chown -R e2e:e2e`), and the archive `run-20261029-1629.tar.zst` back to `/home/e2e/`. §3 and §4 need them. Step 8 locks them again before the launch. Then go to §3 for the next segment.
+- Before §3 of the next segment, as root, move `$L/<time>/kit-src` back to `/home/e2e/kit-src` (owner e2e: `chown -R e2e:e2e`), and the archive `run-20261029-1629.tar.zst` back to `/home/e2e/`. §3 and §4 need them. Then go to §3 for the next segment, and do §4 steps 2–8 again: step 7 makes a fresh root-owned `/opt/harness-v3` from the kit source of that segment (the old copy is renamed, not deleted), and step 8 locks the kit source again before the launch.
 - Report to Marlon for each story: PASS/FAIL per check, the kit and harness commit, the start snapshot, the turns and time, any finding, and the trash paths. Repeat the caveat: four stories on the new kit, not a single-version result.
 - After a clean V3, the planned follow-ups are: make `CHAIN_RESUME_IN_STORY=1` the default, keep the fail modes, add `CHAIN_STOP_AFTER_STORY`, and fast-forward `e2eplan-20261029` (only with Marlon's go-ahead; never force-push). Archive, sign out and delete the VM only with his go-ahead, in that order, as on 2026-10-30.

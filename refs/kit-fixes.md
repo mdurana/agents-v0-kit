@@ -220,3 +220,29 @@ Limits:
 - **Network remotes.** A remote already configured in the project is trusted; an `https` remote pointing at the public kit would be fetched. The V3 project's only remote is its own origin.
 - **Unknown kit lineages.** A kit repository whose root is not in `KIT_ROOT_COMMITS` and whose tips do not hold `templates/` is not recognised.
 - **Git history.** As before, the project's own history still holds kit scripts installed before `kitfix-20261031-installed-no-overrides`; a raw blob id is not recognised.
+
+## kitfix-20261031-escalation
+
+Found by the Sonnet review of `af258c7` (finding 3; approved by Marlon, 2026-10-31 12:56 Asia/Manila). Verified first: at `af258c7`, unattended, `env sudo …`, `xargs sudo …`, `command sudo …`, `nohup sudo …`, `\sudo …` and `/usr/bin/sudo …` passed the hook (only a bare `sudo` or `doas` in command position was blocked), and `su -c id`, `su root` and `pkexec id` were allowed.
+
+- `core/common/hooks/hook-policy.py`:
+  - The existing wrapper unwrapping (`_expand_wrapper`) now records every escalator it sees in command position, after stripping a leading `\` and any path (`\sudo`, `/usr/bin/sudo`). It also unwraps `doas`, `setsid`, `ionice`, `run0` and `pkexec`, and skips `xargs` options and their arguments (`xargs -n1 sudo rm`).
+  - **All modes:** `sudo`, `doas` and `run0` in any of those spellings are blocked (attended and unattended), as bare `sudo` was before.
+  - **Unattended only:** `su` and `pkexec` are blocked in any spelling (`env su root`, `nohup pkexec id`). Attended, they are allowed as before. Neither the kit nor the harness needs them from the agent: the V3 procedure's `su - e2e` runs as root from `vm.py`, outside any agent turn.
+  - Text that only mentions them is unchanged (`git commit -m 'sudo fix'` asks, as before).
+- **Tests:** in `scripts/test-hook-policy.py` (now 542 cases, up from 471, shared with the harness lock below), 15 escalation spellings are each checked attended and unattended, plus attended cases that stay unchanged. `scripts/test-hooks.sh` adds end-to-end probes through `pre-shell.sh` (Cursor and Antigravity payloads, sh and dash): 7 `sudo`/`doas` spellings blocked in both modes, and `su`, `pkexec` and `env su root` blocked unattended and allowed attended.
+- **Mutation check:** with the escalator recording off, test-hook-policy has 33 FAIL lines and test-hooks 40 failed probe lines.
+- **Limits:** a speed bump, as before. An encoded command, a function or alias defined earlier, or a copy of the binary under another name can get past it. The fence is the OS: the agent user must have no sudo, doas or polkit rights on the VM (the preflight does not check this; follow-up).
+
+## kitfix-20261031-harness-lock (hook part)
+
+Found by the same review (finding 2c). The hook now protects the harness and its control files as a speed bump; the real fence is the harness lock in `refs/e2e-test-plan/HARNESS-FIXES-20261029.md` (2026-10-31 12:56).
+
+- `core/common/hooks/hook-policy.py`, **unattended mode only** (attended is unchanged):
+  - **Harness paths:** any `harness-v3` folder (`/opt/harness-v3`, `~/harness-v3`), `refs/e2e-test-plan/{scripts,fixtures,tests}`, `$PLAN_DIR`, the run root `agents-v0-e2e/run-*` (and `$TEST_ROOT`) outside its `work/` folder (so `status/pending-turn.json` and the other control files, `results/`, `evidence/`, `run-*/`), and the `agents-v0-e2e` folder itself. Paths are expanded (`$TEST_ROOT`, `~`) and resolved against the hook's working directory, so `../../status/pending-turn.json` and `cd ../.. && rm …` are caught.
+  - **Blocked:** writes to those paths by the shell rules the kit-file protection already uses (redirects, `tee`, `sed -i`, `cp`/`mv`/`rm`/`install`/`ln`/`chmod`, `find -delete`/`-exec`, …), a `python`/`node` heredoc that writes one, and the edit tool on one (`classify_path`).
+  - **Blocked:** setting or unsetting `AGY_ALLOW_TOOLS` or `CURSOR_CONFIG_DIR` (`export`, a prefix assignment, `env VAR=…`, `env -u`, `unset`).
+  - **Still allowed:** reading those files, and anything under `$TEST_ROOT/work` (the project).
+- **Tests:** in `scripts/test-hook-policy.py`, 25 unattended blocks, 7 unattended allows and 4 path cases; `scripts/test-hooks.sh` probes 4 harness and control-file writes (blocked), a read of the pending file and an attended write (allowed), and a `pre-edit.sh` edit of a harness script (blocked).
+- **Mutation check:** with `_segment_changes_harness` and the path rule off, test-hook-policy has 14 FAIL lines and test-hooks 14 failed probe lines; with the `AGY_ALLOW_TOOLS`/`CURSOR_CONFIG_DIR` rule off, test-hook-policy has 5.
+- **Limits:** text matching only (an encoded command or a script file written in `work/` and then run can get past it). The OS lock (root-owned `/opt/harness-v3`) is what keeps the harness code safe; the runtime state outside `work/` is protected only by this hook and by the H10 checks, because the runner runs as the same user as the agent.

@@ -200,6 +200,22 @@ for c in 'git status' 'git fetch origin' 'git pull --ff-only origin main' 'git l
   ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" allow && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" allow ) || fail=1
 done
 ( cd "$scratch/kp" && shell_case "git fetch $scratch/kit.bundle main" allow ) || fail=1   # attended: unchanged
+# kitfix-20261031-escalation: sudo/doas behind a wrapper are blocked in every mode; su/pkexec unattended.
+for c in 'env sudo ls' 'xargs -n1 sudo rm' 'command sudo id' 'nohup sudo id' '\sudo id' '/usr/bin/sudo id' 'env doas id'; do
+  ( cd "$scratch/kp" && shell_case "$c" block && agy_shell_case "$c" block ) || fail=1
+done
+for c in 'su -c id' 'pkexec id' 'env su root'; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" block && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" block && shell_case "$c" allow ) || fail=1
+done
+# kitfix-20261031-harness-lock: unattended, the harness and the run root's control files are not the agent's to change.
+hr="$scratch/agents-v0-e2e/run-1"; mkdir -p "$hr/status" "$hr/work" "$scratch/hv/scripts"; echo '{}' > "$hr/status/pending-turn.json"
+for c in "echo x > $hr/status/pending-turn.json" "sed -i s/a/b/ $scratch/hv/scripts/lib.sh" "rm -f \$TEST_ROOT/results/checks.tsv" "AGY_ALLOW_TOOLS=x bash y.sh"; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "$c" block \
+      && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" agy_shell_case "$c" block ) || fail=1
+done
+( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "cat $hr/status/pending-turn.json" allow ) || fail=1
+( cd "$scratch/kp" && TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "echo x > $hr/status/pending-turn.json" allow ) || fail=1   # attended: unchanged
+( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" run_hook pre-edit.sh cursor "{\"file_path\":$(json_str "$scratch/hv/scripts/lib.sh")}" block "edit of a harness script" ) || fail=1
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then

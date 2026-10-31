@@ -19,7 +19,8 @@ CWD = ""
 
 
 def _run(mode: str, env_extra: dict, cwd: str = "") -> str:
-    env = {k: v for k, v in os.environ.items() if k not in ("HOOK_CWD", "AGY_ALLOW_TOOLS")}
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("HOOK_CWD", "AGY_ALLOW_TOOLS", "TEST_ROOT", "PLAN_DIR", "CURSOR_CONFIG_DIR")}
     env.update(env_extra)
     out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
     return json.loads(out)["action"]
@@ -666,6 +667,66 @@ def root_commit_case(tmp: str) -> list:
     return out
 
 
+def harness_escalation_cases(tmp: str) -> list:
+    """kitfix-20261031-harness-lock and kitfix-20261031-escalation (Sonnet review 12:31, findings 2 and 3)."""
+    tr = os.path.join(tmp, "agents-v0-e2e", "run-1")
+    hv = os.path.join(tmp, "opt", "harness-v3")
+    proj = os.path.join(tr, "work", "portal")
+    for d in (os.path.join(tr, "status"), os.path.join(tr, "results"), os.path.join(hv, "scripts"),
+              os.path.join(hv, "fixtures"), os.path.join(tr, "work", "portal-feat")):
+        os.makedirs(d, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True, capture_output=True)
+    pend = os.path.join(tr, "status", "pending-turn.json")
+    with open(pend, "w", encoding="utf-8") as fh:
+        fh.write('{"allow": "Shell(git:commit*)"}\n')
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)", "TEST_ROOT": tr, "PLAN_DIR": hv}
+    A = {"TEST_ROOT": tr, "PLAN_DIR": hv}
+    c = []
+    def add(kind, arg, env, want, label):
+        c.append((kind, arg, proj, env, want, label))
+    for cmd, label in [
+            (f"echo x > {pend}", "write the allowlist file"), ("echo x > ../../status/pending-turn.json", "relative write"),
+            ("cd ../.. && rm -f status/pending-turn.json", "cd then rm"), ("echo x > $TEST_ROOT/results/checks.tsv", "$TEST_ROOT write"),
+            (f"tee -a {tr}/results/checks.tsv < /dev/null", "tee results"), (f"mv {tr}/results /tmp/r", "mv results"),
+            ("sed -i s/a/b/ /home/e2e/harness-v3/scripts/agy-ws-exec.sh", "sed -i a harness-v3 script"),
+            ("cp /tmp/x ~/harness-v3/fixtures/approvals.tsv", "cp onto approvals.tsv"),
+            ("rm -rf $PLAN_DIR/scripts", "rm the plan scripts"), (f"chmod -R u+w {hv}", "chmod the harness"),
+            (f"ln -sf /tmp/evil {hv}/scripts/lib.sh", "ln onto a harness script"),
+            (f"find {tr}/status -name '*.json' -delete", "find -delete in status"),
+            (f"python3 -c \"open('{pend}','w').write('x')\"", "python write"),
+            (f"python3 - <<'PY'\nopen('{pend}','w').write('x')\nPY", "python heredoc write"),
+            ("AGY_ALLOW_TOOLS='Shell(*)' bash /opt/harness-v3/scripts/agy-ws-exec.sh 'rm -rf x'", "set AGY_ALLOW_TOOLS"),
+            ("export AGY_ALLOW_TOOLS=x", "export AGY_ALLOW_TOOLS"), ("env -u AGY_ALLOW_TOOLS bash y.sh", "env -u AGY_ALLOW_TOOLS"),
+            ("unset CURSOR_CONFIG_DIR", "unset CURSOR_CONFIG_DIR"), ("CURSOR_CONFIG_DIR=/tmp/c agent -p x", "set CURSOR_CONFIG_DIR"),
+            ("su -c id", "su"), ("su - e2e", "su -"), ("env su root", "env su"), ("pkexec id", "pkexec"),
+            ("nohup pkexec id", "nohup pkexec")]:
+        add("shell", cmd, U, "block", "unattended " + label)
+    for cmd, label in [
+            ("echo ok > notes.txt", "own checkout"), (f"cat {pend}", "read the allowlist file"),
+            (f"ls {tr}/results", "list results"), ("git status", "git status"),
+            ("echo x > ../portal-feat/notes.txt", "a sibling worktree under work/"), ("echo su", "echo su"),
+            ("grep -rn pkexec docs", "grep pkexec")]:
+        add("shell", cmd, U, "allow", "unattended " + label)
+    for cmd, label in [
+            ("env sudo ls", "env sudo"), ("xargs sudo rm", "xargs sudo"), ("xargs -n1 sudo rm", "xargs -n1 sudo"),
+            ("command sudo id", "command sudo"), ("nohup sudo id", "nohup sudo"), ("\\sudo id", "backslash sudo"),
+            ("/usr/bin/sudo id", "/usr/bin/sudo"), ("time sudo id", "time sudo"), ("setsid sudo id", "setsid sudo"),
+            ("nice -n 5 sudo id", "nice sudo"), ("timeout 5 sudo id", "timeout sudo"), ("env doas id", "env doas"),
+            ("bash -c \"nohup doas id\"", "bash -c nohup doas"), ("echo $(sudo id)", "$(sudo)"), ("run0 id", "run0")]:
+        add("shell", cmd, A, "block", "all modes " + label)
+        add("shell", cmd, U, "block", "unattended " + label)
+    for cmd, label in [
+            ("su -c id", "su (unchanged)"), ("pkexec id", "pkexec (unchanged)"), ("grep sudo README.md", "grep sudo"),
+            ("git commit -m 'sudo fix'", "a commit message"), (f"echo x > {pend}", "allowlist file (unchanged)"),
+            ("sed -i s/a/b/ /home/e2e/harness-v3/scripts/x.sh", "harness-v3 (unchanged)")]:
+        add("shell", cmd, A, "allow" if "commit" not in cmd else "ask", "attended " + label)
+    add("path", pend, U, "block", "unattended edit of the allowlist file")
+    add("path", os.path.join(hv, "scripts", "lib.sh"), U, "block", "unattended edit of a harness script")
+    add("path", os.path.join(proj, "notes.md"), U, "allow", "unattended edit in the checkout")
+    add("path", pend, A, "allow", "attended edit (unchanged)")
+    return c
+
+
 def main() -> int:
     global CWD
     fail = 0
@@ -711,9 +772,17 @@ def main() -> int:
     rcases = root_commit_case(ktmp)
     for label, got, want in rcases:
         check(str(got), str(want), f"kit-git root commit: {label}")
+    htmp = os.path.join(tmp, "harness")
+    os.makedirs(htmp)
+    hcases = harness_escalation_cases(htmp)
+    for kind, arg, cwd, env, want, label in hcases:
+        e = dict(env)
+        e["HOOK_CWD"] = cwd
+        got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
+        check(got, want, f"harness/escalation {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases) + len(hcases)
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

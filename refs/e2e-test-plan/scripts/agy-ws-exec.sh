@@ -25,6 +25,16 @@ PENDING="$TR/status/pending-turn.json"
 WS="$(jq -r .workspace "$PENDING")"
 ALLOW="$(jq -r .allow "$PENDING")"
 [ -n "$WS_OVERRIDE" ] && WS="$WS_OVERRIDE"
+# kitfix-20261031-harness-lock (Sonnet review 12:31, finding 2): pending-turn.json is in the run root, which the agent's
+#   OS user can write. agy-turn-loop.sh starts each agy turn with the request's allowlist in AGY_ALLOW_TOOLS, and every
+#   command agy runs inherits it, so a file that no longer matches it was changed during the turn: refuse. (The hooks
+#   block an agent command that sets or unsets AGY_ALLOW_TOOLS; this is a speed bump, the procedure is the fence.)
+if [ -n "${AGY_ALLOW_TOOLS+x}" ] && [ "$AGY_ALLOW_TOOLS" != "$ALLOW" ]; then
+  printf '%s allowlist mismatch: env=%s file=%s cmd=%s\n' "$(TZ=Asia/Manila date '+%F %T')" "$AGY_ALLOW_TOOLS" "$ALLOW" "$*" \
+    >> "$TR/agy-driver/ws-exec-denied.log" 2>/dev/null || :
+  echo "HOOK DENIED (allowlist mismatch): status/pending-turn.json does not match the allowlist this turn started with" >&2
+  exit 2
+fi
 
 CMD="$*"
 [ -n "$CMD" ] || { echo "error: command required" >&2; exit 2; }

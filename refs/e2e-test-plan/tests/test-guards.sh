@@ -9,6 +9,9 @@
 #   kit_source_locked / kit_installed_ok / kit-manifest.sh (kitfix-20261031-kit-source-lock): the agent user cannot read
 #      (kitfix-20261031-kit-git-source: nor any *.bundle or kit git repository)
 #      the kit source, and the installed kit is checked against a manifest written before the lock.
+#   harness_locked / harness_integrity_check / agy-ws-exec.sh / agy-ipc-turn.sh (kitfix-20261031-harness-lock): the
+#      agent user cannot write or replace the harness, and a changed harness or allowlist file is caught.
+#   run-plan.sh `modes_preflight early` (kitfix-20261031-preflight-first): a refused launch counts no resume.
 # Usage: bash tests/test-guards.sh   (exit 0 when every case passes)
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,6 +19,7 @@ SB="$(mktemp -d)"; trap 'chmod -R u+rwx "$SB" 2>/dev/null; rm -rf "$SB"' EXIT
 PASS=0; FAILN=0
 ok(){ echo "  PASS $*"; PASS=$((PASS+1)); }; ko(){ echo "  FAIL $*"; FAILN=$((FAILN+1)); }
 TEST_ROOT="$SB/root"; STATUS_LOG="$TEST_ROOT/status/progress.log"; mkdir -p "$TEST_ROOT/status"
+HARNESS_LOCK_PATHS=/usr/bin   # stands in for the root-owned /opt/harness-v3 (this box user cannot write it)
 PLAN_DIR="$HERE"; MAX_TURNS=30 MAX_ANSWERS=3 MAX_RETRY_INFRA=1 INFRA_BACKOFF=0 TURN_PAUSE_SEC=0 RUN_TIMEOUT=600 RUN_TIMEOUT_P0A=600
 MAX_RUNS_PER_STORY=8 HEARTBEAT_SEC=99999 P0A_SLUG=p0-a-platform-skeleton KIT_REF=test KIT_LABEL=test
 . "$HERE/scripts/lib.sh"
@@ -190,10 +194,71 @@ mv "$SB/scan/rooted" "$SB/trash2/"
 grep -q '^KIT_ROOT_COMMITS=.*550da9df6dcfb46995d5af2adced25e21d372bd9.*fc4b642cb947cf38b5fea7cc1005e22d58e17eef' "$HERE/scripts/lib.sh" \
   && grep -q 'KIT_ROOT_COMMITS = ("550da9df6dcfb46995d5af2adced25e21d372bd9", "fc4b642cb947cf38b5fea7cc1005e22d58e17eef")' "$KIT/core/common/hooks/hook-policy.py" \
   && ok "harness and hook list the same kit root commits" || ko "root commit lists differ"
+echo "-- harness lock (kitfix-20261031-harness-lock)"
+HC="$SB/hcopy"; mkdir -p "$HC"; cp -a "$HERE/scripts" "$HERE/fixtures" "$HC/"
+harness_locked > "$SB/hl.log" 2>&1 && grep -q '^HARNESS ok /usr/bin' "$SB/hl.log" && ok "a harness the agent user cannot write or move passes" || ko "root-owned harness: $(cat "$SB/hl.log")"
+( HARNESS_LOCK_PATHS="$HC"; harness_locked ) > "$SB/hl.log" 2>&1 && ko "a writable harness passed" \
+  || { grep -q "^HARNESS WRITABLE by $(id -un): $HC" "$SB/hl.log" && ok "preflight refuses a harness the agent user can write" || ko "writable text: $(cat "$SB/hl.log")"; }
+chmod -R a-w "$HC"
+( HARNESS_LOCK_PATHS="$HC"; harness_locked ) > "$SB/hl.log" 2>&1 && ko "a read-only harness in a writable folder passed" \
+  || { grep -q "^HARNESS REPLACEABLE by $(id -un): $SB is writable" "$SB/hl.log" && ! grep -q WRITABLE "$SB/hl.log" && ok "preflight refuses a read-only harness the agent user could move aside" || ko "replaceable text: $(cat "$SB/hl.log")"; }
+chmod -R u+w "$HC"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail HARNESS_LOCK_PATHS="$HC"; modes_preflight ) && ko "preflight passed with a writable harness" \
+  || { grep -q '^HARNESS WRITABLE' "$RES/modes-preflight.log" && ok "REQUIRE_FAIL_MODES=1 runs the harness lock" || ko "preflight hl: $(cat "$RES/modes-preflight.log")"; }
+( HARNESS_LOCK=1 HARNESS_LOCK_PATHS="$HC"; unset REQUIRE_FAIL_MODES; modes_preflight ) && ko "HARNESS_LOCK=1 alone not checked" || ok "HARNESS_LOCK=1 checks the harness lock without the fail modes"
+( AGENT_USER=nobody-such-user; harness_locked ) > "$SB/hl.log" 2>&1 && ko "harness lock passed for an agent user it cannot test" \
+  || { grep -q '^HARNESS cannot test as nobody-such-user' "$SB/hl.log" && ok "harness lock refuses an agent user it cannot test" || ko "untestable: $(cat "$SB/hl.log")"; }
+# H10 detector: a harness file or the allowlist file changed during a turn
+RUN="$EVID/S4-s1-harness-1"; mkdir -p "$RUN"; k=1
+( PLAN_DIR="$HC"; harness_integrity > "$RUN/harness-integrity-before-$k.tsv"; harness_integrity_check $k ); [ ! -e "$RUN/kit-tamper.txt" ] && ok "an unchanged harness is not a finding" || ko "false harness tamper"
+( PLAN_DIR="$HC"; harness_integrity > "$RUN/harness-integrity-before-$k.tsv"; printf 'x\ty\n' >> "$HC/fixtures/approvals.tsv"; harness_integrity_check $k )
+grep -q '^turn-1 changed harness fixtures/approvals.tsv' "$RUN/kit-tamper.txt" 2>/dev/null && grep -q 'FINDING H10 .*changed the harness' "$STATUS_LOG" && ok "a fixture changed during a turn is an H10 finding" || ko "harness tamper: $(cat "$RUN/kit-tamper.txt" 2>/dev/null)"
+RUN="$EVID/S4-s1-harness-2"; mkdir -p "$RUN"; echo "harness status/pending-turn.json changed during turn 1 (sha a, written b)" > "$RUN/pending-tamper-1.txt"
+( PLAN_DIR="$HC"; harness_integrity > "$RUN/harness-integrity-before-1.tsv"; harness_integrity_check 1 )
+grep -q '^turn-1 harness status/pending-turn.json changed' "$RUN/kit-tamper.txt" 2>/dev/null && ok "a changed allowlist file is an H10 finding" || ko "pending tamper not reported"
+grep -q 'harness_integrity_check "$k"' "$HERE/scripts/lib.sh" && grep -q 'harness_integrity > "$RUN/harness-integrity-before-$k.tsv"' "$HERE/scripts/lib.sh" && ok "run_turn checks the harness before and after every turn" || ko "harness integrity not wired"
+# agy-ipc-turn.sh records a pending-turn.json changed during the turn; agy-ws-exec.sh refuses a file that differs from the turn's allowlist
+IR="$SB/ipc"; mkdir -p "$IR/status" "$IR/evidence/S4-x-1" "$IR/ws" "$IR/agy-driver"; IRUN="$IR/evidence/S4-x-1"
+( TEST_ROOT="$IR" bash "$HERE/scripts/agy-ipc-turn.sh" chat "$IR/ws" m "hello" 'Shell(git:commit*)' "$IRUN" 1 > /dev/null ) & ipid=$!
+for _ in $(seq 1 50); do [ -s "$IR/status/pending-turn.json" ] && break; sleep 0.1; done
+AGY_ALLOW_TOOLS='Shell(git:commit*)' bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-ok' > "$SB/wx.out" 2>&1 && grep -q ran-ok "$SB/wx.out" && ok "the wrapper runs a command when the file matches the turn's allowlist" || ko "wrapper match: $(cat "$SB/wx.out")"
+python3 - "$IR/status/pending-turn.json" <<'PY'
+import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["allow"]="Shell(*)"; open(p,"w").write(json.dumps(d))
+PY
+AGY_ALLOW_TOOLS='Shell(git:commit*)' bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-bad' > "$SB/wx.out" 2>&1; wrc=$?
+[ "$wrc" = 2 ] && ! grep -q ran-bad "$SB/wx.out" && grep -q 'allowlist mismatch' "$IR/agy-driver/ws-exec-denied.log" && ok "the wrapper refuses a pending-turn.json whose allowlist was widened" || ko "wrapper mismatch rc=$wrc: $(cat "$SB/wx.out")"
+echo 0 > "$IRUN/turn-1.done"; wait "$ipid"
+grep -q 'pending-turn.json changed during turn 1' "$IRUN/pending-tamper-1.txt" 2>/dev/null && [ -s "$IRUN/pending-turn-1.changed.json" ] && ok "agy-ipc-turn.sh records the changed allowlist file and keeps a copy" || ko "ipc tamper not recorded"
+( TEST_ROOT="$IR" bash "$HERE/scripts/agy-ipc-turn.sh" chat "$IR/ws" m "hello" - "$IRUN" 2 > /dev/null ) & ipid=$!
+for _ in $(seq 1 50); do [ -s "$IR/status/pending-turn.json" ] && break; sleep 0.1; done; echo 0 > "$IRUN/turn-2.done"; wait "$ipid"
+[ ! -e "$IRUN/pending-tamper-2.txt" ] && ok "an untouched allowlist file is not recorded" || ko "ipc false positive"
+
+echo "-- a refused launch counts no resume (kitfix-20261031-preflight-first)"
+PR="$SB/pf-run"; mkdir -p "$PR/results" "$PR/status"; : > "$PR/results/run.meta"; : > "$PR/results/results.tsv"; : > "$PR/results/checks.tsv"
+printf '2026-10-30 10:00:00\t1\t4\tharness-fix\tk1\tFAIL\tH1\n' > "$PR/results/fix-attempts.tsv"
+launch(){ env -i HOME="$SB/pf-home" PATH=/usr/bin:/bin LANG=C.UTF-8 KIT_URL="$SB/no-such-kit" KIT_REF=test MAX_RESUMES_TOTAL=2 \
+    HARNESS_LOCK_PATHS=/usr/bin KIT_SCAN_ROOTS="$SB/pf-home" REQUIRE_FAIL_MODES=1 "$@" \
+    bash "$HERE/scripts/run-plan.sh" --resume-from 2 --test-root "$PR" --reason harness-fix > "$SB/pf.out" 2>&1; }
+mkdir -p "$SB/pf-home"
+launch KIT_TRACE_MODE=fail; r1=$?                          # refused: H6_MODE not fail
+echo bundle > "$SB/pf-home/kit.bundle"; launch H6_MODE=fail KIT_TRACE_MODE=fail; r2=$?   # refused: a readable bundle
+mv "$SB/pf-home/kit.bundle" "$SB/kit.bundle.moved"
+[ "$r1" = 3 ] && [ "$r2" = 3 ] && [ "$(grep -c . "$PR/results/fix-attempts.tsv")" = 1 ] && [ ! -e "$PR/results/attempt-2" ] \
+  && ok "two refused launches write no fix-attempts row and no attempt archive" || ko "refused launches counted (rc $r1/$r2): $(cat "$PR/results/fix-attempts.tsv")"
+launch H6_MODE=fail KIT_TRACE_MODE=fail; r3=$?
+! grep -q FIX-LIMIT "$PR/results/stop.txt" "$SB/pf.out" 2>/dev/null && [ "$(grep -c . "$PR/results/fix-attempts.tsv")" = 2 ] && grep -q 'RUN-START' "$PR/status/progress.log" \
+  && ok "the next good launch starts (no FIX-LIMIT with MAX_RESUMES_TOTAL = counted rows + 1)" || ko "good launch rc=$r3: $(tail -3 "$PR/results/stop.txt" 2>/dev/null) $(tail -2 "$SB/pf.out")"
+# a launch the full preflight refuses after the resume preparation: its row is marked REFUSED and counts nowhere
+FA="$SB/fa.tsv"; printf 'a\t1\t4\tharness-fix\tk\tFAIL\tH1\na\t2\t4\tharness-fix\tk\t\t\n' > "$FA"
+( RES="$SB/fa"; mkdir -p "$RES"; cp "$FA" "$RES/fix-attempts.tsv"; eval "$(sed -n '/^attempt_refused(){/,/; }$/p' "$HERE/scripts/run-plan.sh")"; attempt_refused
+  RESUME_STEP=4 RESUME_REASON=harness-fix; eval "$(grep -m1 '^  nfail=' "$HERE/scripts/run-plan.sh")"; eval "$(grep -m1 '^  nstep=' "$HERE/scripts/run-plan.sh")"
+  [ "$(awk -F'\t' 'NR==2{print $6}' "$RES/fix-attempts.tsv")" = REFUSED ] && [ "$nfail" = 1 ] && [ "$nstep" = 1 ] ) \
+  && ok "a row the full preflight refused is marked REFUSED and not counted" || ko "REFUSED row counted"
+
 mk='# >>> kit-test'; mk="$mk-override"
 grep -q 'kit_installed_ok "$MAIN"' "$HERE/scripts/run-plan.sh" && ! grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests" | grep -q . \
   && ok "story start uses kit_installed_ok; the harness's own *.sh files never match the marker scan" || ko "wiring/marker: $(grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests")"
-grep -q 'chk "$st" "$id" H10 ' "$HERE/scripts/run-plan.sh" && grep -q 'kit_integrity_check "$k"' "$HERE/scripts/lib.sh" && grep -q '^modes_preflight || stop_resume' "$HERE/scripts/run-plan.sh" \
+grep -q 'chk "$st" "$id" H10 ' "$HERE/scripts/run-plan.sh" && grep -q 'kit_integrity_check "$k"' "$HERE/scripts/lib.sh" && grep -q '^modes_preflight early || stop_resume' "$HERE/scripts/run-plan.sh" && grep -q '^modes_preflight || {' "$HERE/scripts/run-plan.sh" \
   && grep -q '"${H10_MODE:-fail}" = warn' "$HERE/scripts/run-plan.sh" && ok "H10 and the preflight are wired (FAIL by default)" || ko "H10 wiring"
 echo "== test-guards: $PASS passed, $FAILN failed"
 [ "$FAILN" = 0 ]

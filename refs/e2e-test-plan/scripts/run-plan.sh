@@ -486,6 +486,14 @@ chain_resume_prepare(){ local A="$1" L="$1/chain-resume-check.log" id sl ok=0 cs
 failed_checks_of(){ awk -F'\t' -v s="$1" '$2==s && $5=="FAIL"{print $3"/"$4}' "$RES/checks.tsv" | sort -u | tr '\n' ' '; }
 stop_resume(){ printf '%s Asia/Manila %s\n' "$(ts)" "$*" >> "$RES/stop.txt"; post STOP "$*"; write_summary; exit 3; }
 
+# kitfix-20261031-preflight-first (Sonnet review 12:31, finding 1): the modes, lock and harness checks run before the
+#   resume bookkeeping, so a refused launch writes no fix-attempts.tsv row, archives nothing and restores nothing.
+modes_preflight early || stop_resume "modes refused: see results/modes-preflight.log (REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-0}); nothing was counted"
+# attempt_refused: the full preflight after the resume preparation refused, so the attempt row just written is marked
+#   REFUSED and no limit counts it (nfail, nstep, nfix and the no-progress rule skip REFUSED rows).
+attempt_refused(){ [ -s "$RES/fix-attempts.tsv" ] || return 0
+  awk -F'\t' -v OFS='\t' 'NR==FNR{last=NR; next} FNR==last{$6="REFUSED"; $7="preflight"} {print}' "$RES/fix-attempts.tsv" "$RES/fix-attempts.tsv" > "$RES/fix-attempts.tmp" && mv "$RES/fix-attempts.tmp" "$RES/fix-attempts.tsv"; }
+
 # ----------------- resume (fix-and-resume.md §5) -----------------
 START=0
 if [ -n "$RESUME_FROM" ]; then
@@ -498,9 +506,10 @@ if [ -n "$RESUME_FROM" ]; then
   nres=$(cat "$RES/fix-attempts.tsv" 2>/dev/null | grep -c .)
   # HARNESS-FIX 2026-10-31 (D7): MAX_RESUMES_TOTAL counts failure resumes only. Rows written for a planned kit update
   #   (reason "kit-update ...", rows 2 and 6 of run 20261029-1629) do not use up the budget. nres still numbers the attempt.
-  nfail=$(awk -F'\t' 'NF && $4 !~ /^kit-update/' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
-  nstep=$(awk -F'\t' -v s="$RESUME_STEP" -v r="$RESUME_REASON" '$3==s && ($4==r || index($4, r " (")==1)' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
-  nfix=$(awk -F'\t' '$4=="kit-fix"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
+  #   kitfix-20261031-preflight-first: a row marked REFUSED (the full preflight refused that launch) counts nowhere.
+  nfail=$(awk -F'\t' 'NF && $4 !~ /^kit-update/ && $6 != "REFUSED"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
+  nstep=$(awk -F'\t' -v s="$RESUME_STEP" -v r="$RESUME_REASON" '$3==s && $6 != "REFUSED" && ($4==r || index($4, r " (")==1)' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
+  nfix=$(awk -F'\t' '$4=="kit-fix" && $6 != "REFUSED"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')
   [ "$nfail" -lt "$MAX_RESUMES_TOTAL" ] || stop_resume "FIX-LIMIT: $nfail failure resumes already (MAX_RESUMES_TOTAL=$MAX_RESUMES_TOTAL; kit-update rows not counted)"
   case "$RESUME_REASON" in
     kit-fix) [ "$nstep" -lt "$MAX_FIX_ATTEMPTS_PER_STEP" ] || stop_resume "FIX-LIMIT: step $RESUME_STEP already had $nstep kit fixes (MAX_FIX_ATTEMPTS_PER_STEP=$MAX_FIX_ATTEMPTS_PER_STEP)"
@@ -510,8 +519,8 @@ if [ -n "$RESUME_FROM" ]; then
     agent-retry) [ "$nstep" -lt "$MAX_AGENT_RETRY_PER_STEP" ] || stop_resume "FIX-LIMIT: step $RESUME_STEP already had $nstep agent retries (MAX_AGENT_RETRY_PER_STEP=$MAX_AGENT_RETRY_PER_STEP); treat the failure as a kit defect (fix-and-resume.md §3)";;
   esac
   # no progress: the last two kit fixes of this step ended with the same failed checks
-  if [ "$RESUME_REASON" = kit-fix ] && [ "$(awk -F'\t' -v s="$RESUME_STEP" '$3==s && $4=="kit-fix" && $6!="" {print $7}' "$RES/fix-attempts.tsv" 2>/dev/null | tail -2 | sort -u | wc -l | tr -d ' ')" = 1 ] &&
-     [ "$(awk -F'\t' -v s="$RESUME_STEP" '$3==s && $4=="kit-fix" && $6!=""' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')" -ge 2 ]; then
+  if [ "$RESUME_REASON" = kit-fix ] && [ "$(awk -F'\t' -v s="$RESUME_STEP" '$3==s && $4=="kit-fix" && $6!="" && $6!="REFUSED" {print $7}' "$RES/fix-attempts.tsv" 2>/dev/null | tail -2 | sort -u | wc -l | tr -d ' ')" = 1 ] &&
+     [ "$(awk -F'\t' -v s="$RESUME_STEP" '$3==s && $4=="kit-fix" && $6!="" && $6!="REFUSED"' "$RES/fix-attempts.tsv" 2>/dev/null | wc -l | tr -d ' ')" -ge 2 ]; then
     stop_resume "NO-PROGRESS: the last two kit fixes of step $RESUME_STEP failed the same checks"; fi
   # runner state of the save point
   if [ ! -f "$SNAP/BEFORE-$RESUME_STEP.state.env" ] && [ "$RESUME_STEP" = 3 ] && [ -f "$SNAP/S2-WORKSPACE.state.env" ]; then
@@ -612,7 +621,7 @@ if [ -n "$RESUME_FROM" ]; then
 fi
 
 # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides): check the modes before anything runs
-modes_preflight || stop_resume "modes refused: see results/modes-preflight.log (REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-0})"
+modes_preflight || { [ -z "$RESUME_FROM" ] || attempt_refused; stop_resume "modes refused: see results/modes-preflight.log (REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-0})${RESUME_FROM:+; the attempt row is marked REFUSED and not counted}"; }
 : > "$TEST_ROOT/RUNNING"; trap 'rm -f "$TEST_ROOT/RUNNING"' EXIT
 post RUN-START "test_root=$TEST_ROOT kit=${KIT_FIX_URL:-$KIT_URL}@${KIT_FIX_REF:-$KIT_REF} start_step=$START"
 final=0

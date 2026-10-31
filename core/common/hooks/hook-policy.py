@@ -199,6 +199,21 @@ def _extract_substitutions(cmd: str) -> List[str]:
     return [b for b in bodies if b.strip()]
 
 
+# kitfix-20261031-escalation (Sonnet review 12:31, finding 3): SUDO_RE only matched a bare sudo/doas after a
+#   separator, so `env sudo`, `xargs sudo`, `command sudo`, `nohup sudo`, `\sudo` and `/usr/bin/sudo` passed. Every
+#   segment goes through _expand_wrapper, also the inner command of each wrapper it unwraps (env, command, nohup,
+#   time, nice, stdbuf, exec, builtin, timeout, xargs, setsid, ionice, sh -c, $(...)), so the program name is recorded
+#   here, as its basename with a leading backslash removed. classify_command blocks sudo/doas/run0 in every mode and
+#   su/pkexec in unattended mode (the kit never needs them; the harness's own `su - e2e` runs outside the agent).
+ESCALATORS_ALL_MODES = frozenset({"sudo", "doas", "run0"})
+ESCALATORS_UNATTENDED = frozenset({"su", "pkexec"})
+_ESCALATIONS: List[str] = []
+ESCALATION_MSG = ("{} is not used by the kit. Do not escalate privileges or switch user; report the missing tool "
+                  "or permission and stop (for a database, run .agents-v0/scripts/check-database-runtime.sh).")
+_XARGS_OPTS_WITH_ARG = frozenset({"-n", "-P", "-L", "-l", "-d", "-E", "-e", "-s", "-a", "--max-args", "--max-procs",
+                                  "--max-lines", "--delimiter", "--eof", "--max-chars", "--arg-file"})
+
+
 def _expand_wrapper(seg: str) -> List[str]:
     seg = _strip_env_prefix(seg)
     try:
@@ -207,6 +222,9 @@ def _expand_wrapper(seg: str) -> List[str]:
         parts = seg.split()
     if not parts:
         return [seg]
+    esc = parts[0].lstrip("\\").split("/")[-1]
+    if esc in ESCALATORS_ALL_MODES or esc in ESCALATORS_UNATTENDED:
+        _ESCALATIONS.append(esc)
     bin0 = parts[0].split("/")[-1]
     if bin0 in ("sh", "bash", "zsh", "dash", "ksh") and len(parts) >= 3:
         i = 1
@@ -245,7 +263,8 @@ def _expand_wrapper(seg: str) -> List[str]:
                 continue
             return split_segments(" ".join(parts[i:]))
         return [seg]
-    if bin0 in ("sudo", "command", "nohup", "time", "nice", "stdbuf", "exec", "builtin") and len(parts) >= 2:
+    if bin0 in ("sudo", "doas", "command", "nohup", "time", "nice", "stdbuf", "exec", "builtin", "setsid", "ionice",
+                "run0", "pkexec") and len(parts) >= 2:
         i = 1
         while i < len(parts) and parts[i].startswith("-"):
             if bin0 == "sudo" and parts[i] in ("-u", "-g", "-C", "-D", "-R", "-T") and i + 1 < len(parts):
@@ -257,10 +276,15 @@ def _expand_wrapper(seg: str) -> List[str]:
         if i < len(parts):
             return split_segments(" ".join(parts[i:]))
     if bin0 == "xargs" and len(parts) >= 2:
-        for i, p in enumerate(parts[1:], 1):
-            if p in ("-I", "--replace", "-i") and i + 1 < len(parts):
-                return split_segments(" ".join(parts[i + 2 :]))
-        return split_segments(" ".join(parts[1:]))
+        i = 1
+        while i < len(parts) and parts[i].startswith("-"):
+            if parts[i] in ("-I", "--replace", "-i") or parts[i] in _XARGS_OPTS_WITH_ARG:
+                i += 2
+            else:
+                i += 1
+        if i < len(parts):
+            return split_segments(" ".join(parts[i:]))
+        return [seg]
     if bin0 == "eval" and len(parts) >= 2:
         return split_segments(" ".join(parts[1:]))
     return [seg]
@@ -436,6 +460,10 @@ def _is_kit_container(p: str) -> bool:
 
 
 def _segment_changes_kit_container(seg: str) -> Optional[str]:
+    return _segment_changes_container(seg, _is_kit_container)
+
+
+def _segment_changes_container(seg: str, _is_kit_container) -> Optional[str]:
     seg = _strip_env_prefix(seg.strip())
     try:
         parts = shlex.split(seg, posix=True)
@@ -483,6 +511,73 @@ def _segment_changes_kit_container(seg: str) -> Optional[str]:
                     if a != "--" and not a.startswith("-") and _is_kit_container(a):
                         return a
     return None
+
+
+# kitfix-20261031-harness-lock (Sonnet review 12:31, finding 2; unattended mode, a speed bump): the agent runs as the
+#   same OS user as the harness runner, so it could edit the harness (scripts, fixtures/approvals.tsv) or the run
+#   root's control files (status/pending-turn.json holds the per-turn allowlist agy-ws-exec.sh applies; results/,
+#   evidence/, snapshots/, agy-driver/). Writing, removing, renaming or replacing anything there is blocked: a
+#   harness-v3 folder, an agents-v0-e2e/run-*/ run root except its work/ (the agent's checkouts), refs/e2e-test-plan
+#   scripts and fixtures, and $PLAN_DIR / $TEST_ROOT (minus work/) when the turn's environment names them. Setting
+#   or unsetting AGY_ALLOW_TOOLS or CURSOR_CONFIG_DIR is blocked too. The fence is the procedure: the harness is
+#   root-owned (/opt/harness-v3) and the preflight refuses a harness the agent user can write (harness_locked).
+HARNESS_PATH_RE = re.compile(
+    r"(^|/)harness-v3(?:/|$)"
+    r"|(^|/)agents-v0-e2e/run-[^/]+/*$"
+    r"|(^|/)agents-v0-e2e/run-[^/]+/(?!work(?:/|$))[^/]"
+    r"|(^|/)agents-v0-e2e/*$"
+    r"|(^|/)refs/e2e-test-plan/(?:scripts|fixtures|tests)(?:/|$)"
+)
+HARNESS_MSG = ("unattended mode: the e2e harness and its run-root control files ({}) are not the agent's to change; "
+               "work only in your checkout under work/. Report the problem instead.")
+ALLOW_VAR_RE = re.compile(
+    r"\b(?:AGY_ALLOW_TOOLS|CURSOR_CONFIG_DIR)\s*\+?="
+    r"|(?:\bunset|(?:^|\s)-u|--unset[=\s])\s*(?:\w+\s+)*(?:AGY_ALLOW_TOOLS|CURSOR_CONFIG_DIR)\b"
+)
+ALLOW_VAR_MSG = ("unattended mode: the per-turn allowlist (AGY_ALLOW_TOOLS, CURSOR_CONFIG_DIR) is set by the harness "
+                 "only; an agent command must not set or unset it.")
+
+
+def _harness_roots() -> List[Tuple[str, str]]:
+    roots = []
+    pd = os.environ.get("PLAN_DIR", "").strip()
+    if pd and os.path.isdir(pd):
+        roots.append((os.path.realpath(pd), ""))
+    tr = os.environ.get("TEST_ROOT", "").strip()
+    if tr and os.path.isdir(tr):
+        roots.append((os.path.realpath(tr), os.path.join(os.path.realpath(tr), "work")))
+    return roots
+
+
+def _is_harness_path(p: str) -> bool:
+    raw = os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+    if not raw:
+        return False
+    cands = [raw, posixpath.normpath(raw)]
+    g = re.search(r"[*?\[]", raw)
+    if g:
+        prefix = raw[: g.start()]
+        cands.append(prefix.rstrip("/") if prefix.endswith("/") else posixpath.dirname(prefix))
+    if "$" not in raw:
+        full = os.path.normpath(cands[-1] if os.path.isabs(cands[-1]) else os.path.join(_base_dir(), cands[-1]))
+        try:
+            full = os.path.join(os.path.realpath(os.path.dirname(full)), os.path.basename(full)) \
+                if os.path.basename(full) else os.path.realpath(full)
+        except OSError:
+            pass
+        cands.append(full)
+        for root, carve in _harness_roots():
+            if (full == root or full.startswith(root + "/")) and not (
+                    carve and (full == carve or full.startswith(carve + "/"))):
+                return True
+    return any(c and HARNESS_PATH_RE.search(c) for c in cands)
+
+
+def _segment_changes_harness(seg: str) -> Optional[str]:
+    w = _segment_writes_matching_path(seg, _is_harness_path)
+    if w:
+        return w
+    return _segment_changes_container(seg, _is_harness_path)
 
 
 # kitfix-20261031-kit-source-exec (item 1 of the 10:35 review, unattended mode): the kit's own copies of its scripts
@@ -1145,6 +1240,7 @@ def _cd_target(seg: str) -> Optional[str]:
 def classify_command(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
+    del _ESCALATIONS[:]
     if GUARD_OVERRIDE_RE.search(cmd):
         return "block", GUARD_OVERRIDE_MSG
     if TEST_OVERRIDES_RE.search(cmd):
@@ -1167,9 +1263,18 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     worst: Action = "ask" if ha else "allow"
     msg = ha[1] if ha else ""
     unattended = unattended_mode()
+    for esc in _ESCALATIONS:
+        if esc in ESCALATORS_ALL_MODES or unattended:
+            return "block", ESCALATION_MSG.format(esc)
     stdin_exec = unattended and any(_segment_reads_stdin_program(sg) for sg in segments)
     hook_root = _project_root(_base_dir()) if unattended else ""
     if unattended:
+        if ALLOW_VAR_RE.search(cmd):
+            return "block", ALLOW_VAR_MSG
+        if re.search(r"\b(?:python3?|node|perl|ruby)\b[^\n|;&]*(?:\s-\s*)?<<-?\s*['\"]?\w+", cmd) and SCRIPT_WRITE_HINT.search(cmd):
+            for lit in re.findall(r"['\"]([^'\"\n]+)['\"]", cmd):
+                if _is_harness_path(lit):
+                    return "block", HARNESS_MSG.format(lit)
         why = command_git_env_kit_source(cmd, hook_root)
         if why:
             return "block", GIT_SOURCE_MSG.format(why)
@@ -1179,6 +1284,9 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
             _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(cd_to)))
             continue
         if unattended:
+            hp = _segment_changes_harness(seg)
+            if hp:
+                return "block", HARNESS_MSG.format(hp)
             why = _segment_uses_outside_kit(seg, stdin_exec, hook_root)
             if why:
                 return "block", KIT_SOURCE_MSG.format(why)
@@ -1372,6 +1480,8 @@ def lessons_story_block(path: str) -> Optional[str]:
 
 
 def classify_path(path: str) -> Tuple[Action, str]:
+    if unattended_mode() and _is_harness_path(path):  # kitfix-20261031-harness-lock
+        return "block", HARNESS_MSG.format(path)
     if is_protected_path(path):
         return (
             "block",

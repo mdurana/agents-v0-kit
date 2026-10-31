@@ -155,6 +155,7 @@ bash scripts/run-plan.sh --resume-from auto --test-root "$TEST_ROOT" --reason ag
 
 ### 5.2 What the runner does, in order
 
+0. Runs the modes preflight first (`MODES-EARLY … OK|REFUSED (before any resume bookkeeping)` in `status/progress.log`; kitfix-20261031-preflight-first): fail modes, kit source lock, harness lock and manifest. A refusal here stops with exit 3 before anything below, so it writes no `fix-attempts.tsv` row, archives nothing and is not counted. If the full preflight after the bookkeeping still refuses, the new row is marked `REFUSED` in column 6 and is not counted either.
 1. Refuses (exit 3, reason in `results/stop.txt` and `summary.md`) if another runner is active, the step is invalid, the save point is missing, the kit fix inputs are missing, or a limit in §7 is reached.
 2. Loads the runner state of the save point (`snapshots/BEFORE-<N>.state.env`): story ids, P0-A slug, ask mode, kit label.
 3. `kit-fix` only: checks out the fixed kit in `$TEST_ROOT/kit` (base commit + patch, or the pushed ref), sets the new kit label, and appends `kit_sha`, `kit_label`, `kit_source` to `results/run.meta`.
@@ -298,10 +299,12 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `KIT_SOURCE_LOCK` | `0` | `1`: the preflight checks the lock even without `REQUIRE_FAIL_MODES` (which implies it). Each of `KIT_SOURCE_PATHS` must be absent, or neither readable nor enterable by `AGENT_USER`, and no readable `*.sh` under `KIT_SCAN_ROOTS` may still hold a test-override block (kitfix-20261031-kit-source-lock). No readable `*.bundle`, and no readable git repository or bare repository whose objects hold the kit, may be under `KIT_SCAN_ROOTS` either (kitfix-20261031-kit-git-source) |
 | `KIT_SOURCE_PATHS` | `$KIT $TEST_ROOT/calib/kit $HOME/kit-src` | the kit source copies to test (a local `KIT_URL` / `KIT_FIX_URL` is always added) |
 | `KIT_SCAN_ROOTS` | `$HOME $TEST_ROOT /tmp` | where the preflight looks for readable unstripped kit scripts, git bundles and kit git repositories; add places, never drop the defaults |
+| `HARNESS_LOCK` | `0` | `1`: the preflight checks the harness lock even without `REQUIRE_FAIL_MODES` (which implies it): `AGENT_USER` must not be able to write any file or folder of the harness (`$PLAN_DIR`), and no parent folder may let that user rename it away (`HARNESS WRITABLE`/`HARNESS REPLACEABLE`, kitfix-20261031-harness-lock). The runner also hashes `scripts/` and `fixtures/` around every turn (a change is `FINDING H10`) |
+| `HARNESS_LOCK_PATHS` | `$PLAN_DIR` | the folders the harness lock checks instead of `$PLAN_DIR`; for the harness tests only (they use `/usr/bin` as a root-owned stand-in), never in a launch env |
 | `KIT_ROOT_COMMITS` | `550da9df… fc4b642c…` (full ids in `scripts/lib.sh`) | the kit's root commits: a git dir that holds one of them holds the kit. Must match `KIT_ROOT_COMMITS` in the hook (`core/common/hooks/hook-policy.py`); test-guards checks that |
 | `AGENT_USER` | the harness user | the OS user the agent runs as; as root the lock is tested with `runuser -u`, as any other user the preflight refuses |
 | `KIT_MANIFEST` | unset | the manifest `scripts/kit-manifest.sh` wrote after `HASH-OK`, before the lock; `kit_installed_ok` then checks the installed scripts and hooks against it, with no kit source needed |
-| `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
+| `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) and rows marked `REFUSED` (a launch the preflight refused, kitfix-20261031-preflight-first) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):
 - **FIX-LIMIT**: any limit above is reached.
