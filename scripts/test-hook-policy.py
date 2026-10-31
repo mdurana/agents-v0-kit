@@ -823,6 +823,57 @@ def n1_python_startup_cases(tmp: str) -> list:
     return c
 
 
+def jn4_shell_startup_cases(tmp: str) -> list:
+    """kitfix-20261031-jn4 (Jiraiya JN-4 with M-1): shell and session start-up files in the agent user's home get the
+    N-1 start-up rule. A shell write asks attended and blocks unattended; an edit-tool write blocks in both modes."""
+    proj = os.path.join(tmp, "jn4proj")
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True, capture_output=True)
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)"}
+    A = {}
+    c = []
+    def add(kind, arg, env, want, label, cwd=proj):
+        c.append((kind, arg, cwd, env, want, label))
+    home = os.path.expanduser("~")
+    writes = [
+        # Jiraiya's JN-4 placements and the M-1 PATH line
+        ("echo 'export LD_PRELOAD=/tmp/x.so' >> ~/.profile", "echo >> ~/.profile (LD_PRELOAD)"),
+        ("echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc", "echo >> ~/.bashrc (PATH, M-1)"),
+        ("echo LD_PRELOAD=/tmp/x.so > ~/.config/environment.d/x.conf", "echo > environment.d/x.conf"),
+        ("printf 'LD_PRELOAD DEFAULT=/tmp/x.so\\n' > ~/.pam_environment", "printf > ~/.pam_environment"),
+        ("tee -a ~/.zshenv < /tmp/env", "tee -a ~/.zshenv"),
+        ("echo x | tee -a $HOME/.bash_profile", "tee -a $HOME/.bash_profile"),
+        ("sed -i 's|^PATH=.*|PATH=/tmp/b:$PATH|' ~/.bashrc", "sed -i ~/.bashrc"),
+        ("cp /tmp/rc ~/.zshrc", "cp onto ~/.zshrc"),
+        ("mv /tmp/rc ~/.bash_login", "mv onto ~/.bash_login"),
+        ("cp /tmp/p ~/.zprofile", "cp onto ~/.zprofile"),
+        ("printf 'export LD_PRELOAD=/tmp/x.so\\n' > ~/.bash_aliases", "printf > ~/.bash_aliases"),
+        ("echo '[install]' > ~/.config/pip/pip.conf", "echo > ~/.config/pip/pip.conf"),
+        ("ln -sf /tmp/rc ~/.profile", "ln -sf onto ~/.profile"),
+        (f"echo x >> {home}/.profile", "echo >> absolute ~/.profile"),
+        ("cd ~ && echo 'export PATH=/tmp/b:$PATH' >> .bashrc", "cd ~ && echo >> .bashrc"),
+        ("cp -r /tmp/cfg/. ~/.config/", "cp -r a tree into ~/.config"),
+        ("systemctl --user set-environment LD_PRELOAD=/tmp/x.so", "systemctl --user set-environment"),
+        ("launchctl setenv PATH /tmp/b", "launchctl setenv"),
+        ("dbus-update-activation-environment LD_PRELOAD=/tmp/x.so", "dbus-update-activation-environment"),
+    ]
+    for cmd, label in writes:
+        add("shell", cmd, U, "block", "unattended " + label)
+        add("shell", cmd, A, "ask", "attended " + label)
+    for cmd, label in [
+            ("cat ~/.bashrc", "read ~/.bashrc"), ("cp ~/.profile /tmp/profile.bak", "copy ~/.profile out"),
+            ("echo x >> docker/.bashrc", "a project's docker/.bashrc"), ("ls ~/.config", "list ~/.config"),
+            ("echo x > notes.txt", "a normal write"), ("cp app.conf ~/.config/app.conf", "a file into ~/.config")]:
+        add("shell", cmd, U, "allow", "unattended " + label)
+        add("shell", cmd, A, "allow", "attended " + label)
+    for rel in (".profile", ".bashrc", ".bash_profile", ".bash_login", ".zshenv", ".zprofile", ".zshrc",
+                ".pam_environment", ".config/environment.d/50-x.conf", ".config/pip/pip.conf"):
+        add("path", os.path.join(home, rel), A, "block", f"attended edit of ~/{rel}")
+        add("path", os.path.join(home, rel), U, "block", f"unattended edit of ~/{rel}")
+    add("path", os.path.join(proj, "docker/.bashrc"), A, "allow", "attended edit of a project's docker/.bashrc")
+    add("path", os.path.join(proj, ".profile"), U, "allow", "unattended edit of a project's .profile")
+    return c
+
+
 def harness_escalation_cases(tmp: str) -> list:
     """kitfix-20261031-harness-lock and kitfix-20261031-escalation (Sonnet review 12:31, findings 2 and 3)."""
     tr = os.path.join(tmp, "agents-v0-e2e", "run-1")
@@ -973,10 +1024,16 @@ def main() -> int:
         e["HOOK_CWD"] = cwd
         got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
         check(got, want, f"N-1 python start-up {label}: `{arg}`")
+    jcases = jn4_shell_startup_cases(htmp)
+    for kind, arg, cwd, env, want, label in jcases:
+        e = dict(env)
+        e["HOOK_CWD"] = cwd
+        got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
+        check(got, want, f"JN-4 shell/session start-up {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
-             + len(hcases) + len(ncases))
+             + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1
