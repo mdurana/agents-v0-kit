@@ -362,10 +362,51 @@ rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
 #   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools
 #   (prereqs.sh, setup-vm.sh, kit-fix.sh) starts python3 without -I -S. Functional: run-plan.sh's own map line,
 #   with a user site that plants a marker, gives the story map and no marker (the bare control does plant it).
-bare="$(grep -nE '(^|[^[:alnum:]_./-])python3? +(-|"|'\''|\$)' "$HERE"/scripts/*.sh | grep -v 'python3 -I -S' \
-  | grep -vE '^[^:]+/(prereqs|setup-vm|kit-fix)\.sh:' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
+# N-1 follow-up (Sakura re-review): tests/py-call-guard.py checks each call, not each line, and also catches
+#   /usr/bin/python3, python3.13, "$PY"/${PYTHON} and a *.py run through its shebang.
+bare="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" $(ls "$HERE"/scripts/*.sh | grep -vE '/(prereqs|setup-vm|kit-fix)\.sh$'))"
 [ -z "$bare" ] && ok "no harness script runs a bare python3 (only prereqs.sh, setup-vm.sh, kit-fix.sh: operator/root setup)" \
   || ko "harness scripts with a bare python3: $bare"
+PG="$SB/pg"; mkdir -p "$PG"
+cat > "$PG/bad.sh" <<'EOF'
+/usr/bin/python3 -c 'print(1)'
+python3.13 -c 'print(1)'
+"$PY" -c 'print(1)'
+"$HERE/next-story.py" map "$MAIN"
+row="$("$HERE/next-story.py" next "$MAIN")"
+python3 -I -S -c 'x'; python3 -c 'y'
+python3 next-story.py map x
+exec python3 -I -c 'x'
+${PYTHON} - <<'PY'
+env python3 -c x
+chk 3 plan L2 "x" -- "$HERE/next-story.py" map "$MAIN"
+mapfile -t rows < <("$HERE"/next-story.py chain "$MAIN")
+if ./tool.py; then :; fi
+python - <<'PY'
+EOF
+cat > "$PG/good.sh" <<'EOF'
+python3 -I -S -c 'x'
+/usr/bin/python3 -I -S -c x
+"$py" -I -S -c x
+python3.13 -I -S "$HERE/next-story.py" map x
+row="$(python3 -I -S "$HERE/next-story.py" next "$MAIN")"
+V3_TOOLS="bash sh python3 jq"
+cat "$HERE"/*.sh "$HERE"/*.py | sha256sum
+out="/usr/bin/python3
+# python3 -c 'commented'
+grep -qE '\.agents-v0/scripts/[a-z-]+\.(sh|py)' f
+post FAIL "no story in the plan (next-story.py chain)"
+say pyyaml MISSING "use python3 for x"
+for f in a.py b.py; do :; done
+[ -f "$d/x.py" ] && echo ok
+EOF
+got="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" | sed -E 's/^[^:]+:([0-9]+):.*/\1/' | sort -un | tr '\n' ' ')"
+[ "$got" = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 " ] && ok "py-call-guard catches /usr/bin/python3, python3.13, \"\$PY\", shebang runs and a bare call beside a good one" \
+  || ko "py-call-guard bad lines caught: $got"
+gg="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/good.sh")"; [ -z "$gg" ] && ok "py-call-guard allows -I -S calls, strings, comments and .py arguments" || ko "py-call-guard false positives: $gg"
+old="$(grep -nE '(^|[^[:alnum:]_./-])python3? +(-|"|'\''|\$)' "$PG/bad.sh" | grep -v 'python3 -I -S' | cut -d: -f1 | tr '\n' ' ')"
+case " $old " in *" 1 "*|*" 2 "*|*" 3 "*|*" 4 "*) ko "control: the 942f076 regex unexpectedly caught one of lines 1-4 ($old)" ;;
+  *) ok "control: the 942f076 regex missed /usr/bin/python3, python3.13, \"\$PY\" and the shebang run (caught only: $old)" ;; esac
 NS="$SB/ns"; mkdir -p "$NS/ws/docs/agents-v0/milestones"
 printf '| Story ID | Title | Dependency |\n|---|---|---|\n| P0-A | Skeleton | - |\n| P1-A | Login | P0-A |\n' > "$NS/ws/docs/agents-v0/milestones/p0-plan.md"
 NSS="$(HOME="$NS/home" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"; mkdir -p "$NSS"
