@@ -87,6 +87,16 @@ SHELL_CASES = [
     ("git clean -fdx", "block"),
     ("git push", "ask"),
     ("git commit -m x", "ask"),
+    # kitfix-20261031-installed-no-overrides: no test-override reinstall, no policy edit by shell
+    ("sh ../kit/scripts/install.sh --update --test-overrides .", "block"),
+    ("sh scripts/strip-test-overrides.sh .agents-v0/scripts/sync-feature-state.sh", "block"),
+    ("echo trace_mode=warn > .agents-v0/policy.conf", "block"),
+    ("printf 'trace_mode=warn\\n' | tee .agents-v0/policy.conf", "block"),
+    ("sed -i s/fail/warn/ .agents-v0/policy.conf", "block"),
+    ("rm .agents-v0/policy.conf", "block"),
+    ("cp /tmp/p .agents-v0/policy.conf", "block"),
+    ("cat .agents-v0/policy.conf", "allow"),
+    ("sh .agents-v0/scripts/check-traceability.sh --print-mode", "allow"),
     # kitfix-20261031-guard-override: an agent never sets AGENTS_V0_* (kit skip flags, clock pin, trace mode)
     ("AGENTS_V0_SKIP_BRANCH_GUARD=1 sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/x.md", "block"),
     ("export AGENTS_V0_SKIP_COMMIT_CHECK=1", "block"),
@@ -349,6 +359,9 @@ PATH_CASES = [
     ("scripts/install.sh", "allow"),
     ("docs/agents-v0/onboarding/report.md", "allow"),
     (".agents-v0/scripts/feature-worktree.sh", "block"),
+    # kitfix-20261031-installed-no-overrides: the trace-mode policy file is harness/team-owned
+    (".agents-v0/policy.conf", "block"),
+    ("/w/portal-orders/.agents-v0/policy.conf", "block"),
     (".agents-v0/scripts/delivery-metrics.sh", "block"),
     (".agents-v0/scripts/check-delivery-gate-local.sh", "block"),
     (".agents-v0/hooks/pre-push", "block"),

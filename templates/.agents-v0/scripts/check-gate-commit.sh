@@ -20,8 +20,9 @@
 #   sh .agents-v0/scripts/check-gate-commit.sh --message <phase> <artifact>
 #        print the gate commit command for <phase>; for release (non-P0-A feature story) it also writes the
 #        squash commit message with its trailers to a file in the git dir and prints `git commit -F <file>`.
-# Ignored paths: *.lock, and every prefix in AGENTS_V0_COMMIT_CHECK_IGNORE (space-separated).
-# AGENTS_V0_SKIP_COMMIT_CHECK=1 skips the checks (kit fixtures only; never in a real story).
+# Ignored paths: *.lock, and (kit test copies only) every prefix in AGENTS_V0_COMMIT_CHECK_IGNORE (space-separated).
+# AGENTS_V0_SKIP_COMMIT_CHECK=1 skips the checks in the kit's own test copies only; install.sh removes both
+# env reads, so an installed copy always checks (kitfix-20261031-installed-no-overrides).
 set -eu
 
 mode=check
@@ -36,8 +37,12 @@ if [ -z "$art" ] || [ ! -f "$art" ]; then
   printf 'usage: %s [--release | --message <phase>] <artifact>\n' "$0" >&2
   exit 2
 fi
-if [ "$mode" != message ] && [ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" = 1 ]; then
-  printf 'OK: gate-commit check skipped (AGENTS_V0_SKIP_COMMIT_CHECK=1)\n'
+gc_skip=0
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+[ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" != 1 ] || gc_skip=1
+# <<< kit-test-override
+if [ "$mode" != message ] && [ "$gc_skip" = 1 ]; then
+  printf 'OK: gate-commit check skipped (kit test override)\n'
   exit 0
 fi
 command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
@@ -92,7 +97,10 @@ def p0a():
     except OSError: return False
     return bool(re.search(r"^\s*(\*\*)?Story(\*\*)?:\s*(\*\*)?P0-A([^A-Za-z0-9]|$)", text, re.M | re.I))
 
+ignore = []
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
 ignore = [p for p in os.environ.get("AGENTS_V0_COMMIT_CHECK_IGNORE", "").split() if p]
+# <<< kit-test-override
 SECRET = re.compile(r"(^|/)(\.env(\.[^/]*)?|[^/]*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|ed25519|ecdsa)|credentials[^/]*\.json|secrets\.ya?ml)$")
 SECRET_OK = re.compile(r"\.env\.(example|sample|template|dist)$|\.example$")
 

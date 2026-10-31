@@ -95,6 +95,11 @@ SCRIPT_WRITE_HINT = re.compile(
     r"open\s*\([^)]*,\s*['\"][wax+]|\.write|unlink|remove|rename|rmtree|writeFile|appendFile|rmSync",
     re.I,
 )
+# kitfix-20261031-installed-no-overrides: the installed scripts carry no AGENTS_V0_* override code; only the
+# kit's own test suites install copies that keep it (install.sh --test-overrides). An agent must not.
+TEST_OVERRIDES_RE = re.compile(r"--test-overrides\b|\bstrip-test-overrides\.sh\b")
+TEST_OVERRIDES_MSG = ("installing the kit with its test overrides (install.sh --test-overrides) is for the kit's own test "
+                      "suites only; an agent never reinstalls or strips the kit scripts. Report the problem instead.")
 
 def _json_out(action: Action, message: str = "") -> None:
     print(json.dumps({"action": action, "message": message}), end="")
@@ -659,6 +664,8 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     _BASE_DIR = None
     if GUARD_OVERRIDE_RE.search(cmd):
         return "block", GUARD_OVERRIDE_MSG
+    if TEST_OVERRIDES_RE.search(cmd):
+        return "block", TEST_OVERRIDES_MSG
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
@@ -788,6 +795,7 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.(sh|py)$"),
     re.compile(r"(^|/)\.agents-v0/packs/.+\.(json|sh|py)$"),
     re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$"),
+    re.compile(r"(^|/)\.agents-v0/policy\.conf$"),  # kitfix-20261031-installed-no-overrides: trace mode
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),

@@ -290,3 +290,13 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - Tests: new `tests/test-guards.sh` (21 cases; mutation checks: without the ancestry test 3 cases fail, without the pattern 8 fail).
 
 - V3 rerun procedure (P1-E, P2-A, P2-F, P2-P from the old run's END snapshots, main-only kit update with a hash check of the installed kit, `H6_MODE=fail`, `AGENTS_V0_TRACE_MODE=fail`, stop-after-story watcher, pass bar, single-version caveat, branches kept): `refs/e2e-test-plan/v3-rerun-procedure.md`.
+
+## 2026-10-31 09:49 Asia/Manila — installed kit without AGENTS_V0_* overrides; H10; harness-owned trace mode (kitfix-20261031-installed-no-overrides, approved by Marlon)
+
+- External review: H8 and the hook rule match text, so a split name (`V=AGENTS_V0_SKIP_BRANCH; env "${V}_GUARD=1" ...`) or a base64-decoded env file loaded with `set -a` got past both. The kit now removes the override code from installed scripts (see `refs/kit-fixes.md`), so those tricks have no effect. H8 stays, as a speed bump only.
+- New **H10** (lib.sh `kit_integrity`, `kit_integrity_check`, `kit_policy_ok`): content hashes of `.agents-v0/scripts/*`, `.agents-v0/hooks/*`, `.agents/hooks/*`, `.cursor/hooks/*`, the hooks.json files and `.agents-v0/policy.conf` in main and the turn's workspace, before and after every turn (`kit-tamper.txt` + FINDING). The story check also needs every `trace.json` gate in `KIT_TRACE_MODE`. FAIL by default; `H10_MODE=warn`.
+- `KIT_TRACE_MODE=warn|fail` (launch env): `kit_policy_apply` writes `.agents-v0/policy.conf` in main and every kit worktree, with a harness commit, before each story. `AGENTS_V0_TRACE_MODE` in the launch env is refused (it no longer reaches installed scripts).
+- `REQUIRE_FAIL_MODES=1` (`modes_preflight`, before RUN-START): refuses to start unless H6=fail, H7–H10 not warn, `KIT_TRACE_MODE=fail` and every checkout passes `check-installed-kit.sh --expect-trace-mode fail`; each story checks main again first. The `MODES` line in progress.log and the Limits line record the modes.
+- `trace_bad_phase` passes `--no-write` (installed copies) and keeps the old env for older copies.
+- Tests: `tests/test-guards.sh` now 42 cases (H10 edits, policy removal, `--test-overrides` reinstall, trace.json mode, preflight). Mutation: with the hash comparison disabled, 9 cases fail.
+

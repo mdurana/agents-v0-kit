@@ -290,8 +290,11 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `MAX_AGENT_RETRY_PER_STEP` | 1 | `--reason agent-retry` resumes of the same step |
 | `CHAIN_RESUME_ROLLBACK` | 1 | in-story resume first resets the story branch to its last clean gate commit (§5.6); `0` keeps the branch as it is |
 | `H7_MODE` | `fail` | `warn` makes a harness gate-commit fallback (H7) a FINDING only |
-| `H8_MODE` | `fail` | `warn` makes an agent `AGENTS_V0_*` assignment (H8, guard override) a FINDING only |
+| `H8_MODE` | `fail` | `warn` makes an agent `AGENTS_V0_*` assignment (H8, guard override; a text speed bump only, see H10) a FINDING only |
 | `H9_MODE` | `fail` | `warn` makes a rewritten or out-of-order story gate commit (H9) a FINDING only |
+| `H10_MODE` | `fail` | `warn` makes a change to the installed kit scripts, hooks or `.agents-v0/policy.conf` during a turn, or a trace gate not in `KIT_TRACE_MODE` (H10), a FINDING only |
+| `KIT_TRACE_MODE` | unset | `warn` or `fail`: the harness writes `trace_mode=<mode>` into `.agents-v0/policy.conf` of main and every kit worktree (one harness commit each) before each story. Installed kit scripts read the trace mode only from that file; `AGENTS_V0_TRACE_MODE` in the launch env has no effect on them and is refused |
+| `REQUIRE_FAIL_MODES` | `0` | `1` (V3): the run refuses to start (exit 3, `results/modes-preflight.log`) unless `H6_MODE=fail`, H7–H10 not `warn`, `KIT_TRACE_MODE=fail`, and every checkout passes `scripts/check-installed-kit.sh --expect-trace-mode fail`; each story checks main again before it starts |
 | `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):

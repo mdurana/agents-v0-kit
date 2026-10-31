@@ -22,6 +22,14 @@
 #       for an offline or air-gapped machine. --update refuses while a story is in
 #       progress (a state.json with a non-empty activePhase); --allow-in-flight overrides.
 #
+#   --test-overrides (kit test suites only; kitfix-20261031-installed-no-overrides)
+#       Keeps the `# >>> kit-test-override` blocks in the installed .agents-v0/scripts. Without it (the
+#       default for every real install and --update) install.sh removes those blocks, so the installed
+#       scripts never read the AGENTS_V0_* overrides (branch-guard and commit-check skips, clock pin,
+#       time zone, trace mode). The trace mode of an installed copy comes only from
+#       .agents-v0/policy.conf (`trace_mode=warn|fail`), which the team or the e2e harness writes and the
+#       hooks protect. Check an install with scripts/check-installed-kit.sh <target-repo>.
+#
 #   --git-hooks (with a first install or --update)
 #       Sets core.hooksPath to .agents-v0/hooks in the target repo, so pre-commit
 #       guards secrets and state files and pre-push verifies the branch's state.json
@@ -41,9 +49,10 @@ PACK=""
 TARGET=""
 GIT_HOOKS=0
 ALLOW_IN_FLIGHT=0
+TEST_OVERRIDES=0
 
 usage() {
-  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--update [--quick] [--allow-in-flight]] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--update [--quick] [--allow-in-flight]] [--test-overrides] <target-repo>\n' "$(basename "$0")" >&2
   printf '       %s --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
@@ -345,6 +354,15 @@ docs/agents-v0/brownfield-onboarding.md
     if [ "$overwrite" = 1 ] || [ ! -f "$dest" ]; then
       mkdir -p "$(dirname "$dest")"
       cp "$KIT/templates/$rel" "$dest"
+      # kitfix-20261031-installed-no-overrides: installed scripts carry no AGENTS_V0_* override code.
+      case "$rel" in
+        .agents-v0/scripts/*)
+          if [ "$TEST_OVERRIDES" != 1 ] && grep -q '# >>> kit-test-override' "$dest"; then
+            sh "$KIT/scripts/strip-test-overrides.sh" "$KIT/templates/$rel" > "$dest.strip.$$" || { rm -f "$dest.strip.$$"; printf 'error: cannot strip test overrides from %s\n' "$rel" >&2; exit 1; }
+            cat "$dest.strip.$$" > "$dest"; rm -f "$dest.strip.$$"
+          fi
+          ;;
+      esac
     fi
   }
   if [ "$WITH_STARTERS" = 1 ]; then
@@ -447,6 +465,10 @@ while [ $# -gt 0 ]; do
       ;;
     --allow-in-flight)
       ALLOW_IN_FLIGHT=1
+      shift
+      ;;
+    --test-overrides)
+      TEST_OVERRIDES=1
       shift
       ;;
     -h|--help)

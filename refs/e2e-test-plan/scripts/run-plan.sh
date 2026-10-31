@@ -218,6 +218,12 @@ story_run(){
   id="$(story_field "$row" 2)"; slug="$(story_field "$row" 3)"; printf '%s\t%s\t%s\n' "$var" "$id" "$slug" >> "$RES/story-ids.tsv"
   printf -v "$var" '%s' "$id"; printf -v "${var}_SLUG" '%s' "$slug"; export "$var" "${var}_SLUG"
   before="$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)"
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides): KIT_TRACE_MODE goes into .agents-v0/policy.conf
+  #   before the story starts; with REQUIRE_FAIL_MODES=1 the installed kit must pass check-installed-kit.sh first.
+  kit_policy_apply "story $id" || ok=0
+  if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] && ! sh "$KIT/scripts/check-installed-kit.sh" --expect-trace-mode fail "$MAIN" >> "$RES/check-output.log" 2>&1; then
+    post FAIL "story $id not started: the installed kit in main fails check-installed-kit.sh --expect-trace-mode fail (see results/check-output.log)"
+    chk "$st" "$id" H10 "installed kit intact with trace mode fail before the story" -- false; return 1; fi
   STORY_H0="$(git -C "$MAIN" rev-parse HEAD)"
   # STAGED HARNESS-FIX 2026-10-30 (in-story resume): if the kept branch is already merged (resume at local-release),
   #   F1's "changed files since the story started" base is main before that merge, not main now.
@@ -245,6 +251,12 @@ story_run(){
   if ! chk "$st" "$id" H9 "gate commits intact and in order on feature/$slug (intake<design<build<verify<release)" -- \
        gate_chain_ok "$st" "$slug" "$RES/gate-chain-$slug.tsv"; then
     post FINDING "H9 $id: gate commits on feature/$slug rewritten, missing or out of order (see evidence/S$st-$slug-*/GATE-CHAIN-BROKEN, results/gate-chain-$slug.tsv)"; [ "${H9_MODE:-fail}" = warn ] || ok=0; fi
+  # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides): H10 the agent did not change the installed kit
+  #   scripts, hooks or policy file during any turn (content hashes, not command text), and with KIT_TRACE_MODE set
+  #   every gate of the story's trace.json was recorded in that mode. FAIL by default; H10_MODE=warn for a FINDING.
+  if ! chk "$st" "$id" H10 "installed kit, hooks and policy unchanged by the agent; trace gates in mode ${KIT_TRACE_MODE:-any}" -- \
+       bash -c '! cat "$1"/S"$2"-"$3"-*/kit-tamper.txt 2>/dev/null | grep -q .' _ "$EVID" "$st" "$slug" || ! kit_policy_ok "$slug" >> "$RES/check-output.log" 2>&1; then
+    post FINDING "H10 $id: installed kit or policy changed by the agent, or a trace gate not in mode ${KIT_TRACE_MODE:-?} (see evidence/S$st-$slug-*/kit-tamper.txt)"; [ "${H10_MODE:-fail}" = warn ] || ok=0; fi
   # HARNESS-FIX 2026-10-31 (kitfix-20261031 fix 4a, D8): H6 warns first. H6_MODE=fail makes a mismatch fail the story.
   if ! chk "$st" "$id" H6 "AC count in requirements matches the milestone plan (Size)" -- ac_count_matches "$slug" "$(story_field "$row" 5)"; then
     post FINDING "H6 $id: AC count differs from the milestone plan (see results/check-output.log)"; [ "${H6_MODE:-warn}" = fail ] && ok=0; fi
@@ -388,7 +400,7 @@ validity_block(){ local kits
   kits="$( { grep '^kit_label=' "$RES/run.meta" 2>/dev/null | cut -d= -f2; grep -o 'new_kit=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2; } | sort -u)"
   echo "- Kit versions used: $(echo "$kits" | paste -sd' ' -) · harness: $(grep -o 'harness_sha=[^ ]*' "$RES/run.meta" 2>/dev/null | cut -d= -f2 | sort -u | paste -sd' ' -)"
   echo "- Single version: $([ "$(echo "$kits" | grep -c .)" -le 1 ] && echo yes || echo no)"
-  echo "- Limits: MAX_RESUMES_TOTAL=${MAX_RESUMES_TOTAL:-?} MAX_RUNS_PER_STORY=${MAX_RUNS_PER_STORY:-?} H6_MODE=${H6_MODE:-warn} NATIVE_VERIFY=${NATIVE_VERIFY:-1} AGENT_TZ=${AGENT_TZ:-Asia/Manila}"
+  echo "- Limits: MAX_RESUMES_TOTAL=${MAX_RESUMES_TOTAL:-?} MAX_RUNS_PER_STORY=${MAX_RUNS_PER_STORY:-?} H6_MODE=${H6_MODE:-warn} H7-H10 modes=${H7_MODE:-fail}/${H8_MODE:-fail}/${H9_MODE:-fail}/${H10_MODE:-fail} KIT_TRACE_MODE=${KIT_TRACE_MODE:-policy-default} REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-0} NATIVE_VERIFY=${NATIVE_VERIFY:-1} AGENT_TZ=${AGENT_TZ:-Asia/Manila}"
   if [ -s "$RES/story-versions.tsv" ]; then echo; echo "| Story | Slug | Kit | Harness | Checks |"; echo "|---|---|---|---|---|"
     awk -F'\t' '{printf "| %s | %s | %s | %s | %s |\n",$2,$3,$4,$5,$6}' "$RES/story-versions.tsv"; fi; echo; }
 # write_run_readme (kitfix-20261031-run-readme): the run README ($TEST_ROOT/README.md, published with the results)
@@ -598,6 +610,8 @@ if [ -n "$RESUME_FROM" ]; then
   [ -z "$CRS" ] || post RESUME-FROM-STORY "attempt $k step 4 chain resumes at $CRS; skipping released ${CRS_SKIP_IDS% } (verified released_ok + merged_into_main; their PASS check rows kept); workspace = S4-$CRS_PREV-END$( [ -n "$CRS_IN_STORY_SLUG" ] && echo " + $CRS in-story (branch, worktree and approved phases kept)"); reason: $CRS_NOTE"
 fi
 
+# HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides): check the modes before anything runs
+modes_preflight || stop_resume "modes refused: see results/modes-preflight.log (REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-0})"
 : > "$TEST_ROOT/RUNNING"; trap 'rm -f "$TEST_ROOT/RUNNING"' EXIT
 post RUN-START "test_root=$TEST_ROOT kit=${KIT_FIX_URL:-$KIT_URL}@${KIT_FIX_REF:-$KIT_REF} start_step=$START"
 final=0

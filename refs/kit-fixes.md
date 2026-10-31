@@ -114,3 +114,32 @@ How to check: `HOOK_CMD='git branch -D feature/orders' python3 core/common/hooks
 
 
 The live check of these fixes (V3: P1-E, P2-A, P2-F, P2-P with the fail modes on; keep-branches included) is described in `refs/e2e-test-plan/v3-rerun-procedure.md`.
+
+## kitfix-20261031-installed-no-overrides
+
+Found by an external review (approved by Marlon, 2026-10-31 09:49 Asia/Manila). `kitfix-20261031-guard-override` blocks agent commands that *name* an `AGENTS_V0_*` variable, but the hook and the harness H8 both match text. A split name (`V=AGENTS_V0_SKIP_BRANCH; env "${V}_GUARD=1" sh .agents-v0/scripts/sync-feature-state.sh ...`) or an env file decoded from base64 and loaded with `set -a; . ./x.env` got past both, and the installed scripts honoured the variable. The fix removes the override code from installed copies, so there is nothing left to switch:
+- `templates/.agents-v0/scripts/sync-feature-state.sh`, `check-gate-commit.sh` and `check-traceability.sh`: every env override sits in a `# >>> kit-test-override` … `# <<< kit-test-override` block, with the safe value set before the block. The blocks cover `AGENTS_V0_SKIP_BRANCH_GUARD`, `AGENTS_V0_SKIP_COMMIT_CHECK`, `AGENTS_V0_COMMIT_CHECK_IGNORE`, `AGENTS_V0_NOW`, `AGENTS_V0_TZ`, `AGENTS_V0_TRACE_MODE` and `AGENTS_V0_TRACE_NO_WRITE`.
+- `scripts/install.sh` (first install and `--update`) runs each installed `.agents-v0/scripts` file through the new `scripts/strip-test-overrides.sh`, which drops those blocks. It fails on unbalanced markers. `--test-overrides` keeps them, for the kit's own suites only (`test-gate-commit.sh` and `test-command-flows.sh` install that way; `test-clock.sh` copies the templates).
+- **Trace mode:** an installed `check-traceability.sh` reads its mode only from `.agents-v0/policy.conf` (`trace_mode=warn|fail`; an unknown value counts as `fail`; a missing file means the default `warn`). The team or the e2e harness writes that file (harness: `KIT_TRACE_MODE`). `--print-mode` prints the mode in force, and `--no-write` replaces `AGENTS_V0_TRACE_NO_WRITE`.
+- An installed `sync-feature-state.sh` refuses to record a phase when `check-gate-commit.sh` or `check-traceability.sh` is missing, because moving a gate script away must not switch its check off.
+- `scripts/check-installed-kit.sh [--expect-trace-mode warn|fail] <project>` checks an install read-only. Each installed script must equal the stripped kit file, and each hook must equal `core/common/hooks`. It also checks that no installed script still reads `AGENTS_V0_*` and, optionally, the trace mode. It prints `HASH-OK` / `HASH-FAIL` and flags a test-override install as `TEST-OVERRIDES-INSTALLED`.
+- `core/common/hooks/hook-policy.py`: `.agents-v0/policy.conf` is a protected path (edit and shell writes blocked), and `--test-overrides` or `strip-test-overrides.sh` in an agent command is blocked. Both are text checks, so they are only a speed bump; see the limits below.
+- Docs: `v0-design.md` (`trace_mode=fail` in `policy.conf`), `workflow-orchestration.mdc` (time zone from the profile only) and `agents-v0-kit.md` Safety Hooks.
+- Tests: new `scripts/test-installed-overrides.sh` (31 checks, run by validate-kit). On an installed copy, the split-name and base64/`set -a` forms leave every guard working:
+  - the branch guard still refuses design on main;
+  - the gate-commit check still refuses;
+  - the clock is not pinned;
+  - `trace_mode=fail` still refuses with the env saying `warn`.
+
+  The same probes on a `--test-overrides` copy do take effect, which shows the probes are live. Also covered: `--update` strips an old copy, a missing gate script is refused, and `check-installed-kit.sh` reports DIFF, MISSING and TRACE-MODE problems. `test-hook-policy.py` now has 312 cases.
+- Mutation checks:
+  - with stripping disabled in `install.sh`, 15 checks fail;
+  - with the missing-script refusal disabled, 1 check fails.
+- Harness side (same commit): H10 and `KIT_TRACE_MODE` / `REQUIRE_FAIL_MODES`, see `refs/e2e-test-plan/HARNESS-FIXES-20261029.md`. H8 stays, as a speed bump.
+
+How to check: `sh scripts/check-installed-kit.sh --expect-trace-mode fail <project>` prints `HASH-OK … trace_mode=fail`; `sh scripts/test-installed-overrides.sh` prints `test-installed-overrides: OK`.
+
+Limits (not fixed here):
+- **Same OS user.** The agent runs as the same OS user that owns the files, so nothing at the file level stops a determined agent from rewriting an installed script, `policy.conf` or the harness itself. The hooks match text, so they are a speed bump. H10 catches a change that is still there at the end of a turn. An edit made and undone inside one turn is not seen, but a gate approved in that window still shows its mode in `trace.json`, which H10 checks. A real fence needs the agent to run as a separate OS user with the kit files read-only, or in a sandbox.
+- **Linked projects.** `install.sh --link` / `scripts/link-project.sh` symlink `.agents-v0/scripts` to the kit templates, so a linked project keeps the overrides. Use a normal install for anything an agent runs unattended.
+- **Kit fetch switch.** `AGENTS_V0_FETCH_KIT` (`resolve-kit-root.sh`) is kept: it chooses where the kit is fetched from and switches no check off.

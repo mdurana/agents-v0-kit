@@ -17,18 +17,42 @@
 #   TRACE <WARN|FAIL> <check> gate=<gate> earliest_bad_phase=<phase> artifact=<file>: <detail>
 # and the result is written to docs/agents-v0/requirements/<feature>.trace.json (committed with the gate),
 # which the e2e harness reads to choose its rollback gate.
-# AGENTS_V0_TRACE_NO_WRITE=1 prints only (the e2e harness re-runs a failed phase's checks this way).
-# Mode: AGENTS_V0_TRACE_MODE=warn (default, D8: warn first; exit 0) or fail (exit 1 on any failure).
+# --no-write (third argument) prints only (the e2e harness re-runs a failed phase's checks this way).
+# Mode: warn (default, D8: warn first; exit 0) or fail (exit 1 on any failure). An installed copy reads the
+# mode only from .agents-v0/policy.conf (`trace_mode=fail`), a file the harness or the team owns and the
+# hooks protect; an unknown value counts as fail. `--print-mode` prints the mode in force and exits.
+# The env overrides AGENTS_V0_TRACE_MODE / AGENTS_V0_TRACE_NO_WRITE work in the kit's own test copies only:
+# install.sh removes them (kitfix-20261031-installed-no-overrides).
 # P0-A: design checks are skipped (no design gate); build/verify checks run when their inputs exist.
 set -eu
-gate="${1:-}"; art="${2:-}"
+TR_DIR="$(cd "$(dirname "$0")" && pwd)"; export TR_DIR
+gate="${1:-}"; art="${2:-}"; TR_NOWRITE=0
+[ "${3:-}" != --no-write ] || TR_NOWRITE=1
+export TR_NOWRITE
+if [ "$gate" = --print-mode ]; then gate=print; art=none; else
 case "$gate" in design|build|verify) ;; *) printf 'usage: %s <design|build|verify> <requirements artifact>\n' "$0" >&2; exit 2 ;; esac
 [ -n "$art" ] && [ -f "$art" ] || { printf 'usage: %s <design|build|verify> <requirements artifact>\n' "$0" >&2; exit 2; }
+fi
 
 TR_GATE="$gate" TR_ART="$art" python3 - <<'PYTR'
 import json, os, re, sys
 gate, art = os.environ["TR_GATE"], os.environ["TR_ART"].replace("\\", "/")
-mode = os.environ.get("AGENTS_V0_TRACE_MODE", "warn").lower()
+mode, source = "warn", "default"
+try:
+    for _line in open(os.path.join(os.environ.get("TR_DIR", "."), "..", "policy.conf"), encoding="utf-8"):
+        _k, _sep, _v = _line.strip().partition("=")
+        if _sep and _k.strip() == "trace_mode":
+            _v = _v.strip().lower()
+            mode, source = (_v if _v in ("warn", "fail") else "fail"), "policy.conf"
+except OSError:
+    pass
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+if os.environ.get("AGENTS_V0_TRACE_MODE"):
+    mode, source = os.environ["AGENTS_V0_TRACE_MODE"].lower(), "env (kit test copy)"
+# <<< kit-test-override
+if gate == "print":
+    print(f"trace_mode={mode} source={source}")
+    sys.exit(0)
 slug = os.path.basename(art)[:-3]
 m = re.match(r"(.*?)docs/agents-v0/requirements/", art)
 root = m.group(1) if m else ""
@@ -139,7 +163,11 @@ try: data = json.load(open(tp, encoding="utf-8"))
 except (OSError, ValueError): data = {}
 data[gate] = {"result": ("fail" if mode == "fail" else "warn") if fails else "ok", "mode": mode,
               "earliestBadPhase": earliest, "failures": fails, "acCount": len(acs)}
-if os.environ.get("AGENTS_V0_TRACE_NO_WRITE", "0") != "1":
+no_write = os.environ.get("TR_NOWRITE", "0") == "1"
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+no_write = no_write or os.environ.get("AGENTS_V0_TRACE_NO_WRITE", "0") == "1"
+# <<< kit-test-override
+if not no_write:
     with open(tp, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2); fh.write("\n")
 if not fails:
@@ -148,5 +176,5 @@ elif mode == "fail":
     print(f"TRACE: {len(fails)} check(s) failed; earliest bad phase: {earliest}. Fix that phase's artifact, or reopen it.", file=sys.stderr)
     sys.exit(1)
 else:
-    print(f"TRACE: {len(fails)} warning(s); earliest bad phase: {earliest} (AGENTS_V0_TRACE_MODE=warn; report them at the gate)")
+    print(f"TRACE: {len(fails)} warning(s); earliest bad phase: {earliest} (trace mode warn; report them at the gate)")
 PYTR

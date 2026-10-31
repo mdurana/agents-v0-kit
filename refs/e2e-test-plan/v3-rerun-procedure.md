@@ -19,7 +19,7 @@ Short names: box folder `B=/workspace/kit-eval/linode-e2e-20261029`, VM run root
 
 ## 0. Before you start (box, read-only)
 
-1. The branch to test is `kitfix-20261031` at `dd980e6` or later; this procedure was written with the commits after `dd980e6` (guard override, H8/H9 checks, keep-branches). Note the exact commit: `git -C <kitfix worktree> rev-parse HEAD` → `KITSHA`. Use the same commit for every segment.
+1. The branch to test is `kitfix-20261031` with the installed-no-overrides commit (2026-10-31, after `f32ddda`) or later: installed scripts read no `AGENTS_V0_*` override, and the trace mode comes from `.agents-v0/policy.conf`. Earlier commits on the branch add guard override, H8/H9 and keep-branches. Note the exact commit: `git -C <kitfix worktree> rev-parse HEAD` → `KITSHA`. Use the same commit for every segment.
 2. The old run archive is `$B/archive/run-20261029-1629.tar.zst` (2.8 GB). Check it against `$B/archive/SHA256SUMS` (`cd $B/archive && sha256sum -c SHA256SUMS`, only the line for this file). Its `run-20261029-1629/snapshots/` has `S4-P1-D-END`, `S4-P1-E-END`, `S4-P2-E-END` and `S4-P2-O-END` (`.tgz`, `.kit`, `.state.env`), checksummed in `snapshots/SHA256SUMS`.
 3. The Gemini quota has reset (the old run stopped on a 53 h quota at P2-P design). Marlon picks the model; by default it is the old run's `gemini-4-argon-medium` for every segment.
 4. Offline tests pass on `KITSHA` (box): `sh scripts/validate-kit.sh` and the harness suites `bash refs/e2e-test-plan/tests/{test-classify,test-checks,test-rollback,sim-in-story-resume,test-guards}.sh`.
@@ -64,17 +64,11 @@ The kit update goes **only into main**. The released stories' worktrees are set 
 1. **Set aside the released worktrees** (`remove-released-worktrees.sh`): list them with `git -C $MAIN worktree list`. For each worktree, check that its branch is fully merged into main and that the worktree is clean. Then copy its git admin folder to `$T/trash/released-worktrees-<time>/admin/`, move the worktree folder into the same trash folder, and run `git -C $MAIN worktree prune -v`. **Branches stay**: the script's last list (`git branch`) must still show every `feature/*` branch. Stop if a branch is missing.
 2. **Check out the new kit and update main** (`kit-update-cca2773.sh` with `KIT_FIX_URL=$KS KIT_FIX_REF=refs/heads/kitfix-20261031`, the expected sha set to `KITSHA`). `kit_checkout` moves `$T/kit` to `KITSHA` and appends `kit_sha`/`kit_label`/`kit_source` to `results/run.meta`. `kit_update_workspace` runs `install.sh --update --quick` (and `--allow-in-flight` if a state file is active) on every remaining worktree. Only main is left, and it gets one harness commit, `Update agents-v0 kit to <label> [harness commit]`. Stop if it prints `KIT-UPDATE-FAIL`.
 3. **Compatibility checks** (`compat-checks.sh`): `validate-kit.sh --target $MAIN` (with `KIT_SKIP_APP_TEMPLATE_TEST=1`), `check-release-evidence.sh` and `released_ok` for P0-A and every released story, `merged_into_main` for each `feature/<slug>`, the program phases approved, `next-story.py map`, main clean, no MERGE_HEAD, and no branch or worktree for the story you are about to run. Every line must PASS (`ALL=PASS`). If `check-release-evidence.sh` prints `WARN: feature/<slug> not found`, a story branch is missing. That should not happen (branches are kept), so stop and restore the branch from its `Story-Tip` before going on.
-4. **Verify the installed kit by hash (required):** every kit script and hook installed in main must be byte-identical to the branch. Run it as e2e, and read it all:
+4. **Verify the installed kit by hash (required):** every kit script and hook installed in main must be byte-identical to the branch, with the test-only override code removed. The kit's own checker does this read-only, comparing against the stripped kit files:
 ```
-su - e2e -c 'M=$HOME/agents-v0-e2e/run-20261029-1629/work/portal; K=$HOME/kit-src; bad=0; n=0
-  cmp_dir(){ for f in "$1"/*; do [ -f "$f" ] || continue; b=${f##*/}; n=$((n+1))
-      if [ ! -e "$2/$b" ]; then echo "MISSING $2/$b"; bad=1
-      elif [ "$(sha256sum < "$f")" != "$(sha256sum < "$2/$b")" ]; then echo "DIFF $2/$b"; bad=1; fi; done
-    for g in "$2"/*; do [ -e "$1/${g##*/}" ] || echo "EXTRA $g (not in the kit; check it is pack-scan.sh or a project file)"; done; }
-  cmp_dir $K/templates/.agents-v0/scripts $M/.agents-v0/scripts; cmp_dir $K/core/common/hooks $M/.agents/hooks
-  echo "kit=$(git -C $K rev-parse --short=12 HEAD) installed=$(cat $M/.agents-kit-version) files=$n"; [ $bad = 0 ] && echo HASH-OK || echo HASH-FAIL'
+su - e2e -c 'M=$HOME/agents-v0-e2e/run-20261029-1629/work/portal; sh $HOME/kit-src/scripts/check-installed-kit.sh $M; echo "installed=$(cat $M/.agents-kit-version)"' | tee /tmp/v3-kit-hash.txt
 ```
-   Go on only on `HASH-OK`, with `.agents-kit-version` naming `KITSHA` (first 12 characters). A `MISSING` line is acceptable only for a script that `install.sh` removes on purpose (`check-delivery-gate-local.sh` when there is no CI). Any other `MISSING` or `DIFF` line is a STOP. Save the output as `$T/results/v3-kit-hash-<ID>.txt`.
+   Go on only on `HASH-OK files=<n> …`, with `.agents-kit-version` naming `KITSHA` (first 12 characters). Any `DIFF`, `MISSING`, `TEST-OVERRIDES-INSTALLED`, `ENV-READ` or `MARKER-LEFT` line is a STOP. Copy the output to `$T/results/v3-kit-hash-<ID>.txt`. The trace mode is checked by the harness at launch (§5, §6).
 5. **Record and snapshot** (`record-and-snap.sh`): snapshot `S4-<START STORY>-END-KIT-<label>`, one `fix-attempts.tsv` row whose note **starts with `kit-update`**, so it is not counted against `MAX_RESUMES_TOTAL` (D7). Also one `kit_update_<k>=… worktrees_set_aside="…"` line in `run.meta`, with a note naming Marlon's approval of V3.
 
 ## 5. Launch env file for the segment
@@ -89,12 +83,14 @@ export MAX_RESUMES_TOTAL=<counted rows of results/fix-attempts.tsv, without kit-
 export AGENT_TZ=Asia/Manila
 # fail modes for V3 (item 3, Marlon 2026-10-31): mismatches fail the story instead of being findings
 export H6_MODE=fail
-export AGENTS_V0_TRACE_MODE=fail
-# H7/H8/H9 already default to fail; do not set H7_MODE/H8_MODE/H9_MODE=warn
+export KIT_TRACE_MODE=fail          # the harness writes trace_mode=fail into .agents-v0/policy.conf (main + worktrees)
+export REQUIRE_FAIL_MODES=1         # refuse to start unless every mode is fail and the installed kit is HASH-OK
+# H7/H8/H9/H10 already default to fail; do not set H7_MODE/H8_MODE/H9_MODE/H10_MODE=warn
+# do NOT set AGENTS_V0_TRACE_MODE: installed scripts ignore it, and the preflight refuses it
 export CHAIN_RESUME_NOTE="V3 rerun of <ID> on kit <KITSHA short> after a main-only kit update, approved by mdurana <date time>"
 ```
-- `AGENTS_V0_TRACE_MODE` is read by the kit's `check-traceability.sh` **in the agent's own shell**. It must therefore come from the harness's launch environment, which `start-tmux.sh` loads with `set -a` into both the runner and the agy loop, so it reaches every agent command. The agent itself cannot set it: since kitfix-20261031-guard-override the hooks block any agent command that sets an `AGENTS_V0_*` variable, and H8 fails the story if an agent tries.
-- Never set `AGENTS_V0_SKIP_BRANCH_GUARD`, `AGENTS_V0_SKIP_COMMIT_CHECK` or `AGENTS_V0_NOW` in a launch env. They are for kit fixtures only.
+- **How the trace mode reaches the kit (kitfix-20261031-installed-no-overrides):** the installed `check-traceability.sh` no longer reads any environment variable. It reads `trace_mode` only from `.agents-v0/policy.conf` in the checkout. Before each story, the harness (`kit_policy_apply`) writes that file from `KIT_TRACE_MODE` into main and every kit worktree, with one `[harness commit]` each. The agent cannot change it through the environment at all. The hooks block agent writes to the file, and H10 fails the story if the file, an installed script or a hook changed during a turn.
+- `H6_MODE`, `H7_MODE` … `H10_MODE` are read only by the runner process, which the agent cannot reach. Never set the kit's test-only variables (`AGENTS_V0_SKIP_BRANCH_GUARD`, `AGENTS_V0_SKIP_COMMIT_CHECK`, `AGENTS_V0_NOW`, `AGENTS_V0_TZ`) in a launch env. Installed scripts ignore them anyway.
 - `kit-fix` is refused for a story resume, which is why the kit was updated by hand in §4 and the reason here is `harness-fix`, as in resume 7 of the old run.
 - Segment 2 (P2-A) only: start the launch so P2-A's approval turns cross 00:00 Asia/Manila, about 23:15.
 - Check the file (`grep -n '^export' <file>`): exactly one line for each name above, no secret.
@@ -106,9 +102,10 @@ vm.py run "su - e2e -c 'cd ~/kit-src/refs/e2e-test-plan && set -a && . ~/.config
 ```
 Within 3 minutes, check (read-only):
 - `progress.log` has `RESUME attempt … reason=harness-fix`, `RESUME-FROM-STORY … <ID>`, `CHAIN-SKIP` for every story before `<ID>`, `STORY step 4 story <ID>`, then `TURN-START run=S4-<slug>-intake-1`;
-- the runner and the agy loop have the fail modes. Print only these lines, never the whole environment: `for p in $(pgrep -u e2e -f 'scripts/(run-plan|agy-turn-loop)\.sh'); do tr '\0' '\n' < /proc/$p/environ | grep -cE '^(H6_MODE|AGENTS_V0_TRACE_MODE)=fail$'; done` must print `2` for each process. The summary's Limits line shows `H6_MODE=fail` at the end of the run.
+- **the modes were verified before anything ran:** `progress.log` has `MODES H6=fail H7=fail H8=fail H9=fail H10=fail trace=fail require_fail=1 OK` before `RUN-START`, and `results/modes-preflight.log` has an `OK portal: HASH-OK … trace_mode=fail` line for main (and for any kept worktree). If the preflight refused, the run stopped with exit 3 and `STOP modes refused …` in `results/stop.txt`: read `modes-preflight.log`, fix the env file or the install, and launch again. Do not lower a mode;
+- `POLICY trace_mode=fail in portal (…)` in `progress.log` at the first launch (later launches find the file already set), and `cat $MAIN/.agents-v0/policy.conf` shows `trace_mode=fail`. The summary's Limits line shows the modes at the end of the run.
 
-**Stop after the story.** The chain goes on to the next story after `<ID>`. The harness has no per-story stop; follow-up: a `CHAIN_STOP_AFTER_STORY` flag. It does check for a `HALT` file before every story and between runs. So for segments 1-3, start a watcher. It writes `HALT` only after `<ID>` has passed every check and its END snapshot is saved (line ` SNAPSHOT S4-<ID>-END `, posted after H1-H9), so `<ID>` itself is never cut short. Before the launch, record where the log ends: `wc -l < $T/status/progress.log > $T/status/v3-start-line`. Save this as `/home/e2e/v3-stop-after.sh` (no secrets):
+**Stop after the story.** The chain goes on to the next story after `<ID>`. The harness has no per-story stop; follow-up: a `CHAIN_STOP_AFTER_STORY` flag. It does check for a `HALT` file before every story and between runs. So for segments 1-3, start a watcher. It writes `HALT` only after `<ID>` has passed every check and its END snapshot is saved (line ` SNAPSHOT S4-<ID>-END `, posted after H1-H10), so `<ID>` itself is never cut short. Before the launch, record where the log ends: `wc -l < $T/status/progress.log > $T/status/v3-start-line`. Save this as `/home/e2e/v3-stop-after.sh` (no secrets):
 ```
 #!/usr/bin/env bash
 # v3-stop-after.sh <ID>: write HALT once <ID>'s END snapshot is posted; give up if the run ends first
@@ -126,8 +123,8 @@ Do not kill the runner or agy yourself. A USAGE or AUTH HALT, a refusal (exit 3,
 
 ## 7. Pass bar (per story, from `results/checks.tsv` rows of `<ID>` in this attempt, `summary.md` and `progress.log`)
 
-- **H1-H9, V1 and L1 PASS** for `<ID>`: H6 (AC count) and the T1-T6 traceability checks are in fail mode. H7 means no harness gate-commit fallback. H8 means no `AGENTS_V0_*` override. H9 means the gate commits are intact and in order intake < design < build < verify < release on `feature/<slug>`. For P2-P, also F1 (frontend changed, `npm run verify` passing).
-- No `SEMI-SYNTHETIC` build label, no `GATE-COMMIT-MISSING`, no `GATE-CHAIN-BROKEN`, and no `FINDING H6`/`H8`/`H9`. No `TRACE WARN`: in fail mode a traceability gap refuses the approval, so a refusal the agent then fixed is fine if it is explained.
+- **H1-H10, V1 and L1 PASS** for `<ID>`: H6 (AC count) and the T1-T6 traceability checks are in fail mode. H7 means no harness gate-commit fallback. H8 means no `AGENTS_V0_*` override typed by the agent (a text speed bump only). H9 means the gate commits are intact and in order intake < design < build < verify < release on `feature/<slug>`. H10 means the installed kit, hooks and `policy.conf` were not changed during any turn, and every gate in `<slug>.trace.json` was recorded in `fail` mode. For P2-P, also F1 (frontend changed, `npm run verify` passing).
+- No `SEMI-SYNTHETIC` build label, no `GATE-COMMIT-MISSING`, no `GATE-CHAIN-BROKEN`, no `kit-tamper.txt`, and no `FINDING H6`/`H8`/`H9`/`H10`. No `TRACE WARN`: in fail mode a traceability gap refuses the approval, so a refusal the agent then fixed is fine if it is explained.
 - `check-release-evidence.sh` for `<ID>` prints `OK` with no `WARN: feature/… not found`. `feature/<slug>` exists after the release and is never deleted.
 - P2-A: the phase dates survive the midnight crossing, and `/v0-design` before the branch step is refused by the branch guard.
 - `results/v3-kit-hash-<ID>.txt` says `HASH-OK`. The README Validity block lists DEGRADED only for `container` (no Docker), and it lists the kits of the kept stories (expected: see the caveat).

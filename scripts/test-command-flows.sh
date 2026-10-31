@@ -49,7 +49,7 @@ new_repo "$plain"
   || fail "install without --git-hooks leaves core.hooksPath unset"
 
 r="$tmp/r"
-new_repo "$r" --git-hooks
+new_repo "$r" --git-hooks --test-overrides   # kit test copy: keeps the AGENTS_V0_* overrides
 [ "$(git -C "$r" config --get core.hooksPath)" = ".agents-v0/hooks" ] \
   && pass "install --git-hooks sets core.hooksPath=.agents-v0/hooks" \
   || fail "install --git-hooks sets core.hooksPath=.agents-v0/hooks"

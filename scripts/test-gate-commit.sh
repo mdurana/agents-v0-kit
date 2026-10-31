@@ -18,7 +18,7 @@ S=".agents-v0/scripts"
 export AGENTS_V0_TZ=Asia/Manila
 
 r="$tmp/portal"; mkdir -p "$r"; git -C "$r" init -q -b main
-(cd "$r" && sh "$KIT/scripts/install.sh" "$r" >/dev/null 2>&1) || fail "install.sh"
+(cd "$r" && sh "$KIT/scripts/install.sh" --test-overrides "$r" >/dev/null 2>&1) || fail "install.sh"   # kit test copy: keeps the AGENTS_V0_* overrides
 G "$r" add -A; G "$r" commit -qm base
 
 # ---- project phases: commit to main, one commit each, tagged -----------------------------------

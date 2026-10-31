@@ -157,7 +157,12 @@ fi
 # release were all recorded and committed on main; prose in v0-design/v0-build did not stop it.
 # P0-A has no feature branch and works on the integration branch. Recording a blocked state is
 # allowed anywhere (it records a stop, it does no work). Maintenance notes are not checked here.
-# AGENTS_V0_SKIP_BRANCH_GUARD=1 skips the check (kit fixtures only; never in a real story).
+# AGENTS_V0_SKIP_BRANCH_GUARD=1 skips the check in the kit's own test copies only: install.sh removes the
+# override block below, so an installed copy always runs the guard (kitfix-20261031-installed-no-overrides).
+bg_skip=0
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+[ "${AGENTS_V0_SKIP_BRANCH_GUARD:-0}" != 1 ] || bg_skip=1
+# <<< kit-test-override
 case "$art" in
   docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
     bg_phase=""
@@ -168,7 +173,7 @@ case "$art" in
     if [ -z "$bg_phase" ] && [ -n "$verify_passed" ] && [ "$approve_lc" != release ]; then
       bg_phase="verify"
     fi
-    if [ -n "$bg_phase" ] && [ "${AGENTS_V0_SKIP_BRANCH_GUARD:-0}" != 1 ] \
+    if [ -n "$bg_phase" ] && [ "$bg_skip" != 1 ] \
        && command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       bg_current="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
       bg_p0a=0
@@ -204,9 +209,25 @@ esac
 # Gate commits (kitfix-20261031-gate-commit). Every approved gate is one commit (check-gate-commit.sh):
 # a new phase does not start while the last approved phase is uncommitted, and a feature story's release
 # is approved only after feature/<feature> is committed and squash-staged in the integration checkout.
-# AGENTS_V0_SKIP_COMMIT_CHECK=1 skips both (kit fixtures only).
+# AGENTS_V0_SKIP_COMMIT_CHECK=1 skips both in the kit's own test copies only (installed copies never skip).
 gc_script="$(dirname "$0")/check-gate-commit.sh"
-if [ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" != 1 ] && [ -f "$gc_script" ]; then
+gc_skip=0
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+[ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" != 1 ] || gc_skip=1
+# <<< kit-test-override
+# An installed copy refuses when a gate script is missing (deleting it must not switch the check off);
+# the kit's own test copies may run without them.
+kit_missing_ok=0
+# >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+kit_missing_ok=1
+# <<< kit-test-override
+for kit_req in check-gate-commit.sh check-traceability.sh; do
+  if [ ! -f "$(dirname "$0")/$kit_req" ] && [ "$kit_missing_ok" != 1 ]; then
+    printf 'FAIL: .agents-v0/scripts/%s is missing; reinstall the kit (install.sh --update) before recording a phase.\n' "$kit_req" >&2
+    exit 1
+  fi
+done
+if [ "$gc_skip" != 1 ] && [ -f "$gc_script" ]; then
   if [ "$set_active" = 1 ] && [ "$active_status" = in_progress ]; then
     gc_prev_active="$(python3 -c 'import json,sys
 try: print((json.load(open(sys.argv[1])).get("activePhase") or ""))
@@ -335,15 +356,18 @@ if prev_last in phases and prev_last not in approved_list:
 
 # kitfix-20261031-single-clock: one clock for every date this script writes (phaseDates, phaseTimes,
 # the Date cell of the approved Delivery approvals row, updatedAt). The project time zone comes from
-# AGENTS_V0_TZ, else the `Timezone` row of docs/agents-v0/project-profile.md, else the system zone.
+# AGENTS_V0_TZ (kit test copies only), else the `Timezone` row of docs/agents-v0/project-profile.md, else the system zone.
 # Run 20261029-1629 (P2-A H3): the script dated approvals in UTC while the agent typed local dates
 # (or `date -u`), so phaseDates went backwards across midnight Asia/Manila.
-# AGENTS_V0_NOW=<ISO time with offset> pins the clock (kit tests only).
+# AGENTS_V0_NOW=<ISO time with offset> pins the clock (kit test copies only: install.sh removes both env reads).
 import datetime as _dt
 
 
 def _project_tz():
+    name = ""
+    # >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
     name = os.environ.get("AGENTS_V0_TZ", "").strip()
+    # <<< kit-test-override
     if not name:
         prof = "docs/agents-v0/project-profile.md"
         try:
@@ -366,7 +390,10 @@ def _project_tz():
 
 
 def kit_now():
+    pinned = ""
+    # >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
     pinned = os.environ.get("AGENTS_V0_NOW", "").strip()
+    # <<< kit-test-override
     tz = _project_tz()
     if pinned:
         t = _dt.datetime.fromisoformat(pinned)
