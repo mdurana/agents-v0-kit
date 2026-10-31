@@ -576,6 +576,96 @@ def unattended_file_cases(tmp: str) -> list:
              "unattended-allow file: own script")]
 
 
+def kit_git_cases(tmp: str) -> list:
+    """kitfix-20261031-kit-git-source: unattended, no kit bundle, clone or mirror through git; normal git still works."""
+    def git(*a, cwd):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
+                        "-c", "protocol.file.allow=always", *a], cwd=cwd, check=True, capture_output=True)
+    kit, proj, feat = (os.path.join(tmp, n) for n in ("kit-src", "portal", "portal-feat"))
+    git("bundle", "create", os.path.join(tmp, "kit.bundle"), "main", cwd=kit)
+    shutil.copy(os.path.join(tmp, "kit.bundle"), os.path.join(tmp, "kitdata.bin"))   # a bundle under another name
+    git("clone", "-q", "--bare", kit, os.path.join(tmp, "kit-mirror.git"), cwd=tmp)
+    git("clone", "-q", kit, os.path.join(tmp, "kit-clone"), cwd=tmp)
+    git("init", "-q", "--bare", "-b", "main", os.path.join(tmp, "origin.git"), cwd=tmp)
+    git("remote", "add", "origin", os.path.join(tmp, "origin.git"), cwd=proj)
+    git("push", "-q", "origin", "main", cwd=proj)
+    git("remote", "add", "kitb", os.path.join(tmp, "kit.bundle"), cwd=proj)
+    lib = os.path.join(tmp, "lib-repo")
+    os.makedirs(lib)
+    git("init", "-q", "-b", "main", lib, cwd=tmp)
+    with open(os.path.join(lib, "a.txt"), "w", encoding="utf-8") as fh:
+        fh.write("a\n")
+    git("add", "-A", cwd=lib)
+    git("commit", "-qm", "lib", cwd=lib)
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)"}
+    b, m, kc, kd = (os.path.join(tmp, n) for n in ("kit.bundle", "kit-mirror.git", "kit-clone", "kitdata.bin"))
+    T = "templates/.agents-v0/scripts/sync-feature-state.sh"
+    c = []
+    def add(cmd, want, env=U, label="", cwd=proj):
+        c.append((cmd, cwd, env, want, label))
+    for cmd, label in [
+            (f"git clone {b} /tmp/kitx", "clone a bundle"), (f"git clone -q {m} /tmp/kitx", "clone a mirror"),
+            ("git clone https://example.invalid/any.git /tmp/any", "clone anything"),
+            (f"git fetch {b} main", "fetch a bundle"), (f"git fetch {b} main:refs/heads/kit", "fetch a bundle into a ref"),
+            (f"git pull {b} main", "pull a bundle"), (f"git fetch {m}", "fetch a mirror"), (f"git fetch {kc} main", "fetch a clone"),
+            ("git fetch https://example.invalid/kit.git main", "fetch a URL that is not a remote"),
+            ("git fetch kitb", "fetch a configured remote whose URL is a bundle"), (f"git ls-remote {b}", "ls-remote a bundle"),
+            (f"git bundle unbundle {b}", "bundle unbundle"), (f"git bundle verify {b}", "bundle verify"),
+            (f"git bundle list-heads {b}", "bundle list-heads"), (f"git remote add k {b}", "remote add"),
+            (f"git remote set-url origin {b}", "remote set-url"), (f"git config remote.origin.url {b}", "config remote url"),
+            (f"git -c remote.origin.url={b} fetch origin", "-c remote url"),
+            (f"git -C {kit} show HEAD:{T}", "-C kit-src show"), (f"git -C {kc} log -1", "-C kit clone log"),
+            (f"git --git-dir={m} cat-file -p HEAD:{T}", "--git-dir= mirror cat-file"),
+            (f"git --git-dir {m} show HEAD", "--git-dir mirror show"), (f"git -C {kd} log", "-C a renamed bundle"),
+            (f"GIT_DIR={m} git show HEAD:{T}", "GIT_DIR prefix"), (f"env GIT_DIR={m} git log -1", "env GIT_DIR"),
+            (f"export GIT_DIR={m}; git log -1", "export GIT_DIR"),
+            (f"GIT_ALTERNATE_OBJECT_DIRECTORIES={m}/objects git cat-file -p HEAD", "alternate objects"),
+            ("git archive HEAD .agents-v0/scripts | tar -x -C /tmp/old", "git archive"),
+            (f"git submodule add {kit} kit", "submodule add"), (f"cp {b} /tmp/k.bundle", "cp a bundle"),
+            (f"bash -c 'git fetch {b} main'", "bash -c fetch")]:
+        add(cmd, "block", label=label)
+    for cmd, want, label in [
+            ("git status", "allow", "status"), ("git log --oneline -3", "allow", "log"), ("git fetch", "allow", "fetch"),
+            ("git fetch origin", "allow", "fetch origin"), ("git fetch --all --prune", "allow", "fetch --all"),
+            ("git pull --ff-only origin main", "allow", "pull origin"), ("git remote -v", "allow", "remote -v"),
+            ("git ls-remote origin", "allow", "ls-remote origin"), ("git config --get remote.origin.url", "allow", "config --get"),
+            ("git show HEAD:.agents-v0/policy.conf", "allow", "show own blob"), ("git cat-file -p HEAD", "allow", "cat-file own"),
+            ("git -C ../portal-feat log -1", "allow", "-C sibling worktree (same repo)"), (f"git -C {feat} status", "allow", "-C worktree"),
+            (f"git -C {lib} log -1", "allow", "-C an unrelated repo"), ("git worktree list", "allow", "worktree list"),
+            ("git push origin feature/x", "ask", "push asks as before"), (f"ls -la {b}", "allow", "ls a bundle")]:
+        add(cmd, want, label=label)
+    add("git fetch origin", "allow", label="fetch origin from the worktree", cwd=feat)
+    add(f"git clone {b} /tmp/kitx", "allow", env={}, label="attended: clone (unchanged)")
+    add(f"git fetch {b} main", "allow", env={}, label="attended: fetch a path (unchanged)")
+    return c
+
+
+def root_commit_case(tmp: str) -> list:
+    """A repository whose tips no longer hold templates/ but whose objects hold a kit root commit (in-process)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("kit_hook_policy_t", POLICY)
+    hp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hp)
+    kit = os.path.join(tmp, "kit-src")
+    root = subprocess.run(["git", "-C", kit, "rev-list", "--max-parents=0", "HEAD"], capture_output=True, text=True,
+                          check=True).stdout.split()[0]
+    r = os.path.join(tmp, "rooted")
+    subprocess.run(["git", "clone", "-q", kit, r], check=True, capture_output=True)
+    subprocess.run(["git", "-C", r, "rm", "-rq", "templates"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", r, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "drop"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", r, "remote", "remove", "origin"], check=True, capture_output=True)
+    gd = os.path.join(r, ".git")
+    out = [("tips without templates/, no root listed", hp._repo_holds_kit(gd), False)]
+    hp._REPO_KIT_CACHE.clear()
+    hp.KIT_ROOT_COMMITS = (root,)
+    out.append(("same repo, its root commit listed as a kit root", hp._repo_holds_kit(gd), True))
+    hp._REPO_KIT_CACHE.clear()
+    hp.KIT_ROOT_COMMITS = ("0" * 40,)
+    out.append(("an unknown root", hp._repo_holds_kit(gd), False))
+    return out
+
+
 def main() -> int:
     global CWD
     fail = 0
@@ -614,9 +704,16 @@ def main() -> int:
     fcases = unattended_file_cases(ktmp)
     for cmd, cwd, env, want, label in fcases:
         check(shell(cmd, cwd, cwd, env), want, f"kit-source {label}: `{cmd}`")
+    shutil.move(flag, flag + ".off")  # back to attended for the next cases (never deleted)
+    gcases = kit_git_cases(ktmp)
+    for cmd, cwd, env, want, label in gcases:
+        check(shell(cmd, cwd, cwd, env), want, f"kit-git {label}: `{cmd}`")
+    rcases = root_commit_case(ktmp)
+    for label, got, want in rcases:
+        check(str(got), str(want), f"kit-git root commit: {label}")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases)
+    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

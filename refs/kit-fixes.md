@@ -192,3 +192,31 @@ Limits:
 - **Git history.** The project's own git history still holds kit scripts installed before `kitfix-20261031-installed-no-overrides`. The hook blocks the `<rev>:<path>` forms, but a raw blob id (`git cat-file -p <sha>`) is not recognised.
 - **Outcome checks.** The harness outcome checks still catch the effects: H1 for the branch guard, H3 for phase times, H10 for `trace.json` mode and kit tampering.
 - **Snapshot archives.** Old snapshot archives are made root-only by the procedure, not by the harness. The marker scan reads plain files only.
+
+## kitfix-20261031-kit-git-source
+
+Found by the next external review (approved by Marlon, 2026-10-31 11:25 Asia/Manila). The V3 procedure delivered the kit to the VM as a git bundle in `/tmp` (mode 644), and the lock step left it there. A bundle, clone or mirror of the kit holds the unstripped scripts in its git objects, where the `*.sh` scan cannot see them. In unattended mode the hook still allowed `git clone`, `git fetch` and `git bundle unbundle` against it, so the agent could get an unstripped copy back.
+
+- `core/common/hooks/hook-policy.py`, **unattended mode only** (attended mode is unchanged). Git works on this project's own repository and its configured remotes only:
+  - **Blocked outright:** `git clone`, `git bundle` (any subcommand: `unbundle`, `verify`, `list-heads`, `create`), `git archive`, `git submodule add`, `git remote add` / `set-url`, a `git config` write of `remote.*.url` or `url.*.insteadOf`, and `-c remote.*.url=` / `-c url.*.insteadOf=` on the command line.
+  - **`git fetch`, `pull` and `ls-remote`:** allowed with no source, or with a source that is a remote configured in the repository the command runs in. A local URL (path or `file://`) must not be a git bundle or a kit repository. Any other source (a path, a URL, a bundle) is blocked.
+  - **Other repositories:** `git -C <dir>`, `--git-dir=`, `--work-tree=`, and `GIT_DIR`, `GIT_WORK_TREE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES` or `GIT_COMMON_DIR` (as a prefix, `env`, `export` or `declare -x`) are blocked when they point at a git bundle (by name or by its `# v2/v3 git bundle` header), at a git repository outside this project that holds the kit, at a folder holding kit scripts, or at an unresolved variable. So `git -C ~/kit-src show …`, `git --git-dir=kit-mirror.git cat-file …` and `GIT_DIR=… git log` are blocked. Sibling worktrees of this project and unrelated repositories stay allowed.
+  - **A kit repository** is one whose objects hold a known kit root commit (`KIT_ROOT_COMMITS`: `550da9df…` "agents-v0 version 0.0.1", `fc4b642c…`), or that has `templates/.agents-v0/scripts/sync-feature-state.sh` at HEAD, FETCH_HEAD or any of its first 500 branch or tag tips. One `git cat-file --batch-check` call per repository, cached.
+  - **Copying a bundle** (`cp`, `rsync`, `install`, `tar`, …) counts as copying the kit source (the existing kit-source rule now treats a bundle file as one).
+  - **Still allowed** (tested): `git status`, `log`, `diff`, `show` and `cat-file` on this repository's objects, `fetch`, `fetch origin`, `fetch --all --prune`, `pull --ff-only origin main`, `ls-remote origin`, `remote -v`, `config --get`, `worktree list`, `-C` on a sibling worktree or an unrelated repository; `git push` still asks.
+- **Harness (the real fence):** `kit_source_locked` also refuses to start if the agent user can read any `*.bundle`, or any git repository or bare repository holding the kit, under `KIT_SCAN_ROOTS`. See `refs/e2e-test-plan/HARNESS-FIXES-20261029.md` (2026-10-31 11:25). The procedure now moves the delivery bundle to a root-only folder right after the fetch, and the lock moves it (and any other bundle under `/tmp` and `/home/e2e`) into `/root/kit-locked/<time>` (`v3-rerun-procedure.md` §2 and §4 step 8). Nothing is deleted.
+- **Tests:**
+  - `scripts/test-hook-policy.py`: 471 cases, up from 417. 30 block cases (clone of a bundle, mirror or URL; fetch and pull of a bundle, a renamed bundle, a mirror, a clone, a URL that is not a remote, a remote that points at a bundle; ls-remote of a bundle; bundle unbundle/verify/list-heads; remote add/set-url; config and `-c` remote URLs; `-C`/`--git-dir` show, log and cat-file on the kit source, a clone and a mirror; the `GIT_DIR` family as prefix, `env` and `export`; `git archive | tar`; `submodule add`; `cp` of a bundle; `bash -c` fetch). 17 allow cases for the project's own git and its origin (push asks). 3 more: `fetch origin` from a worktree, and attended clone/fetch of a bundle still allowed. 3 in-process cases for the root-commit test.
+  - `scripts/test-hooks.sh`: 6 block and 5 allow probes end to end through `pre-shell.sh` against a real kit repository, a bundle and a bare origin (Cursor and Antigravity payloads, sh and dash), plus attended fetch of a bundle allowed.
+- **Mutation checks:**
+
+  | Mutation | test-hook-policy | test-hooks |
+  |---|---|---|
+  | `_segment_git_kit_source` off | 13 FAIL | 4 FAIL lines (`git -C <kit repo> show`; the bundle probes are still caught by the kit-source copy rule) |
+  | `command_git_env_kit_source` off | 5 FAIL | — |
+
+Limits:
+- **Speed bump only.** The rules match command text. An encoded command, a git alias defined earlier, or a bundle renamed and stripped of its header (it is never stripped by git) can get past them. The fence is the OS user: the agent user cannot read any bundle or kit repository (preflight-checked).
+- **Network remotes.** A remote already configured in the project is trusted; an `https` remote pointing at the public kit would be fetched. The V3 project's only remote is its own origin.
+- **Unknown kit lineages.** A kit repository whose root is not in `KIT_ROOT_COMMITS` and whose tips do not hold `templates/` is not recognised.
+- **Git history.** As before, the project's own history still holds kit scripts installed before `kitfix-20261031-installed-no-overrides`; a raw blob id is not recognised.

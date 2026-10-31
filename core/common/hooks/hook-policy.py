@@ -629,6 +629,8 @@ def _outside_kit_ref(cand: str, historical: bool, ctx: "_KitCtx") -> Optional[st
         if not _dir_holds_kit(real) or ctx.same_repo(real):
             return None
         return f"{cand} -> {real} holds another copy of the kit scripts"
+    if _is_bundle_file(real):
+        return f"{cand} -> {real} is a git bundle (it may hold the kit source)"
     in_kit_dir = "/.agents-v0/scripts/" in real or "/.agents-v0/hooks/" in real
     by_name = (os.path.basename(real) in ctx.names or base in ctx.names) and _mentions_kit(real)
     if not (in_kit_dir or by_name):
@@ -636,6 +638,172 @@ def _outside_kit_ref(cand: str, historical: bool, ctx: "_KitCtx") -> Optional[st
     if any(real.startswith(a + os.sep) for a in ctx.allowed):
         return None
     return f"{cand} -> {real}"
+
+
+# kitfix-20261031-kit-git-source (11:25 review, unattended mode): a git bundle, a clone or a mirror of the kit holds the
+#   unstripped kit source too, and git reaches it without naming any kit script: `git clone /tmp/kit.bundle x`,
+#   `git fetch /tmp/kit.bundle main`, `git bundle unbundle`, `git -C ~/kit-src show HEAD:templates/...`. Unattended,
+#   git may work on this project's own repository and its configured remotes only:
+#   - clone, bundle, archive, submodule add, remote add/set-url, a remote.*.url / url.*.insteadOf config write: blocked;
+#   - fetch, pull, ls-remote: allowed with no source or a configured remote whose URL is not a local bundle or kit
+#     repository; any other path or URL is blocked;
+#   - -C, --git-dir, --work-tree and GIT_DIR/GIT_WORK_TREE/GIT_OBJECT_DIRECTORY/GIT_ALTERNATE_OBJECT_DIRECTORIES
+#     pointing at a bundle file, or at a repository outside this project whose objects hold the kit (a ref tip with
+#     templates/.agents-v0/scripts/sync-feature-state.sh, or a kit root commit): blocked, readers (show, cat-file,
+#     log) included.
+#   Text and path checks only (a speed bump); the fence is that the agent user cannot read any kit copy (harness
+#   kit_source_locked also refuses a readable *.bundle or kit repository).
+KIT_ROOT_COMMITS = ("550da9df6dcfb46995d5af2adced25e21d372bd9", "fc4b642cb947cf38b5fea7cc1005e22d58e17eef")
+KIT_PROBE_PATH = "templates/.agents-v0/scripts/sync-feature-state.sh"
+GIT_SOURCE_MSG = ("unattended mode: {}. git works on this project's own repository and its configured remotes only; "
+                  "a kit bundle, clone or mirror stays out of the agent's reach.")
+_REPO_KIT_CACHE: dict = {}
+
+
+def _is_bundle_file(p: str) -> bool:
+    if not os.path.isfile(p):
+        return False
+    if p.endswith(".bundle"):
+        return True
+    try:
+        with open(p, "rb") as fh:
+            head = fh.read(16)
+    except OSError:
+        return False
+    return head.startswith((b"# v2 git bundle", b"# v3 git bundle"))
+
+
+def _repo_holds_kit(gd: str) -> bool:
+    """True when the git dir <gd> holds a kit root commit or a ref (or HEAD/FETCH_HEAD) whose tree has the kit source."""
+    if gd in _REPO_KIT_CACHE:
+        return _REPO_KIT_CACHE[gd]
+    found = False
+    try:
+        refs = subprocess.run(["git", "--git-dir", gd, "for-each-ref", "--count=500", "--format=%(objectname)"],
+                              capture_output=True, text=True, timeout=10, check=False).stdout.split()
+        lines = list(KIT_ROOT_COMMITS) + [f"{r}:{KIT_PROBE_PATH}" for r in refs + ["HEAD", "FETCH_HEAD"]]
+        out = subprocess.run(["git", "--git-dir", gd, "cat-file", "--batch-check"], input="\n".join(lines) + "\n",
+                             capture_output=True, text=True, timeout=10, check=False).stdout
+        found = any(l and not l.endswith(" missing") and " " in l for l in out.splitlines())
+    except (OSError, subprocess.SubprocessError):
+        found = False
+    _REPO_KIT_CACHE[gd] = found
+    return found
+
+
+def _kit_git_target(path: str, hook_common: str) -> Optional[str]:
+    """A reason when <path> is a git bundle, or a repository outside this project that holds the kit."""
+    p = os.path.expanduser(path.strip().strip("'\""))
+    if not p:
+        return None
+    if re.search(r"[$`]", p):
+        return f"{path}: an unresolved git repository path"
+    full = os.path.normpath(p if os.path.isabs(p) else os.path.join(_base_dir(), p))
+    real = os.path.realpath(full)
+    if _is_bundle_file(real):
+        return f"{path} is a git bundle"
+    if not os.path.isdir(real):
+        return None
+    gd = _git_common_dir(real)
+    if not gd and os.path.isfile(os.path.join(real, "HEAD")) and os.path.isdir(os.path.join(real, "objects")):
+        gd = real
+    if gd and gd != hook_common and _repo_holds_kit(gd):
+        return f"{path} is a repository holding the kit source"
+    if not gd and _dir_holds_kit(real):
+        return f"{path} holds another copy of the kit scripts"
+    return None
+
+
+def _is_local_url(u: str) -> bool:
+    return "://" not in u and not re.match(r"^[\w.+-]+@[\w.-]+:", u) and not re.match(r"^[\w.-]+:(?!/)", u)
+
+
+GIT_ENV_RE = re.compile(r"(?:^|[\s;&|(])(?:export\s+|declare\s+-x\s+)?"
+                        r"(GIT_DIR|GIT_WORK_TREE|GIT_OBJECT_DIRECTORY|GIT_ALTERNATE_OBJECT_DIRECTORIES|GIT_COMMON_DIR)="
+                        r"(\"[^\"]*\"|'[^']*'|[^\s;&|)]+)")
+
+
+def command_git_env_kit_source(cmd: str, hook_root: str) -> Optional[str]:
+    """GIT_DIR=... and friends anywhere in the command (env prefixes are dropped when segments are split)."""
+    hook_common = _git_common_dir(hook_root)
+    for m in GIT_ENV_RE.finditer(cmd):
+        for part in m.group(2).strip("'\"").split(":"):
+            why = _kit_git_target(part, hook_common) if part else None
+            if why:
+                return f"{m.group(1)}: {why}"
+    return None
+
+
+def _segment_git_kit_source(seg: str, hook_root: str) -> Optional[str]:
+    s = _strip_env_prefix(seg.strip())
+    hook_common = _git_common_dir(hook_root)
+    try:
+        parts = shlex.split(s, posix=True)
+    except ValueError:
+        parts = s.split()
+    if not parts or parts[0].split("/")[-1] != "git":
+        return None
+    i, cwd = 1, None
+    while i < len(parts):
+        a = parts[i]
+        if a == "-C" and i + 1 < len(parts):
+            cwd = parts[i + 1] if cwd is None or os.path.isabs(parts[i + 1]) else os.path.join(cwd, parts[i + 1])
+            why = _kit_git_target(cwd, hook_common)
+            if why:
+                return f"git -C {why}"
+            i += 2
+            continue
+        if a in ("--git-dir", "--work-tree") and i + 1 < len(parts):
+            why = _kit_git_target(parts[i + 1], hook_common)
+            if why:
+                return f"git {a} {why}"
+            i += 2
+            continue
+        if a.startswith(("--git-dir=", "--work-tree=")):
+            why = _kit_git_target(a.split("=", 1)[1], hook_common)
+            if why:
+                return f"git {a.split('=', 1)[0]} {why}"
+            i += 1
+            continue
+        if a == "-c" and i + 1 < len(parts):
+            if re.match(r"(?i)^(remote\..+\.(url|pushurl)|url\..+\.insteadof)=", parts[i + 1]):
+                return f"git -c {parts[i + 1].split('=', 1)[0]} changes where git fetches from"
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        break
+    sub = parts[i] if i < len(parts) else ""
+    args = parts[i + 1:]
+    pos = [x for x in args if not x.startswith("-")]
+    if sub in ("clone", "bundle", "archive"):
+        return f"git {sub} is not used unattended"
+    if sub == "submodule" and pos[:1] == ["add"]:
+        return "git submodule add is not used unattended"
+    if sub == "remote" and pos[:1] and pos[0] in ("add", "set-url"):
+        return f"git remote {pos[0]} is not used unattended"
+    if sub == "config" and any(re.match(r"(?i)^(remote\..+\.(url|pushurl)|url\..+\.insteadof)$", x) for x in pos) \
+            and (len(pos) >= 2 or any(x in ("--add", "--replace-all") for x in args)):
+        return "a git config write of a remote URL is not used unattended"
+    if sub in ("fetch", "pull", "ls-remote") and pos:
+        src = pos[0]
+        base = os.path.join(_base_dir(), cwd) if cwd and not os.path.isabs(cwd) else (cwd or _base_dir())
+        try:
+            url = subprocess.run(["git", "-C", base, "config", "--get", f"remote.{src}.url"], capture_output=True,
+                                 text=True, timeout=5, check=False).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            url = ""
+        if not url:
+            return f"git {sub} from {src}, which is not a configured remote of this project"
+        if _is_local_url(url):
+            u = url[len("file://"):] if url.startswith("file://") else url
+            if not os.path.isabs(u):
+                u = os.path.join(base, u)
+            why = _kit_git_target(u, hook_common)
+            if why:
+                return f"git {sub} {src}: {why}"
+    return None
 
 
 def _segment_reads_stdin_program(seg: str) -> bool:
@@ -1001,6 +1169,10 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     unattended = unattended_mode()
     stdin_exec = unattended and any(_segment_reads_stdin_program(sg) for sg in segments)
     hook_root = _project_root(_base_dir()) if unattended else ""
+    if unattended:
+        why = command_git_env_kit_source(cmd, hook_root)
+        if why:
+            return "block", GIT_SOURCE_MSG.format(why)
     for seg in segments:
         cd_to = _cd_target(seg)
         if cd_to:
@@ -1010,6 +1182,9 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
             why = _segment_uses_outside_kit(seg, stdin_exec, hook_root)
             if why:
                 return "block", KIT_SOURCE_MSG.format(why)
+            why = _segment_git_kit_source(seg, hook_root)
+            if why:
+                return "block", GIT_SOURCE_MSG.format(why)
         action, message = classify_segment(seg)
         if action == "block":
             return "block", message

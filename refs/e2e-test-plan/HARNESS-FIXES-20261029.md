@@ -315,3 +315,17 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - **Tests:** `tests/test-guards.sh` is now 54 cases. They cover a readable source refused, a mode-000 source accepted, a moved-away source accepted, a readable unstripped copy in trash refused, `KIT_SOURCE_LOCK=1` alone, an agent user that cannot be tested refused, the manifest written, a preflight on the manifest with the source unreadable, manifest drift refused, `trace_mode=warn` refused, a missing manifest refused, and the harness's own `*.sh` free of the marker string.
 - **Mutation checks:** with `kit_source_locked` always passing, 3 cases fail. With the manifest comparison off, 1 case fails.
 - **Not checked:** compressed archives (the procedure makes the old snapshots root-only) and the project's git history.
+
+## 2026-10-31 11:25 Asia/Manila — no kit bundle, clone or mirror within the agent's reach (kitfix-20261031-kit-git-source, approved by Marlon)
+
+- **Why (external review):** `v3-rerun-procedure.md` put the kit as `/tmp/kitfix-20261031.bundle` (mode 644) on the VM, and the lock step left it there. The lock scan only reads `*.sh` files, so it could not see inside a bundle, and unattended the hook still allowed `git clone`, `git fetch` and `git bundle unbundle` against it.
+- **`kit_source_locked` (lib.sh), new checks under `KIT_SCAN_ROOTS`** (default `$HOME $TEST_ROOT /tmp`):
+  - any `*.bundle` the agent user can read → `LOCK READABLE git bundle for <user>: <path>`;
+  - any git dir (a folder with `HEAD` next to `objects`, so bare repositories, `.git` folders and worktree-less mirrors) the agent user can read whose objects hold the kit (`kit_git_dir_holds_kit`: a `KIT_ROOT_COMMITS` commit, or `templates/.agents-v0/scripts/sync-feature-state.sh` at HEAD, FETCH_HEAD or a ref tip) → `LOCK READABLE kit git repository for <user>: <git dir>`;
+  - otherwise `LOCK git scan ok: no readable *.bundle, <n> git dirs checked, none holds the kit`.
+  - Cheap: one `find` per root for each kind (`node_modules`, `.m2`, `target`, `.npm` pruned; at most 50 bundles and 500 git dirs), two git calls per repository. The project's own repository passes (installed kit only, its own root commit).
+- **Procedure:** §2 moves the bundle into root-only `/root/kit-incoming/` right after the fetch; §4 step 8 moves that folder, and any other `*.bundle` under `/tmp` and `/home/e2e`, into `/root/kit-locked/<time>` (moved, never deleted); §5 documents the new checks, `KIT_SCAN_ROOTS` and `KIT_ROOT_COMMITS`; §6 and §7 need `LOCK git scan ok`.
+- **Kit hook (same commit, `refs/kit-fixes.md`):** unattended, git works only on the project's own repository and its configured remotes.
+- **Tests:** `tests/test-guards.sh` is now 63 cases: an unrelated repository checked and passed, a readable bundle refused, a mode-000 bundle accepted, a bare mirror, a clone and a repository that fetched the kit (FETCH_HEAD) refused, a repository whose tips no longer hold `templates/` passed with an unknown root and refused when `KIT_ROOT_COMMITS` names its root, and the harness and hook root-commit lists equal.
+- **Mutation checks:** with `kit_git_dir_holds_kit` always false, 4 cases fail; with the bundle check off, 1 fails.
+- **Not checked:** a bundle without the `.bundle` name (the hook reads its header; the harness scan does not), compressed archives, and kit lineages with an unknown root and no `templates/` at any tip.

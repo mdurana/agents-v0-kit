@@ -777,7 +777,31 @@ kit_source_locked(){ local u="${AGENT_USER:-$(id -un)}" me; me="$(id -un)"; loca
            --exclude-dir=target --exclude-dir=.npm -- "$mk" ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp} 2>/dev/null | head -20)"
   if [ -n "$hits" ]; then printf '%s\n' "$hits" | sed "s|^|LOCK READABLE unstripped kit script for $u: |"; bad=1
   else echo "LOCK scan ok: no readable test-override block under ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp}"; fi
+  # kitfix-20261031-kit-git-source: a git bundle, clone or mirror holds the unstripped kit too, and the *.sh scan cannot
+  #   see inside one. Any *.bundle the agent user can read is refused, and so is any git dir it can read whose objects
+  #   hold the kit (kit_git_dir_holds_kit). Cheap: one find per root (build folders pruned), two git calls per repo.
+  local f g n=0
+  # shellcheck disable=SC2086
+  while IFS= read -r f; do [ -n "$f" ] || continue
+    if as_agent test -r "$f"; then echo "LOCK READABLE git bundle for $u: $f"; bad=1; fi
+  done < <(find ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp} \( -name node_modules -o -name .m2 -o -name target -o -name .npm \) -prune \
+             -o -type f -name '*.bundle' -print 2>/dev/null | head -50)
+  # shellcheck disable=SC2086
+  while IFS= read -r g; do g="${g%/objects}"; [ -f "$g/HEAD" ] || continue; n=$((n+1))
+    as_agent test -r "$g/HEAD" && as_agent test -x "$g/objects" || continue
+    if kit_git_dir_holds_kit "$g"; then echo "LOCK READABLE kit git repository for $u: $g"; bad=1; fi
+  done < <(find ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp} \( -name node_modules -o -name .m2 -o -name target -o -name .npm \) -prune \
+             -o -type d -name objects -print 2>/dev/null | head -500)
+  [ "$bad" = 0 ] && echo "LOCK git scan ok: no readable *.bundle, $n git dirs checked, none holds the kit"
   [ "$bad" = 0 ]; }
+# kit_git_dir_holds_kit <git dir>: the objects hold a kit root commit (KIT_ROOT_COMMITS) or a ref tip, HEAD or
+#   FETCH_HEAD whose tree has templates/.agents-v0/scripts/sync-feature-state.sh (the kit source layout).
+KIT_ROOT_COMMITS="${KIT_ROOT_COMMITS:-550da9df6dcfb46995d5af2adced25e21d372bd9 fc4b642cb947cf38b5fea7cc1005e22d58e17eef}"
+kit_git_dir_holds_kit(){ local gd="$1" r
+  { for r in $KIT_ROOT_COMMITS; do echo "$r"; done
+    git -c safe.directory='*' --git-dir="$gd" for-each-ref --count=500 --format='%(objectname)' 2>/dev/null | sed 's|$|:templates/.agents-v0/scripts/sync-feature-state.sh|'
+    echo "HEAD:templates/.agents-v0/scripts/sync-feature-state.sh"; echo "FETCH_HEAD:templates/.agents-v0/scripts/sync-feature-state.sh"; } \
+  | git -c safe.directory='*' --git-dir="$gd" cat-file --batch-check 2>/dev/null | grep -qv ' missing$'; }
 # modes_preflight: REQUIRE_FAIL_MODES=1 (V3) refuses to start unless every mode is fail: H6_MODE=fail, H7-H10 not warn,
 #   KIT_TRACE_MODE=fail, the kit source is locked away from the agent user (kit_source_locked; also on its own with
 #   KIT_SOURCE_LOCK=1), and (when the workspace exists) every checkout passes kit_installed_ok. AGENTS_V0_TRACE_MODE

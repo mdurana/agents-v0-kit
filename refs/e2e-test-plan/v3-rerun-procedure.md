@@ -36,9 +36,9 @@ Short names: box folder `B=/workspace/kit-eval/linode-e2e-20261029`, VM run root
 On the box, from the kitfix worktree: `git bundle create /workspace/kit-eval/kitfix-plan-20261031/kitfix-20261031.bundle kitfix-20261031`. Then:
 ```
 vm.py put /workspace/kit-eval/kitfix-plan-20261031/kitfix-20261031.bundle /tmp/kitfix-20261031.bundle
-vm.py run "chmod 644 /tmp/kitfix-20261031.bundle && su - e2e -c 'cd ~/kit-src && git status --porcelain | head -3; git fetch -q /tmp/kitfix-20261031.bundle kitfix-20261031:kitfix-20261031 && git checkout -q kitfix-20261031 && git rev-parse HEAD && git status --porcelain | wc -l'"
+vm.py run "chmod 644 /tmp/kitfix-20261031.bundle && su - e2e -c 'cd ~/kit-src && git status --porcelain | head -3; git fetch -q /tmp/kitfix-20261031.bundle kitfix-20261031:kitfix-20261031 && git checkout -q kitfix-20261031 && git rev-parse HEAD && git status --porcelain | wc -l'; install -d -m 700 -o root -g root /root/kit-incoming && mv /tmp/kitfix-20261031.bundle /root/kit-incoming/ && chown root:root /root/kit-incoming/kitfix-20261031.bundle && chmod 600 /root/kit-incoming/kitfix-20261031.bundle && ls -la /root/kit-incoming"
 ```
-The printed HEAD must be `KITSHA`, and the status count must be 0. `$KS` is now both the kit source and the harness (`$H`). Never edit files there by hand.
+The printed HEAD must be `KITSHA`, and the status count must be 0. **The bundle holds the whole kit, test-override blocks included (kitfix-20261031-kit-git-source).** It is readable by e2e only for the one fetch above, with no agent running. The same command moves it into the root-only `/root/kit-incoming/` (moved, never deleted), and the lock (§4 step 8) moves that folder into `$L`. Never leave a bundle, clone or mirror of the kit in `/tmp` or in e2e's home: the preflight refuses to start if e2e can read one (§5). `$KS` is now both the kit source and the harness (`$H`). Never edit files there by hand.
 
 ## 3. Restore the segment's start point (once per segment)
 
@@ -85,9 +85,12 @@ vm.py run 'set -eu; T=/home/e2e/agents-v0-e2e/run-20261029-1629; L=/root/kit-loc
   mv /home/e2e/kit-src "$L/kit-src"; [ ! -e $T/kit ] || mv $T/kit "$L/run-kit"; [ ! -e $T/calib ] || mv $T/calib "$L/calib"
   mkdir -p "$L/trash"; for f in $T/trash/* $T/snapshots/old-run /home/e2e/agents-v0-e2e/run-20261029-1629.v3-* /home/e2e/run-20261029-1629.tar.zst; do [ ! -e "$f" ] || mv "$f" "$L/trash/"; done
   for f in $T/snapshots/*.tgz; do chown root:root "$f"; chmod 600 "$f"; done   # old installs inside; the harness only tests that they exist
-  ls -la "$L" "$L/trash"'
+  [ ! -e /root/kit-incoming ] || mv /root/kit-incoming "$L/incoming"   # the delivery bundle (§2)
+  mkdir -p "$L/bundles"; find /tmp /home/e2e -xdev -type f -name "*.bundle" -print 2>/dev/null | while IFS= read -r f; do mv --backup=numbered "$f" "$L/bundles/"; done
+  ls -la "$L" "$L/trash" "$L/bundles"'
 ```
-   The old snapshot archives stay in place but become root-only: a chain resume in V3 restores nothing (main was updated in place in step 2) and only checks that the previous END snapshot exists. New snapshots the run writes are e2e's, as before. Check the lock as e2e: `su - e2e -c 'test ! -r ~/kit-src && test ! -e ~/kit-src && echo LOCKED'`. The launch preflight (§6) checks it again, together with a scan of `$HOME`, `$T` and `/tmp` for any readable `*.sh` that still has a test-override block.
+   **Bundles, clones and mirrors (kitfix-20261031-kit-git-source):** a git bundle, clone or mirror of the kit holds the unstripped scripts in its objects, where the `*.sh` scan cannot see them, and `git clone`/`git fetch`/`git show` would bring them back. So the lock also moves the delivery bundle (`/root/kit-incoming`, §2) and any other `*.bundle` under `/tmp` and `/home/e2e` into `$L`. `~/kit-src` and `$T/kit` are kit clones and are moved above. If you made any other kit clone or mirror for delivery (for example a `kit-mirror.git`), move it into `$L/trash/` too. Never delete one.
+   The old snapshot archives stay in place but become root-only: a chain resume in V3 restores nothing (main was updated in place in step 2) and only checks that the previous END snapshot exists. New snapshots the run writes are e2e's, as before. Check the lock as e2e: `su - e2e -c 'test ! -r ~/kit-src && test ! -e ~/kit-src && echo LOCKED'`. The launch preflight (§6) checks it again, together with a scan of `$HOME`, `$T` and `/tmp` (plus any `KIT_SCAN_ROOTS`) for any readable `*.sh` that still has a test-override block, any readable `*.bundle`, and any readable git repository or bare repository whose objects hold the kit.
    **When the harness itself needs the kit source** (a kit update, `install.sh --update`, `validate-kit.sh --target`, a kit-fix resume, `check-installed-kit.sh`):
    - **Read-only checks:** run them as root against the locked copy, with no run going, e.g. `sh $L/kit-src/scripts/check-installed-kit.sh --expect-trace-mode fail $MAIN`.
    - **Anything that writes into the project** (install, update), so the files stay e2e's:
@@ -122,7 +125,11 @@ export CHAIN_RESUME_NOTE="V3 rerun of <ID> on kit <KITSHA short> after a main-on
 - `H6_MODE`, `H7_MODE` … `H10_MODE` are read only by the runner process, which the agent cannot reach. Never set the kit's test-only variables (`AGENTS_V0_SKIP_BRANCH_GUARD`, `AGENTS_V0_SKIP_COMMIT_CHECK`, `AGENTS_V0_NOW`, `AGENTS_V0_TZ`) in a launch env. Installed scripts ignore them anyway.
 - **Kit source lock (kitfix-20261031-kit-source-lock):** with `REQUIRE_FAIL_MODES=1` (or `KIT_SOURCE_LOCK=1` on its own), the preflight (`kit_source_locked`) needs:
   - each of `$T/kit`, `$T/calib/kit`, `~/kit-src` and a local `KIT_URL`/`KIT_FIX_URL` to be absent, or neither readable nor enterable by `AGENT_USER`;
-  - no readable `*.sh` with a test-override block under `$HOME`, `$T` and `/tmp`. Set `KIT_SOURCE_PATHS` / `KIT_SCAN_ROOTS` only to add places, never to skip one.
+  - no readable `*.sh` with a test-override block under the scan roots;
+  - no readable `*.bundle` under the scan roots (`LOCK READABLE git bundle for e2e: <path>`);
+  - no readable git repository or bare repository under the scan roots whose objects hold the kit: a known kit root commit (`KIT_ROOT_COMMITS`, default `550da9d…` "agents-v0 version 0.0.1" and `fc4b642…`), or `templates/.agents-v0/scripts/sync-feature-state.sh` at HEAD, FETCH_HEAD or any branch or tag tip (`LOCK READABLE kit git repository for e2e: <git dir>`). The project's own repository passes: it holds the installed kit, never `templates/`, and its root is its own. When all is clean the log has `LOCK git scan ok: no readable *.bundle, <n> git dirs checked, none holds the kit`.
+
+  **Scan roots:** `KIT_SCAN_ROOTS` (default `$HOME $TEST_ROOT /tmp`, i.e. `/home/e2e`, `$T` and `/tmp`). Set it only to add places (keep the defaults in the list), never to skip one. Set `KIT_SOURCE_PATHS` the same way. The scan is cheap: one `find` per root for each kind (build folders such as `node_modules`, `.m2`, `target` and `.npm` are skipped; at most 50 bundles and 500 git dirs), and two git calls per repository.
   
   With `KIT_MANIFEST` set, main and every worktree are compared with the manifest (`kit_installed_ok`), so the run needs no kit source. `KIT_URL` stays in the file for the record only. The run checks out no kit (`harness-fix`, not `kit-fix`).
 - `kit-fix` is refused for a story resume, which is why the kit was updated by hand in §4 and the reason here is `harness-fix`, as in resume 7 of the old run.
@@ -138,7 +145,7 @@ Within 3 minutes, check (read-only):
 - `progress.log` has `RESUME attempt … reason=harness-fix`, `RESUME-FROM-STORY … <ID>`, `CHAIN-SKIP` for every story before `<ID>`, `STORY step 4 story <ID>`, then `TURN-START run=S4-<slug>-intake-1`;
 - **the modes were verified before anything ran:** `progress.log` has `MODES H6=fail H7=fail H8=fail H9=fail H10=fail trace=fail require_fail=1 lock=checked OK` before `RUN-START`. `results/modes-preflight.log` must have:
   - a `LOCK ok …` or `LOCK absent …` line for every kit source path;
-  - `LOCK scan ok: …`;
+  - `LOCK scan ok: …` and `LOCK git scan ok: …` (no `LOCK READABLE …` line);
   - an `OK portal: MANIFEST-OK files=<n> trace_mode=fail kit=<KITSHA short> …` line for main, and one for any kept worktree. If the preflight refused, the run stopped with exit 3 and `STOP modes refused …` in `results/stop.txt`: read `modes-preflight.log`, fix the env file or the install, and launch again. Do not lower a mode;
 - `POLICY trace_mode=fail in portal (…)` in `progress.log` at the first launch (later launches find the file already set), and `cat $MAIN/.agents-v0/policy.conf` shows `trace_mode=fail`. The summary's Limits line shows the modes at the end of the run.
 
@@ -164,7 +171,7 @@ Do not kill the runner or agy yourself. A USAGE or AUTH HALT, a refusal (exit 3,
 - No `SEMI-SYNTHETIC` build label, no `GATE-COMMIT-MISSING`, no `GATE-CHAIN-BROKEN`, no `kit-tamper.txt`, and no `FINDING H6`/`H8`/`H9`/`H10`. No `TRACE WARN`: in fail mode a traceability gap refuses the approval, so a refusal the agent then fixed is fine if it is explained.
 - `check-release-evidence.sh` for `<ID>` prints `OK` with no `WARN: feature/… not found`. `feature/<slug>` exists after the release and is never deleted.
 - P2-A: the phase dates survive the midnight crossing, and `/v0-design` before the branch step is refused by the branch guard.
-- `results/v3-kit-hash-<ID>.txt` says `HASH-OK`, `results/kit-manifest-<ID>.tsv` exists, and `modes-preflight.log` shows the lock (`LOCK ok`/`LOCK absent`, `LOCK scan ok`) and `MANIFEST-OK`. The README Validity block lists DEGRADED only for `container` (no Docker), and it lists the kits of the kept stories (expected: see the caveat).
+- `results/v3-kit-hash-<ID>.txt` says `HASH-OK`, `results/kit-manifest-<ID>.tsv` exists, and `modes-preflight.log` shows the lock (`LOCK ok`/`LOCK absent`, `LOCK scan ok`, `LOCK git scan ok`) and `MANIFEST-OK`. The README Validity block lists DEGRADED only for `container` (no Docker), and it lists the kits of the kept stories (expected: see the caveat).
 
 ## 8. After each segment, and at the end
 

@@ -7,6 +7,7 @@
 #   H10 kit_integrity / kit_integrity_check / kit_policy_apply / kit_policy_ok / modes_preflight
 #      (kitfix-20261031-installed-no-overrides): content hashes of the installed kit, the harness-owned trace mode.
 #   kit_source_locked / kit_installed_ok / kit-manifest.sh (kitfix-20261031-kit-source-lock): the agent user cannot read
+#      (kitfix-20261031-kit-git-source: nor any *.bundle or kit git repository)
 #      the kit source, and the installed kit is checked against a manifest written before the lock.
 # Usage: bash tests/test-guards.sh   (exit 0 when every case passes)
 set -u
@@ -162,6 +163,33 @@ printf 'trace_mode=warn\n' > "$MAIN/.agents-v0/policy.conf"
 ( KIT_MANIFEST="$SB/kit-manifest.tsv"; kit_installed_ok "$MAIN" ) > "$SB/kio.txt" 2>&1 && ko "kit_installed_ok passed trace_mode=warn" || { grep -q 'TRACE-MODE warn (need fail)' "$SB/kio.txt" && ok "kit_installed_ok refuses trace_mode=warn" || ko "kio: $(cat "$SB/kio.txt")"; }
 gm checkout -q -- .agents-v0
 ( KIT_MANIFEST="$SB/none.tsv"; kit_installed_ok "$MAIN" ) > "$SB/kio.txt" 2>&1 && ko "kit_installed_ok passed without its manifest" || ok "kit_installed_ok refuses a missing manifest"
+echo "-- kit bundles and kit git repositories (kitfix-20261031-kit-git-source)"
+KG="$SB/kgit"; mkdir -p "$KG/templates/.agents-v0/scripts"; cp "$KIT/templates/.agents-v0/scripts/sync-feature-state.sh" "$KG/templates/.agents-v0/scripts/"
+git -C "$KG" init -q -b main; git -C "$KG" add -A; git -C "$KG" commit -qm kit
+pf(){ ( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail; modes_preflight ); }
+mkdir -p "$SB/scan/lib"; git -C "$SB/scan/lib" init -q -b main; echo a > "$SB/scan/lib/a"; git -C "$SB/scan/lib" add -A; git -C "$SB/scan/lib" commit -qm lib
+pf && grep -q 'LOCK git scan ok: no readable \*.bundle, [1-9][0-9]* git dirs checked' "$RES/modes-preflight.log" && ok "an unrelated git repo under the scan roots is checked and passes" || ko "lib repo: $(cat "$RES/modes-preflight.log")"
+git -C "$KG" bundle create "$SB/scan/kitfix.bundle" main 2>/dev/null
+pf && ko "preflight passed with a readable kit bundle" || { grep -q "^LOCK READABLE git bundle for $(id -un): $SB/scan/kitfix.bundle" "$RES/modes-preflight.log" && ok "preflight refuses a readable *.bundle" || ko "bundle: $(cat "$RES/modes-preflight.log")"; }
+chmod 000 "$SB/scan/kitfix.bundle"
+pf && ok "a root-only (mode 000) bundle is accepted" || ko "000 bundle: $(cat "$RES/modes-preflight.log")"
+git clone -q --bare "$KG" "$SB/scan/kit-mirror.git"
+pf && ko "preflight passed with a readable kit mirror" || { grep -q "^LOCK READABLE kit git repository for $(id -un): $SB/scan/kit-mirror.git" "$RES/modes-preflight.log" && ok "preflight refuses a readable bare kit mirror" || ko "mirror: $(cat "$RES/modes-preflight.log")"; }
+mv "$SB/scan/kit-mirror.git" "$SB/trash2/"
+git clone -q "$KG" "$SB/scan/kit-clone"
+pf && ko "preflight passed with a readable kit clone" || { grep -q "^LOCK READABLE kit git repository for $(id -un): $SB/scan/kit-clone/.git" "$RES/modes-preflight.log" && ok "preflight refuses a readable kit clone" || ko "clone: $(cat "$RES/modes-preflight.log")"; }
+mv "$SB/scan/kit-clone" "$SB/trash2/"
+git -C "$SB/scan/lib" fetch -q "$KG" main 2>/dev/null
+pf && ko "preflight passed a repo whose FETCH_HEAD is the kit" || { grep -q "^LOCK READABLE kit git repository for $(id -un): $SB/scan/lib/.git" "$RES/modes-preflight.log" && ok "preflight refuses a repo that fetched the kit (FETCH_HEAD)" || ko "fetch_head: $(cat "$RES/modes-preflight.log")"; }
+mv "$SB/scan/lib" "$SB/trash2/lib-fetched"
+mkdir -p "$SB/scan/rooted"; git clone -q "$KG" "$SB/scan/rooted"; git -C "$SB/scan/rooted" rm -rq templates; git -C "$SB/scan/rooted" commit -qm drop; git -C "$SB/scan/rooted" remote remove origin
+pf && ok "a repo whose tips no longer hold templates/ passes when its root is not a known kit root" || ko "rooted unknown: $(cat "$RES/modes-preflight.log")"
+( KIT_ROOT_COMMITS="$(git -C "$KG" rev-list --max-parents=0 HEAD)"; pf ) && ko "preflight passed a repo holding a kit root commit" \
+  || { grep -q "^LOCK READABLE kit git repository for $(id -un): $SB/scan/rooted/.git" "$RES/modes-preflight.log" && ok "preflight refuses a repo whose objects hold a kit root commit" || ko "rooted: $(cat "$RES/modes-preflight.log")"; }
+mv "$SB/scan/rooted" "$SB/trash2/"
+grep -q '^KIT_ROOT_COMMITS=.*550da9df6dcfb46995d5af2adced25e21d372bd9.*fc4b642cb947cf38b5fea7cc1005e22d58e17eef' "$HERE/scripts/lib.sh" \
+  && grep -q 'KIT_ROOT_COMMITS = ("550da9df6dcfb46995d5af2adced25e21d372bd9", "fc4b642cb947cf38b5fea7cc1005e22d58e17eef")' "$KIT/core/common/hooks/hook-policy.py" \
+  && ok "harness and hook list the same kit root commits" || ko "root commit lists differ"
 mk='# >>> kit-test'; mk="$mk-override"
 grep -q 'kit_installed_ok "$MAIN"' "$HERE/scripts/run-plan.sh" && ! grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests" | grep -q . \
   && ok "story start uses kit_installed_ok; the harness's own *.sh files never match the marker scan" || ko "wiring/marker: $(grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests")"

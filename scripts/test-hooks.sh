@@ -186,6 +186,20 @@ for c in 'mv .agents-v0/scripts /tmp/x' 'git rm .agents-v0/policy.conf' 'git mv 
   ( cd "$scratch/kp" && shell_case "$c" block && agy_shell_case "$c" block && AGY_ALLOW_TOOLS="$UA" shell_case "$c" block ) || fail=1
 done
 
+# kitfix-20261031-kit-git-source: unattended, no kit bundle, clone or mirror through git; the project's own git works.
+kg="$scratch/kgit"; mkdir -p "$kg/templates/.agents-v0/scripts"; cp "$KIT/templates/.agents-v0/scripts/sync-feature-state.sh" "$kg/templates/.agents-v0/scripts/"
+GI='-c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false'
+git -C "$kg" init -q -b main && git -C "$kg" add -A && git $GI -C "$kg" commit -qm kit && git -C "$kg" bundle create -q "$scratch/kit.bundle" main 2>/dev/null
+git -C "$scratch/kp" init -q -b main && git -C "$scratch/kp" add -A && git $GI -C "$scratch/kp" commit -qm base
+git init -q --bare -b main "$scratch/origin.git" && git -C "$scratch/kp" remote add origin "$scratch/origin.git" && git -C "$scratch/kp" push -q origin main 2>/dev/null
+for c in "git clone $scratch/kit.bundle /tmp/kitx" "git fetch $scratch/kit.bundle main" "git bundle unbundle $scratch/kit.bundle" \
+         "git remote add k $scratch/kit.bundle" "git -C $kg show HEAD:templates/.agents-v0/scripts/sync-feature-state.sh" "GIT_DIR=$kg/.git git log -1"; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" block && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" block ) || fail=1
+done
+for c in 'git status' 'git fetch origin' 'git pull --ff-only origin main' 'git log -1' 'git remote -v'; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" allow && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" allow ) || fail=1
+done
+( cd "$scratch/kp" && shell_case "git fetch $scratch/kit.bundle main" allow ) || fail=1   # attended: unchanged
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then
