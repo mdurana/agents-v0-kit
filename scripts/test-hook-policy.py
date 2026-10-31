@@ -697,6 +697,47 @@ def n1_python_startup_cases(tmp: str) -> list:
     add("path", up, A, "ask", "attended edit of usercustomize.py")
     add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), U, "block", "unattended edit of a site-packages .pth")
     add("path", os.path.join(proj, "src/app.py"), U, "allow", "unattended edit of project code")
+    # Sakura B-2 (N-1 rework): trees copied, moved, synced or unpacked into the user site or its parents, and
+    #   pip --user installs. A fresh fake HOME, so ~/.local/lib does not exist yet (the destination becomes it).
+    fh = os.path.join(tmp, "n1home")
+    os.makedirs(os.path.join(proj, "src"), exist_ok=True)
+    os.makedirs(fh, exist_ok=True)
+    UH, AH = dict(U, HOME=fh), dict(A, HOME=fh)
+    for cmd, label in [
+            ("cp -r /tmp/stage/python3.13 ~/.local/lib/", "cp -r a python3.X folder into ~/.local/lib/"),
+            ("mv /tmp/stage/python3.13 ~/.local/lib/", "mv a python3.X folder into ~/.local/lib/"),
+            ("cp -a /tmp/stage/lib ~/.local/", "cp -a a lib folder into ~/.local/"),
+            ("cp -r /tmp/stage/.local ~/", "cp -r a .local folder into ~"),
+            ("rsync -a /tmp/stage/ ~/", "rsync the contents of a folder into ~"),
+            ("rsync -a /tmp/stage/ $HOME/.local/lib", "rsync into $HOME/.local/lib"),
+            ("cp -R /tmp/stage/. ~/.local", "cp -R folder/. into ~/.local"),
+            ("cp -r /tmp/stage ~/.local/lib", "cp -r onto a ~/.local/lib that does not exist yet"),
+            ("ln -s /tmp/stage ~/.local/lib", "ln -s a folder as ~/.local/lib"),
+            ("mv /tmp/stage/bin ~/.local/", "mv a bin folder into ~/.local/"),
+            ("cd ~ && cp -r /tmp/stage/.local .", "cd ~ then cp -r .local ."),
+            ("unzip -o /tmp/x.zip -d ~/.local/lib", "unzip -d ~/.local/lib"),
+            ("unzip -o /tmp/x.zip -d$HOME/.local", "unzip -d$HOME/.local"),
+            ("cd ~/.local/lib && unzip /tmp/x.zip", "unzip in ~/.local/lib"),
+            ("pip install --user ./pkg", "pip install --user"),
+            ("python3 -m pip install --user ./pkg", "python3 -m pip install --user"),
+            ("pip3 install --target ~/.local/lib/python3.13/site-packages ./pkg", "pip --target the user site"),
+            ("pip install --prefix ~/.local ./pkg", "pip --prefix ~/.local"),
+            ("PIP_USER=1 pip install ./pkg", "PIP_USER=1 prefix"),
+            ("env PIP_USER=yes pip install x", "env PIP_USER=yes"),
+            ("export PIP_USER=1", "export PIP_USER=1"),
+            ("pip config set global.user true", "pip config set global.user"),
+            ("python3 setup.py install --user", "setup.py install --user")]:
+        add("shell", cmd, UH, "block", "unattended " + label)
+        add("shell", cmd, AH, "ask", "attended " + label)
+    for cmd, label in [
+            ("cp -r src build/", "cp -r in the project"), ("cp -a src dist", "cp -a in the project"),
+            ("rsync -a src/ build/", "rsync in the project"), ("mv a.txt b.txt", "mv in the project"),
+            ("cp notes.txt ~/", "cp one file into ~"), ("cp -r /tmp/stage ~/", "cp -r a folder into ~ (lands as ~/stage)"),
+            ("unzip x.zip -d vendor", "unzip into the project"), ("pip install -r requirements.txt", "pip install -r"),
+            ("python3 -m pip install -e .", "pip install -e ."), ("PIP_USER=0 pip install x", "PIP_USER=0"),
+            ("cp README.md ~/.local/share/", "cp into ~/.local/share"), ("mkdir -p ~/.local/lib", "mkdir ~/.local/lib")]:
+        add("shell", cmd, UH, "allow", "unattended " + label)
+        add("shell", cmd, AH, "allow", "attended " + label)
     return c
 
 

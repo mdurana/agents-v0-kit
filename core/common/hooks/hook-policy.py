@@ -645,7 +645,132 @@ def _is_py_startup_path(p: str) -> bool:
 
 def _segment_writes_py_startup(seg: str) -> Optional[str]:
     return _segment_writes_matching_path(seg, _is_py_startup_path) or \
-        _segment_changes_container(seg, _is_py_startup_path)
+        _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
+
+
+# kitfix-20261031-n1 rework (Sakura B-2): a whole tree copied, moved, synced or unpacked into the user site's
+#   parents (~, ~/.local, ~/.local/lib, ~/.local/bin) plants the same start-up files without naming them, and so does
+#   pip install --user. A destination is judged as the path each source lands on (dest/basename, or dest itself for
+#   rsync "src/", "src/." and a destination folder that does not exist yet). Copying a single file into ~ or a
+#   project folder stays allowed. Setting PIP_USER (pip then installs into the user site by default) and
+#   `pip config set <x>.user` count as a pip --user install. tar -x -C and dd/sponge stay with H-5.
+PY_STARTUP_PARENT_RE = re.compile(r"(^|/)\.local(?:/(?:lib|bin))?/*$")
+# Judged on the whole command (an env prefix or `env` wrapper is gone by the time a segment is classified).
+PIP_USER_RE = re.compile(r"\bPIP_USER\s*=\s*['\"]?(?!0\b|false\b|no\b|off\b)[^\s;&|'\"]", re.I)
+_PIP_PATH_OPTS = ("--target", "-t", "--prefix", "--root", "--home")
+
+
+def _py_startup_expand(p: str) -> str:
+    return os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+
+
+def _is_py_startup_parent(p: str) -> bool:
+    """True for ~, ~/.local, ~/.local/lib or ~/.local/bin (any spelling): a tree landing there can hold the user site."""
+    raw = _py_startup_expand(p)
+    if not raw:
+        return False
+    cands = [raw.rstrip("/") or "/", posixpath.normpath(raw)]
+    if not raw.startswith("/"):
+        # the cd target counts even before it exists (cd ~/.local/lib && unzip x.zip)
+        cands.append(posixpath.normpath(posixpath.join(_BASE_DIR or _base_dir(), raw)))
+    home = posixpath.normpath(os.path.expanduser("~"))
+    homes = {home, os.path.realpath(home)} if home not in ("", "/", "~") else set()
+    return any(PY_STARTUP_PARENT_RE.search(c) or c in homes for c in cands)
+
+
+def _is_py_startup_tree_dest(p: str) -> bool:
+    return _is_py_startup_path(p) or _is_py_startup_parent(p)
+
+
+def _existing_dir(p: str) -> bool:
+    raw = _py_startup_expand(p)
+    if not raw or re.search(r"[$`*?\[]", raw):
+        return False
+    return os.path.isdir(raw if raw.startswith("/") else os.path.join(_base_dir(), raw))
+
+
+def _pip_install_args(parts: List[str]) -> Optional[List[str]]:
+    """The arguments after `install` for pip/pip3/pip3.X, python* -m pip, or uv pip; None when it is not a pip install."""
+    bin0 = parts[0].split("/")[-1]
+    rest: Optional[List[str]] = None
+    if re.fullmatch(r"pip[0-9.]*", bin0):
+        rest = parts[1:]
+    elif re.fullmatch(r"python[0-9.]*", bin0) and "-m" in parts:
+        i = parts.index("-m")
+        if i + 1 < len(parts) and re.fullmatch(r"pip[0-9.]*", parts[i + 1]):
+            rest = parts[i + 2:]
+    elif bin0 == "uv" and len(parts) > 1 and parts[1] == "pip":
+        rest = parts[2:]
+    if rest is None:
+        return None
+    ops = [a for a in rest if not a.startswith("-")]
+    if not ops or ops[0] != "install":
+        return None
+    return rest[rest.index("install") + 1:]
+
+
+def _segment_py_startup_tree(seg: str) -> Optional[str]:
+    seg = _strip_env_prefix(seg.strip())
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    if re.fullmatch(r"pip[0-9.]*", bin0) and len(parts) > 3 and parts[1:3] == ["config", "set"] and \
+            re.search(r"\.user$", parts[3]):
+        return "pip config set " + parts[3]
+    pip = _pip_install_args(parts)
+    if pip is not None:
+        if "--user" in pip:
+            return "pip install --user"
+        for i, a in enumerate(pip):
+            for o in _PIP_PATH_OPTS:
+                v = pip[i + 1] if a == o and i + 1 < len(pip) else (a.split("=", 1)[1] if a.startswith(o + "=") else None)
+                if v and _is_py_startup_tree_dest(v):
+                    return v
+        return None
+    if re.fullmatch(r"python[0-9.]*", bin0) and "setup.py" in parts and "install" in parts and "--user" in parts:
+        return "setup.py install --user"
+    if bin0 == "unzip":
+        dest = "."
+        for i, a in enumerate(parts[1:], 1):
+            if a == "-d" and i + 1 < len(parts):
+                dest = parts[i + 1]
+            elif a.startswith("-d") and len(a) > 2:
+                dest = a[2:]
+        return dest if _is_py_startup_tree_dest(dest) else None
+    if bin0 not in ("cp", "mv", "rsync", "ln", "ditto"):
+        return None
+    shorts = "".join(a[1:] for a in parts[1:] if a.startswith("-") and not a.startswith("--"))
+    longs = [a for a in parts[1:] if a.startswith("--")]
+    recursive = bin0 in ("mv", "ln", "ditto") or bool(re.search(r"[rRa]", shorts)) or \
+        any(a in ("--recursive", "--archive") for a in longs)
+    tgt = None
+    for i, a in enumerate(parts[1:], 1):
+        if a in ("-t", "--target-directory") and i + 1 < len(parts):
+            tgt = parts[i + 1]
+        elif a.startswith("--target-directory="):
+            tgt = a.split("=", 1)[1]
+    ops = [a for a in parts[1:] if not a.startswith("-") and a != tgt]
+    if tgt is None:
+        if len(ops) < 2:
+            return None
+        tgt, srcs = ops[-1], ops[:-1]
+    else:
+        srcs = ops
+    lands = []
+    for src in srcs:
+        s = src.rstrip("/")
+        contents = (bin0 == "rsync" and src.endswith("/")) or s.endswith("/.") or s in (".", "")
+        lands.append(tgt if contents else posixpath.join(tgt, posixpath.basename(s)))
+    if not _existing_dir(tgt):
+        lands.append(tgt)
+    for land in lands:
+        if _is_py_startup_path(land) or (recursive and _is_py_startup_parent(land)):
+            return land
+    return None
 
 
 def _segment_changes_harness(seg: str) -> Optional[str]:
@@ -1391,6 +1516,11 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         if action == "ask" and worst != "block":
             worst = "ask"
             msg = message or msg
+    if PIP_USER_RE.search(cmd):  # kitfix-20261031-n1 rework (Sakura B-2): pip then installs into the user site
+        if unattended:
+            return "block", PY_STARTUP_MSG.format("PIP_USER")
+        if worst != "block":
+            worst, msg = "ask", PY_STARTUP_MSG.format("PIP_USER")
     # sudo is unwrapped when segments are split, and a pipe splits a download from its interpreter,
     # so both are judged on the whole command. A block above still wins.
     if SUDO_RE.search(cmd):
