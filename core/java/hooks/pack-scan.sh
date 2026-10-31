@@ -10,7 +10,7 @@ hook_pack_scan() {
     *Test.java|*Tests.java|*/test/*|*/it/*) return 0 ;;
   esac
   pack_warns="$(mktemp)"
-  HOOK_PACK_FILE="$path" python3 -c '
+  HOOK_PACK_FILE="$path" hook_py -c '
 import os, re, sys
 path = os.environ.get("HOOK_PACK_FILE", "")
 try:

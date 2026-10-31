@@ -10,7 +10,7 @@ hook_pack_scan() {
     *.test.ts|*.spec.ts|*.test.js|*.spec.js|*/__tests__/*|*/test/*|*/tests/*) return 0 ;;
   esac
   pack_warns="$(mktemp)"
-  HOOK_PACK_FILE="$path" python3 -c '
+  HOOK_PACK_FILE="$path" hook_py -c '
 import os, re
 path = os.environ.get("HOOK_PACK_FILE", "")
 try:

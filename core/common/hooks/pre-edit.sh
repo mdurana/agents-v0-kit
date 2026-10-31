@@ -4,9 +4,16 @@ set -eu
 
 . "$(dirname "$0")/lib.sh"
 
+# N-1: checked before the payload is read, so a missing interpreter (no path read) is not an allow.
+if [ ! -x "$HOOK_PYTHON" ]; then
+  printf 'BLOCK: the hook interpreter %s is missing (path guardrails fail closed)\n' "$HOOK_PYTHON" >&2
+  printf '{"permission": "deny", "decision": "deny", "reason": "kit hook interpreter missing (fail-closed)"}\n'
+  exit 2
+fi
+
 payload="$(cat || true)"
 path="$(hook_extract_file_path "$payload")"
-[ -n "$path" ] || path="$(printf '%s' "$payload" | python3 -c '
+[ -n "$path" ] || path="$(printf '%s' "$payload" | hook_py -c '
 import json,sys
 raw=sys.stdin.read()
 try:
@@ -25,21 +32,16 @@ if isinstance(ti,dict):
 
 [ -n "$path" ] || exit 0
 
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'BLOCK: python3 required for path guardrails\n' >&2
-  exit 2
-fi
-
-result="$(HOOK_PATH="$path" python3 "$(dirname "$0")/hook-policy.py" path 2>/dev/null)" || exit 2
+result="$(HOOK_PATH="$path" hook_py "$HOOK_POLICY_PY" path 2>/dev/null)" || exit 2
 [ -n "$result" ] || exit 2
 
-action="$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("action","allow"))')"
-message="$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message",""))')"
+action="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("action","allow"))')"
+message="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("message",""))')"
 
 if [ "$action" = "block" ]; then
   hook_audit_log "path" "$path" "block" "$message"
   printf 'BLOCK: %s\n' "$message" >&2
-  HOOK_DENY_MSG="$message" python3 -c '
+  HOOK_DENY_MSG="$message" hook_py -c '
 import json, os
 msg = os.environ.get("HOOK_DENY_MSG", "")
 print(json.dumps({"permission": "deny", "decision": "deny", "reason": msg, "user_message": msg}))

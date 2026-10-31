@@ -5,12 +5,34 @@
 # (shipped from `core/<pack>/hooks/pack-scan.sh`). Authoritative F4 access-control
 # evidence is the Verify phase (security-reviewer + vapt-review), not after-edit hook warnings.
 
+# N-1 (kitfix-20261031-n1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): every hook runs Python as
+#   "$HOOK_PYTHON" -I -S (the hook_py helper below). HOOK_PYTHON is the absolute interpreter path that install.sh
+#   checked and wrote into the file hook-python next to these scripts. It is never read from the environment: an
+#   agent sets the environment of the commands it starts, and a developer's shell reads agent-writable dotfiles.
+#   Without that file (the kit's own tree, a --link install, an install older than N-1) it is /usr/bin/python3.
+#   -I ignores PYTHON* variables and keeps the user site, the working folder (a json.py the agent wrote into the
+#   project, N-2) and the script folder off sys.path; -S skips the site module, so no sitecustomize, *.pth or
+#   site-packages. The hooks use the standard library only, and hook-policy.py is loaded by its absolute path.
+HOOK_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || HOOK_DIR="$(dirname "$0")"
+HOOK_PYTHON=""
+if [ -f "$HOOK_DIR/hook-python" ]; then
+  IFS= read -r HOOK_PYTHON < "$HOOK_DIR/hook-python" || :
+fi
+case "$HOOK_PYTHON" in
+  /*) ;;
+  *) HOOK_PYTHON=/usr/bin/python3 ;;
+esac
+HOOK_POLICY_PY="$HOOK_DIR/hook-policy.py"
+PYTHONNOUSERSITE=1
+export PYTHONNOUSERSITE
+hook_py() { "$HOOK_PYTHON" -I -S "$@"; }
+
 # Read hook JSON from stdin; print a string field (supports nested keys with dots).
 # Tries common Cursor payload shapes when the top-level key is missing.
 hook_json_string_field() {
   field="${1:-}"
   [ -n "$field" ] || return 0
-  HOOK_JSON_FIELD="$field" python3 -c '
+  HOOK_JSON_FIELD="$field" hook_py -c '
 import json, os, sys
 
 field = os.environ.get("HOOK_JSON_FIELD", "")
@@ -86,7 +108,7 @@ hook_audit_log() {
   logfile="$logdir/audit.jsonl"
   mkdir -p "$logdir" 2>/dev/null || return 0
   HOOK_AUDIT_EVENT="$event" HOOK_AUDIT_SUBJECT="$subject" HOOK_AUDIT_DECISION="$decision" HOOK_AUDIT_DETAIL="$detail" \
-    python3 -c '
+    hook_py -c '
 import json, os, re, time
 
 def redact(s):
@@ -111,7 +133,7 @@ print(json.dumps({
 hook_emit_additional_context() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_CONTEXT_TEXT="$text" python3 -c '
+  HOOK_CONTEXT_TEXT="$text" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
 if not text.strip():
@@ -124,7 +146,7 @@ print(json.dumps({"additional_context": text}))
 hook_emit_session_context() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_CONTEXT_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" python3 -c '
+  HOOK_CONTEXT_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
 flavor = os.environ.get("HOOK_FLAVOR", "cursor")
@@ -141,7 +163,7 @@ else:
 hook_emit_stop_followup() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_FOLLOWUP_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" python3 -c '
+  HOOK_FOLLOWUP_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_FOLLOWUP_TEXT", "")
 flavor = os.environ.get("HOOK_FLAVOR", "cursor")
@@ -162,7 +184,7 @@ hook_shell_permission_ask() {
   agent_message="$2"
   cmd_str="${3:-}"
   HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" HOOK_CMD_STR="$cmd_str" \
-    HOOK_POLICY_PY="${HOOK_POLICY_PY:-$(dirname "$0")/hook-policy.py}" python3 -c '
+    HOOK_POLICY_PY="$HOOK_POLICY_PY" hook_py -c '
 import fnmatch, importlib.util, json, os, re, shlex, sys
 
 user = os.environ.get("HOOK_USER_MESSAGE", "")
@@ -264,7 +286,7 @@ print(json.dumps({"permission": "ask", "decision": "ask", "reason": user, "user_
 # Emit allow for Cursor & Antigravity permission hooks (beforeShellExecution / PreToolUse).
 # Exit 0 without valid JSON is treated as invalid under failClosed and blocks the tool.
 hook_shell_permission_allow() {
-  HOOK_ALLOW_AGENT_MESSAGE="${1:-}" python3 -c '
+  HOOK_ALLOW_AGENT_MESSAGE="${1:-}" hook_py -c '
 import json, os
 agent = os.environ.get("HOOK_ALLOW_AGENT_MESSAGE", "")
 out = {"permission": "allow", "decision": "allow"}
