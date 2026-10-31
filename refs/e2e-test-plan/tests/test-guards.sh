@@ -367,6 +367,27 @@ echo '# changed' >> "$NG/gyp_main.py"
 bash "$HV3/scripts/home-hash.sh" --check "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/r1.log" \
   && ok "home-hash still hashes all of .local/lib (a changed node_modules .py is HOME-CHANGED)" || ko "home-hash node_modules change: $(cat "$SB/r1.log")"
 rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
+# N-1 final round (Sakura 7e91af9 nit): under V3 prereqs.sh never pip --user installs PyYAML (that fills the user
+#   site the record refuses); it is HUMAN "needs apt-get install python3-yaml". pyyaml_prereq runs from a copy with
+#   stubbed say/python3 (no yaml; pip leaves a mark): V3 marker, E2E_NO_USER_SITE=1, and the laptop control.
+PQ="$SB/pq"; mkdir -p "$PQ/scripts"
+{ echo 'say(){ echo "PREREQ $1 $2 $3"; }'
+  echo 'python3(){ case "$*" in *"import yaml"*) return 1;; *pip*) echo PIP >> "$PQ_MARK"; return 0;; esac; }'
+  echo 'MODE=--install'
+  sed -n '/^pyyaml_prereq(){/,/^}/p' "$HERE/scripts/prereqs.sh"
+  echo 'pyyaml_prereq'; } > "$PQ/scripts/pq.sh"
+grep -q '^pyyaml_prereq(){' "$PQ/scripts/pq.sh" || ko "prereqs.sh has no pyyaml_prereq function"
+: > "$PQ/V3-REQUIRED"; out="$(PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ ! -e "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml HUMAN needs apt-get install python3-yaml' \
+  && ok "prereqs.sh under V3 (marker): PyYAML missing is HUMAN 'needs apt-get install python3-yaml', no pip --user" || ko "prereqs V3 marker: $out mark=$(cat "$PQ/mark" 2>/dev/null)"
+rm -f "$PQ/V3-REQUIRED"; out="$(E2E_NO_USER_SITE=1 PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ ! -e "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml HUMAN needs apt-get install python3-yaml' \
+  && ok "prereqs.sh with E2E_NO_USER_SITE=1 (setup-vm): no pip --user" || ko "prereqs E2E_NO_USER_SITE: $out"
+out="$(PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ -s "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml INSTALLED' && ok "control: off V3 prereqs.sh keeps the pip --user fallback" || ko "prereqs laptop control: $out"
+nv="$(grep -n 'prereqs\.sh" --' "$HERE/scripts/setup-vm.sh" | grep -v 'E2E_NO_USER_SITE=1')"
+[ -z "$nv" ] && ok "setup-vm.sh runs every prereqs.sh with E2E_NO_USER_SITE=1" || ko "setup-vm prereqs without E2E_NO_USER_SITE: $nv"
+rm -rf "$PQ"
 # Sakura B-3: the harness's own Python runs isolated. run-plan.sh's next-story.py calls (they pick the next story) ran
 #   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools
 #   (prereqs.sh, setup-vm.sh, kit-fix.sh) starts python3 without -I -S. Functional: run-plan.sh's own map line,
