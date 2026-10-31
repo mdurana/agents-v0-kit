@@ -24,7 +24,7 @@ run_isolated() { # <timeout_sec> <cmd...> — runs in a new process group with t
   if command -v setsid >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
     exec setsid timeout -k 30 "$cap" "$@"
   else
-    exec python3 -c '
+    exec python3 -I -S -c '
 import os, signal, subprocess, sys
 cap = float(sys.argv[1])
 cmd = sys.argv[2:]
@@ -54,7 +54,7 @@ create_agent_chat() { # <workspace>
   if [ "$drv" = cursor ] && [ -x "${AGENT_BIN:-}" ]; then
     (cd "$ws" && "$AGENT_BIN" create-chat)
   else
-    python3 -c 'import uuid; print(uuid.uuid4())'
+    python3 -I -S -c 'import uuid; print(uuid.uuid4())'
   fi
 }
 LAST_POST=0
@@ -103,7 +103,7 @@ load_state(){ [ -f "$1" ] || return 1; local line name val n=0 re='^([A-Z][A-Z0-
 # ---------- fixtures ----------
 approval_for(){ awk -F'\t' -v g="$1" '!/^#/ && $1==g {print $2 "\t" $3; exit}' "$PLAN_DIR/fixtures/approvals.tsv"; }
 answer_for(){ # <context> <final-message-file>
-  python3 - "$PLAN_DIR/fixtures/scripted-answers.tsv" "$1" "$2" <<'PY'
+  python3 -I -S - "$PLAN_DIR/fixtures/scripted-answers.tsv" "$1" "$2" <<'PY'
 import re,sys
 rows=[l.rstrip("\n").split("\t") for l in open(sys.argv[1],encoding="utf-8") if l.strip() and not l.startswith("#")]
 msg=open(sys.argv[3],encoding="utf-8",errors="replace").read()
@@ -165,7 +165,7 @@ mkcfg(){ # <dir> <allow csv or ->
   if [ ! -s "$1/cli-config.json" ]; then
     printf '{"version":1,"editor":{"vimMode":false},"permissions":{"allow":[],"deny":[]}}\n' > "$1/cli-config.json"
   fi
-  [ "$2" = - ] || python3 -c 'import json,sys;p=sys.argv[1];d=json.load(open(p));a=d.setdefault("permissions",{}).setdefault("allow",[]);[a.append(x) for x in sys.argv[2].split(",") if x and x not in a];json.dump(d,open(p,"w"),indent=2)' "$1/cli-config.json" "$2"; }
+  [ "$2" = - ] || python3 -I -S -c 'import json,sys;p=sys.argv[1];d=json.load(open(p));a=d.setdefault("permissions",{}).setdefault("allow",[]);[a.append(x) for x in sys.argv[2].split(",") if x and x not in a];json.dump(d,open(p,"w"),indent=2)' "$1/cli-config.json" "$2"; }
 # HARNESS-FIX 2026-10-30 (P2-P, approved by Sensei 19:14 Asia/Manila; findings HF-F1 and HF-F3): agy quota / 429.
 #   With the agy driver the agy errors are only in the agy side files next to the runner's turn files
 #   (turn-<k>.agy.jsonl result.error, turn-<k>.agy.stderr) and in the transcript (ERROR_MESSAGE entries of
@@ -191,7 +191,7 @@ mkcfg(){ # <dir> <allow csv or ->
 #     none        anything else (no agy files, no such error, or other errors mixed in) -> the rules as before
 agy_api_error_kind(){
   [ -s "$1" ] || [ -s "$2" ] || { echo none; return 0; }
-  python3 - "$1" "$2" "$3" <<'PY' 2>/dev/null || echo none
+  python3 -I -S - "$1" "$2" "$3" <<'PY' 2>/dev/null || echo none
 import json, re, sys
 aj, ae, tj = sys.argv[1:4]
 # HARNESS-FIX 2026-10-31 (kitfix-20261031, review of run 20261029-1629): a reset given in minutes, "try again in N
@@ -923,7 +923,7 @@ kit_policy_apply(){ local w f rc=0
 #   recorded in that mode (the report is written by check-traceability.sh at the gate).
 kit_policy_ok(){ local tj="$MAIN/docs/agents-v0/requirements/$1.trace.json"
   [ -n "${KIT_TRACE_MODE:-}" ] && [ -f "$tj" ] || return 0
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); bad=[g for g,v in d.items() if isinstance(v,dict) and "mode" in v and v["mode"]!=sys.argv[2]]
+  python3 -I -S -c 'import json,sys; d=json.load(open(sys.argv[1])); bad=[g for g,v in d.items() if isinstance(v,dict) and "mode" in v and v["mode"]!=sys.argv[2]]
 print("trace.json gates not in mode %s: %s" % (sys.argv[2], " ".join(bad))) if bad else None; sys.exit(1 if bad else 0)' "$tj" "$KIT_TRACE_MODE"; }
 # kitfix-20261031-kit-source-lock (item 1b of the 10:35 review): the agent runs as the same OS user as the harness, so
 #   any readable copy of the kit SOURCE (templates/.agents-v0/scripts keeps the test-override blocks that install.sh
@@ -1051,7 +1051,7 @@ released_ok(){ # <slug> <is_p0a>: state, evidence, git
 #   written by --approve since kitfix-20261031) must be non-decreasing intake <= design <= build <= verify <= release;
 #   without phaseTimes the phaseDates day check is used. With an evidence prefix, every gate's approvals.log SENT time
 #   (Asia/Manila) must also be non-decreasing in the same order.
-phases_in_order(){ python3 - "$1" "${2:-}" <<'PYX'
+phases_in_order(){ python3 -I -S - "$1" "${2:-}" <<'PYX'
 import datetime as dt, glob, json, re, sys
 f, pre = sys.argv[1], sys.argv[2]
 s = json.load(open(f)); order = ["intake", "design", "build", "verify", "release"]
@@ -1102,7 +1102,7 @@ native_verify(){ local slug="$1" surf="${2:-}" log="$RES/native-verify-$1.log" c
   echo "$(ts) native_verify rc=$rc" >> "$log"; echo "native_verify $slug rc=$rc (log $log)"; [ "$rc" = 0 ]; }
 # squash_of <branch>: "<squash sha> <Story-Tip>" of the newest first-parent commit on main whose message has
 #   "Story-Branch: <branch>"; empty if none (HARNESS-FIX 2026-10-31, kitfix-20261031-gate-commit).
-squash_of(){ git -C "$MAIN" log --first-parent --format='%H%x1f%B%x1e' HEAD 2>/dev/null | python3 -c '
+squash_of(){ git -C "$MAIN" log --first-parent --format='%H%x1f%B%x1e' HEAD 2>/dev/null | python3 -I -S -c '
 import re, sys
 b = sys.argv[1]
 for rec in sys.stdin.read().split("\x1e"):
