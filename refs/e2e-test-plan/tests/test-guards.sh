@@ -322,6 +322,21 @@ echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"
 mkdir -p "$VH/.local/lib/python3.13/site-packages"; echo 'import os' > "$VH/.local/lib/python3.13/site-packages/usercustomize.py"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-.*\.local/lib' "$SB/v3.log" && ok "V3 refuses a usercustomize.py added to the user site (home-hash .local/lib, N-1)" || ko "V3 user site: $(cat "$SB/v3.log")"
 rm -rf "$VH/.local/lib"
+# Sakura B-1: a sourceless usercustomize.pyc in the user site runs in every bare python3 of that user, so home-hash
+#   must hash it; only __pycache__/ (a cache Python never imports sourceless) is left out.
+HH="$SB/hh"; HHS="$(HOME="$HH" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "$HHS"; echo 'X = 1' > "$HHS/plain.py"; bash "$HV3/scripts/home-hash.sh" --record "$SB/hh.sha256" "$HH" > /dev/null
+mkdir -p "$HHS/__pycache__"; HOME="$HH" /usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$HHS/plain.py" "$HHS/__pycache__/plain.cpython-0.pyc"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1 && grep -q '^HOME-HASH-OK' "$SB/hh.log" \
+  && ok "home-hash ignores a __pycache__/ refresh under .local/lib" || ko "home-hash __pycache__: $(cat "$SB/hh.log")"
+printf 'open(%s, "w").write("ran")\n' "'$SB/hh.mark'" > "$SB/hh-uc.py"
+/usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$SB/hh-uc.py" "$HHS/usercustomize.pyc"
+rm -f "$SB/hh.mark"; HOME="$HH" /usr/bin/python3 -c 'pass'
+[ "$(cat "$SB/hh.mark" 2>/dev/null)" = ran ] && ok "control: a sourceless usercustomize.pyc in the user site runs in a bare python3" \
+  || ko "control: the sourceless usercustomize.pyc did not run (user site disabled here?)"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/hh.log" \
+  && ok "home-hash sees a sourceless usercustomize.pyc added to the user site (Sakura B-1)" || ko "home-hash .pyc: $(cat "$SB/hh.log")"
+rm -rf "$HH" "$SB/hh.mark"
 echo 'export REQUIRE_FAIL_MODES=0' >> "$VH/.profile"; v3; [ $? != 0 ] && grep -q '^V3 HOME-CHANGED .profile' "$SB/v3.log" && ok "V3 refuses a changed startup file (.profile)" || ko "V3 dotfile: $(cat "$SB/v3.log")"
 sed -i '$d' "$VH/.profile"; mkdir -p "$VH/.local/agents-v0-tools"; echo 'TOOLS_PATH=/x' > "$VH/.local/agents-v0-tools/tools.env"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-ADDED .local/agents-v0-tools/tools.env' "$SB/v3.log" && ok "V3 refuses a new tools.env the record did not have" || ko "V3 tools.env: $(cat "$SB/v3.log")"

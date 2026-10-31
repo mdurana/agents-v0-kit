@@ -8,15 +8,16 @@
 #   bash home-hash.sh --record <file> <home>    as root at lock time (V3 procedure §4 step 9): write the list to <file>
 #   bash home-hash.sh --check <file> <home>     compare with <file>: prints HOME-HASH-OK <n> files (exit 0), or one
 #                                               HOME-CHANGED/HOME-ADDED/HOME-REMOVED line per difference (exit 1)
-#   kitfix-20261031-n1: also .local/lib (the user site-packages: usercustomize.py, *.pth). Compiled *.pyc files are
-#   left out of folder hashes, so a Python run that only refreshes its cache is not a change.
+#   kitfix-20261031-n1: also .local/lib (the user site-packages: usercustomize.py, *.pth). Only files under a
+#   __pycache__/ folder are left out of folder hashes (a cache refresh is not a change; Python never imports a
+#   sourceless .pyc from there). Any other .pyc is hashed: a sourceless usercustomize.pyc runs (Sakura B-1).
 set -u
 FILES=".profile .bash_profile .bash_login .bashrc .bash_logout .bash_aliases .zshenv .zprofile .zshrc .inputrc
 .tmux.conf .config/tmux/tmux.conf .gitconfig .config/git/config .config/git/attributes .ssh/rc .ssh/environment
 .pam_environment .config/environment.d .config/e2e-secrets.env .local/agents-v0-tools/tools.env .local/lib"
 list(){ local h="$1" f
   for f in $FILES; do
-    if [ -d "$h/$f" ]; then printf '%s  %s/\n' "$(cd "$h/$f" && find . -type f ! -name '*.pyc' | LC_ALL=C sort | xargs -r sha256sum | sha256sum | cut -c1-64)" "$f"
+    if [ -d "$h/$f" ]; then printf '%s  %s/\n' "$(cd "$h/$f" && find . -type f ! -path '*/__pycache__/*' | LC_ALL=C sort | xargs -r sha256sum | sha256sum | cut -c1-64)" "$f"
     elif [ -e "$h/$f" ] || [ -L "$h/$f" ]; then printf '%s  %s\n' "$(sha256sum < "$h/$f" | cut -c1-64)" "$f"
     else printf 'absent  %s\n' "$f"; fi
   done; }
