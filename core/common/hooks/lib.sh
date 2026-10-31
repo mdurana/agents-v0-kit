@@ -5,12 +5,79 @@
 # (shipped from `core/<pack>/hooks/pack-scan.sh`). Authoritative F4 access-control
 # evidence is the Verify phase (security-reviewer + vapt-review), not after-edit hook warnings.
 
+# N-1 (kitfix-20261031-n1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): every hook runs Python as
+#   "$HOOK_PYTHON" -I -S (the hook_py helper below). HOOK_PYTHON is the absolute interpreter path that install.sh
+#   checked and wrote into the file hook-python next to these scripts. It is never read from the environment: an
+#   agent sets the environment of the commands it starts, and a developer's shell reads agent-writable dotfiles.
+#   Without that file (the kit's own tree, a --link install, an install older than N-1) it is /usr/bin/python3.
+#   -I ignores PYTHON* variables and keeps the user site, the working folder (a json.py the agent wrote into the
+#   project, N-2) and the script folder off sys.path; -S skips the site module, so no sitecustomize, *.pth or
+#   site-packages. The hooks use the standard library only, and hook-policy.py is loaded by its absolute path.
+HOOK_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || HOOK_DIR="$(dirname "$0")"
+HOOK_PYTHON=""
+if [ -f "$HOOK_DIR/hook-python" ]; then
+  IFS= read -r HOOK_PYTHON < "$HOOK_DIR/hook-python" || :
+fi
+case "$HOOK_PYTHON" in
+  /*) ;;
+  *) HOOK_PYTHON=/usr/bin/python3 ;;
+esac
+HOOK_POLICY_PY="$HOOK_DIR/hook-policy.py"
+PYTHONNOUSERSITE=1
+export PYTHONNOUSERSITE
+# JN-7 (Jiraiya's N-1 review): -I -S does not stop a module loaded by path (hook-policy.py in
+#   hook_shell_permission_ask) from reading a planted __pycache__/hook-policy.cpython-*.pyc next to the hooks.
+#   -X pycache_prefix points every bytecode lookup at a folder that cannot exist (/dev/null is not a folder, for
+#   root too), so the source is always compiled, and -B never writes a cache (PYTHONDONTWRITEBYTECODE is ignored
+#   under -I). Python 3.7 and older ignore pycache_prefix; the check below accepts them without it.
+HOOK_PYCACHE_PREFIX=/dev/null/agents-v0
+_hook_py_run() { "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
+hook_py() { [ -z "$HOOK_PYTHON_WHY" ] || return 126; _hook_py_run "$@"; }
+# JN-2 / JN-5 / JN-8 (Jiraiya's N-1 review): hook_python_problem prints why HOOK_PYTHON must not be trusted, nothing
+#   when it may. The pin can arrive through git (a pulled or merged hook-python) or be rewritten (H-5), so it is
+#   checked at every hook run, not only by install.sh:
+#   - it is an executable file, and it (followed through a symlink) and its folder are owned by root and not writable
+#     by group or others (one ls, one awk);
+#   - it is a working Python that runs as hook_py runs it: a fixed snippet must print the marker with isolated=1,
+#     no_site=1, dont_write_bytecode=1 and the pycache prefix. /bin/true, /usr/bin/env or a folder print nothing,
+#     and dropping -I, -S, -B or -X from hook_py changes the line, so the hooks fail closed (JN-8 at run time).
+#   It runs once, when this file is sourced (HOOK_PYTHON_WHY, never read from the environment). pre-shell.sh and
+#   pre-edit.sh deny with a literal JSON line when it is set, and hook_py refuses to run an untrusted pin (rc 126).
+hook_python_problem() {
+  if [ ! -f "$HOOK_PYTHON" ] || [ ! -x "$HOOK_PYTHON" ]; then
+    printf '%s is missing or not an executable file' "$HOOK_PYTHON"; return 0
+  fi
+  if ! ls -ldnL "$HOOK_PYTHON" "$(dirname "$HOOK_PYTHON")" 2>/dev/null | awk '
+      NF < 3 || $3 != "0" || substr($1, 6, 1) == "w" || substr($1, 9, 1) == "w" { bad = 1 }
+      END { exit (bad || NR != 2) }'; then
+    printf '%s or its folder is not owned by root, or is writable by group or others' "$HOOK_PYTHON"; return 0
+  fi
+  hp_marker="$(_hook_py_run -c 'import sys
+f = sys.flags
+p = getattr(sys, "pycache_prefix", None) if sys.version_info >= (3, 8) else "pre-3.8"
+print("agents-v0-hook-python %d %d %d %s" % (f.isolated, f.no_site, f.dont_write_bytecode, p))' </dev/null 2>/dev/null)" || hp_marker=""
+  case "$hp_marker" in
+    "agents-v0-hook-python 1 1 1 $HOOK_PYCACHE_PREFIX"|"agents-v0-hook-python 1 1 1 pre-3.8") ;;
+    *) printf '%s is not a working Python run with -I -S -B (marker: %s)' "$HOOK_PYTHON" "${hp_marker:-none}" ;;
+  esac
+}
+HOOK_PYTHON_WHY=""
+HOOK_PYTHON_WHY="$(hook_python_problem)"
+# hook_deny_literal <reason>: a deny verdict that needs no Python; exits 2. The reason may hold the pin's text (from
+#   git), so quotes, backslashes and control characters are dropped before it goes into the JSON line.
+hook_deny_literal() {
+  hd_r="$(printf '%s' "$1" | tr -d '"\\\000-\037')"
+  printf 'BLOCK: %s (fail-closed)\n' "$hd_r" >&2
+  printf '{"permission": "deny", "decision": "deny", "reason": "%s (fail-closed)"}\n' "$hd_r"
+  exit 2
+}
+
 # Read hook JSON from stdin; print a string field (supports nested keys with dots).
 # Tries common Cursor payload shapes when the top-level key is missing.
 hook_json_string_field() {
   field="${1:-}"
   [ -n "$field" ] || return 0
-  HOOK_JSON_FIELD="$field" python3 -c '
+  HOOK_JSON_FIELD="$field" hook_py -c '
 import json, os, sys
 
 field = os.environ.get("HOOK_JSON_FIELD", "")
@@ -86,7 +153,7 @@ hook_audit_log() {
   logfile="$logdir/audit.jsonl"
   mkdir -p "$logdir" 2>/dev/null || return 0
   HOOK_AUDIT_EVENT="$event" HOOK_AUDIT_SUBJECT="$subject" HOOK_AUDIT_DECISION="$decision" HOOK_AUDIT_DETAIL="$detail" \
-    python3 -c '
+    hook_py -c '
 import json, os, re, time
 
 def redact(s):
@@ -111,7 +178,7 @@ print(json.dumps({
 hook_emit_additional_context() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_CONTEXT_TEXT="$text" python3 -c '
+  HOOK_CONTEXT_TEXT="$text" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
 if not text.strip():
@@ -124,7 +191,7 @@ print(json.dumps({"additional_context": text}))
 hook_emit_session_context() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_CONTEXT_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" python3 -c '
+  HOOK_CONTEXT_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_CONTEXT_TEXT", "")
 flavor = os.environ.get("HOOK_FLAVOR", "cursor")
@@ -141,7 +208,7 @@ else:
 hook_emit_stop_followup() {
   text="$1"
   [ -n "$text" ] || return 0
-  HOOK_FOLLOWUP_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" python3 -c '
+  HOOK_FOLLOWUP_TEXT="$text" HOOK_FLAVOR="${KIT_HOOK_FLAVOR:-cursor}" hook_py -c '
 import json, os
 text = os.environ.get("HOOK_FOLLOWUP_TEXT", "")
 flavor = os.environ.get("HOOK_FLAVOR", "cursor")
@@ -162,7 +229,7 @@ hook_shell_permission_ask() {
   agent_message="$2"
   cmd_str="${3:-}"
   HOOK_USER_MESSAGE="$user_message" HOOK_AGENT_MESSAGE="$agent_message" HOOK_CMD_STR="$cmd_str" \
-    HOOK_POLICY_PY="${HOOK_POLICY_PY:-$(dirname "$0")/hook-policy.py}" python3 -c '
+    HOOK_POLICY_PY="$HOOK_POLICY_PY" hook_py -c '
 import fnmatch, importlib.util, json, os, re, shlex, sys
 
 user = os.environ.get("HOOK_USER_MESSAGE", "")
@@ -264,7 +331,7 @@ print(json.dumps({"permission": "ask", "decision": "ask", "reason": user, "user_
 # Emit allow for Cursor & Antigravity permission hooks (beforeShellExecution / PreToolUse).
 # Exit 0 without valid JSON is treated as invalid under failClosed and blocks the tool.
 hook_shell_permission_allow() {
-  HOOK_ALLOW_AGENT_MESSAGE="${1:-}" python3 -c '
+  HOOK_ALLOW_AGENT_MESSAGE="${1:-}" hook_py -c '
 import json, os
 agent = os.environ.get("HOOK_ALLOW_AGENT_MESSAGE", "")
 out = {"permission": "allow", "decision": "allow"}

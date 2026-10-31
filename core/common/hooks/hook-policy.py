@@ -334,7 +334,10 @@ def _segment_writes_protected_path(seg: str) -> Optional[str]:
 
 def _segment_writes_ask_path(seg: str) -> Optional[Tuple[str, str]]:
     """Detect shell redirection or cp/mv/tee/sed/interpreter writes targeting ask-level paths."""
-    target = _segment_writes_matching_path(seg, lambda p: classify_path(p)[0] == "ask")
+    # N-1 final round: Python start-up paths are judged by _segment_writes_py_startup (it runs first and knows that a
+    #   cp/rsync source is a read); here they would ask for a backup copy out of the user site in supervised mode.
+    target = _segment_writes_matching_path(
+        seg, lambda p: not _is_py_startup_path(p) and classify_path(p)[0] == "ask")
     if target:
         return target, classify_path(target)[1]
     return None
@@ -620,6 +623,346 @@ def _is_harness_path(p: str) -> bool:
                     carve and (full == carve or full.startswith(carve + "/"))):
                 return True
     return any(c and HARNESS_PATH_RE.search(c) for c in cands)
+
+
+# kitfix-20261031-n1 (Sasuke N-1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): Python start-up
+#   files run inside every Python process of the user that owns them: the user site (~/.local/lib/python*/,
+#   with usercustomize.py and *.pth files), a python* in ~/.local/bin (often first on PATH), and any
+#   usercustomize.py / sitecustomize.py or site-packages *.pth. The hooks no longer load them (-I -S, a pinned
+#   interpreter), so this is the second line: a write there is blocked unattended and asks in supervised mode.
+#   Only spellings the write detection already knows are caught (dd of=, sponge, tar -x are H-5).
+PY_STARTUP_RE = re.compile(
+    r"(^|/)\.local/lib/python[^/]*(?:/|$)"
+    r"|(^|/)\.local/bin/python[^/]*$"
+    r"|(^|/)(?:usercustomize|sitecustomize)\.py$"
+    r"|(^|/)(?:site|dist)-packages/[^/]+\.pth$"
+)
+PY_STARTUP_MSG = ("Python start-up file or user site ({}): code there runs inside every Python process of this user, "
+                  "the kit hooks included. Blocked unattended; in supervised mode approve only if you asked for it.")
+# JN-6 (Jiraiya's N-1 review): the Edit/Write tool cannot prompt. pre-edit.sh turns "ask" into a recorded allow
+#   (Cursor does not enforce "ask" for preToolUse), so for a start-up path an edit is blocked in both modes. An agent
+#   never needs the Edit tool there; a shell write still asks in supervised mode, and a developer edits in a terminal.
+PY_STARTUP_EDIT_MSG = ("Python start-up file or user site ({}): code there runs inside every Python process of this "
+                       "user. The edit tool cannot ask for approval, so this edit is blocked in every mode; if you "
+                       "need the change, make it yourself in a terminal.")
+
+
+def _is_py_startup_path(p: str) -> bool:
+    raw = os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+    return bool(raw) and any(PY_STARTUP_RE.search(c) for c in (raw, posixpath.normpath(raw)))
+
+
+def _segment_writes_py_startup(seg: str) -> Optional[str]:
+    # N-1 final round (Sakura 7e91af9 nit): a cp/rsync SOURCE under the user site is a read, not a write
+    #   (cp -r ~/.local/lib/python3.13 /tmp/backup/). For those two only the redirections and where each source
+    #   lands (the destination) are judged; every other program keeps the operand check.
+    try:
+        first = shlex.split(_strip_env_prefix(seg.strip()), posix=True)[:1]
+    except ValueError:
+        first = seg.split()[:1]
+    if first and first[0].split("/")[-1] in ("cp", "rsync"):
+        return _redirect_writes(seg, _is_py_startup_path) or \
+            _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
+    return _segment_writes_matching_path(seg, _is_py_startup_path) or \
+        _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
+
+
+def _redirect_writes(seg: str, predicate) -> Optional[str]:
+    for m in re.finditer(r">+\s*([^\s;|&]+)", _strip_env_prefix(seg.strip())):
+        target = m.group(1).strip().strip("'\"")
+        if predicate(target):
+            return target
+    return None
+
+
+# kitfix-20261031-n1 rework (Sakura B-2): a whole tree copied, moved, synced or unpacked into the user site's
+#   parents (~, ~/.local, ~/.local/lib, ~/.local/bin) plants the same start-up files without naming them, and so does
+#   pip install --user. A destination is judged as the path each source lands on (dest/basename, or dest itself for
+#   rsync "src/", "src/." and a destination folder that does not exist yet). Copying a single file into ~ or a
+#   project folder stays allowed. Setting PIP_USER (pip then installs into the user site by default) and
+#   `pip config set <x>.user` count as a pip --user install. tar -x -C and dd/sponge stay with H-5.
+PY_STARTUP_PARENT_RE = re.compile(r"(^|/)\.local(?:/(?:lib|bin))?/*$")
+# Judged on the whole command (an env prefix or `env` wrapper is gone by the time a segment is classified).
+PIP_USER_RE = re.compile(r"\bPIP_USER\s*=\s*['\"]?(?!0\b|false\b|no\b|off\b)[^\s;&|'\"]", re.I)
+# N-1 follow-up (Sakura re-review): PIP_TARGET / PIP_PREFIX / PIP_ROOT pointing into the user site or its parents.
+PIP_PATH_ENV_RE = re.compile(r"\bPIP_(?:TARGET|PREFIX|ROOT)\s*=\s*['\"]?([^\s;&|'\"]+)", re.I)
+_PIP_PATH_OPTS = ("--target", "-t", "--prefix", "--root", "--home")
+
+
+def _py_startup_expand(p: str) -> str:
+    return os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+
+
+def _is_py_startup_parent(p: str) -> bool:
+    """True for ~, ~/.local, ~/.local/lib or ~/.local/bin (any spelling): a tree landing there can hold the user site."""
+    raw = _py_startup_expand(p)
+    if not raw:
+        return False
+    cands = [raw.rstrip("/") or "/", posixpath.normpath(raw)]
+    if not raw.startswith("/"):
+        # the cd target counts even before it exists (cd ~/.local/lib && unzip x.zip)
+        cands.append(posixpath.normpath(posixpath.join(_BASE_DIR or _base_dir(), raw)))
+    home = posixpath.normpath(os.path.expanduser("~"))
+    homes = {home, os.path.realpath(home)} if home not in ("", "/", "~") else set()
+    return any(PY_STARTUP_PARENT_RE.search(c) or c in homes for c in cands)
+
+
+def _is_py_startup_tree_dest(p: str) -> bool:
+    return _is_py_startup_path(p) or _is_py_startup_parent(p)
+
+
+def _existing_dir(p: str) -> bool:
+    raw = _py_startup_expand(p)
+    if not raw or re.search(r"[$`*?\[]", raw):
+        return False
+    return os.path.isdir(raw if raw.startswith("/") else os.path.join(_base_dir(), raw))
+
+
+def _python_module(parts: List[str]) -> Optional[Tuple[str, List[str]]]:
+    """(module, its arguments) for python* -m <mod> in any spelling (-m mod, -mmod, -Im mod, -I -m mod); else None."""
+    if not re.fullmatch(r"python[0-9.]*", parts[0].split("/")[-1]):
+        return None
+    i = 1
+    while i < len(parts):
+        a = parts[i]
+        if a == "--" or a == "-" or not a.startswith("-"):
+            return None
+        if a.startswith("--"):
+            i += 1
+            continue
+        cl = a[1:]
+        for k, ch in enumerate(cl):
+            if ch == "m":
+                if cl[k + 1:]:
+                    return cl[k + 1:], parts[i + 1:]
+                return (parts[i + 1], parts[i + 2:]) if i + 1 < len(parts) else None
+            if ch == "c":
+                return None
+            if ch in "WX":  # takes a value: the rest of the cluster or the next word
+                if not cl[k + 1:]:
+                    i += 1
+                break
+        i += 1
+    return None
+
+
+def _python_c_body(parts: List[str]) -> Optional[str]:
+    """The program text of python* -c <body> (also -Ic, -I -S -c); None when there is no -c."""
+    if not re.fullmatch(r"python[0-9.]*", parts[0].split("/")[-1]):
+        return None
+    for i, a in enumerate(parts[1:], 1):
+        if a == "--" or not a.startswith("-") or a.startswith("--"):
+            if a.startswith("--"):
+                continue
+            return None
+        k = a.find("c", 1)
+        if k > 0:
+            return a[k + 1:] or (parts[i + 1] if i + 1 < len(parts) else None)
+    return None
+
+
+# Python calls that copy, move or unpack: name -> (index of the destination argument, does it place a whole tree).
+_PY_TREE_CALLS = {"copytree": (1, True), "copy_tree": (1, True), "move": (1, True), "unpack_archive": (1, True),
+                  "extractall": (0, True), "symlink": (1, True), "symlink_to": (0, True), "rename": (1, True),
+                  "replace": (1, True), "copy": (1, False), "copy2": (1, False), "copyfile": (1, False)}
+
+
+def _call_args(text: str, start: int) -> List[str]:
+    """Top-level comma-separated arguments of the call whose '(' is at text[start]."""
+    args, depth, cur, q, i = [], 0, "", None, start + 1
+    while i < len(text):
+        ch = text[i]
+        if q:
+            cur += ch
+            if ch == "\\" and i + 1 < len(text):
+                cur += text[i + 1]
+                i += 1
+            elif ch == q:
+                q = None
+        elif ch in "'\"":
+            q = ch
+            cur += ch
+        elif ch in "([{":
+            depth += 1
+            cur += ch
+        elif ch in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+            cur += ch
+        elif ch == "," and depth == 0:
+            args.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+        i += 1
+    if cur.strip():
+        args.append(cur.strip())
+    return args
+
+
+def _py_code_tree_dest(body: str) -> Optional[str]:
+    """A shutil/zipfile/os/Path call in Python source whose destination is a start-up path or (for a tree) a parent
+    of the user site. String literals of the destination argument are joined with '/', so
+    os.path.join(os.path.expanduser('~'), '.local', 'lib') and Path.home() / '.local' / 'lib' are seen."""
+    for m in re.finditer(r"\b(" + "|".join(_PY_TREE_CALLS) + r")\s*\(", body):
+        idx, tree = _PY_TREE_CALLS[m.group(1)]
+        args = _call_args(body, m.end() - 1)
+        kw = [a.split("=", 1)[1] for a in args if re.match(r"(?:dst|path|extract_dir|target)\s*=", a)]
+        pos = [a for a in args if not re.match(r"[A-Za-z_]\w*\s*=(?!=)", a)]
+        dest = kw[0] if kw else (pos[idx] if idx < len(pos) else None)
+        if m.group(1) in ("symlink_to",):  # Path(dest).symlink_to(src): the destination is before the call
+            pre = body[max(0, m.start() - 200):m.start()]
+            lit = re.findall(r"['\"]([^'\"]+)['\"]", pre)
+            dest = "'" + "/".join(lit[-3:]) + "'" if lit else None
+        if not dest:
+            continue
+        lits = re.findall(r"['\"]([^'\"]*)['\"]", dest)
+        if not lits:
+            continue
+        joined = "/".join(x.strip("/") if j else x.rstrip("/") for j, x in enumerate(lits) if x)
+        for cand in (joined, lits[-1]):
+            if _is_py_startup_path(cand) or (tree and _is_py_startup_parent(cand)):
+                return cand
+    return None
+
+
+def _brace_expand(s: str, limit: int = 64) -> List[str]:
+    m = re.search(r"\{([^{}]*,[^{}]*)\}", s)
+    if not m:
+        return [s]
+    out: List[str] = []
+    for alt in m.group(1).split(","):
+        out.extend(_brace_expand(s[:m.start()] + alt + s[m.end():], limit))
+        if len(out) >= limit:
+            break
+    return out[:limit]
+
+
+def _is_home(p: str) -> bool:
+    raw = _py_startup_expand(p)
+    if not raw:
+        return False
+    full = posixpath.normpath(raw if raw.startswith("/") else posixpath.join(_BASE_DIR or _base_dir(), raw))
+    home = posixpath.normpath(os.path.expanduser("~"))
+    return home not in ("", "/", "~") and full in (home, os.path.realpath(home))
+
+
+def _pip_install_args(parts: List[str]) -> Optional[List[str]]:
+    """The arguments after `install` for pip/pip3/pip3.X, python* -m pip, or uv pip; None when it is not a pip install."""
+    bin0 = parts[0].split("/")[-1]
+    rest: Optional[List[str]] = None
+    mod = _python_module(parts)
+    if re.fullmatch(r"pip[0-9.]*", bin0):
+        rest = parts[1:]
+    elif mod and re.fullmatch(r"pip[0-9.]*", mod[0]):
+        rest = mod[1]
+    elif bin0 == "uv" and len(parts) > 1 and parts[1] == "pip":
+        rest = parts[2:]
+    if rest is None:
+        return None
+    ops = [a for a in rest if not a.startswith("-")]
+    if not ops or ops[0] != "install":
+        return None
+    return rest[rest.index("install") + 1:]
+
+
+def _segment_py_startup_tree(seg: str) -> Optional[str]:
+    seg = _strip_env_prefix(seg.strip())
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    if re.fullmatch(r"pip[0-9.]*", bin0) and len(parts) > 3 and parts[1:3] == ["config", "set"]:
+        if re.search(r"\.user$", parts[3]):
+            return "pip config set " + parts[3]
+        if re.search(r"\.(?:target|prefix|root)$", parts[3]) and len(parts) > 4 and _is_py_startup_tree_dest(parts[4]):
+            return parts[4]
+    pip = _pip_install_args(parts)
+    if pip is not None:
+        if "--user" in pip:
+            return "pip install --user"
+        for i, a in enumerate(pip):
+            for o in _PIP_PATH_OPTS:
+                v = pip[i + 1] if a == o and i + 1 < len(pip) else (a.split("=", 1)[1] if a.startswith(o + "=") else None)
+                if v is None and o == "-t" and a.startswith("-t") and len(a) > 2:
+                    v = a[2:]  # -t<path>
+                if v and _is_py_startup_tree_dest(v):
+                    return v
+        return None
+    mod = _python_module(parts)
+    if mod and mod[0] in ("zipfile", "tarfile") and any(a in ("-e", "--extract") for a in mod[1]):
+        ops = [a for a in mod[1] if not a.startswith("-")]
+        dest = ops[1] if len(ops) >= 2 else "."
+        return dest if _is_py_startup_tree_dest(dest) else None
+    body = _python_c_body(parts)
+    if body:
+        hit = _py_code_tree_dest(body)
+        if hit:
+            return hit
+    if re.fullmatch(r"python[0-9.]*", bin0) and "setup.py" in parts and "install" in parts and "--user" in parts:
+        return "setup.py install --user"
+    if bin0 == "unzip":
+        dest = "."
+        for i, a in enumerate(parts[1:], 1):
+            if a == "-d" and i + 1 < len(parts):
+                dest = parts[i + 1]
+            elif a.startswith("-d") and len(a) > 2:
+                dest = a[2:]
+        return dest if _is_py_startup_tree_dest(dest) else None
+    if bin0 not in ("cp", "mv", "rsync", "ln", "ditto"):
+        return None
+    shorts = "".join(a[1:] for a in parts[1:] if a.startswith("-") and not a.startswith("--"))
+    longs = [a for a in parts[1:] if a.startswith("--")]
+    recursive = bin0 in ("mv", "ln", "ditto") or bool(re.search(r"[rRa]", shorts)) or \
+        any(a in ("--recursive", "--archive") for a in longs)
+    tgt, used = None, set()
+    for i, a in enumerate(parts[1:], 1):
+        if a == "--target-directory" and i + 1 < len(parts):
+            tgt = parts[i + 1]
+            used.add(i + 1)
+        elif a.startswith("--target-directory="):
+            tgt = a.split("=", 1)[1]
+        elif bin0 != "rsync" and a.startswith("-") and not a.startswith("--") and "t" in a[1:]:
+            rest = a[a.index("t", 1) + 1:]  # -t DIR, -tDIR, -rt DIR, -rtDIR (rsync -t is --times)
+            if rest:
+                tgt = rest
+            elif i + 1 < len(parts):
+                tgt = parts[i + 1]
+                used.add(i + 1)
+    ops = [a for j, a in enumerate(parts[1:], 1) if not a.startswith("-") and j not in used]
+    if tgt is None:
+        if len(ops) < 2:
+            return None
+        tgt, srcs = ops[-1], ops[:-1]
+    else:
+        srcs = ops
+    lands = []
+    tgt_dir = _existing_dir(tgt)
+    # N-1 follow-up (Sakura re-review): a brace source is expanded, and a glob source counts as its contents (it
+    #   lands on the destination itself). Into ~ only a glob that can match a dot name counts (.[!.]*, .l*): a plain
+    #   * skips .local unless dotglob is set.
+    all_srcs = [b for x in srcs for b in _brace_expand(x)]
+    into = tgt_dir or len(all_srcs) > 1 or tgt.endswith("/")  # else one source onto a new name: it lands as tgt
+    for src in all_srcs:
+        s = src.rstrip("/")
+        base = posixpath.basename(s)
+        if re.search(r"[*?\[]", base):
+            if base.startswith(".") or base.startswith("[.") or not _is_home(tgt):
+                lands.append(tgt)
+            continue
+        contents = (bin0 == "rsync" and src.endswith("/")) or s.endswith("/.") or s in (".", "")
+        if contents or into:
+            lands.append(tgt if contents else posixpath.join(tgt, base))
+    if not tgt_dir:
+        lands.append(tgt)
+    for land in lands:
+        if _is_py_startup_path(land) or (recursive and _is_py_startup_parent(land)):
+            return land
+    return None
 
 
 def _segment_changes_harness(seg: str) -> Optional[str]:
@@ -1011,6 +1354,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if kpath:
         return "block", KIT_CONTAINER_MSG.format(kpath)
 
+    ppath = _segment_writes_py_startup(seg)  # kitfix-20261031-n1
+    if ppath:
+        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(ppath)
+
     # MEM-13: a shell write to lessons.md / lessons-archive.md from a story checkout is blocked.
     lpath = _segment_writes_matching_path(seg, lambda p: lessons_story_block(p) is not None)
     if lpath:
@@ -1361,6 +1708,13 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         if action == "ask" and worst != "block":
             worst = "ask"
             msg = message or msg
+    pip_env = "PIP_USER" if PIP_USER_RE.search(cmd) else next(
+        (m.group(0) for m in PIP_PATH_ENV_RE.finditer(cmd) if _is_py_startup_tree_dest(m.group(1))), None)
+    if pip_env:  # kitfix-20261031-n1 rework (Sakura B-2) and follow-up: pip then installs into the user site
+        if unattended:
+            return "block", PY_STARTUP_MSG.format(pip_env)
+        if worst != "block":
+            worst, msg = "ask", PY_STARTUP_MSG.format(pip_env)
     # sudo is unwrapped when segments are split, and a pipe splits a download from its interpreter,
     # so both are judged on the whole command. A block above still wins.
     if SUDO_RE.search(cmd):
@@ -1549,6 +1903,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
             "block",
             f"Protected kit/CI path cannot be modified by agents: {path}",
         )
+    if _is_py_startup_path(path):  # kitfix-20261031-n1
+        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(path)
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         if norm.endswith(".phase-result.md"):
@@ -1602,6 +1958,8 @@ def main() -> int:
         if not path and len(sys.argv) > 2:
             path = sys.argv[2]
         action, message = classify_path(path)
+        if action == "ask" and _is_py_startup_path(path):  # JN-6
+            action, message = "block", PY_STARTUP_EDIT_MSG.format(path)
         _json_out(action, message)
         return 0
     _json_out("block", f"hook-policy: unknown mode {mode}")

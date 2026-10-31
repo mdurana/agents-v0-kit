@@ -130,6 +130,7 @@ vm.py run 'set -eu; E=/opt/harness-v3-env; HV=/opt/harness-v3; t=$(TZ=Asia/Manil
      - nothing listens on TCP 2375 or 2376.
    - **Any `ESC … HIT` line, or `ESCALATION-FOUND`, is a STOP: do not launch.** Report the line to Marlon. Never remove the access yourself.
    - `HOME-HASH recorded <n> files` lists e2e's startup files with their sha256: `.profile`, `.bashrc`, `.bash_profile`, `.tmux.conf`, `.gitconfig`, `.config/e2e-secrets.env`, `.local/agents-v0-tools/tools.env` and the others in `home-hash.sh`. Absent files are recorded as absent.
+   - **`HOME-HASH REFUSED: /home/e2e/.local/lib/python* holds … Python source` is a STOP** (kitfix-20261031-n1, Sakura R-1). The record skips `__pycache__/`, which is only safe while e2e's user site holds no `.py` or `.pth`. Report it to Marlon; the fix is to remove the user-site packages (PyYAML comes from apt's `python3-yaml`), then record again.
    - The secrets copy is root-owned. e2e can read it (the run needs the key) but cannot change it.
    - At launch, the preflight needs both records root-owned and newer than `$HV/HARNESS-FROM`. It needs `ESCALATION-NONE` for e2e, the live part of the escalation check (groups, sockets, listeners) passing again, and e2e's startup files matching the record.
 

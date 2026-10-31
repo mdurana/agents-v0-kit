@@ -30,6 +30,13 @@
 #       .agents-v0/policy.conf (`trace_mode=warn|fail`), which the team or the e2e harness writes and the
 #       hooks protect. Check an install with scripts/check-installed-kit.sh <target-repo>.
 #
+#   --hook-python <absolute path> (first install or --update; kitfix-20261031-n1)
+#       The Python the hooks run, as "<path>" -I -S. Default: /usr/bin/python3, else the absolute python3 on
+#       PATH. install.sh refuses an interpreter that it, its real file or any folder on its sys.path is not
+#       owned by root, is writable by group or others, or is writable by the installing user, and writes the
+#       checked path into .cursor/hooks/hook-python and .agents/hooks/hook-python. The hooks never read the
+#       interpreter from the environment. On a Mac with only a Homebrew Python, pass --hook-python /usr/bin/python3.
+#
 #   --git-hooks (with a first install or --update)
 #       Sets core.hooksPath to .agents-v0/hooks in the target repo, so pre-commit
 #       guards secrets and state files and pre-push verifies the branch's state.json
@@ -50,9 +57,10 @@ TARGET=""
 GIT_HOOKS=0
 ALLOW_IN_FLIGHT=0
 TEST_OVERRIDES=0
+HOOK_PYTHON_ARG=""
 
 usage() {
-  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--update [--quick] [--allow-in-flight]] [--test-overrides] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--hook-python <abs-path>] [--update [--quick] [--allow-in-flight]] [--test-overrides] <target-repo>\n' "$(basename "$0")" >&2
   printf '       %s --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
@@ -154,6 +162,77 @@ seed_agent_ignore() {
   [ -f "$t/$name" ] || cp "$src" "$t/$name"
 }
 
+# kitfix-20261031-n1: the hook interpreter. hook_python_unsafe <path> prints why it is unsafe (nothing = safe): it
+#   must be an absolute path to an executable file; it, its real file and every folder on its sys.path (as the
+#   hooks run it, -I -S) must be owned by root and not writable by group or others, nor by the installing user.
+#   A user-owned site or stdlib folder would let an agent drop a module or *.pth that runs inside every hook.
+hook_python_owner_bad() {
+  # ls -ldnL: mode, links, uid, ... (follows a symlink). Prints the reason, nothing when root-owned and locked.
+  hp_l="$(ls -ldnL "$1" 2>/dev/null)" || { printf '%s cannot be read' "$1"; return; }
+  hp_mode="$(printf '%s' "$hp_l" | awk '{print $1}')"
+  hp_uid="$(printf '%s' "$hp_l" | awk '{print $3}')"
+  [ "$hp_uid" = 0 ] || { printf '%s is owned by uid %s, not root' "$1" "$hp_uid"; return; }
+  case "$hp_mode" in
+    ?????w????*|????????w?*) printf '%s is writable by group or others (%s)' "$1" "$hp_mode"; return ;;
+  esac
+  if [ "$(id -u)" != 0 ] && [ -w "$1" ]; then printf '%s is writable by %s' "$1" "$(id -un)"; fi
+}
+hook_python_unsafe() {
+  hp="$1"
+  case "$hp" in /*) ;; *) printf 'not an absolute path: %s' "$hp"; return ;; esac
+  [ -f "$hp" ] && [ -x "$hp" ] || { printf 'not an executable file: %s' "$hp"; return; }
+  for hp_p in "$hp" "$(dirname "$hp")"; do
+    hp_why="$(hook_python_owner_bad "$hp_p")"
+    [ -z "$hp_why" ] || { printf '%s' "$hp_why"; return; }
+  done
+  hp_paths="$("$hp" -I -S -c 'import os, sys
+r = os.path.realpath(sys.executable)
+print(r); print(os.path.dirname(r))
+for p in sys.path:
+    if p and os.path.isdir(p):
+        print(os.path.realpath(p))' 2>/dev/null)" || { printf 'cannot run %s -I -S' "$hp"; return; }
+  [ -n "$hp_paths" ] || { printf '%s -I -S printed no sys.path' "$hp"; return; }
+  hp_why="$(printf '%s\n' "$hp_paths" | while IFS= read -r hp_p; do
+    hp_w="$(hook_python_owner_bad "$hp_p")"
+    if [ -n "$hp_w" ]; then printf '%s' "$hp_w"; break; fi
+  done)"
+  [ -z "$hp_why" ] || printf '%s' "$hp_why"
+}
+resolve_hook_python() {
+  if [ -n "$HOOK_PYTHON_ARG" ]; then
+    HOOK_PYTHON_PIN="$HOOK_PYTHON_ARG"
+  elif [ -x /usr/bin/python3 ]; then
+    HOOK_PYTHON_PIN=/usr/bin/python3
+  else
+    HOOK_PYTHON_PIN="$(command -v python3 2>/dev/null || true)"
+  fi
+  why="$(hook_python_unsafe "$HOOK_PYTHON_PIN")"
+  if [ -n "$why" ]; then
+    printf 'error: hook interpreter %s refused: %s.\n' "${HOOK_PYTHON_PIN:-(none found)}" "$why" >&2
+    printf 'The kit hooks run it on every agent command; an agent-writable interpreter or site folder would let it switch them off. Pass --hook-python <root-owned python3>, for example /usr/bin/python3.\n' >&2
+    exit 1
+  fi
+}
+write_hook_python() {
+  printf '%s\n' "$HOOK_PYTHON_PIN" > "$1/hook-python"
+  chmod 644 "$1/hook-python"
+}
+# JN-2 (Jiraiya's N-1 review): the pin is per-machine state checked on this machine. A gate commit (git add -A) would
+#   otherwise stage it and send it to every clone, where a pin to an agent-writable path switches the hooks off. The
+#   template .gitignore lists both pins; an existing (brownfield) .gitignore gains the lines on install and --update.
+ignore_hook_python() {
+  gi="$1/.gitignore"
+  ig_missing=""
+  for ig in .cursor/hooks/hook-python .agents/hooks/hook-python; do
+    [ -f "$gi" ] && grep -Fqx "$ig" "$gi" || ig_missing="$ig_missing $ig"
+  done
+  [ -n "$ig_missing" ] || return 0
+  [ ! -s "$gi" ] || [ -z "$(tail -c 1 "$gi")" ] || printf '\n' >> "$gi"
+  printf '\n# --- Hook interpreter pin (per machine; never commit) ---\n' >> "$gi"
+  for ig in $ig_missing; do printf '%s\n' "$ig" >> "$gi"; done
+  printf 'MIGRATED (project-owned file edited): .gitignore gained%s\n' "$ig_missing"
+}
+
 install_cursor() {
   t="$1"
   seed_agent_ignore "$t" .cursorignore
@@ -179,6 +258,7 @@ install_cursor() {
   fi
   rm -f "$t/.cursor/hooks/pre-mcp.sh" "$t/.cursor/hooks/mcp-policy.json" "$t/.cursor/hooks/after-edit.sh"
   chmod +x "$t"/.cursor/hooks/*.sh "$t/.cursor/hooks/hook-policy.py"
+  write_hook_python "$t/.cursor/hooks"
   cp "$KIT/core/common/adapters/cursor/hooks.json" "$t/.cursor/hooks.json"
   cp "$KIT/core/common/adapters/cursor/cli.json" "$t/.cursor/cli.json"
   if [ -f "$KIT/templates/.cursor/model-config.json" ] && [ ! -f "$t/.cursor/model-config.json" ]; then
@@ -226,6 +306,7 @@ PY
     cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.agents/hooks/pack-scan.sh"
   fi
   chmod +x "$t"/.agents/hooks/*.sh "$t/.agents/hooks/hook-policy.py"
+  write_hook_python "$t/.agents/hooks"
   cp "$KIT/core/common/adapters/antigravity/hooks.json" "$t/.agents/hooks.json"
 }
 
@@ -471,6 +552,11 @@ while [ $# -gt 0 ]; do
       TEST_OVERRIDES=1
       shift
       ;;
+    --hook-python)
+      [ $# -ge 2 ] || usage
+      HOOK_PYTHON_ARG="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       ;;
@@ -562,6 +648,7 @@ if [ "$LINK" = 1 ]; then
   exit 0
 fi
 
+resolve_hook_python
 require_pyyaml
 if [ -z "$PACK" ] && [ -f "$TARGET_ABS/docs/agents-v0/project-profile.md" ]; then
   PACK="$(python3 - "$TARGET_ABS/docs/agents-v0/project-profile.md" <<'PY'
@@ -598,6 +685,7 @@ if [ "$WITH_STARTERS" = 1 ]; then
 fi
 install_cursor "$TARGET_ABS"
 install_antigravity "$TARGET_ABS"
+ignore_hook_python "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 
 for hook in "$TARGET_ABS"/.agents-v0/hooks/*; do

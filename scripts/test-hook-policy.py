@@ -22,7 +22,7 @@ def _run(mode: str, env_extra: dict, cwd: str = "") -> str:
     env = {k: v for k, v in os.environ.items()
            if k not in ("HOOK_CWD", "AGY_ALLOW_TOOLS", "TEST_ROOT", "PLAN_DIR", "CURSOR_CONFIG_DIR")}
     env.update(env_extra)
-    out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
+    out = subprocess.check_output([sys.executable, "-I", "-S", POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
     return json.loads(out)["action"]
 
 
@@ -667,6 +667,162 @@ def root_commit_case(tmp: str) -> list:
     return out
 
 
+def n1_python_startup_cases(tmp: str) -> list:
+    """kitfix-20261031-n1 (Sasuke N-1): writes to Python start-up files (user site, ~/.local/bin/python*,
+    usercustomize.py / sitecustomize.py, site-packages *.pth) block unattended and ask attended, through main()."""
+    proj = os.path.join(tmp, "n1proj")
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True, capture_output=True)
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)"}
+    A = {}
+    c = []
+    def add(kind, arg, env, want, label):
+        c.append((kind, arg, proj, env, want, label))
+    for cmd, label in [
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages/usercustomize.py", "cp usercustomize.py into the user site"),
+            ("echo 'import os' > ~/.local/lib/python3.12/site-packages/a.pth", "write a .pth into the user site"),
+            ("cp /tmp/u.py $HOME/.local/lib/python3.13/site-packages/", "cp into the user site folder"),
+            ("tee ~/.local/lib/python3.11/site-packages/x.pth < /tmp/p", "tee a .pth"),
+            ("cp /tmp/fake ~/.local/bin/python3", "a python3 in ~/.local/bin"),
+            ("echo x > sitecustomize.py", "a sitecustomize.py"),
+            ("mv /tmp/u.py venv/lib/python3.13/site-packages/usercustomize.py", "usercustomize.py in a venv")]:
+        add("shell", cmd, U, "block", "unattended " + label)
+        add("shell", cmd, A, "ask", "attended " + label)
+    for cmd, label in [
+            ("ls ~/.local/lib", "list the user lib"), ("cat ~/.local/lib/python3.13/site-packages/x.pth", "read a .pth"),
+            ("cp model.pth checkpoints/model.pth", "a model checkpoint named .pth"), ("echo hi > notes.txt", "a normal write")]:
+        add("shell", cmd, U, "allow", "unattended " + label)
+        add("shell", cmd, A, "allow", "attended " + label)
+    up = os.path.expanduser("~/.local/lib/python3.13/site-packages/usercustomize.py")
+    add("path", up, U, "block", "unattended edit of usercustomize.py")
+    # JN-6 (Jiraiya's N-1 review): an edit-tool "ask" was a silent allow, so the edit tool is blocked in both modes.
+    add("path", up, A, "block", "attended edit of usercustomize.py (JN-6)")
+    add("path", os.path.expanduser("~/.local/lib/python3.13/site-packages/a b.pth"), A, "block", "attended edit of a user-site .pth (JN-6)")
+    add("path", os.path.expanduser("~/.local/bin/python3"), A, "block", "attended edit of ~/.local/bin/python3 (JN-6)")
+    add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), A, "block", "attended edit of a site-packages .pth (JN-6)")
+    add("path", os.path.join(proj, "src/app.py"), A, "allow", "attended edit of project code (JN-6 control)")
+    add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), U, "block", "unattended edit of a site-packages .pth")
+    add("path", os.path.join(proj, "src/app.py"), U, "allow", "unattended edit of project code")
+    # Sakura B-2 (N-1 rework): trees copied, moved, synced or unpacked into the user site or its parents, and
+    #   pip --user installs. A fresh fake HOME, so ~/.local/lib does not exist yet (the destination becomes it).
+    fh = os.path.join(tmp, "n1home")
+    os.makedirs(os.path.join(proj, "src"), exist_ok=True)
+    os.makedirs(fh, exist_ok=True)
+    UH, AH = dict(U, HOME=fh), dict(A, HOME=fh)
+    for cmd, label in [
+            ("cp -r /tmp/stage/python3.13 ~/.local/lib/", "cp -r a python3.X folder into ~/.local/lib/"),
+            ("mv /tmp/stage/python3.13 ~/.local/lib/", "mv a python3.X folder into ~/.local/lib/"),
+            ("cp -a /tmp/stage/lib ~/.local/", "cp -a a lib folder into ~/.local/"),
+            ("cp -r /tmp/stage/.local ~/", "cp -r a .local folder into ~"),
+            ("rsync -a /tmp/stage/ ~/", "rsync the contents of a folder into ~"),
+            ("rsync -a /tmp/stage/ $HOME/.local/lib", "rsync into $HOME/.local/lib"),
+            ("cp -R /tmp/stage/. ~/.local", "cp -R folder/. into ~/.local"),
+            ("cp -r /tmp/stage ~/.local/lib", "cp -r onto a ~/.local/lib that does not exist yet"),
+            ("ln -s /tmp/stage ~/.local/lib", "ln -s a folder as ~/.local/lib"),
+            ("mv /tmp/stage/bin ~/.local/", "mv a bin folder into ~/.local/"),
+            ("cd ~ && cp -r /tmp/stage/.local .", "cd ~ then cp -r .local ."),
+            ("unzip -o /tmp/x.zip -d ~/.local/lib", "unzip -d ~/.local/lib"),
+            ("unzip -o /tmp/x.zip -d$HOME/.local", "unzip -d$HOME/.local"),
+            ("cd ~/.local/lib && unzip /tmp/x.zip", "unzip in ~/.local/lib"),
+            ("pip install --user ./pkg", "pip install --user"),
+            ("python3 -m pip install --user ./pkg", "python3 -m pip install --user"),
+            ("pip3 install --target ~/.local/lib/python3.13/site-packages ./pkg", "pip --target the user site"),
+            ("pip install --prefix ~/.local ./pkg", "pip --prefix ~/.local"),
+            ("PIP_USER=1 pip install ./pkg", "PIP_USER=1 prefix"),
+            ("env PIP_USER=yes pip install x", "env PIP_USER=yes"),
+            ("export PIP_USER=1", "export PIP_USER=1"),
+            ("pip config set global.user true", "pip config set global.user"),
+            ("python3 setup.py install --user", "setup.py install --user")]:
+        add("shell", cmd, UH, "block", "unattended " + label)
+        add("shell", cmd, AH, "ask", "attended " + label)
+    for cmd, label in [
+            ("cp -r src build/", "cp -r in the project"), ("cp -a src dist", "cp -a in the project"),
+            ("rsync -a src/ build/", "rsync in the project"), ("mv a.txt b.txt", "mv in the project"),
+            ("cp notes.txt ~/", "cp one file into ~"), ("cp -r /tmp/stage ~/", "cp -r a folder into ~ (lands as ~/stage)"),
+            ("unzip x.zip -d vendor", "unzip into the project"), ("pip install -r requirements.txt", "pip install -r"),
+            ("python3 -m pip install -e .", "pip install -e ."), ("PIP_USER=0 pip install x", "PIP_USER=0"),
+            ("cp README.md ~/.local/share/", "cp into ~/.local/share"), ("mkdir -p ~/.local/lib", "mkdir ~/.local/lib")]:
+        add("shell", cmd, UH, "allow", "unattended " + label)
+        add("shell", cmd, AH, "allow", "attended " + label)
+    # N-1 follow-up (Sakura re-review of 942f076): the realistic home, where ~/.local/lib and ~/.local/bin exist.
+    #   Glob, brace and dot-glob sources, -t folded into -rt, pip -t<path>, -mpip, PIP_TARGET/PIP_PREFIX,
+    #   python -m zipfile/tarfile -e, and shutil/zipfile calls in python -c. Every block/ask case here is allowed by
+    #   the 942f076 policy.
+    fh1 = os.path.join(tmp, "n1home1")
+    for d in (".local/lib", ".local/bin"):
+        os.makedirs(os.path.join(fh1, d), exist_ok=True)
+    site1 = os.path.join(fh1, ".local/lib/python3.13/site-packages")
+    U1, A1 = dict(U, HOME=fh1), dict(A, HOME=fh1)
+    for cmd, label in [
+            ("cp -r /tmp/stage/* ~/.local/lib/", "cp -r a glob into an existing ~/.local/lib"),
+            ("cp -r /tmp/fakehome/* ~/.local/", "cp -r a glob into ~/.local"),
+            ("mv /tmp/stage/* ~/.local/", "mv a glob into ~/.local"),
+            ("rsync -a /tmp/stage/* ~/.local/", "rsync a glob into ~/.local"),
+            ("cp -r /tmp/stage/python3.1? ~/.local/lib/", "cp -r a ? glob into ~/.local/lib"),
+            ("cp -r /tmp/fakehome/.[!.]* ~", "cp -r a dot-glob into ~"),
+            ("cp -r /tmp/fakehome/.l* ~/", "cp -r .l* into ~"),
+            ("cp -r /tmp/stage/{python3.13,x} ~/.local/lib/", "cp -r a brace source into ~/.local/lib"),
+            ("cp -rt ~/.local/lib /tmp/stage/python3.13", "cp -rt DIR"),
+            ("cp -rt~/.local/lib /tmp/stage/python3.13", "cp -rtDIR"),
+            ("mv -t ~/.local/ /tmp/stage/lib", "mv -t ~/.local"),
+            ("pip install -t~/.local/lib/python3.13/site-packages x", "pip -t<path>"),
+            ("python3 -mpip install --user x", "python3 -mpip --user"),
+            ("python3 -Impip install --user x", "python3 -Impip --user"),
+            ("PIP_TARGET=~/.local/lib/python3.13/site-packages pip install x", "PIP_TARGET into the user site"),
+            ("PIP_PREFIX=~/.local pip install x", "PIP_PREFIX=~/.local"),
+            ("export PIP_TARGET=$HOME/.local/lib/python3.13/site-packages", "export PIP_TARGET"),
+            (f"pip config set global.target {site1}", "pip config set global.target"),
+            ("python3 -m zipfile -e x.zip ~/.local/lib", "python3 -m zipfile -e into ~/.local/lib"),
+            ("python3 -m tarfile -e x.tar ~/.local", "python3 -m tarfile -e into ~/.local"),
+            (f"python3 -c 'import shutil; shutil.copytree(\"/tmp/stage\", \"{fh1}/.local/lib/python3.13\")'",
+             "shutil.copytree to a literal user-site path"),
+            ("python3 -c 'import shutil,os; shutil.copytree(\"/tmp/s\", os.path.join(os.path.expanduser(\"~\"), "
+             "\".local\", \"lib\"), dirs_exist_ok=True)'", "shutil.copytree to os.path.join(~, .local, lib)"),
+            ("python3 -c 'import shutil; from pathlib import Path; shutil.copytree(\"/tmp/s\", Path.home() / "
+             "\".local\" / \"lib\", dirs_exist_ok=True)'", "shutil.copytree to Path.home() / .local / lib"),
+            (f"python3 -c 'import zipfile; zipfile.ZipFile(\"x.zip\").extractall(\"{fh1}/.local\")'",
+             "ZipFile.extractall into ~/.local"),
+            (f"python3 -I -S -c 'import shutil; shutil.copy(\"/tmp/u.py\", \"{site1}/usercustomize.py\")'",
+             "shutil.copy onto usercustomize.py")]:
+        add("shell", cmd, U1, "block", "unattended " + label)
+        add("shell", cmd, A1, "ask", "attended " + label)
+    for cmd, label in [
+            ("cp -r src/* build/", "cp -r a glob in the project"), ("cp src/*.txt ~/", "cp a glob of files into ~"),
+            ("cp -r /tmp/stage/* ~/", "cp -r a plain * glob into ~ (it skips .local)"),
+            ("mv downloads/* ~/", "mv a plain * glob into ~"), ("cp -r /tmp/stage/{a,b} build/", "a brace source into the project"),
+            ("cp -r /tmp/stage ~/.local/", "cp -r a folder into ~/.local (lands as ~/.local/stage)"),
+            ("cp -rt build src", "cp -rt in the project"), ("rsync -rt src/ build/", "rsync -rt (times, not a target)"),
+            ("rsync -a -t src/ build/", "rsync -t"), ("pip install -tvendor x", "pip -tvendor"),
+            ("python3 -mpip install -r requirements.txt", "python3 -mpip -r"), ("PIP_TARGET=vendor pip install x", "PIP_TARGET=vendor"),
+            ("python3 -m zipfile -e x.zip vendor", "zipfile -e into the project"), ("python3 -m zipfile -l x.zip", "zipfile -l"),
+            ("python3 -c 'import shutil; shutil.copytree(\"src\", \"build\")'", "shutil.copytree in the project"),
+            ("python3 -c 'import shutil,os; shutil.copytree(os.path.expanduser(\"~/.local/lib\"), \"/tmp/backup\")'",
+             "shutil.copytree that backs up ~/.local/lib"),
+            ("cp -r ~/.local/lib /tmp/backup", "cp -r a backup of ~/.local/lib"), ("rsync -a ~/ /tmp/backup/", "rsync a backup of ~")]:
+        add("shell", cmd, U1, "allow", "unattended " + label)
+        add("shell", cmd, A1, "allow", "attended " + label)
+    # N-1 final round (Sakura 7e91af9 nit): a cp/rsync source under the user site is a read. The user site exists.
+    os.makedirs(site1, exist_ok=True)
+    for cmd, label in [
+            ("cp -r ~/.local/lib/python3.13 /tmp/backup/", "cp -r the user site to a backup folder"),
+            ("cp -r ~/.local/lib/python3.13 /tmp/backup", "cp -r the user site to a new backup name"),
+            ("cp -a ~/.local/lib/python3.13/site-packages /tmp/bk", "cp -a site-packages out"),
+            ("rsync -a ~/.local/lib/python3.13/ /tmp/backup/", "rsync the user site out"),
+            ("cp ~/.local/lib/python3.13/site-packages/usercustomize.py /tmp/uc.txt", "cp usercustomize.py out to a new name"),
+            ("cp -t /tmp/backup ~/.local/lib/python3.13/site-packages/a.pth", "cp -t a .pth out")]:
+        add("shell", cmd, U1, "allow", "unattended " + label)
+        add("shell", cmd, A1, "allow", "attended " + label)
+    for cmd, label in [
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages/usercustomize.py", "cp onto usercustomize.py (site exists)"),
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages", "cp into the existing site folder"),
+            ("cp -t ~/.local/lib/python3.13/site-packages /tmp/a.pth", "cp -t into the site"),
+            ("rsync /tmp/a.pth ~/.local/lib/python3.13/site-packages/", "rsync a .pth into the site"),
+            ("cp -r ~/.local/lib/python3.13 ~/.local/lib/python3.14", "cp -r inside the user site"),
+            ("mv ~/.local/lib/python3.13 /tmp/backup", "mv the user site (mv keeps the operand check)")]:
+        add("shell", cmd, U1, "block", "unattended " + label)
+        add("shell", cmd, A1, "ask", "attended " + label)
+    return c
+
+
 def harness_escalation_cases(tmp: str) -> list:
     """kitfix-20261031-harness-lock and kitfix-20261031-escalation (Sonnet review 12:31, findings 2 and 3)."""
     tr = os.path.join(tmp, "agents-v0-e2e", "run-1")
@@ -811,9 +967,16 @@ def main() -> int:
         e["HOOK_CWD"] = cwd
         got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
         check(got, want, f"harness/escalation {label}: `{arg}`")
+    ncases = n1_python_startup_cases(htmp)
+    for kind, arg, cwd, env, want, label in ncases:
+        e = dict(env)
+        e["HOOK_CWD"] = cwd
+        got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
+        check(got, want, f"N-1 python start-up {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases) + len(hcases)
+    total = (len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(hcases) + len(ncases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

@@ -10,7 +10,7 @@ lines=""
 [ -f docs/agents-v0/repo-map.md ] && lines="${lines}Repo map: docs/agents-v0/repo-map.md
 "
 
-state_summaries="$(python3 - <<'PY'
+state_summaries="$(hook_py - <<'PY'
 import glob, json
 
 paths = (

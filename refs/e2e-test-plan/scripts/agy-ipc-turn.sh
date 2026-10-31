@@ -39,7 +39,7 @@ fi
 # kitfix-20261031-harness-lock: the sha256 of what was written is kept in this process (PSHA), and a pending-turn.json
 #   that changed during the turn (the allowlist agy-ws-exec.sh applies) is recorded for H10 (lib.sh
 #   harness_integrity_check) and kept as pending-turn-<k>.changed.json.
-PSHA="$(python3 - "$CHAT" "$WS" "$MODEL" "$MSG" "$ALLOW" "$RUN" "$TURN" "$REQ" "$STATUS_DIR/pending-turn.json" <<'PY'
+PSHA="$(python3 -I -S - "$CHAT" "$WS" "$MODEL" "$MSG" "$ALLOW" "$RUN" "$TURN" "$REQ" "$STATUS_DIR/pending-turn.json" <<'PY'
 import hashlib, json, sys, time
 chat, ws, model, msg, allow, run_dir, turn, req_path, pending_path = sys.argv[1:10]
 payload = {
@@ -67,7 +67,7 @@ done
 
 [ -f "$RESP" ] && cat "$RESP"
 rc="$(tr -d ' \n\r' < "$DONE" 2>/dev/null || echo 0)"
-NSHA="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$STATUS_DIR/pending-turn.json" 2>/dev/null || echo absent)"
+NSHA="$(python3 -I -S -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$STATUS_DIR/pending-turn.json" 2>/dev/null || echo absent)"
 if [ "$NSHA" != "$PSHA" ]; then
   echo "harness status/pending-turn.json changed during turn $TURN (sha $NSHA, written $PSHA)" >> "$RUN/pending-tamper-$TURN.txt"
   [ "$NSHA" = absent ] || cp "$STATUS_DIR/pending-turn.json" "$RUN/pending-turn-$TURN.changed.json"

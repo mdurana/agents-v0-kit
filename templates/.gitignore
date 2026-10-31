@@ -72,6 +72,9 @@ coverage/
 .cursor/hooks/audit.jsonl
 .agents/hooks/audit.jsonl
 .agents/hooks/unattended-allow
+# The hook interpreter install.sh checked on this machine (kitfix-20261031-n1, JN-2): never shared through git.
+.cursor/hooks/hook-python
+.agents/hooks/hook-python
 
 # --- Logs and dumps ---
 *.log

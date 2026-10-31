@@ -54,8 +54,18 @@ else
 fi
 for t in timeout setsid; do
   command -v "$t" >/dev/null 2>&1 && say "$t" PRESENT "$(command -v "$t")" || say "$t" PRESENT "python3 fallback ($OS)"; done
-python3 -c 'import yaml' 2>/dev/null && say pyyaml PRESENT "python3 -c 'import yaml' ok" || {
-  if [ "$MODE" = --install ] && python3 -m pip install --user --quiet pyyaml 2>/dev/null; then say pyyaml INSTALLED "pip --user"; else say pyyaml MISSING "python3 -m pip install --user pyyaml (Ubuntu 24.04 refuses pip --user: install the python3-yaml package once, as root)"; fi; }
+# kitfix-20261031-n1 (Sakura R-1 / 7e91af9 nit): under V3 (the root-owned V3-REQUIRED marker next to scripts/, or
+#   E2E_NO_USER_SITE=1, which setup-vm.sh sets on the e2e VM) PyYAML never goes into the user site: pip --user fills
+#   ~/.local/lib/python*/, which home-hash --record refuses and whose cached bytecode is not hashed. It is HUMAN
+#   (setup-vm and the procedure stop on it). Laptops keep the pip --user fallback.
+pyyaml_prereq(){
+  if python3 -c 'import yaml' 2>/dev/null; then say pyyaml PRESENT "python3 -c 'import yaml' ok"; return; fi
+  if [ -e "$(dirname "$0")/../V3-REQUIRED" ] || [ "${E2E_NO_USER_SITE:-0}" = 1 ]; then
+    say pyyaml HUMAN "needs apt-get install python3-yaml (as root); pip --user is not used under V3 (home-hash refuses a user site with Python source)"
+  elif [ "$MODE" = --install ] && python3 -m pip install --user --quiet pyyaml 2>/dev/null; then say pyyaml INSTALLED "pip --user"
+  else say pyyaml MISSING "python3 -m pip install --user pyyaml (Ubuntu 24.04 refuses pip --user: install the python3-yaml package once, as root)"; fi
+}
+pyyaml_prereq
 python3 -c 'import docx' 2>/dev/null && say python-docx PRESENT "optional (report rendering only)" || say python-docx DEGRADED "optional; only needed to rebuild test-plan.docx"
 
 # --- JDK 21 ---

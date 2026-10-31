@@ -79,7 +79,7 @@ $MSG"
     # copy of the transcript with run_command CommandLine decoded (agy stores it JSON-quoted), so the harness's
     # command checks see the plain command text
     mkdir -p "$BRAIN_COPY/$CONV/.system_generated/logs"
-    python3 - "$T" "$BRAIN_COPY/$CONV/.system_generated/logs/transcript.jsonl" <<'PY'
+    python3 -I -S - "$T" "$BRAIN_COPY/$CONV/.system_generated/logs/transcript.jsonl" <<'PY'
 import json,sys
 out=open(sys.argv[2],"w",encoding="utf-8")
 for l in open(sys.argv[1],encoding="utf-8",errors="replace"):

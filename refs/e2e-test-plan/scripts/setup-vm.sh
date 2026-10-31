@@ -71,7 +71,7 @@ user_phase(){
   if [ "$MODE" = after-image ]; then
     # Deferred OWASP data: plain prereqs.sh --install (without ODC_DEFER) installs only what is still missing.
     say "installing deferred OWASP data (ODC_SRC=${ODC_SRC_U:-none})"
-    run env ODC_SRC="${ODC_SRC_U:-}" TOOLS_DIR="$TOOLS_DIR_U" bash "$PLAN/scripts/prereqs.sh" --install
+    run env ODC_SRC="${ODC_SRC_U:-}" E2E_NO_USER_SITE=1 TOOLS_DIR="$TOOLS_DIR_U" bash "$PLAN/scripts/prereqs.sh" --install
     run rm -f "$U_HOME/.odc-deferred"
     write_versions; return 0; fi
 
@@ -99,10 +99,10 @@ json.dump(d,open(p,"w"),indent=2)' "$U_HOME/.gemini/antigravity-cli/settings.jso
   #    prereqs.sh --install is the same code step 1 of the run uses; it writes $TOOLS_DIR/tools.env.
   local odc_env=(ODC_SRC="${ODC_SRC_U:-}")
   if [ "$DEFER_ODC" = 1 ]; then odc_env+=(ODC_DEFER=1); run touch "$U_HOME/.odc-deferred"; fi
-  run env "${odc_env[@]}" TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --install
+  run env "${odc_env[@]}" E2E_NO_USER_SITE=1 TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --install
   say "prerequisite check (agent sign-in is expected to be missing until after the image):"
-  if [ "$DRY" = 1 ]; then run env "${odc_env[@]}" TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --check
-  else env "${odc_env[@]}" TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --check | tee "$LOG_DIR/prereqs-check.txt" || true
+  if [ "$DRY" = 1 ]; then run env "${odc_env[@]}" E2E_NO_USER_SITE=1 TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --check
+  else env "${odc_env[@]}" E2E_NO_USER_SITE=1 TOOLS_DIR="$TOOLS_DIR_U" AGENT_DRIVER=antigravity bash "$PLAN/scripts/prereqs.sh" --check | tee "$LOG_DIR/prereqs-check.txt" || true
     ! grep -qE '^PREREQ +(git|jq|python3|curl|tar|xz|sha256|pyyaml|python-docx|jdk21|node22|postgres17|agy-bin|network|disk) +(MISSING|HUMAN|FAILED)' "$LOG_DIR/prereqs-check.txt" ||
       die "a prerequisite is missing, see $LOG_DIR/prereqs-check.txt"; fi
 

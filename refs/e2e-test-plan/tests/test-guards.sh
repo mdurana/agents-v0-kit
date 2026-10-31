@@ -306,6 +306,203 @@ v3 KIT_SOURCE_PATHS="$SB/elsewhere"; [ $? != 0 ] && grep -q 'V3 REFUSED KIT_SOUR
 v3 HARNESS_LOCK_PATHS=/usr/bin; [ $? != 0 ] && grep -q 'V3 REFUSED HARNESS_LOCK_PATHS drops the harness' "$SB/v3.log" && ok "V3 refuses HARNESS_LOCK_PATHS without the harness" || ko "V3 lock paths: $(cat "$SB/v3.log")"
 mkdir -p "$SB/fakebin"; printf '#!/bin/sh\nexec /usr/bin/git "$@"\n' > "$SB/fakebin/git"; chmod +x "$SB/fakebin/git"
 v3 PATH="$SB/fakebin:$PATH"; [ $? != 0 ] && grep -q 'V3 REFUSED tool git .* writable by' "$SB/v3.log" && ok "V3 refuses a PATH that puts an agent-writable git first" || ko "V3 path: $(cat "$SB/v3.log")"
+# kitfix-20261031-n1: the hook interpreter main's installed hooks pin (hook-python) must be out of the agent user's reach,
+#   with every folder on its -I -S sys.path; a user-site usercustomize.py is a startup-file change (home-hash .local/lib).
+printf '#!/bin/sh\nexec /usr/bin/python3 "$@"\n' > "$SB/fakebin/python3"; chmod +x "$SB/fakebin/python3"
+mkdir -p "$SB/v3main/.agents/hooks" "$SB/v3main/.cursor/hooks"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"; echo /usr/bin/python3 > "$SB/v3main/.cursor/hooks/hook-python"
+v3 MAIN="$SB/v3main" && grep -q '^V3 launch ok' "$SB/v3.log" && ok "V3 accepts hooks pinned to the root-owned /usr/bin/python3" || ko "V3 hook python ok: $(cat "$SB/v3.log")"
+echo "$SB/fakebin/python3" > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter $SB/fakebin/python3: .* not owned by root" "$SB/v3.log" && ok "V3 refuses hooks pinned to an interpreter the agent user owns (N-1)" || ko "V3 hook python user-owned: $(cat "$SB/v3.log")"
+echo python3 > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter 'python3' is not an absolute path" "$SB/v3.log" && ok "V3 refuses a relative hook interpreter (N-1)" || ko "V3 hook python relative: $(cat "$SB/v3.log")"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"
+( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; [ -z "$(hook_python_locked /usr/bin/python3)" ] && hook_python_locked "$SB/fakebin/python3" | grep -q 'not owned by root' ) \
+  && ok "hook_python_locked accepts /usr/bin/python3 and refuses a user-owned one" || ko "hook_python_locked"
+# JN-5 (Jiraiya's N-1 review): a root-owned program that runs but is not a working Python (it printed nothing, which
+#   counted as "no unlocked folder") is refused, and an empty pin file still checks the hooks' default interpreter.
+( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; for b in /bin/true /usr/bin/env; do hook_python_locked "$b" | grep -Eq 'not a working Python|does not run with -I -S' || exit 1; done ) \
+  && ok "hook_python_locked refuses /bin/true and /usr/bin/env as the hook interpreter (JN-5)" || ko "hook_python_locked /bin/true (JN-5)"
+echo /bin/true > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter /bin/true is not a working Python" "$SB/v3.log" && ok "V3 refuses hooks pinned to /bin/true (JN-5)" || ko "V3 hook python /bin/true: $(cat "$SB/v3.log")"
+: > "$SB/v3main/.agents/hooks/hook-python"; : > "$SB/v3main/.cursor/hooks/hook-python"
+( . "$HV3/scripts/lib.sh"; [ "$(MAIN="$SB/v3main" hook_pythons)" = /usr/bin/python3 ] ) && ok "hook_pythons checks /usr/bin/python3 for an empty pin file (JN-5)" || ko "hook_pythons empty pin (JN-5)"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"; echo /usr/bin/python3 > "$SB/v3main/.cursor/hooks/hook-python"
+mkdir -p "$VH/.local/lib/python3.13/site-packages"; echo 'import os' > "$VH/.local/lib/python3.13/site-packages/usercustomize.py"
+v3; [ $? != 0 ] && grep -q '^V3 HOME-.*\.local/lib' "$SB/v3.log" && ok "V3 refuses a usercustomize.py added to the user site (home-hash .local/lib, N-1)" || ko "V3 user site: $(cat "$SB/v3.log")"
+rm -rf "$VH/.local/lib"
+# Sakura B-1: a sourceless usercustomize.pyc in the user site runs in every bare python3 of that user, so home-hash
+#   must hash it; only __pycache__/ (a cache Python never imports sourceless) is left out.
+HH="$SB/hh"; HHS="$(HOME="$HH" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "$HHS"; echo 'not python' > "$HHS/README.txt"; echo 'X = 1' > "$SB/plain.py"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/hh.sha256" "$HH" > /dev/null || ko "home-hash --record refused a user site without Python source"
+mkdir -p "$HHS/__pycache__"; HOME="$HH" /usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$SB/plain.py" "$HHS/__pycache__/plain.cpython-0.pyc"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1 && grep -q '^HOME-HASH-OK' "$SB/hh.log" \
+  && ok "home-hash ignores a __pycache__/ refresh under .local/lib" || ko "home-hash __pycache__: $(cat "$SB/hh.log")"
+printf 'open(%s, "w").write("ran")\n' "'$SB/hh.mark'" > "$SB/hh-uc.py"
+/usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$SB/hh-uc.py" "$HHS/usercustomize.pyc"
+rm -f "$SB/hh.mark"; HOME="$HH" /usr/bin/python3 -c 'pass'
+[ "$(cat "$SB/hh.mark" 2>/dev/null)" = ran ] && ok "control: a sourceless usercustomize.pyc in the user site runs in a bare python3" \
+  || ko "control: the sourceless usercustomize.pyc did not run (user site disabled here?)"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/hh.log" \
+  && ok "home-hash sees a sourceless usercustomize.pyc added to the user site (Sakura B-1)" || ko "home-hash .pyc: $(cat "$SB/hh.log")"
+rm -rf "$HH" "$SB/hh.mark"
+# Sakura R-1 (N-1 follow-up): with a real module in the user site, a swapped __pycache__ .pyc runs and is not hashed.
+#   --record therefore refuses while .local/lib holds any .py or .pth outside __pycache__/ (942f076 recorded it).
+R1="$SB/r1"; R1S="$(HOME="$R1" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "$R1S/legit/__pycache__"; echo 'OK = 1' > "$R1S/legit/__init__.py"
+printf 'open(%s, "w").write("ran")\nOK = 1\n' "'$SB/r1.mark'" > "$SB/r1-evil.py"
+/usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2], invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)' \
+  "$SB/r1-evil.py" "$R1S/legit/__pycache__/__init__.$(/usr/bin/python3 -c 'import sys; print(sys.implementation.cache_tag)').pyc"
+rm -f "$SB/r1.mark"; ( cd "$SB" && HOME="$R1" /usr/bin/python3 -c 'import legit' ) 2>/dev/null
+[ "$(cat "$SB/r1.mark" 2>/dev/null)" = ran ] && ok "control: a swapped __pycache__ .pyc of a user-site module runs in a bare python3 (R-1)" \
+  || ko "control: the swapped __pycache__ .pyc did not run"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED: .*\.local/lib/python\* holds 1 Python source' "$SB/r1.log" && [ ! -e "$SB/r1.sha256" ] \
+  && ok "home-hash --record refuses a user site that holds a .py, and writes no record (Sakura R-1)" || ko "home-hash R-1 .py: rc=$r $(cat "$SB/r1.log")"
+rm -rf "$R1S/legit"; echo 'import os' > "$R1S/x.pth"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED' "$SB/r1.log" && ok "home-hash --record refuses a user site that holds a .pth (Sakura R-1)" || ko "home-hash R-1 .pth: rc=$r $(cat "$SB/r1.log")"
+rm -f "$R1S/x.pth"; mkdir -p "$R1S/__pycache__"; : > "$R1S/__pycache__/stale.cpython-313.pyc"; : > "$R1S/data.txt"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1 && grep -q '^HOME-HASH recorded' "$SB/r1.log" \
+  && ok "home-hash --record accepts a user site with only __pycache__ and data files" || ko "home-hash R-1 allow: $(cat "$SB/r1.log")"
+# N-1 final round: a .py outside .local/lib/python*/ (npm prefix ~/.local: node-gyp's gyp_main.py) is not on
+#   sys.path: the record is written, and a later change there is still a HOME change (all of .local/lib is hashed).
+rm -rf "$R1S/__pycache__" "$R1S/data.txt" "$SB/r1.sha256"; NG="$R1/.local/lib/node_modules/npm/node_modules/node-gyp/gyp"
+mkdir -p "$NG"; echo 'import sys' > "$NG/gyp_main.py"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1 && grep -q '^HOME-HASH recorded' "$SB/r1.log" \
+  && ok "home-hash --record accepts a .py outside .local/lib/python*/ (node-gyp gyp_main.py)" || ko "home-hash node-gyp: $(cat "$SB/r1.log")"
+echo '# changed' >> "$NG/gyp_main.py"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/r1.log" \
+  && ok "home-hash still hashes all of .local/lib (a changed node_modules .py is HOME-CHANGED)" || ko "home-hash node_modules change: $(cat "$SB/r1.log")"
+rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
+# JN-3 (Jiraiya's N-1 review) and Sakura's F-1: names with a space or a newline, and symlinks, under .local/lib are
+#   hashed. Before, xargs split "a b.pth" into two missing files (HOME-HASH-OK) and symlinks were not listed.
+J3="$SB/j3"; J3S="$(HOME="$J3" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+j3rec(){ rm -f "$SB/j3.sha256"; bash "$HV3/scripts/home-hash.sh" --record "$SB/j3.sha256" "$J3" > /dev/null || ko "JN-3 --record refused a user site without Python source"; }
+j3changed(){ bash "$HV3/scripts/home-hash.sh" --check "$SB/j3.sha256" "$J3" > "$SB/j3.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib/' "$SB/j3.log"; }
+mkdir -p "$J3S"; : > "$J3S/data.txt"; j3rec
+printf 'import os; open(%s, "w").write("pth ran")\n' "'$SB/j3.mark'" > "$J3S/a b.pth"
+rm -f "$SB/j3.mark"; HOME="$J3" /usr/bin/python3 -c 'pass'
+[ "$(cat "$SB/j3.mark" 2>/dev/null)" = "pth ran" ] && ok "control: a user-site 'a b.pth' runs in a bare python3 (JN-3)" || ko "control: 'a b.pth' did not run (user site disabled here?)"
+j3changed && ok "home-hash sees a user-site .pth whose name has a space (JN-3)" || ko "home-hash 'a b.pth': $(cat "$SB/j3.log")"
+rm -f "$J3S/a b.pth"; j3rec; printf 'import os\n' > "$J3S/n
+l.pth"
+j3changed && ok "home-hash sees a .pth whose name has a newline (JN-3)" || ko "home-hash newline name: $(cat "$SB/j3.log")"
+rm -f "$J3S"/n*l.pth; printf 'import os\n' > "$SB/j3-target.txt"; j3rec
+ln -s "$SB/j3-target.txt" "$J3S/evil.pth"
+j3changed && ok "home-hash sees a symlink added to the user site (Sakura F-1)" || ko "home-hash symlink added: $(cat "$SB/j3.log")"
+rm -f "$J3S/evil.pth"; ln -s "$SB/j3-target.txt" "$J3S/link.txt"; j3rec; ln -sfn /etc/hostname "$J3S/link.txt"
+j3changed && ok "home-hash sees a user-site symlink repointed (Sakura F-1)" || ko "home-hash symlink repointed: $(cat "$SB/j3.log")"
+rm -f "$J3S/link.txt"; ln -s "$SB/j3-target.txt" "$J3S/evil.pth"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/j3b.sha256" "$J3" > "$SB/j3.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED' "$SB/j3.log" && ok "home-hash --record refuses a symlinked .pth in the user site (Sakura F-1)" || ko "home-hash record symlink .pth: rc=$r $(cat "$SB/j3.log")"
+rm -f "$J3S/evil.pth"; j3rec
+bash "$HV3/scripts/home-hash.sh" --check "$SB/j3.sha256" "$J3" > "$SB/j3.log" 2>&1 && grep -q '^HOME-HASH-OK' "$SB/j3.log" \
+  && ok "home-hash control: an unchanged user site with a data file is HOME-HASH-OK (JN-3)" || ko "home-hash JN-3 control: $(cat "$SB/j3.log")"
+rm -rf "$J3" "$SB"/j3*
+# N-1 final round (Sakura 7e91af9 nit): under V3 prereqs.sh never pip --user installs PyYAML (that fills the user
+#   site the record refuses); it is HUMAN "needs apt-get install python3-yaml". pyyaml_prereq runs from a copy with
+#   stubbed say/python3 (no yaml; pip leaves a mark): V3 marker, E2E_NO_USER_SITE=1, and the laptop control.
+PQ="$SB/pq"; mkdir -p "$PQ/scripts"
+{ echo 'say(){ echo "PREREQ $1 $2 $3"; }'
+  echo 'python3(){ case "$*" in *"import yaml"*) return 1;; *pip*) echo PIP >> "$PQ_MARK"; return 0;; esac; }'
+  echo 'MODE=--install'
+  sed -n '/^pyyaml_prereq(){/,/^}/p' "$HERE/scripts/prereqs.sh"
+  echo 'pyyaml_prereq'; } > "$PQ/scripts/pq.sh"
+grep -q '^pyyaml_prereq(){' "$PQ/scripts/pq.sh" || ko "prereqs.sh has no pyyaml_prereq function"
+: > "$PQ/V3-REQUIRED"; out="$(PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ ! -e "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml HUMAN needs apt-get install python3-yaml' \
+  && ok "prereqs.sh under V3 (marker): PyYAML missing is HUMAN 'needs apt-get install python3-yaml', no pip --user" || ko "prereqs V3 marker: $out mark=$(cat "$PQ/mark" 2>/dev/null)"
+rm -f "$PQ/V3-REQUIRED"; out="$(E2E_NO_USER_SITE=1 PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ ! -e "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml HUMAN needs apt-get install python3-yaml' \
+  && ok "prereqs.sh with E2E_NO_USER_SITE=1 (setup-vm): no pip --user" || ko "prereqs E2E_NO_USER_SITE: $out"
+out="$(PQ_MARK="$PQ/mark" bash "$PQ/scripts/pq.sh")"
+[ -s "$PQ/mark" ] && printf '%s' "$out" | grep -q 'PREREQ pyyaml INSTALLED' && ok "control: off V3 prereqs.sh keeps the pip --user fallback" || ko "prereqs laptop control: $out"
+nv="$(grep -n 'prereqs\.sh" --' "$HERE/scripts/setup-vm.sh" | grep -v 'E2E_NO_USER_SITE=1')"
+[ -z "$nv" ] && ok "setup-vm.sh runs every prereqs.sh with E2E_NO_USER_SITE=1" || ko "setup-vm prereqs without E2E_NO_USER_SITE: $nv"
+rm -rf "$PQ"
+# Sakura B-3: the harness's own Python runs isolated. run-plan.sh's next-story.py calls (they pick the next story) ran
+#   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools
+#   (prereqs.sh, setup-vm.sh, kit-fix.sh) starts python3 without -I -S. Functional: run-plan.sh's own map line,
+#   with a user site that plants a marker, gives the story map and no marker (the bare control does plant it).
+# N-1 follow-up (Sakura re-review): tests/py-call-guard.py checks each call, not each line, and also catches
+#   /usr/bin/python3, python3.13, "$PY"/${PYTHON} and a *.py run through its shebang.
+# N-1 final round (Sakura 7e91af9): fail closed. Clean means rc 0 AND the guard scanned every file passed, at least
+#   PG_MIN (12; the harness has 14 today). A crash, a missing file or zero files is rc 2, never a pass.
+PG_MIN=12; pgfiles="$(ls "$HERE"/scripts/*.sh | grep -vE '/(prereqs|setup-vm|kit-fix)\.sh$')"; pgn="$(printf '%s\n' "$pgfiles" | grep -c .)"
+bare="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" --min-files "$PG_MIN" $pgfiles 2> "$SB/pg.err")"; pgrc=$?
+[ "$pgrc" = 0 ] && [ -z "$bare" ] && grep -qx "py-call-guard: scanned $pgn file(s)" "$SB/pg.err" && [ "$pgn" -ge "$PG_MIN" ] \
+  && ok "no harness script runs a bare python3: rc 0, $pgn files scanned (>= $PG_MIN; prereqs.sh, setup-vm.sh, kit-fix.sh excluded)" \
+  || ko "py-call-guard on the harness: rc=$pgrc files=$pgn $(cat "$SB/pg.err") $bare"
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$HERE/scripts/lib.sh" "$SB/no-such-file.sh" > /dev/null 2>&1; r1=$?
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" > /dev/null 2>&1; r2=$?
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" --min-files 99 "$HERE/scripts/lib.sh" > /dev/null 2>&1; r3=$?
+[ "$r1" = 2 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && ok "py-call-guard fails closed: a missing file, no files and too few files are rc 2" \
+  || ko "py-call-guard fail-closed: missing=$r1 none=$r2 few=$r3"
+PG="$SB/pg"; mkdir -p "$PG"
+cat > "$PG/bad.sh" <<'EOF'
+/usr/bin/python3 -c 'print(1)'
+python3.13 -c 'print(1)'
+"$PY" -c 'print(1)'
+"$HERE/next-story.py" map "$MAIN"
+row="$("$HERE/next-story.py" next "$MAIN")"
+python3 -I -S -c 'x'; python3 -c 'y'
+python3 next-story.py map x
+exec python3 -I -c 'x'
+${PYTHON} - <<'PY'
+env python3 -c x
+chk 3 plan L2 "x" -- "$HERE/next-story.py" map "$MAIN"
+mapfile -t rows < <("$HERE"/next-story.py chain "$MAIN")
+if ./tool.py; then :; fi
+x | python3
+python3 <<'PY'
+"${PY:-python3}" -c x
+$(command -v python3) -c x
+out="$(printf x | python3 | cat)"
+python - <<'PY'
+EOF
+cat > "$PG/good.sh" <<'EOF'
+python3 -I -S -c 'x'
+/usr/bin/python3 -I -S -c x
+"$py" -I -S -c x
+python3.13 -I -S "$HERE/next-story.py" map x
+row="$(python3 -I -S "$HERE/next-story.py" next "$MAIN")"
+V3_TOOLS="bash sh python3 jq"
+cat "$HERE"/*.sh "$HERE"/*.py | sha256sum
+out="/usr/bin/python3
+# python3 -c 'commented'
+grep -qE '\.agents-v0/scripts/[a-z-]+\.(sh|py)' f
+post FAIL "no story in the plan (next-story.py chain)"
+say pyyaml MISSING "use python3 for x"
+for f in a.py b.py; do :; done
+[ -f "$d/x.py" ] && echo ok
+x | python3 -I -S
+python3 -I -S <<'PY'
+"${PY:-python3}" -I -S -c x
+command -v python3 > /dev/null
+for t in git jq python3 curl; do :; done
+EOF
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" > /dev/null 2>&1; [ $? = 1 ] || ko "py-call-guard: bad lines did not give rc 1"
+got="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" 2>/dev/null | sed -E 's/^[^:]+:([0-9]+):.*/\1/' | sort -un | tr '\n' ' ')"
+[ "$got" = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 " ] && ok "py-call-guard catches /usr/bin/python3, python3.13, \"\$PY\", \"\${PY:-python3}\", \$(command -v python3), | python3, python3 <<, shebang runs and a bare call beside a good one" \
+  || ko "py-call-guard bad lines caught: $got"
+gg="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/good.sh" 2>/dev/null)"; ggrc=$?; [ "$ggrc" = 0 ] && [ -z "$gg" ] && ok "py-call-guard allows -I -S calls, strings, comments and .py arguments" || ko "py-call-guard false positives: $gg"
+old="$(grep -nE '(^|[^[:alnum:]_./-])python3? +(-|"|'\''|\$)' "$PG/bad.sh" | grep -v 'python3 -I -S' | cut -d: -f1 | tr '\n' ' ')"
+case " $old " in *" 1 "*|*" 2 "*|*" 3 "*|*" 4 "*) ko "control: the 942f076 regex unexpectedly caught one of lines 1-4 ($old)" ;;
+  *) ok "control: the 942f076 regex missed /usr/bin/python3, python3.13, \"\$PY\" and the shebang run (caught only: $old)" ;; esac
+NS="$SB/ns"; mkdir -p "$NS/ws/docs/agents-v0/milestones"
+printf '| Story ID | Title | Dependency |\n|---|---|---|\n| P0-A | Skeleton | - |\n| P1-A | Login | P0-A |\n' > "$NS/ws/docs/agents-v0/milestones/p0-plan.md"
+NSS="$(HOME="$NS/home" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"; mkdir -p "$NSS"
+printf 'open(%s, "w").write("ran")\n' "'$NS/mark'" > "$NSS/usercustomize.py"
+mapline="$(grep -m1 -E 'next-story\.py" map "\$MAIN" > "\$RES/stories\.tsv"' "$HERE/scripts/run-plan.sh" | sed 's/^[[:space:]]*//')"
+case "$mapline" in *'python3 -I -S "$HERE/next-story.py"'*) ok "run-plan.sh runs next-story.py with python3 -I -S" ;; *) ko "run-plan.sh map line: $mapline" ;; esac
+( HERE="$HERE/scripts"; MAIN="$NS/ws"; RES="$NS"; HOME="$NS/home"; export HOME; eval "$mapline" )
+[ ! -e "$NS/mark" ] && grep -q 'P1-A' "$NS/stories.tsv" && ok "run-plan.sh's next-story.py map ignores the e2e user site and still maps the plan (Sakura B-3)" \
+  || ko "next-story.py under run-plan.sh: mark=$(cat "$NS/mark" 2>/dev/null) map=$(cat "$NS/stories.tsv" 2>/dev/null)"
+rm -f "$NS/mark"; ( HOME="$NS/home"; export HOME; python3 "$HERE/scripts/next-story.py" map "$NS/ws" > /dev/null 2>&1 )
+[ "$(cat "$NS/mark" 2>/dev/null)" = ran ] && ok "control: a bare python3 next-story.py loads the user site" || ko "control: bare next-story.py did not load the user site"
+rm -rf "$NS"
 echo 'export REQUIRE_FAIL_MODES=0' >> "$VH/.profile"; v3; [ $? != 0 ] && grep -q '^V3 HOME-CHANGED .profile' "$SB/v3.log" && ok "V3 refuses a changed startup file (.profile)" || ko "V3 dotfile: $(cat "$SB/v3.log")"
 sed -i '$d' "$VH/.profile"; mkdir -p "$VH/.local/agents-v0-tools"; echo 'TOOLS_PATH=/x' > "$VH/.local/agents-v0-tools/tools.env"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-ADDED .local/agents-v0-tools/tools.env' "$SB/v3.log" && ok "V3 refuses a new tools.env the record did not have" || ko "V3 tools.env: $(cat "$SB/v3.log")"

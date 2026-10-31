@@ -194,8 +194,8 @@ s3(){ local ok=1 rm map
   [ "$ok" = 1 ] || return 1; hc "Approve architecture"
   drive_run S3-plan "$MAIN" "/v0-plan" plan "plan" "$RUN_TIMEOUT"
   chk 3 plan L1 "plan approved" -- has_appr "$(pf)" plan || ok=0
-  chk 3 plan L2 "story graph parses: unique ids, known deps (next-story.py map exit 0)" -- python3 "$HERE/next-story.py" map "$MAIN" || ok=0
-  python3 "$HERE/next-story.py" map "$MAIN" > "$RES/stories.tsv" 2>/dev/null
+  chk 3 plan L2 "story graph parses: unique ids, known deps (next-story.py map exit 0)" -- python3 -I -S "$HERE/next-story.py" map "$MAIN" || ok=0
+  python3 -I -S "$HERE/next-story.py" map "$MAIN" > "$RES/stories.tsv" 2>/dev/null
   chk 3 plan L3 "P0-A present and >= 3 stories after it" -- bash -c "awk -F'\t' '\$2==\"P0-A\"{f=1} END{exit !f}' '$RES/stories.tsv' && test \$(wc -l < '$RES/stories.tsv') -ge 4" || ok=0
   chk 3 plan L4 "Approved plan row by $APPROVER in a milestone manifest" -- bash -c "for m in '$MAIN'/docs/agents-v0/milestones/p*.md; do grep -qiE '^\|[[:space:]\`*]*plan[[:space:]\`*]*\|.*\|[[:space:]\`*@]*${APPROVER}[[:space:]\`*]*\|[[:space:]\`*]*Approved' \"\$m\" && exit 0; done; exit 1" || ok=0
   [ "$ok" = 1 ] || return 1; hc "Approve plan"; snap S3-PLANNED
@@ -210,7 +210,7 @@ s3(){ local ok=1 rm map
 # ================= steps 4 and 5: next story in roadmap order, intake -> local release =================
 happy_story(){ # <step> <var name to set> <released ids...>
   local st="$1" var="$2"; shift 2; local row
-  row="$(python3 "$HERE/next-story.py" next "$MAIN" "$@")" || { post FAIL "no eligible story after: $*"; return 1; }
+  row="$(python3 -I -S "$HERE/next-story.py" next "$MAIN" "$@")" || { post FAIL "no eligible story after: $*"; return 1; }
   story_run "$st" "$var" "$row" "S$st-END"; }
 # story_run <step> <var name to set> <next-story.py TSV row> <snapshot name on pass>: one story intake -> local release,
 #   checks H1-H5 (and L1 when LESSONS_CHECK=1). HARNESS-FIX 2026-10-29: split out of happy_story, unchanged otherwise,
@@ -282,7 +282,7 @@ lessons_chk(){ [ "${LESSONS_CHECK:-0}" = 1 ] || return 0
 #   story and the end-of-run lessons check L1-END. The step passes only if every check passed.
 chain_steps(){ local st="$1" ok=1 i=0 row id slug tgt n
   local -a rows
-  mapfile -t rows < <(python3 "$HERE/next-story.py" chain "$MAIN" "$TARGET_SURFACE" P0-A) || true
+  mapfile -t rows < <(python3 -I -S "$HERE/next-story.py" chain "$MAIN" "$TARGET_SURFACE" P0-A) || true
   if [ "${#rows[@]}" = 0 ]; then post FAIL "no story with Surface '$TARGET_SURFACE' in the plan (next-story.py chain)"
     chk "$st" chain C0 "plan has a story with Surface $TARGET_SURFACE" -- false; return 1; fi
   printf '%s\n' "${rows[@]}" > "$RES/chain.tsv"; n="${#rows[@]}"; tgt="$(story_field "${rows[$((n-1))]}" 2)"
@@ -372,7 +372,7 @@ setup8(){ # <name> <base> <phase cmd> <gates> <must-have phase> <new snapshot>
   [ "$3" != intake ] || chk 8 "$1" S2 "feature/$N3_SLUG worktree exists" -- test -n "$(wt_for_branch "feature/$N3_SLUG")" || return 1
   snap "$6"; result "8.$1" setup PASS; }
 s8(){ local ok=1 row
-  if [ -z "${N3:-}" ]; then row="$(python3 "$HERE/next-story.py" next "$MAIN" P0-A "$N1" "$N2")" || return 1
+  if [ -z "${N3:-}" ]; then row="$(python3 -I -S "$HERE/next-story.py" next "$MAIN" P0-A "$N1" "$N2")" || return 1
     N3="$(story_field "$row" 2)"; N3_SLUG="$(story_field "$row" 3)"; export N3 N3_SLUG; printf 'N3\t%s\t%s\n' "$N3" "$N3_SLUG" >> "$RES/story-ids.tsv"; fi
   probe8 a S6-END build build main || ok=0                 # no intake -> build
   probe8 b S6-END design design main || ok=0               # no intake -> design
@@ -601,7 +601,7 @@ if [ -n "$RESUME_FROM" ]; then
       tail -1 "$A/validate-kit-target.log" | grep -q '^validate-kit: OK' || compat=0
     fi
     if [ "$RESUME_STEP" -gt 3 ]; then for ph in roadmap architecture plan; do has_appr "$(pf)" "$ph" || compat=0; done
-      python3 "$HERE/next-story.py" map "$MAIN" > /dev/null 2>&1 || compat=0
+      python3 -I -S "$HERE/next-story.py" map "$MAIN" > /dev/null 2>&1 || compat=0
       if [ -f "$MAIN/.agents-v0/scripts/check-release-evidence.sh" ]; then
         for s in ${P0A_SLUG:-} $(awk -F'\t' '$1!="N3"{print $3}' "$RES/story-ids.tsv"); do
           has_appr "$MAIN/docs/agents-v0/requirements/$s.state.json" release || continue

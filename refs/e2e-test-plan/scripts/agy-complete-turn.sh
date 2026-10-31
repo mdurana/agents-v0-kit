@@ -27,7 +27,7 @@ done
 PENDING="$TR/status/pending-turn.json"
 [ -f "$PENDING" ] || { echo "error: no pending turn at $PENDING" >&2; exit 1; }
 
-python3 - "$PENDING" "$CONV" "$BRAIN_DIR" "$DIRECT_TEXT" "$DIRECT_CMD" "$RC" <<'PY'
+python3 -I -S - "$PENDING" "$CONV" "$BRAIN_DIR" "$DIRECT_TEXT" "$DIRECT_CMD" "$RC" <<'PY'
 import json, os, sys
 
 pending_path, conv_id, brain_dir, direct_text, direct_cmd, rc_str = sys.argv[1:7]
