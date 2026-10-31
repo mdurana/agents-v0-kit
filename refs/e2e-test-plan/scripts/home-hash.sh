@@ -21,16 +21,24 @@ set -u
 FILES=".profile .bash_profile .bash_login .bashrc .bash_logout .bash_aliases .zshenv .zprofile .zshrc .inputrc
 .tmux.conf .config/tmux/tmux.conf .gitconfig .config/git/config .config/git/attributes .ssh/rc .ssh/environment
 .pam_environment .config/environment.d .config/e2e-secrets.env .local/agents-v0-tools/tools.env .local/lib"
+#   JN-3 (Jiraiya's N-1 review) and Sakura's F-1: folder entries are read NUL-separated (find -print0, sort -z,
+#   xargs -0), so a name with a space or a newline ("a b.pth", which Python still runs) is hashed like any other, and
+#   a symlink is hashed as its target text (readlink), so adding, removing or repointing a link is a change. Before,
+#   xargs split "a b.pth" into two missing files and the folder hash did not change; symlinks were not listed at all.
+tree_hash(){ ( cd "$1" || exit 1
+    find . -type f ! -path '*/__pycache__/*' -print0 | LC_ALL=C sort -z | xargs -0r sha256sum --
+    find . -type l ! -path '*/__pycache__/*' -print0 | LC_ALL=C sort -z | while IFS= read -r -d '' l; do
+      printf 'L %s -> %s\0' "$l" "$(readlink -- "$l")"; done ) | sha256sum | cut -c1-64; }
 list(){ local h="$1" f
   for f in $FILES; do
-    if [ -d "$h/$f" ]; then printf '%s  %s/\n' "$(cd "$h/$f" && find . -type f ! -path '*/__pycache__/*' | LC_ALL=C sort | xargs -r sha256sum | sha256sum | cut -c1-64)" "$f"
+    if [ -d "$h/$f" ]; then printf '%s  %s/\n' "$(tree_hash "$h/$f")" "$f"
     elif [ -e "$h/$f" ] || [ -L "$h/$f" ]; then printf '%s  %s\n' "$(sha256sum < "$h/$f" | cut -c1-64)" "$f"
     else printf 'absent  %s\n' "$f"; fi
   done; }
 case "${1:-}" in
   --record) [ $# = 3 ] || { echo "usage: $0 --record <file> <home>" >&2; exit 2; }
             src=""; [ ! -d "$3/.local/lib" ] || src="$(find "$3/.local/lib" -mindepth 1 -maxdepth 1 -name 'python*' \
-                -exec find {} -type f \( -name '*.py' -o -name '*.pth' \) ! -path '*/__pycache__/*' \; 2>/dev/null | LC_ALL=C sort)"
+                -exec find {} \( -type f -o -type l \) \( -name '*.py' -o -name '*.pth' \) ! -path '*/__pycache__/*' \; 2>/dev/null | LC_ALL=C sort)"
             [ -z "$src" ] || { printf 'HOME-HASH REFUSED: %s/.local/lib/python* holds %s Python source or .pth file(s), first %s. Their cached bytecode under __pycache__/ is not hashed, so it could be swapped unseen. Remove the user-site packages (PyYAML comes from apt python3-yaml) and record again.\n' \
                 "$3" "$(printf '%s\n' "$src" | wc -l | tr -d ' ')" "$(printf '%s\n' "$src" | head -n 1)"; exit 2; }
             (umask 022; list "$3" > "$2") || exit 2; echo "HOME-HASH recorded $(grep -vc '^absent' "$2") files of $3 in $2";;

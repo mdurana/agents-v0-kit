@@ -376,6 +376,31 @@ echo '# changed' >> "$NG/gyp_main.py"
 bash "$HV3/scripts/home-hash.sh" --check "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/r1.log" \
   && ok "home-hash still hashes all of .local/lib (a changed node_modules .py is HOME-CHANGED)" || ko "home-hash node_modules change: $(cat "$SB/r1.log")"
 rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
+# JN-3 (Jiraiya's N-1 review) and Sakura's F-1: names with a space or a newline, and symlinks, under .local/lib are
+#   hashed. Before, xargs split "a b.pth" into two missing files (HOME-HASH-OK) and symlinks were not listed.
+J3="$SB/j3"; J3S="$(HOME="$J3" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+j3rec(){ rm -f "$SB/j3.sha256"; bash "$HV3/scripts/home-hash.sh" --record "$SB/j3.sha256" "$J3" > /dev/null || ko "JN-3 --record refused a user site without Python source"; }
+j3changed(){ bash "$HV3/scripts/home-hash.sh" --check "$SB/j3.sha256" "$J3" > "$SB/j3.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib/' "$SB/j3.log"; }
+mkdir -p "$J3S"; : > "$J3S/data.txt"; j3rec
+printf 'import os; open(%s, "w").write("pth ran")\n' "'$SB/j3.mark'" > "$J3S/a b.pth"
+rm -f "$SB/j3.mark"; HOME="$J3" /usr/bin/python3 -c 'pass'
+[ "$(cat "$SB/j3.mark" 2>/dev/null)" = "pth ran" ] && ok "control: a user-site 'a b.pth' runs in a bare python3 (JN-3)" || ko "control: 'a b.pth' did not run (user site disabled here?)"
+j3changed && ok "home-hash sees a user-site .pth whose name has a space (JN-3)" || ko "home-hash 'a b.pth': $(cat "$SB/j3.log")"
+rm -f "$J3S/a b.pth"; j3rec; printf 'import os\n' > "$J3S/n
+l.pth"
+j3changed && ok "home-hash sees a .pth whose name has a newline (JN-3)" || ko "home-hash newline name: $(cat "$SB/j3.log")"
+rm -f "$J3S"/n*l.pth; printf 'import os\n' > "$SB/j3-target.txt"; j3rec
+ln -s "$SB/j3-target.txt" "$J3S/evil.pth"
+j3changed && ok "home-hash sees a symlink added to the user site (Sakura F-1)" || ko "home-hash symlink added: $(cat "$SB/j3.log")"
+rm -f "$J3S/evil.pth"; ln -s "$SB/j3-target.txt" "$J3S/link.txt"; j3rec; ln -sfn /etc/hostname "$J3S/link.txt"
+j3changed && ok "home-hash sees a user-site symlink repointed (Sakura F-1)" || ko "home-hash symlink repointed: $(cat "$SB/j3.log")"
+rm -f "$J3S/link.txt"; ln -s "$SB/j3-target.txt" "$J3S/evil.pth"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/j3b.sha256" "$J3" > "$SB/j3.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED' "$SB/j3.log" && ok "home-hash --record refuses a symlinked .pth in the user site (Sakura F-1)" || ko "home-hash record symlink .pth: rc=$r $(cat "$SB/j3.log")"
+rm -f "$J3S/evil.pth"; j3rec
+bash "$HV3/scripts/home-hash.sh" --check "$SB/j3.sha256" "$J3" > "$SB/j3.log" 2>&1 && grep -q '^HOME-HASH-OK' "$SB/j3.log" \
+  && ok "home-hash control: an unchanged user site with a data file is HOME-HASH-OK (JN-3)" || ko "home-hash JN-3 control: $(cat "$SB/j3.log")"
+rm -rf "$J3" "$SB"/j3*
 # N-1 final round (Sakura 7e91af9 nit): under V3 prereqs.sh never pip --user installs PyYAML (that fills the user
 #   site the record refuses); it is HUMAN "needs apt-get install python3-yaml". pyyaml_prereq runs from a copy with
 #   stubbed say/python3 (no yaml; pip leaves a mark): V3 marker, E2E_NO_USER_SITE=1, and the laptop control.
