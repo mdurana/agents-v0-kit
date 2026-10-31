@@ -143,3 +143,52 @@ Limits (not fixed here):
 - **Same OS user.** The agent runs as the same OS user that owns the files, so nothing at the file level stops a determined agent from rewriting an installed script, `policy.conf` or the harness itself. The hooks match text, so they are a speed bump. H10 catches a change that is still there at the end of a turn. An edit made and undone inside one turn is not seen, but a gate approved in that window still shows its mode in `trace.json`, which H10 checks. A real fence needs the agent to run as a separate OS user with the kit files read-only, or in a sandbox.
 - **Linked projects.** `install.sh --link` / `scripts/link-project.sh` symlink `.agents-v0/scripts` to the kit templates, so a linked project keeps the overrides. Use a normal install for anything an agent runs unattended.
 - **Kit fetch switch.** `AGENTS_V0_FETCH_KIT` (`resolve-kit-root.sh`) is kept: it chooses where the kit is fetched from and switches no check off.
+
+## kitfix-20261031-kit-source-exec and kitfix-20261031-kit-paths
+
+Found by the next external review (approved by Marlon, 2026-10-31 10:35 Asia/Manila). Two gaps were left after `kitfix-20261031-installed-no-overrides`:
+
+**Item 1: unstripped copies could still be run.** The hook allowed `sh /home/e2e/kit-src/templates/.agents-v0/scripts/sync-feature-state.sh …`. That copy (and another project's, another worktree's, or an old install's) keeps the test-override blocks, so a split-name override aimed at it skipped the branch guard.
+- `core/common/hooks/hook-policy.py`, **unattended mode only** (`AGY_ALLOW_TOOLS`, or `.agents/hooks/unattended-allow` next to the hook, in the payload cwd or the process cwd, as `lib.sh` decides). A command may run only the kit scripts of the checkout it works in.
+  - **Which checkout:** the payload cwd's checkout, or a `cd` target in the same repository, such as the integration checkout at local release.
+  - **What counts as a kit script:** a path in `.agents-v0/scripts|hooks`, or a file named like one that mentions agents-v0. The path is resolved, with symlinks followed.
+  - **Where it is judged:** per segment, after `sh -c`, `env`, `xargs`, `timeout`, `nohup`, `exec`, `eval` and `$(…)` are unwrapped. Also covered: `<` redirects, `<(…)`, pipes into `sh`/`sh -s`/`python -`, and paths inside interpreter `-c` bodies.
+  - **What is blocked:** running, sourcing, copying, linking, `rsync`/`install`/`tar` or `git clone` of a copy outside that checkout. So is a folder holding one, if it is not a checkout of the same repository. So is a `<rev>:<path>` blob of a kit script, and a variable or unresolved path that names one.
+  - **What stays allowed:** reading a copy (`cat`, `grep`, `diff`, `ls`, `git show`), unless the command redirects the output or pipes into a shell.
+  - **Linked installs:** a linked `.agents-v0/scripts` (`install.sh --link`) counts as the kit source, so it is blocked too.
+  - **Attended mode is unchanged.** The existing protected-path rule already blocked `cp` of a `*/.agents-v0/scripts/*.sh` file in every mode.
+- **Harness (the real fence):** see `refs/e2e-test-plan/HARNESS-FIXES-20261029.md` (2026-10-31 10:35) and `v3-rerun-procedure.md` §4 steps 6–8 (install first, then lock).
+  - The kit source is moved where the agent user cannot read it.
+  - With `REQUIRE_FAIL_MODES=1`, the preflight refuses to start while the agent user can read or enter a kit source path, or while any readable `*.sh` under `$HOME`, `$TEST_ROOT` or `/tmp` still holds a test-override block.
+  - Main is then checked against a manifest written after `HASH-OK`, before the lock (`scripts/kit-manifest.sh`, `kit_installed_ok`), so the run needs no kit source.
+
+**Item 2: the guard folders themselves could be moved or removed.** The per-file patterns missed:
+- `mv .agents-v0/scripts /tmp/x`;
+- `git rm .agents-v0/policy.conf`;
+- `git mv`;
+- a glob, a folder argument, or a relative path after `cd .agents-v0`.
+
+`hook-policy.py`, all modes (agents only; a person's own terminal is not hooked): `mv`, `rm`, `rmdir`, `unlink`, `shred`, `truncate`, `chmod`/`chown`/`chgrp`/`chattr`/`setfacl`, and `cp`/`ln`/`install`/`rsync`/`link` onto a target are blocked. So are `find … -delete/-exec`, `git rm`, `git mv`, and `git checkout`/`git restore` (not `--staged` only) of an older version. This covers `.agents-v0/scripts`, `.agents-v0/hooks`, `.agents-v0/ci`, `.agents-v0/packs`, `.agents-v0/policy.conf`, `.agents/{hooks,rules,agents,commands,skills}`, `.agents/hooks.json`, `.cursor/{hooks,rules,agents,commands,skills}`, `.cursor/hooks.json`, `.cursor/cli.json`, and the parents `.agents-v0`, `.agents` and `.cursor`. Paths are matched by name and glob, and also resolved against the command's directory. H10 stays the backstop.
+
+- **Tests:**
+  - `scripts/test-hook-policy.py`: 417 cases, up from 312;
+    - 40 item-2 shell cases: blocked and allowed;
+    - 63 kit-source cases in scratch repositories: the kit source by 11 run forms, xargs, `bash -c`, a stdin redirect, `cat | sh`, process substitution, python subprocess, cd into kit-src, a variable path, a sibling worktree (absolute and relative), another project (path and cd), a symlink in the project, a symlink outside, and a linked install; copy, rsync, install, clone, tar and git-blob forms; allowed own-script, worktree, release-`cd`, reading and app-script cases; attended-mode cases; resolved-path item-2 cases;
+    - 2 cases through the `unattended-allow` file;
+  - `scripts/test-hooks.sh`: the same probes end to end through `pre-shell.sh` (Cursor and Antigravity payloads, sh and dash);
+  - `refs/e2e-test-plan/tests/test-guards.sh`: 54 cases, up from 42.
+- **Mutation checks:**
+
+  | Mutation | test-hook-policy | test-hooks |
+  |---|---|---|
+  | unattended rule off | 36 FAIL | 60 FAIL lines (its embedded test-hook-policy run included) |
+  | folder rule off | 30 FAIL | 60 FAIL lines |
+
+  In the harness: with `kit_source_locked` always passing, test-guards fails 3. With the manifest comparison off, it fails 1.
+
+Limits:
+- **Speed bump only.** Both hook rules match command text. An encoded command (`echo <base64> | base64 -d | sh` whose output names a kit path) or a copy made earlier under a neutral name, holding no `agents-v0` text, is not recognised.
+- **The fence is the OS user.** On the V3 VM, the agent user cannot read any kit source (preflight-checked).
+- **Git history.** The project's own git history still holds kit scripts installed before `kitfix-20261031-installed-no-overrides`. The hook blocks the `<rev>:<path>` forms, but a raw blob id (`git cat-file -p <sha>`) is not recognised.
+- **Outcome checks.** The harness outcome checks still catch the effects: H1 for the branch guard, H3 for phase times, H10 for `trace.json` mode and kit tampering.
+- **Snapshot archives.** Old snapshot archives are made root-only by the procedure, not by the harness. The marker scan reads plain files only.

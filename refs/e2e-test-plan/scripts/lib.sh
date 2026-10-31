@@ -737,9 +737,51 @@ kit_policy_ok(){ local tj="$MAIN/docs/agents-v0/requirements/$1.trace.json"
   [ -n "${KIT_TRACE_MODE:-}" ] && [ -f "$tj" ] || return 0
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); bad=[g for g,v in d.items() if isinstance(v,dict) and "mode" in v and v["mode"]!=sys.argv[2]]
 print("trace.json gates not in mode %s: %s" % (sys.argv[2], " ".join(bad))) if bad else None; sys.exit(1 if bad else 0)' "$tj" "$KIT_TRACE_MODE"; }
+# kitfix-20261031-kit-source-lock (item 1b of the 10:35 review): the agent runs as the same OS user as the harness, so
+#   any readable copy of the kit SOURCE (templates/.agents-v0/scripts keeps the test-override blocks that install.sh
+#   strips) can be run with a split-name override, whatever the hooks match. For V3 the kit source is made unreadable
+#   for that user after the kit is installed (v3-rerun-procedure.md §4), and the harness checks it before it starts:
+# kit_manifest_lines <checkout>: "<relpath>\t<sha256>" of the installed scripts and hooks (policy.conf excluded, the
+#   harness writes it), sorted. scripts/kit-manifest.sh writes them after check-installed-kit.sh says HASH-OK.
+kit_manifest_lines(){ kit_integrity "$1" | awk -F'\t' '$2!=".agents-v0/policy.conf"{print $2"\t"$3}' | LC_ALL=C sort; }
+# kit_installed_ok <checkout>: the installed kit is the verified one and its trace mode is fail. With KIT_MANIFEST
+#   (written before the source was locked) it compares with the manifest and needs no kit source; without it,
+#   check-installed-kit.sh runs from $KIT.
+kit_installed_ok(){ local w="$1" out mode mk
+  if [ -z "${KIT_MANIFEST:-}" ]; then sh "$KIT/scripts/check-installed-kit.sh" --expect-trace-mode fail "$w"; return; fi
+  [ -s "$KIT_MANIFEST" ] || { echo "MANIFEST-MISSING $KIT_MANIFEST"; return 1; }
+  out="$(diff <(grep -v '^#' "$KIT_MANIFEST" | LC_ALL=C sort) <(kit_manifest_lines "$w"))" \
+    || { echo "MANIFEST-DIFF (< manifest, > installed):"; printf '%s\n' "$out" | head -20; return 1; }
+  mk='# >>> kit-test'; mk="$mk-override"   # split, so this file never matches the marker scan below
+  if grep -lF -- "$mk" "$w"/.agents-v0/scripts/* 2>/dev/null | grep -q .; then echo "MARKER-LEFT in $w/.agents-v0/scripts"; return 1; fi
+  mode="$(sed -n 's/^trace_mode=//p' "$w/.agents-v0/policy.conf" 2>/dev/null | tail -1)"
+  [ "$mode" = fail ] || { echo "TRACE-MODE ${mode:-absent} (need fail)"; return 1; }
+  echo "MANIFEST-OK files=$(grep -vc '^#' "$KIT_MANIFEST") trace_mode=fail $(grep -m1 '^# kit=' "$KIT_MANIFEST" | cut -c3-)"; }
+# kit_source_locked: AGENT_USER (default: the user running the harness) can neither read nor enter any of
+#   KIT_SOURCE_PATHS (default: $KIT, $TEST_ROOT/calib/kit, $HOME/kit-src, and KIT_URL / KIT_FIX_URL when they are
+#   local folders), and no readable *.sh under KIT_SCAN_ROOTS (default: $HOME $TEST_ROOT /tmp) still holds a
+#   test-override block (a kit source, an old install, a set-aside worktree in trash/). Run as root, it tests as
+#   AGENT_USER with runuser; run as another user it refuses (it cannot tell).
+kit_source_locked(){ local u="${AGENT_USER:-$(id -un)}" me; me="$(id -un)"; local bad=0 p paths hits mk
+  as_agent(){ if [ "$me" = "$u" ]; then "$@"; elif [ "$(id -u)" = 0 ]; then runuser -u "$u" -- "$@"; else return 125; fi; }
+  paths="${KIT_SOURCE_PATHS:-$KIT $TEST_ROOT/calib/kit $HOME/kit-src}"
+  for p in "${KIT_URL:-}" "${KIT_FIX_URL:-}"; do [ -n "$p" ] && [ -d "$p" ] && paths="$paths $p"; done
+  for p in $paths; do
+    as_agent test -e "$p"; case $? in 125) echo "LOCK cannot test as $u from $me"; return 1;; 0) ;; *) echo "LOCK absent $p"; continue;; esac
+    if as_agent sh -c 'test -r "$1" || { test -d "$1" && test -x "$1"; }' _ "$p"; then echo "LOCK READABLE by $u: $p"; bad=1
+    else echo "LOCK ok $p (not readable by $u)"; fi
+  done
+  mk='# >>> kit-test'; mk="$mk-override"
+  # shellcheck disable=SC2086
+  hits="$(as_agent grep -rlsF --include='*.sh' --exclude-dir=node_modules --exclude-dir=.m2 --exclude-dir=.git \
+           --exclude-dir=target --exclude-dir=.npm -- "$mk" ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp} 2>/dev/null | head -20)"
+  if [ -n "$hits" ]; then printf '%s\n' "$hits" | sed "s|^|LOCK READABLE unstripped kit script for $u: |"; bad=1
+  else echo "LOCK scan ok: no readable test-override block under ${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp}"; fi
+  [ "$bad" = 0 ]; }
 # modes_preflight: REQUIRE_FAIL_MODES=1 (V3) refuses to start unless every mode is fail: H6_MODE=fail, H7-H10 not warn,
-#   KIT_TRACE_MODE=fail, and (when the workspace exists) every checkout passes check-installed-kit.sh with trace mode
-#   fail. AGENTS_V0_TRACE_MODE in the launch env is refused in any case: installed copies ignore it.
+#   KIT_TRACE_MODE=fail, the kit source is locked away from the agent user (kit_source_locked; also on its own with
+#   KIT_SOURCE_LOCK=1), and (when the workspace exists) every checkout passes kit_installed_ok. AGENTS_V0_TRACE_MODE
+#   in the launch env is refused in any case: installed copies ignore it.
 modes_preflight(){ local w bad=0 log="$RES/modes-preflight.log"
   : > "$log"
   if [ -n "${AGENTS_V0_TRACE_MODE:-}" ]; then echo "AGENTS_V0_TRACE_MODE is set in the launch env; installed kit scripts ignore it: use KIT_TRACE_MODE" >> "$log"; bad=1; fi
@@ -747,15 +789,16 @@ modes_preflight(){ local w bad=0 log="$RES/modes-preflight.log"
     [ "${H6_MODE:-warn}" = fail ] || { echo "H6_MODE=${H6_MODE:-warn} (need fail)" >> "$log"; bad=1; }
     local m; for m in H7_MODE H8_MODE H9_MODE H10_MODE; do [ "$(eval "echo \${$m:-fail}")" != warn ] || { echo "$m=warn (need fail)" >> "$log"; bad=1; }; done
     [ "${KIT_TRACE_MODE:-}" = fail ] || { echo "KIT_TRACE_MODE=${KIT_TRACE_MODE:-unset} (need fail)" >> "$log"; bad=1; }
-    if [ "$bad" = 0 ] && [ -d "$MAIN/.git" ]; then
-      kit_policy_apply "preflight" >> "$log" 2>&1 || bad=1
-      local out; for w in $(worktrees); do
-        if out="$(sh "$KIT/scripts/check-installed-kit.sh" --expect-trace-mode fail "$w" 2>&1)"; then printf '%s\n' "$out" | sed "s|^|OK ${w##*/}: |" >> "$log"
-        else printf '%s\n' "$out" | sed "s|^|FAIL ${w##*/}: |" >> "$log"; bad=1; fi
-      done
-    fi
   fi
-  post MODES "H6=${H6_MODE:-warn} H7=${H7_MODE:-fail} H8=${H8_MODE:-fail} H9=${H9_MODE:-fail} H10=${H10_MODE:-fail} trace=${KIT_TRACE_MODE:-policy-default} require_fail=${REQUIRE_FAIL_MODES:-0} $([ "$bad" = 0 ] && echo OK || echo REFUSED)"
+  if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] || [ "${KIT_SOURCE_LOCK:-0}" = 1 ]; then kit_source_locked >> "$log" 2>&1 || bad=1; fi
+  if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] && [ "$bad" = 0 ] && [ -d "$MAIN/.git" ]; then
+    kit_policy_apply "preflight" >> "$log" 2>&1 || bad=1
+    local out; for w in $(worktrees); do
+      if out="$(kit_installed_ok "$w" 2>&1)"; then printf '%s\n' "$out" | sed "s|^|OK ${w##*/}: |" >> "$log"
+      else printf '%s\n' "$out" | sed "s|^|FAIL ${w##*/}: |" >> "$log"; bad=1; fi
+    done
+  fi
+  post MODES "H6=${H6_MODE:-warn} H7=${H7_MODE:-fail} H8=${H8_MODE:-fail} H9=${H9_MODE:-fail} H10=${H10_MODE:-fail} trace=${KIT_TRACE_MODE:-policy-default} require_fail=${REQUIRE_FAIL_MODES:-0} lock=$([ "${REQUIRE_FAIL_MODES:-0}" = 1 ] || [ "${KIT_SOURCE_LOCK:-0}" = 1 ] && echo checked || echo off) $([ "$bad" = 0 ] && echo OK || echo REFUSED)"
   [ "$bad" = 0 ]; }
 no_forbidden(){ ! cat "$EVID"/"$1"*/forbidden-commands.txt 2>/dev/null | grep -q .; }
 no_self_approval(){ ! ls "$EVID"/"$1"*/self-approval.txt >/dev/null 2>&1; }

@@ -300,3 +300,18 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - `trace_bad_phase` passes `--no-write` (installed copies) and keeps the old env for older copies.
 - Tests: `tests/test-guards.sh` now 42 cases (H10 edits, policy removal, `--test-overrides` reinstall, trace.json mode, preflight). Mutation: with the hash comparison disabled, 9 cases fail.
 
+
+## 2026-10-31 10:35 Asia/Manila — kit source locked away from the agent user; manifest check (kitfix-20261031-kit-source-lock, approved by Marlon)
+
+- **Why (external review, item 1):** the agent runs as the same OS user as the harness (e2e). Any readable kit source (`~/kit-src`, `$T/kit`, `$T/calib/kit`, old installs in `trash/`, a previous run root) keeps the test-override blocks, so a split-name override aimed at it skips the branch guard, whatever the hooks match. The hooks now block running such a copy in unattended mode (`refs/kit-fixes.md`), but that is a text check.
+- **`kit_source_locked` (lib.sh):** run by `modes_preflight` when `REQUIRE_FAIL_MODES=1` (or `KIT_SOURCE_LOCK=1`).
+  - Every path in `KIT_SOURCE_PATHS` (default `$KIT $TEST_ROOT/calib/kit $HOME/kit-src`, plus a local `KIT_URL`/`KIT_FIX_URL`) must be absent, or neither readable nor enterable by `AGENT_USER`.
+  - No readable `*.sh` under `KIT_SCAN_ROOTS` (default `$HOME $TEST_ROOT /tmp`) may still hold a test-override block.
+  - It tests as `AGENT_USER` directly when the harness is that user, with `runuser -u` as root, and refuses otherwise.
+  - Lines `LOCK ok|absent|READABLE …` and `LOCK scan ok` go to `modes-preflight.log`. The `MODES` line now ends `lock=checked OK|REFUSED`.
+- **`scripts/kit-manifest.sh <checkout> <file> [<kit>]`:** written after `check-installed-kit.sh` says HASH-OK, before the lock. It lists the hashes of the installed scripts and hooks; policy.conf is excluded because the harness writes it.
+- **`kit_installed_ok`:** with `KIT_MANIFEST` it compares main and every worktree against the manifest, finds no marker, and needs `trace_mode=fail`. Without it, it runs `check-installed-kit.sh` as before. The preflight and the story start both use it, so a run with the source locked needs no kit source.
+- **Procedure:** `v3-rerun-procedure.md` §4 steps 6–8 (manifest, harness copy to `~/harness-v3`, lock as root), §5 (`KIT_MANIFEST`, `AGENT_USER`), §6 (launch from `~/harness-v3`; check the `LOCK` and `MANIFEST-OK` lines), §8 (unlock before the next segment). When the harness itself needs the source: read-only checks as root against the locked copy; installs go unlock → install as e2e → lock again, with no agent running.
+- **Tests:** `tests/test-guards.sh` is now 54 cases. They cover a readable source refused, a mode-000 source accepted, a moved-away source accepted, a readable unstripped copy in trash refused, `KIT_SOURCE_LOCK=1` alone, an agent user that cannot be tested refused, the manifest written, a preflight on the manifest with the source unreadable, manifest drift refused, `trace_mode=warn` refused, a missing manifest refused, and the harness's own `*.sh` free of the marker string.
+- **Mutation checks:** with `kit_source_locked` always passing, 3 cases fail. With the manifest comparison off, 1 case fails.
+- **Not checked:** compressed archives (the procedure makes the old snapshots root-only) and the project's git history.

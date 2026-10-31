@@ -19,14 +19,15 @@ CWD = ""
 
 
 def _run(mode: str, env_extra: dict, cwd: str = "") -> str:
-    env = {k: v for k, v in os.environ.items() if k != "HOOK_CWD"}
+    env = {k: v for k, v in os.environ.items() if k not in ("HOOK_CWD", "AGY_ALLOW_TOOLS")}
     env.update(env_extra)
     out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
     return json.loads(out)["action"]
 
 
-def shell(cmd: str, cwd: str = "", hook_cwd: str = "") -> str:
+def shell(cmd: str, cwd: str = "", hook_cwd: str = "", env: dict = None) -> str:
     extra = {"HOOK_CMD": cmd}
+    extra.update(env or {})
     if hook_cwd:
         extra["HOOK_CWD"] = hook_cwd
     return _run("shell", extra, cwd)
@@ -96,6 +97,47 @@ SHELL_CASES = [
     ("rm .agents-v0/policy.conf", "block"),
     ("cp /tmp/p .agents-v0/policy.conf", "block"),
     ("cat .agents-v0/policy.conf", "allow"),
+    # kitfix-20261031-kit-paths: removing, renaming, replacing or restoring a guard folder or file (all modes)
+    ("mv .agents-v0/scripts /tmp/x", "block"),
+    ("mv .agents-v0/scripts/ /tmp/x", "block"),
+    ("mv .agents-v0 /tmp/x", "block"),
+    ("mv .agents-v0/scripts/* /tmp/x/", "block"),
+    ("mv .agents-v0/policy.conf /tmp/p", "block"),
+    ("mv .agents/hooks /tmp/h", "block"),
+    ("mv .cursor/hooks.json /tmp/h.json", "block"),
+    ("git rm .agents-v0/policy.conf", "block"),
+    ("git rm -q --cached .agents-v0/policy.conf", "block"),
+    ("git rm -r .agents-v0/scripts", "block"),
+    ("git mv .agents-v0/scripts x", "block"),
+    ("git mv .agents-v0/policy.conf x.conf", "block"),
+    ("git mv .agents/hooks hooks-old", "block"),
+    ("rm -rf .agents-v0/scripts", "block"),
+    ("rm -rf .agents-v0", "block"),
+    ("rm .agents-v0/hooks/pre-commit", "block"),
+    ("unlink .agents/hooks/pre-shell.sh", "block"),
+    ("rmdir .agents-v0/scripts", "block"),
+    ("cp /tmp/x .agents-v0/scripts", "block"),
+    ("cp -r /tmp/x/. .agents-v0/", "block"),
+    ("cp -t .agents-v0/scripts /tmp/sync-feature-state.sh", "block"),
+    ("ln -sfn /tmp/x .agents-v0/scripts", "block"),
+    ("ln -s /tmp/x .agents/hooks", "block"),
+    ("truncate -s 0 .agents-v0/policy.conf", "block"),
+    (": > .agents-v0/policy.conf", "block"),
+    ("chmod -R a-x .agents-v0/scripts", "block"),
+    ("find .agents-v0 -delete", "block"),
+    ("find .agents-v0/scripts -name '*.sh' -exec rm {} +", "block"),
+    ("git checkout HEAD~3 -- .agents-v0/scripts", "block"),
+    ("git checkout HEAD~3 .agents-v0/scripts/sync-feature-state.sh", "block"),
+    ("git restore --source=HEAD~2 .agents-v0/policy.conf", "block"),
+    ("git restore -s HEAD~2 -- .agents/hooks", "block"),
+    ("bash -c 'mv .agents-v0/scripts /tmp/x'", "block"),
+    ("mv docs/a.md docs/b.md", "allow"),
+    ("git mv src/a.txt src/b.txt", "allow"),
+    ("rm -f .cursor/mcp.json", "allow"),
+    ("cp .agents-v0/policy.conf.example /tmp/x", "allow"),
+    ("ls -la .agents-v0/scripts", "allow"),
+    ("git restore --staged .agents-v0/policy.conf", "allow"),
+    ("git checkout main", "allow"),
     ("sh .agents-v0/scripts/check-traceability.sh --print-mode", "allow"),
     # kitfix-20261031-guard-override: an agent never sets AGENTS_V0_* (kit skip flags, clock pin, trace mode)
     ("AGENTS_V0_SKIP_BRANCH_GUARD=1 sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/x.md", "block"),
@@ -405,6 +447,135 @@ def lessons_cases(r: dict) -> list:
     ]
 
 
+def kit_source_cases(tmp: str) -> list:
+    """kitfix-20261031-kit-source-exec: unattended, only the checkout's own .agents-v0/scripts may run."""
+    def git(*a, cwd):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
+                        *a], cwd=cwd, check=True, capture_output=True)
+    tpl = os.path.join(ROOT, "templates", ".agents-v0", "scripts")
+    strip = os.path.join(ROOT, "scripts", "strip-test-overrides.sh")
+    kit = os.path.join(tmp, "kit-src")
+    shutil.copytree(tpl, os.path.join(kit, "templates", ".agents-v0", "scripts"))
+    subprocess.run(["git", "init", "-q", "-b", "main", kit], check=True, capture_output=True)
+    git("add", "-A", cwd=kit)
+    git("commit", "-qm", "kit", cwd=kit)
+
+    def project(d: str) -> None:
+        sd = os.path.join(d, ".agents-v0", "scripts")
+        os.makedirs(sd)
+        os.makedirs(os.path.join(d, ".agents", "hooks"))
+        os.makedirs(os.path.join(d, "scripts"))
+        os.makedirs(os.path.join(d, "tools"))
+        for n in os.listdir(tpl):
+            with open(os.path.join(sd, n), "w", encoding="utf-8") as fh:
+                fh.write(subprocess.run(["sh", strip, os.path.join(tpl, n)], capture_output=True,
+                                        check=True).stdout.decode())
+        with open(os.path.join(d, ".agents-v0", "policy.conf"), "w", encoding="utf-8") as fh:
+            fh.write("trace_mode=fail\n")
+        with open(os.path.join(d, "scripts", "build.sh"), "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh\necho build\n")
+
+    proj = os.path.join(tmp, "portal")
+    project(proj)
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True, capture_output=True)
+    git("add", "-A", cwd=proj)
+    git("commit", "-qm", "base", cwd=proj)
+    feat = os.path.join(tmp, "portal-feat")
+    git("worktree", "add", "-q", "-b", "feature/x", feat, "main", cwd=proj)
+    other = os.path.join(tmp, "other")
+    project(other)
+    subprocess.run(["git", "init", "-q", "-b", "main", other], check=True, capture_output=True)
+    linked = os.path.join(tmp, "linked")  # install --link: .agents-v0/scripts is a symlink to the kit templates
+    os.makedirs(os.path.join(linked, ".agents-v0"))
+    os.symlink(os.path.join(kit, "templates", ".agents-v0", "scripts"), os.path.join(linked, ".agents-v0", "scripts"))
+    subprocess.run(["git", "init", "-q", "-b", "main", linked], check=True, capture_output=True)
+    ks = os.path.join(kit, "templates", ".agents-v0", "scripts")
+    sfs = os.path.join(ks, "sync-feature-state.sh")
+    os.symlink(sfs, os.path.join(proj, "tools", "sfs.sh"))
+    os.symlink(sfs, os.path.join(tmp, "link.sh"))
+    os.symlink(os.path.join(proj, ".agents-v0", "scripts", "sync-feature-state.sh"), os.path.join(tmp, "own-link.sh"))
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)"}
+    A: dict = {}
+    split = 'V=AGENTS; env "${V}_V0_SKIP_BRANCH_GUARD=1" '
+    c = []
+    def add(cmd, want, cwd=proj, env=U, label=""):
+        c.append((cmd, cwd, env, want, label))
+    # blocked: the kit source (templates/), the kit-src checkout, a sibling worktree, another project, symlinks
+    for run in ("sh ", "bash ", "dash -e ", ". ", "source ", "", "env FOO=1 sh ", "timeout 60 sh ", "nohup sh ",
+                "exec sh ", split + "sh "):
+        add(f"{run}{sfs} --approve design docs/x.md", "block", label="kit source: " + (run.strip() or "direct path"))
+    add(f"echo {sfs} | xargs sh", "block", label="xargs")
+    add(f"bash -c 'sh {sfs} --approve design x'", "block", label="bash -c")
+    add(f"sh < {sfs}", "block", label="stdin redirect")
+    add(f"cat {sfs} | sh -s -- --approve design x", "block", label="cat | sh")
+    add(f"bash <(cat {sfs})", "block", label="process substitution")
+    add(f"python3 -c \"import subprocess; subprocess.run(['sh', '{sfs}'])\"", "block", label="python subprocess")
+    add(f"cd {kit} && sh templates/.agents-v0/scripts/sync-feature-state.sh --approve design x", "block",
+        label="cd kit-src, relative path")
+    add(f"cd {ks} && sh ./sync-feature-state.sh", "block", label="cd into the kit scripts folder")
+    add(f"K={kit}; sh $K/templates/.agents-v0/scripts/sync-feature-state.sh", "block", label="variable path")
+    add(f"sh {feat}/.agents-v0/scripts/sync-feature-state.sh --approve design x", "block", label="sibling worktree (abs)")
+    add("sh ../portal-feat/.agents-v0/scripts/sync-feature-state.sh --approve design x", "block",
+        label="sibling worktree (relative)")
+    add(f"sh {other}/.agents-v0/scripts/sync-feature-state.sh --approve design x", "block", label="other project")
+    add(f"cd {other} && sh .agents-v0/scripts/sync-feature-state.sh", "block", label="cd other project")
+    add("sh tools/sfs.sh --approve design x", "block", label="symlink in the project to the kit source")
+    add(f"sh {tmp}/link.sh --approve design x", "block", label="symlink outside the project")
+    add("sh .agents-v0/scripts/sync-feature-state.sh --approve design x", "block", cwd=linked,
+        label="linked install (.agents-v0/scripts -> kit templates)")
+    # blocked: copying, linking, cloning or exporting a kit copy
+    add(f"cp {sfs} tools/s.sh", "block", label="cp kit script into the project")
+    add(f"cp -r {ks} /tmp/kitcopy", "block", label="cp -r kit scripts folder")
+    add(f"cp -r {kit} /tmp/kitcopy", "block", label="cp -r kit-src")
+    add(f"ln -s {sfs} tools/s.sh", "block", label="ln -s kit script into the project")
+    add(f"rsync -a {ks}/ tools/k/", "block", label="rsync")
+    add(f"install -m 755 {sfs} tools/s.sh", "block", label="install")
+    add(f"git clone -q {kit} /tmp/kitclone", "block", label="git clone kit-src")
+    add(f"cat {sfs} > tools/s.sh", "block", label="cat > file")
+    add(f"git -C {kit} show HEAD:templates/.agents-v0/scripts/sync-feature-state.sh > /tmp/s.sh", "block",
+        label="git show kit blob > file")
+    add("git show HEAD~1:.agents-v0/scripts/sync-feature-state.sh | sh", "block", label="old blob | sh")
+    add(f"tar -cf /tmp/k.tar -C {kit} templates", "block", label="tar the kit")
+    # allowed: the checkout's own scripts, reading, app scripts, same-repo work
+    for run in ("sh ", "bash ", "sh ./", "env TZ=UTC sh ", "timeout 60 sh "):
+        add(f"{run}.agents-v0/scripts/sync-feature-state.sh --approve intake docs/x.md", "allow",
+            label="own script: " + run.strip())
+    add(f"sh {proj}/.agents-v0/scripts/check-traceability.sh --print-mode", "allow", label="own script, absolute")
+    add(f"sh {tmp}/own-link.sh --approve intake x", "allow", label="symlink to the project's own script")
+    add("sh .agents-v0/scripts/sync-feature-state.sh --approve design x", "allow", cwd=feat,
+        label="worktree runs its own script")
+    add(f"cd {proj} && sh .agents-v0/scripts/sync-feature-state.sh --approve release x", "allow", cwd=feat,
+        label="worktree -> cd integration checkout (release)")
+    add("sh scripts/build.sh", "allow", label="app script")
+    add(f"cat {sfs}", "allow", label="cat kit source")
+    add(f"diff {sfs} .agents-v0/scripts/sync-feature-state.sh", "allow", label="diff kit source")
+    add(f"grep -n guard {sfs} 2>/dev/null", "allow", label="grep kit source")
+    add(f"ls {kit}", "allow", label="ls kit-src")
+    add(f"git -C {feat} add -A", "allow", label="git -C sibling worktree")
+    add("git -C ../portal-feat status", "allow", label="git status sibling")
+    add(f"cp .agents-v0/scripts/check-traceability.sh /tmp/t.sh", "block", label="copy own script (protected path)")
+    # attended: unchanged (the person approves)
+    add(f"sh {sfs} --approve design x", "allow", env=A, label="attended: kit source")
+    add(f"cp {sfs} tools/s.sh", "block", env=A, label="attended: cp kit source (protected-path rule, unchanged)")
+    add(f"cp -r {ks} /tmp/kitcopy", "allow", env=A, label="attended: cp -r kit folder (unchanged)")
+    # item 2, resolved paths (all modes)
+    add("cd .agents-v0 && mv scripts /tmp/x", "block", env=A, label="cd .agents-v0 && mv scripts")
+    add("cd .agents-v0 && rm policy.conf", "block", env=A, label="cd .agents-v0 && rm policy.conf")
+    add("cd .agents && git rm -r hooks", "block", env=A, label="cd .agents && git rm -r hooks")
+    add("cd .agents-v0 && git mv scripts s", "block", env=U, label="unattended cd && git mv")
+    add("mv scripts/build.sh scripts/b.sh", "allow", env=A, label="mv app script")
+    return c
+
+
+def unattended_file_cases(tmp: str) -> list:
+    """The .agents/hooks/unattended-allow file switches the same rule on, without AGY_ALLOW_TOOLS."""
+    proj = os.path.join(tmp, "portal")
+    sfs = os.path.join(tmp, "kit-src", "templates", ".agents-v0", "scripts", "sync-feature-state.sh")
+    return [(f"sh {sfs} --approve design x", proj, {}, "block", "unattended-allow file: kit source"),
+            ("sh .agents-v0/scripts/sync-feature-state.sh --approve intake x", proj, {}, "allow",
+             "unattended-allow file: own script")]
+
+
 def main() -> int:
     global CWD
     fail = 0
@@ -432,9 +603,20 @@ def main() -> int:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
         check(got, want, f"MEM-13 {kind} `{arg}` (cwd={os.path.relpath(cwd, tmp)}"
               + (f", HOOK_CWD={os.path.relpath(hook_cwd, tmp)}" if hook_cwd else "") + ")")
+    ktmp = os.path.join(tmp, "kitsrc")
+    os.makedirs(ktmp)
+    kcases = kit_source_cases(ktmp)
+    for cmd, cwd, env, want, label in kcases:
+        check(shell(cmd, cwd, cwd, env), want, f"kit-source {label}: `{cmd}`")
+    flag = os.path.join(ktmp, "portal", ".agents", "hooks", "unattended-allow")
+    with open(flag, "w", encoding="utf-8") as fh:
+        fh.write("Shell(git:commit*)\n")
+    fcases = unattended_file_cases(ktmp)
+    for cmd, cwd, env, want, label in fcases:
+        check(shell(cmd, cwd, cwd, env), want, f"kit-source {label}: `{cmd}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra)
+    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases)
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

@@ -294,7 +294,12 @@ Start a **new run** (new `RUN_ID`, new `TEST_ROOT`, `test-plan.md` §8) instead 
 | `H9_MODE` | `fail` | `warn` makes a rewritten or out-of-order story gate commit (H9) a FINDING only |
 | `H10_MODE` | `fail` | `warn` makes a change to the installed kit scripts, hooks or `.agents-v0/policy.conf` during a turn, or a trace gate not in `KIT_TRACE_MODE` (H10), a FINDING only |
 | `KIT_TRACE_MODE` | unset | `warn` or `fail`: the harness writes `trace_mode=<mode>` into `.agents-v0/policy.conf` of main and every kit worktree (one harness commit each) before each story. Installed kit scripts read the trace mode only from that file; `AGENTS_V0_TRACE_MODE` in the launch env has no effect on them and is refused |
-| `REQUIRE_FAIL_MODES` | `0` | `1` (V3): the run refuses to start (exit 3, `results/modes-preflight.log`) unless `H6_MODE=fail`, H7–H10 not `warn`, `KIT_TRACE_MODE=fail`, and every checkout passes `scripts/check-installed-kit.sh --expect-trace-mode fail`; each story checks main again before it starts |
+| `REQUIRE_FAIL_MODES` | `0` | `1` (V3): the run refuses to start (exit 3, `results/modes-preflight.log`) unless `H6_MODE=fail`, H7–H10 not `warn`, `KIT_TRACE_MODE=fail`, the kit source is locked away from `AGENT_USER` (see `KIT_SOURCE_LOCK`), and every checkout passes `kit_installed_ok` (the `KIT_MANIFEST` when set, else `check-installed-kit.sh --expect-trace-mode fail`); each story checks main again before it starts |
+| `KIT_SOURCE_LOCK` | `0` | `1`: the preflight checks the lock even without `REQUIRE_FAIL_MODES` (which implies it). Each of `KIT_SOURCE_PATHS` must be absent, or neither readable nor enterable by `AGENT_USER`, and no readable `*.sh` under `KIT_SCAN_ROOTS` may still hold a test-override block (kitfix-20261031-kit-source-lock) |
+| `KIT_SOURCE_PATHS` | `$KIT $TEST_ROOT/calib/kit $HOME/kit-src` | the kit source copies to test (a local `KIT_URL` / `KIT_FIX_URL` is always added) |
+| `KIT_SCAN_ROOTS` | `$HOME $TEST_ROOT /tmp` | where the preflight looks for readable unstripped kit scripts |
+| `AGENT_USER` | the harness user | the OS user the agent runs as; as root the lock is tested with `runuser -u`, as any other user the preflight refuses |
+| `KIT_MANIFEST` | unset | the manifest `scripts/kit-manifest.sh` wrote after `HASH-OK`, before the lock; `kit_installed_ok` then checks the installed scripts and hooks against it, with no kit source needed |
 | `MAX_RESUMES_TOTAL` | 8 | failure resumes in one run; rows whose reason starts with `kit-update` (a planned kit update, D7 of kitfix-20261031) are not counted |
 
 Stop conditions (the runner or `kit-fix.sh` refuses with exit 3 and writes the reason to `results/stop.txt`, which `summary.md` shows under **Stop condition**):

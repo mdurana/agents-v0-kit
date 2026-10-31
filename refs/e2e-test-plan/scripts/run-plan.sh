@@ -219,10 +219,11 @@ story_run(){
   printf -v "$var" '%s' "$id"; printf -v "${var}_SLUG" '%s' "$slug"; export "$var" "${var}_SLUG"
   before="$(for s in $(awk -F'\t' '{print $3}' "$RES/story-ids.tsv" | grep -v "^$slug\$") "$P0A_SLUG"; do state_sem "$MAIN/docs/agents-v0/requirements/$s.state.json"; done)"
   # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides): KIT_TRACE_MODE goes into .agents-v0/policy.conf
-  #   before the story starts; with REQUIRE_FAIL_MODES=1 the installed kit must pass check-installed-kit.sh first.
+  #   before the story starts; with REQUIRE_FAIL_MODES=1 the installed kit must pass kit_installed_ok first (KIT_MANIFEST
+#   when the kit source is locked, else check-installed-kit.sh).
   kit_policy_apply "story $id" || ok=0
-  if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] && ! sh "$KIT/scripts/check-installed-kit.sh" --expect-trace-mode fail "$MAIN" >> "$RES/check-output.log" 2>&1; then
-    post FAIL "story $id not started: the installed kit in main fails check-installed-kit.sh --expect-trace-mode fail (see results/check-output.log)"
+  if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] && ! kit_installed_ok "$MAIN" >> "$RES/check-output.log" 2>&1; then
+    post FAIL "story $id not started: the installed kit in main is not the verified one with trace mode fail (kit_installed_ok; see results/check-output.log)"
     chk "$st" "$id" H10 "installed kit intact with trace mode fail before the story" -- false; return 1; fi
   STORY_H0="$(git -C "$MAIN" rev-parse HEAD)"
   # STAGED HARNESS-FIX 2026-10-30 (in-story resume): if the kept branch is already merged (resume at local-release),

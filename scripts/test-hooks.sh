@@ -164,6 +164,27 @@ for c in 'AGENTS_V0_SKIP_BRANCH_GUARD=1 sh .agents-v0/scripts/sync-feature-state
 shell_case 'echo "$AGENTS_V0_TZ"' allow
 # attended mode (no allowlist) still asks, as before
 shell_case 'git commit --amen --no-edit' ask
+# kitfix-20261031-kit-source-exec: unattended, a kit script may run only from the checkout's own .agents-v0/scripts.
+#   The kit source (templates/, unstripped), another checkout's copy, or a symlink to one is blocked; reading is not.
+# kitfix-20261031-kit-paths: moving or removing the guard folders/files is blocked in every mode.
+ks="$scratch/kit-src/templates/.agents-v0/scripts"; mkdir -p "$ks" "$scratch/kp/.agents-v0/scripts" "$scratch/kp/tools"
+cp "$KIT/templates/.agents-v0/scripts/sync-feature-state.sh" "$ks/"
+sh "$KIT/scripts/strip-test-overrides.sh" "$ks/sync-feature-state.sh" > "$scratch/kp/.agents-v0/scripts/sync-feature-state.sh"
+ln -s "$ks/sync-feature-state.sh" "$scratch/kp/tools/sfs.sh"
+UA='Shell(git:commit*)'
+for c in "sh $ks/sync-feature-state.sh --approve design x" "V=AGENTS; env \"\${V}_V0_SKIP_BRANCH_GUARD=1\" sh $ks/sync-feature-state.sh --approve design x" \
+         "bash -c 'sh $ks/sync-feature-state.sh'" "echo $ks/sync-feature-state.sh | xargs sh" "sh tools/sfs.sh --approve design x" \
+         "cp $ks/sync-feature-state.sh tools/s.sh" "cd $scratch/kit-src && sh templates/.agents-v0/scripts/sync-feature-state.sh"; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" block && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" block ) || fail=1
+done
+for c in 'sh .agents-v0/scripts/sync-feature-state.sh --approve intake docs/x.md' "cat $ks/sync-feature-state.sh"; do
+  ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" shell_case "$c" allow && AGY_ALLOW_TOOLS="$UA" agy_shell_case "$c" allow ) || fail=1
+done
+( cd "$scratch/kp" && shell_case "sh $ks/sync-feature-state.sh --approve design x" allow ) || fail=1   # attended: unchanged
+for c in 'mv .agents-v0/scripts /tmp/x' 'git rm .agents-v0/policy.conf' 'git mv .agents-v0/scripts s' 'rm -rf .agents-v0/scripts' \
+         'mv .agents/hooks /tmp/h' 'cd .agents-v0 && mv scripts /tmp/x'; do
+  ( cd "$scratch/kp" && shell_case "$c" block && agy_shell_case "$c" block && AGY_ALLOW_TOOLS="$UA" shell_case "$c" block ) || fail=1
+done
 
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 

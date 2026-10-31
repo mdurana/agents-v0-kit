@@ -368,6 +368,317 @@ def _rm_is_recursive(parts: List[str]) -> bool:
     return False
 
 
+# kitfix-20261031-kit-paths (item 2 of the 10:35 review, all modes): removing, renaming, replacing or restoring
+#   the kit's own guard files is blocked, not only writing one file inside them. The per-file patterns above miss
+#   `mv .agents-v0/scripts /tmp/x`, `git rm .agents-v0/policy.conf`, `git mv`, a glob, a directory argument, or a
+#   relative path after `cd .agents-v0`. KIT_CONTAINER_RE matches the guard folders themselves, their parents
+#   (.agents-v0, .agents, .cursor) and anything inside them; the path is also resolved against the command's
+#   directory (cd prefix or payload cwd), so `cd .agents-v0 && mv scripts x` is caught. H10 stays the backstop.
+KIT_CONTAINER_RE = re.compile(
+    r"(^|/)(?:\.agents-v0(?:/(?:scripts|hooks|ci|packs)(?:/.*)?|/policy\.conf)?"
+    r"|\.agents(?:/(?:hooks|rules|agents|commands|skills)(?:/.*)?|/hooks\.json)?"
+    r"|\.cursor(?:/(?:hooks|rules|agents|commands|skills)(?:/.*)?|/hooks\.json|/cli\.json)?)/*$"
+)
+KIT_CONTAINER_MSG = ("the kit's guard files (.agents-v0/scripts, .agents-v0/hooks, .agents-v0/policy.conf, the agent "
+                     "hooks and rules) cannot be removed, renamed, replaced or restored by an agent: {}. "
+                     "Report the problem instead.")
+# Programs whose every path operand changes or removes it, and those where only the target changes.
+_ALL_OPERANDS_CHANGE = frozenset({"mv", "rm", "rmdir", "unlink", "shred", "truncate", "chmod", "chown", "chgrp",
+                                  "chattr", "setfacl"})
+_TARGET_CHANGES = frozenset({"cp", "ln", "install", "rsync", "link"})
+
+
+def _kit_container_text(p: str) -> bool:
+    raw = p.replace("\\", "/").strip().strip("'\"")
+    if not raw:
+        return False
+    cands = [raw, posixpath.normpath(raw)]
+    g = re.search(r"[*?\[]", raw)
+    if g:  # a glob: judge the folder it expands in (".agents-v0/*" -> ".agents-v0")
+        prefix = raw[: g.start()]
+        cands.append(prefix.rstrip("/") if prefix.endswith("/") else posixpath.dirname(prefix))
+    return any(c and KIT_CONTAINER_RE.search(c) for c in cands)
+
+
+def _project_root(d: str) -> str:
+    try:
+        r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                           timeout=5, check=False)
+        if r.returncode == 0 and r.stdout.strip():
+            return os.path.realpath(r.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    cur = os.path.realpath(d)
+    while True:
+        if os.path.isdir(os.path.join(cur, ".agents-v0")) or os.path.isdir(os.path.join(cur, ".agents")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return os.path.realpath(d)
+        cur = parent
+
+
+def _kit_container_resolved(p: str) -> bool:
+    raw = os.path.expanduser(p.strip().strip("'\""))
+    if not raw or re.search(r"[$`*?\[]", raw):
+        return False
+    full = os.path.normpath(raw if os.path.isabs(raw) else os.path.join(_base_dir(), raw))
+    root = _project_root(_existing_dir_of(full) if not os.path.isdir(full) else full)
+    rel = os.path.relpath(os.path.realpath(os.path.dirname(full)) + "/" + os.path.basename(full), root) \
+        if os.path.basename(full) else os.path.relpath(os.path.realpath(full), root)
+    if rel.startswith(".."):
+        return False
+    return bool(KIT_CONTAINER_RE.search("/" + rel.replace(os.sep, "/")))
+
+
+def _is_kit_container(p: str) -> bool:
+    return _kit_container_text(p) or _kit_container_resolved(p)
+
+
+def _segment_changes_kit_container(seg: str) -> Optional[str]:
+    seg = _strip_env_prefix(seg.strip())
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    ops = [a for a in parts[1:] if not a.startswith("-")]
+    if bin0 in _ALL_OPERANDS_CHANGE:
+        if bin0 == "truncate" or bin0 in ("chmod", "chown", "chgrp", "setfacl", "chattr"):
+            ops = ops[1:] if bin0 != "truncate" else ops
+        for a in ops:
+            if _is_kit_container(a):
+                return a
+    if bin0 in _TARGET_CHANGES:
+        tgt = None
+        for i, a in enumerate(parts[1:], 1):
+            if a in ("-t", "--target-directory") and i + 1 < len(parts):
+                tgt = parts[i + 1]
+            elif a.startswith("--target-directory="):
+                tgt = a.split("=", 1)[1]
+        if tgt is None and len(ops) >= 2:
+            tgt = ops[-1]
+        if tgt and _is_kit_container(tgt):
+            return tgt
+    if bin0 == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-okdir") for a in parts):
+        for a in parts[1:]:
+            if a.startswith("-"):
+                break
+            if _is_kit_container(a):
+                return a
+    if bin0 == "git":
+        sub = _git_subcommand(parts)
+        sub_args = parts[parts.index(sub) + 1:] if sub in parts else []
+        if sub in ("rm", "mv"):
+            for a in sub_args:
+                if not a.startswith("-") and _is_kit_container(a):
+                    return a
+        if sub in ("checkout", "restore"):  # an older version of a guard file is a replaced guard file
+            staged_only = sub == "restore" and any(x in ("--staged", "-S") for x in sub_args) and not any(
+                x in ("--worktree", "-W") for x in sub_args)
+            if not staged_only:
+                for a in sub_args:
+                    if a != "--" and not a.startswith("-") and _is_kit_container(a):
+                        return a
+    return None
+
+
+# kitfix-20261031-kit-source-exec (item 1 of the 10:35 review, unattended mode): the kit's own copies of its scripts
+#   (templates/.agents-v0/scripts in a kit checkout such as /home/e2e/kit-src, another project's or another
+#   worktree's .agents-v0/scripts) still hold the test-override blocks that install.sh strips, so a split-name
+#   override aimed at one of them would skip the branch guard. Unattended, a command may only run the scripts of
+#   the checkout it runs in (<checkout>/.agents-v0/scripts, the checkout being the payload cwd or a cd target in
+#   the same repository). Running, sourcing, copying, linking or archiving any other copy is blocked, judged per
+#   segment after sh -c / env / xargs / timeout / nohup are unwrapped, on the resolved path (symlinks followed).
+#   Reading one (cat, grep, diff, git show ...) stays allowed unless the command also pipes into a shell or
+#   redirects the output. This is a text check, so it is a speed bump too; the fence is that the agent user cannot
+#   read the kit source (v3-rerun-procedure.md, harness `kit_source_locked`).
+KIT_SOURCE_MSG = ("unattended mode: running, sourcing, copying or linking an agents-v0 kit script from outside this "
+                  "checkout's .agents-v0/scripts is blocked ({}). Use `sh .agents-v0/scripts/<name>` in the checkout "
+                  "the work is in.")
+KIT_CORE_SCRIPTS = frozenset({"sync-feature-state.sh", "check-gate-commit.sh", "check-traceability.sh",
+                              "feature-worktree.sh", "check-release-evidence.sh", "resolve-kit-root.sh",
+                              "strip-test-overrides.sh", "packlib.py"})
+_READERS = frozenset({"cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg", "diff", "cmp", "wc",
+                      "sha256sum", "sha1sum", "md5sum", "shasum", "ls", "stat", "file", "readlink", "realpath",
+                      "test", "[", "echo", "printf"})
+_GIT_READERS = frozenset({"show", "log", "diff", "blame", "cat-file", "ls-files", "ls-tree", "status", "grep",
+                          "rev-parse", "symbolic-ref", "merge-base", "describe"})
+_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "busybox", ".", "source"})
+_INTERPRETERS = _SHELLS | SCRIPT_INTERPRETERS
+
+
+def unattended_mode() -> bool:
+    """Same switch as lib.sh hook_shell_permission_ask: AGY_ALLOW_TOOLS or .agents/hooks/unattended-allow."""
+    if os.environ.get("AGY_ALLOW_TOOLS", "").strip():
+        return True
+    here = os.path.dirname(os.path.abspath(__file__))
+    cands = [os.path.join(here, "unattended-allow"),
+             os.path.join(here, "..", "..", ".agents", "hooks", "unattended-allow"),
+             os.path.join(".agents", "hooks", "unattended-allow"),
+             os.path.join("..", ".agents", "hooks", "unattended-allow")]
+    hc = os.environ.get("HOOK_CWD", "")
+    if hc:
+        cands.append(os.path.join(hc, ".agents", "hooks", "unattended-allow"))
+    return any(os.path.isfile(c) for c in cands)
+
+
+_COMMON_DIR_CACHE: dict = {}
+
+
+def _git_common_dir(d: str) -> str:
+    if d in _COMMON_DIR_CACHE:
+        return _COMMON_DIR_CACHE[d]
+    out = ""
+    try:
+        r = subprocess.run(["git", "-C", d, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=5, check=False)
+        if r.returncode == 0:
+            out = os.path.realpath(r.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    _COMMON_DIR_CACHE[d] = out
+    return out
+
+
+def _kit_script_names(roots: List[str]) -> set:
+    names = set(KIT_CORE_SCRIPTS)
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in [os.path.join(r, ".agents-v0", "scripts") for r in roots] + [
+            os.path.join(here, "..", "..", ".agents-v0", "scripts")]:
+        try:
+            names.update(n for n in os.listdir(d) if n.endswith((".sh", ".py")))
+        except OSError:
+            pass
+    return names
+
+
+def _dir_holds_kit(d: str) -> bool:
+    for sub in (".agents-v0/scripts", "templates/.agents-v0/scripts", "scripts", ""):
+        if os.path.isfile(os.path.join(d, sub, "sync-feature-state.sh")):
+            return True
+    return False
+
+
+def _mentions_kit(path: str) -> bool:
+    try:
+        with open(path, "rb") as fh:
+            return b"agents-v0" in fh.read(65536)
+    except OSError:
+        return True  # unreadable: judge by name (fail closed)
+
+
+def _token_candidates(tok: str, is_git: bool) -> List[Tuple[str, bool]]:
+    """(path, historical) pairs; historical marks a <rev>:<path> blob, which is never the installed copy."""
+    t = tok.strip()
+    for pre in ("<(", ">(", "<", ">"):
+        if t.startswith(pre):
+            t = t[len(pre):]
+    t = t.rstrip(")").strip("'\"")
+    if t.startswith("--") and "=" in t:
+        t = t.split("=", 1)[1]
+    out = [(t, False)]
+    if is_git and ":" in t and not t.startswith("/"):
+        out.append((t.split(":", 1)[1], True))
+    if re.search(r"[\s'\"(]", tok):
+        out += [(c, False) for c in re.findall(
+            r"[\w./~${}@+-]*(?:\.agents-v0/|templates/)[\w./${}@+-]*|[\w./~${}@+-]+\.(?:sh|py)\b", tok)]
+    return [(c, h) for c, h in out if c]
+
+
+class _KitCtx:
+    def __init__(self, hook_root: str):
+        self.hook_root = hook_root
+        self.hook_common = _git_common_dir(hook_root)
+        eff = _project_root(_base_dir())
+        self.roots = [hook_root]
+        if eff != hook_root and self.hook_common and _git_common_dir(eff) == self.hook_common:
+            self.roots.append(eff)
+        self.allowed = []
+        for r in self.roots:
+            for sub in (".agents-v0/scripts", ".agents-v0/hooks"):
+                d = os.path.join(r, sub)
+                if os.path.isdir(d) and not os.path.islink(d):  # a linked folder (install --link) is the kit source
+                    self.allowed.append(os.path.realpath(d))
+        self.names = _kit_script_names(self.roots)
+
+    def same_repo(self, d: str) -> bool:
+        root = _project_root(d)
+        return root in self.roots or bool(self.hook_common and _git_common_dir(root) == self.hook_common)
+
+
+def _outside_kit_ref(cand: str, historical: bool, ctx: "_KitCtx") -> Optional[str]:
+    """A reason when <cand> names a kit script, or a folder holding kit scripts, outside the allowed folders."""
+    norm = cand.replace("\\", "/")
+    base = posixpath.basename(norm.rstrip("/"))
+    looks_kit = base in ctx.names or ".agents-v0/scripts" in norm or ".agents-v0/hooks" in norm
+    if historical:
+        return f"{cand} from git history (not the installed copy)" if looks_kit else None
+    if re.search(r"[$`]", norm):
+        return f"unresolved path {cand}" if looks_kit or ".agents-v0" in norm else None
+    p = os.path.expanduser(norm)
+    full = os.path.normpath(p if os.path.isabs(p) else os.path.join(_base_dir(), p))
+    if not os.path.exists(full):
+        if looks_kit and "/" in norm and not any(full.startswith(a + os.sep) for a in ctx.allowed):
+            return f"{cand} (not this checkout's .agents-v0/scripts)"
+        return None
+    real = os.path.realpath(full)
+    if os.path.isdir(real):
+        if not _dir_holds_kit(real) or ctx.same_repo(real):
+            return None
+        return f"{cand} -> {real} holds another copy of the kit scripts"
+    in_kit_dir = "/.agents-v0/scripts/" in real or "/.agents-v0/hooks/" in real
+    by_name = (os.path.basename(real) in ctx.names or base in ctx.names) and _mentions_kit(real)
+    if not (in_kit_dir or by_name):
+        return None
+    if any(real.startswith(a + os.sep) for a in ctx.allowed):
+        return None
+    return f"{cand} -> {real}"
+
+
+def _segment_reads_stdin_program(seg: str) -> bool:
+    try:
+        parts = shlex.split(_strip_env_prefix(seg.strip()), posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts or parts[0].split("/")[-1] not in _INTERPRETERS:
+        return False
+    rest = []
+    for a in parts[1:]:
+        if a == "--":
+            break
+        if a.startswith("-") and a != "-":
+            if not a.startswith("--") and "s" in a[1:]:
+                return True  # sh -s: the script comes from stdin
+            continue
+        rest.append(a)
+    return not rest or rest[0] == "-"
+
+
+def _segment_uses_outside_kit(seg: str, stdin_exec: bool, hook_root: str) -> Optional[str]:
+    s = _strip_env_prefix(seg.strip())
+    try:
+        parts = shlex.split(s, posix=True)
+    except ValueError:
+        parts = s.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    out_redirect = re.search(r"(?:^|[^0-9&>])>{1,2}\s*(?!&|/dev/null\b)\S", s)
+    reader = (bin0 in _READERS or (bin0 == "git" and _git_subcommand(parts) in _GIT_READERS)) \
+        and not stdin_exec and not out_redirect
+    if reader:
+        return None
+    ctx = _KitCtx(hook_root)
+    for tok in parts:
+        for cand, hist in _token_candidates(tok, bin0 == "git"):
+            why = _outside_kit_ref(cand, hist, ctx)
+            if why:
+                return why
+    return None
+
 def classify_segment(seg: str) -> Tuple[Action, str]:
     seg = _strip_env_prefix(seg.strip())
     if not seg:
@@ -383,6 +694,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             "block",
             f"Protected kit/CI path cannot be modified via shell: {wpath}",
         )
+
+    kpath = _segment_changes_kit_container(seg)
+    if kpath:
+        return "block", KIT_CONTAINER_MSG.format(kpath)
 
     # MEM-13: a shell write to lessons.md / lessons-archive.md from a story checkout is blocked.
     lpath = _segment_writes_matching_path(seg, lambda p: lessons_story_block(p) is not None)
@@ -683,11 +998,18 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         return ("ask", ha[1]) if ha else ("allow", "")
     worst: Action = "ask" if ha else "allow"
     msg = ha[1] if ha else ""
+    unattended = unattended_mode()
+    stdin_exec = unattended and any(_segment_reads_stdin_program(sg) for sg in segments)
+    hook_root = _project_root(_base_dir()) if unattended else ""
     for seg in segments:
         cd_to = _cd_target(seg)
         if cd_to:
             _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(cd_to)))
             continue
+        if unattended:
+            why = _segment_uses_outside_kit(seg, stdin_exec, hook_root)
+            if why:
+                return "block", KIT_SOURCE_MSG.format(why)
         action, message = classify_segment(seg)
         if action == "block":
             return "block", message

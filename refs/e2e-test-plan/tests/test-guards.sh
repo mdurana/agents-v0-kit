@@ -6,10 +6,12 @@
 #      (catches --amend, reset, rebase, forced ref moves);
 #   H10 kit_integrity / kit_integrity_check / kit_policy_apply / kit_policy_ok / modes_preflight
 #      (kitfix-20261031-installed-no-overrides): content hashes of the installed kit, the harness-owned trace mode.
+#   kit_source_locked / kit_installed_ok / kit-manifest.sh (kitfix-20261031-kit-source-lock): the agent user cannot read
+#      the kit source, and the installed kit is checked against a manifest written before the lock.
 # Usage: bash tests/test-guards.sh   (exit 0 when every case passes)
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-SB="$(mktemp -d)"; trap 'rm -rf "$SB"' EXIT
+SB="$(mktemp -d)"; trap 'chmod -R u+rwx "$SB" 2>/dev/null; rm -rf "$SB"' EXIT
 PASS=0; FAILN=0
 ok(){ echo "  PASS $*"; PASS=$((PASS+1)); }; ko(){ echo "  FAIL $*"; FAILN=$((FAILN+1)); }
 TEST_ROOT="$SB/root"; STATUS_LOG="$TEST_ROOT/status/progress.log"; mkdir -p "$TEST_ROOT/status"
@@ -123,15 +125,46 @@ printf '{"design": {"result": "ok", "mode": "fail"}}\n' > "$MAIN/docs/agents-v0/
 KIT_TRACE_MODE=fail kit_policy_ok s2 && ok "kit_policy_ok passes when every gate was in fail mode" || ko "kpo clean"
 mv "$MAIN/docs/agents-v0/requirements/s2.trace.json" "$SB/trash/"
 echo "-- modes_preflight (REQUIRE_FAIL_MODES=1)"
+LK="$SB/kit-locked"; mkdir -p "$LK/templates" "$SB/scan"; chmod 000 "$LK"   # stands for the kit source after the lock
+export KIT_SOURCE_PATHS="$LK" KIT_SCAN_ROOTS="$SB/scan"
 ( REQUIRE_FAIL_MODES=1; unset H6_MODE; KIT_TRACE_MODE=fail; modes_preflight ) && ko "preflight passed without H6_MODE=fail" || { grep -q 'H6_MODE=warn (need fail)' "$RES/modes-preflight.log" && ok "preflight refuses H6_MODE unset" || ko "h6 text"; }
 ( REQUIRE_FAIL_MODES=1 H6_MODE=fail H9_MODE=warn KIT_TRACE_MODE=fail; modes_preflight ) && ko "preflight passed H9_MODE=warn" || ok "preflight refuses H9_MODE=warn"
 ( REQUIRE_FAIL_MODES=1 H6_MODE=fail; unset KIT_TRACE_MODE; modes_preflight ) && ko "preflight passed without KIT_TRACE_MODE" || ok "preflight refuses KIT_TRACE_MODE unset"
 ( AGENTS_V0_TRACE_MODE=fail; export AGENTS_V0_TRACE_MODE; modes_preflight ) && ko "preflight accepted AGENTS_V0_TRACE_MODE" || { grep -q 'installed kit scripts ignore it: use KIT_TRACE_MODE' "$RES/modes-preflight.log" && ok "preflight refuses AGENTS_V0_TRACE_MODE in the launch env (it has no effect)" || ko "atm text"; }
 ( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail; modes_preflight ) && grep -q '^OK m2: HASH-OK .*trace_mode=fail' "$RES/modes-preflight.log" \
-  && grep -q 'MODES H6=fail .* trace=fail require_fail=1 OK' "$STATUS_LOG" && ok "preflight passes with every mode fail and HASH-OK in main" || ko "preflight ok: $(cat "$RES/modes-preflight.log")"
+  && grep -q 'MODES H6=fail .* trace=fail require_fail=1 lock=checked OK' "$STATUS_LOG" && ok "preflight passes with every mode fail and HASH-OK in main" || ko "preflight ok: $(cat "$RES/modes-preflight.log")"
 printf '\n# drift\n' >> "$MAIN/.agents-v0/scripts/sync-feature-state.sh"
 ( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail; modes_preflight ) && ko "preflight passed a changed installed script" || { grep -q '^FAIL m2: DIFF .agents-v0/scripts/sync-feature-state.sh' "$RES/modes-preflight.log" && ok "preflight refuses a changed installed script" || ko "drift text"; }
 gm checkout -q -- .agents-v0
+echo "-- kit source lock and manifest (kitfix-20261031-kit-source-lock)"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail KIT_SOURCE_PATHS="$KIT"; modes_preflight ) && ko "preflight passed with a readable kit source" \
+  || { grep -q "^LOCK READABLE by $(id -un): $KIT\$" "$RES/modes-preflight.log" && grep -q 'lock=checked REFUSED' "$STATUS_LOG" && ok "preflight refuses a kit source the agent user can read" || ko "lock text: $(cat "$RES/modes-preflight.log")"; }
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail; modes_preflight ) >/dev/null
+grep -q "^LOCK ok $LK (not readable by $(id -un))" "$RES/modes-preflight.log" && ok "a root-only (mode 000) kit source counts as locked" || ko "locked dir: $(cat "$RES/modes-preflight.log")"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail KIT_SOURCE_PATHS="$SB/moved-away"; modes_preflight ) && grep -q "^LOCK absent $SB/moved-away" "$RES/modes-preflight.log" \
+  && ok "a kit source moved out of reach counts as locked" || ko "absent: $(cat "$RES/modes-preflight.log")"
+mkdir -p "$SB/scan/trash/old-worktree/.agents-v0/scripts"; cp "$KIT/templates/.agents-v0/scripts/sync-feature-state.sh" "$SB/scan/trash/old-worktree/.agents-v0/scripts/"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail; modes_preflight ) && ko "preflight passed with a readable unstripped copy" \
+  || { grep -q "^LOCK READABLE unstripped kit script for $(id -un): $SB/scan/trash/old-worktree/.agents-v0/scripts/sync-feature-state.sh" "$RES/modes-preflight.log" && ok "preflight refuses a readable unstripped kit copy anywhere under the scan roots (old install, trash)" || ko "scan: $(cat "$RES/modes-preflight.log")"; }
+mkdir -p "$SB/trash2"; mv "$SB/scan/trash" "$SB/trash2/"
+( KIT_SOURCE_LOCK=1 KIT_SOURCE_PATHS="$KIT"; unset REQUIRE_FAIL_MODES; modes_preflight ) && ko "KIT_SOURCE_LOCK=1 alone not checked" || ok "KIT_SOURCE_LOCK=1 checks the lock without the fail modes"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail AGENT_USER=nobody-such-user; modes_preflight ) && ko "preflight passed for another agent user it cannot test" \
+  || { grep -q '^LOCK cannot test as nobody-such-user' "$RES/modes-preflight.log" && ok "preflight refuses when it cannot test as the agent user (not root, not that user)" || ko "other user: $(cat "$RES/modes-preflight.log")"; }
+bash "$HERE/scripts/kit-manifest.sh" "$MAIN" "$SB/kit-manifest.tsv" "$KIT" > "$SB/manifest.log" 2>&1 && grep -q '^# kit=' "$SB/kit-manifest.tsv" && grep -q $'^.agents-v0/scripts/sync-feature-state.sh\t' "$SB/kit-manifest.tsv" \
+  && ! grep -q 'policy.conf' "$SB/kit-manifest.tsv" && ok "kit-manifest.sh writes the manifest after HASH-OK (policy.conf excluded)" || ko "manifest: $(cat "$SB/manifest.log")"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail KIT="$LK" KIT_MANIFEST="$SB/kit-manifest.tsv"; modes_preflight ) && grep -q '^OK m2: MANIFEST-OK files=.* trace_mode=fail kit=' "$RES/modes-preflight.log" \
+  && ok "with the source locked, preflight checks main against the manifest (no kit source needed)" || ko "manifest preflight: $(cat "$RES/modes-preflight.log")"
+printf '\n# drift\n' >> "$MAIN/.agents-v0/scripts/check-gate-commit.sh"
+( REQUIRE_FAIL_MODES=1 H6_MODE=fail KIT_TRACE_MODE=fail KIT="$LK" KIT_MANIFEST="$SB/kit-manifest.tsv"; modes_preflight ) && ko "manifest preflight passed a changed script" \
+  || { grep -q '^FAIL m2: MANIFEST-DIFF' "$RES/modes-preflight.log" && grep -q 'check-gate-commit.sh' "$RES/modes-preflight.log" && ok "manifest preflight refuses a changed installed script" || ko "manifest drift: $(cat "$RES/modes-preflight.log")"; }
+gm checkout -q -- .agents-v0
+printf 'trace_mode=warn\n' > "$MAIN/.agents-v0/policy.conf"
+( KIT_MANIFEST="$SB/kit-manifest.tsv"; kit_installed_ok "$MAIN" ) > "$SB/kio.txt" 2>&1 && ko "kit_installed_ok passed trace_mode=warn" || { grep -q 'TRACE-MODE warn (need fail)' "$SB/kio.txt" && ok "kit_installed_ok refuses trace_mode=warn" || ko "kio: $(cat "$SB/kio.txt")"; }
+gm checkout -q -- .agents-v0
+( KIT_MANIFEST="$SB/none.tsv"; kit_installed_ok "$MAIN" ) > "$SB/kio.txt" 2>&1 && ko "kit_installed_ok passed without its manifest" || ok "kit_installed_ok refuses a missing manifest"
+mk='# >>> kit-test'; mk="$mk-override"
+grep -q 'kit_installed_ok "$MAIN"' "$HERE/scripts/run-plan.sh" && ! grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests" | grep -q . \
+  && ok "story start uses kit_installed_ok; the harness's own *.sh files never match the marker scan" || ko "wiring/marker: $(grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests")"
 grep -q 'chk "$st" "$id" H10 ' "$HERE/scripts/run-plan.sh" && grep -q 'kit_integrity_check "$k"' "$HERE/scripts/lib.sh" && grep -q '^modes_preflight || stop_resume' "$HERE/scripts/run-plan.sh" \
   && grep -q '"${H10_MODE:-fail}" = warn' "$HERE/scripts/run-plan.sh" && ok "H10 and the preflight are wired (FAIL by default)" || ko "H10 wiring"
 echo "== test-guards: $PASS passed, $FAILN failed"
