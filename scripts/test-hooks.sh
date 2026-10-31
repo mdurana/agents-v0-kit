@@ -382,6 +382,18 @@ if [ -x /usr/bin/python3 ]; then
   [ ! -s "$n1/marks/pyc" ] || err "JN-7 the planted __pycache__ .pyc ran inside a hook"
   rm -rf "$n1/pyc/__pycache__"
 fi
+# JN-8: hook_py runs with -I and -S (and -B); a lib.sh whose interpreter call drops -S or -I makes the hooks fail
+#   closed (the start-up check runs through the same call), so a dropped flag cannot pass unnoticed.
+flags="$(cd "$n1/proj" && sh -c '. "$1/lib.sh"; hook_py -c "import sys; f = sys.flags; print(f.isolated, f.no_site, f.dont_write_bytecode)"' sh "$n1/jn" 2>/dev/null)"
+[ "$flags" = "1 1 1" ] || err "JN-8 hook_py flags: expected isolated, no_site and dont_write_bytecode = 1 1 1, got '$flags'"
+for drop in -S -I; do
+  rm -rf "$n1/mut"; cp -R "$HOOKS" "$n1/mut"
+  sed "/\"\$HOOK_PYTHON\" -I -S/s/ $drop / /" "$HOOKS/lib.sh" > "$n1/mut/lib.sh"
+  if cmp -s "$HOOKS/lib.sh" "$n1/mut/lib.sh"; then err "JN-8 mutant without $drop: lib.sh unchanged (the hook_py line moved?)"; continue; fi
+  n1_expect_deny "JN-8 hooks without $drop: ls" "$n1/mut" pre-shell.sh '{"command":"ls"}'
+  n1_expect_deny "JN-8 hooks without $drop: edit src" "$n1/mut" pre-edit.sh '{"file_path":"src/a.txt"}'
+done
+
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then
