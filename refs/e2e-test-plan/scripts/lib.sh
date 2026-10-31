@@ -843,12 +843,17 @@ _covers(){ local list="$1" p q hit; shift
 hook_python_locked(){ local py="$1" p why paths
   case "$py" in /*) ;; *) echo "hook interpreter '$py' is not an absolute path"; return;; esac
   [ -f "$py" ] && [ -x "$py" ] || { echo "hook interpreter $py is not an executable file"; return; }
+  # JN-5 (Jiraiya's N-1 review): /bin/true printed nothing and counted as locked. The probe must print the marker
+  #   line with sys.flags.isolated and no_site both 1 first, then the paths; anything else is refused.
   paths="$("$py" -I -S -c 'import os, sys
+print("agents-v0-hook-python %d %d" % (sys.flags.isolated, sys.flags.no_site))
 r = os.path.realpath(sys.executable)
 print(r); print(os.path.dirname(r))
 for p in sys.path:
     if p and os.path.isdir(p):
-        print(os.path.realpath(p))' 2>/dev/null)" || { echo "hook interpreter $py does not run with -I -S"; return; }
+        print(os.path.realpath(p))' </dev/null 2>/dev/null)" || { echo "hook interpreter $py does not run with -I -S"; return; }
+  [ "${paths%%$'\n'*}" = "agents-v0-hook-python 1 1" ] || { echo "hook interpreter $py is not a working Python under -I -S (no marker)"; return; }
+  paths="${paths#*$'\n'}"
   while IFS= read -r p; do [ -n "$p" ] || continue
     [ "$(stat -Lc %u "$p" 2>/dev/null)" = 0 ] || { echo "hook interpreter $py: $p is not owned by root"; return; }
     why="$(_locked_path "$p" 0)"; [ -z "$why" ] || { echo "hook interpreter $py: $why"; return; }
@@ -856,9 +861,11 @@ for p in sys.path:
 $(dirname "$py")
 $paths"; }
 # hook_pythons: the interpreters the installed hooks of main use (the pinned ones, or the hooks' default).
-hook_pythons(){ local f out=""
+# JN-5: a pin file whose first line is empty makes the hooks use /usr/bin/python3 (lib.sh), so that is the interpreter
+#   checked for it (before, an empty pin file meant nothing was checked). A relative pin is still refused as such.
+hook_pythons(){ local f l out=""
   for f in "${MAIN:-/nonexistent}/.agents/hooks/hook-python" "${MAIN:-/nonexistent}/.cursor/hooks/hook-python"; do
-    [ -f "$f" ] && out="$out$(head -n 1 "$f")
+    [ -f "$f" ] || continue; l="$(head -n 1 "$f")"; [ -n "$l" ] || l=/usr/bin/python3; out="$out$l
 "; done
   [ -n "$out" ] || out="/usr/bin/python3
 "

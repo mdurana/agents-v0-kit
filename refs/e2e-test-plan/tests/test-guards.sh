@@ -319,6 +319,15 @@ v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter 'pytho
 echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"
 ( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; [ -z "$(hook_python_locked /usr/bin/python3)" ] && hook_python_locked "$SB/fakebin/python3" | grep -q 'not owned by root' ) \
   && ok "hook_python_locked accepts /usr/bin/python3 and refuses a user-owned one" || ko "hook_python_locked"
+# JN-5 (Jiraiya's N-1 review): a root-owned program that runs but is not a working Python (it printed nothing, which
+#   counted as "no unlocked folder") is refused, and an empty pin file still checks the hooks' default interpreter.
+( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; for b in /bin/true /usr/bin/env; do hook_python_locked "$b" | grep -Eq 'not a working Python|does not run with -I -S' || exit 1; done ) \
+  && ok "hook_python_locked refuses /bin/true and /usr/bin/env as the hook interpreter (JN-5)" || ko "hook_python_locked /bin/true (JN-5)"
+echo /bin/true > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter /bin/true is not a working Python" "$SB/v3.log" && ok "V3 refuses hooks pinned to /bin/true (JN-5)" || ko "V3 hook python /bin/true: $(cat "$SB/v3.log")"
+: > "$SB/v3main/.agents/hooks/hook-python"; : > "$SB/v3main/.cursor/hooks/hook-python"
+( . "$HV3/scripts/lib.sh"; [ "$(MAIN="$SB/v3main" hook_pythons)" = /usr/bin/python3 ] ) && ok "hook_pythons checks /usr/bin/python3 for an empty pin file (JN-5)" || ko "hook_pythons empty pin (JN-5)"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"; echo /usr/bin/python3 > "$SB/v3main/.cursor/hooks/hook-python"
 mkdir -p "$VH/.local/lib/python3.13/site-packages"; echo 'import os' > "$VH/.local/lib/python3.13/site-packages/usercustomize.py"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-.*\.local/lib' "$SB/v3.log" && ok "V3 refuses a usercustomize.py added to the user site (home-hash .local/lib, N-1)" || ko "V3 user site: $(cat "$SB/v3.log")"
 rm -rf "$VH/.local/lib"
