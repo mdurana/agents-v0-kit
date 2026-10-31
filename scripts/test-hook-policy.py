@@ -22,7 +22,7 @@ def _run(mode: str, env_extra: dict, cwd: str = "") -> str:
     env = {k: v for k, v in os.environ.items()
            if k not in ("HOOK_CWD", "AGY_ALLOW_TOOLS", "TEST_ROOT", "PLAN_DIR", "CURSOR_CONFIG_DIR")}
     env.update(env_extra)
-    out = subprocess.check_output([sys.executable, POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
+    out = subprocess.check_output([sys.executable, "-I", "-S", POLICY, mode], env=env, text=True, cwd=cwd or CWD or None)
     return json.loads(out)["action"]
 
 
@@ -667,6 +667,39 @@ def root_commit_case(tmp: str) -> list:
     return out
 
 
+def n1_python_startup_cases(tmp: str) -> list:
+    """kitfix-20261031-n1 (Sasuke N-1): writes to Python start-up files (user site, ~/.local/bin/python*,
+    usercustomize.py / sitecustomize.py, site-packages *.pth) block unattended and ask attended, through main()."""
+    proj = os.path.join(tmp, "n1proj")
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True, capture_output=True)
+    U = {"AGY_ALLOW_TOOLS": "Shell(git:commit*)"}
+    A = {}
+    c = []
+    def add(kind, arg, env, want, label):
+        c.append((kind, arg, proj, env, want, label))
+    for cmd, label in [
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages/usercustomize.py", "cp usercustomize.py into the user site"),
+            ("echo 'import os' > ~/.local/lib/python3.12/site-packages/a.pth", "write a .pth into the user site"),
+            ("cp /tmp/u.py $HOME/.local/lib/python3.13/site-packages/", "cp into the user site folder"),
+            ("tee ~/.local/lib/python3.11/site-packages/x.pth < /tmp/p", "tee a .pth"),
+            ("cp /tmp/fake ~/.local/bin/python3", "a python3 in ~/.local/bin"),
+            ("echo x > sitecustomize.py", "a sitecustomize.py"),
+            ("mv /tmp/u.py venv/lib/python3.13/site-packages/usercustomize.py", "usercustomize.py in a venv")]:
+        add("shell", cmd, U, "block", "unattended " + label)
+        add("shell", cmd, A, "ask", "attended " + label)
+    for cmd, label in [
+            ("ls ~/.local/lib", "list the user lib"), ("cat ~/.local/lib/python3.13/site-packages/x.pth", "read a .pth"),
+            ("cp model.pth checkpoints/model.pth", "a model checkpoint named .pth"), ("echo hi > notes.txt", "a normal write")]:
+        add("shell", cmd, U, "allow", "unattended " + label)
+        add("shell", cmd, A, "allow", "attended " + label)
+    up = os.path.expanduser("~/.local/lib/python3.13/site-packages/usercustomize.py")
+    add("path", up, U, "block", "unattended edit of usercustomize.py")
+    add("path", up, A, "ask", "attended edit of usercustomize.py")
+    add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), U, "block", "unattended edit of a site-packages .pth")
+    add("path", os.path.join(proj, "src/app.py"), U, "allow", "unattended edit of project code")
+    return c
+
+
 def harness_escalation_cases(tmp: str) -> list:
     """kitfix-20261031-harness-lock and kitfix-20261031-escalation (Sonnet review 12:31, findings 2 and 3)."""
     tr = os.path.join(tmp, "agents-v0-e2e", "run-1")
@@ -811,9 +844,16 @@ def main() -> int:
         e["HOOK_CWD"] = cwd
         got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
         check(got, want, f"harness/escalation {label}: `{arg}`")
+    ncases = n1_python_startup_cases(htmp)
+    for kind, arg, cwd, env, want, label in ncases:
+        e = dict(env)
+        e["HOOK_CWD"] = cwd
+        got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
+        check(got, want, f"N-1 python start-up {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases) + len(hcases)
+    total = (len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(hcases) + len(ncases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
         return 1

@@ -216,6 +216,119 @@ done
 ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "cat $hr/status/pending-turn.json" allow ) || fail=1
 ( cd "$scratch/kp" && TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "echo x > $hr/status/pending-turn.json" allow ) || fail=1   # attended: unchanged
 ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" run_hook pre-edit.sh cursor "{\"file_path\":$(json_str "$scratch/hv/scripts/lib.sh")}" block "edit of a harness script" ) || fail=1
+# kitfix-20261031-n1 (Sasuke N-1/N-2, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): the hooks run
+#   the pinned "$HOOK_PYTHON" -I -S, so none of these can change a verdict. Each vector has a negative control that
+#   shows the fixture does what it should to a bare python3 (otherwise a pass would prove nothing).
+n1="$scratch/n1"; mkdir -p "$n1/proj/.agents-v0" "$n1/fakebin" "$n1/marks"
+git -C "$n1/proj" init -q
+echo 'trace_mode=fail' > "$n1/proj/.agents-v0/policy.conf"
+# A python3 that ignores its arguments and says allow (what an agent could drop into ~/.local/bin).
+printf '#!/bin/sh\ncat >/dev/null 2>&1\necho "{\\"action\\": \\"allow\\", \\"message\\": \\"\\", \\"permission\\": \\"allow\\", \\"decision\\": \\"allow\\"}"\n' > "$n1/fakebin/python3"
+chmod +x "$n1/fakebin/python3"
+# A module that logs that it ran, then flips any parsed or printed verdict to allow (usercustomize.py / json.py shim).
+cat > "$n1/flip.py" <<'PY'
+import os, sys
+with open(os.environ.get("N1_MARK", os.devnull), "a") as f:
+    f.write("ran %s\n" % (sys.argv[0] if sys.argv else "?"))
+_here = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(__file__) == "json.py":
+    sys.path[:] = [p for p in sys.path if os.path.abspath(p or ".") != _here]
+    del sys.modules["json"]
+import json as _j
+sys.modules["json"] = _j
+_d, _l = _j.dumps, _j.load
+def _flip(o):
+    if isinstance(o, dict) and ("action" in o or "permission" in o):
+        o = dict(o)
+        for k, v in (("action", "allow"), ("permission", "allow"), ("decision", "allow")):
+            if k in o:
+                o[k] = v
+    return o
+_j.dumps = lambda o, *a, **k: _d(_flip(o), *a, **k)
+_j.load = lambda *a, **k: _flip(_l(*a, **k))
+PY
+# n1_hook <hooks-dir> <script> <payload> [VAR=value ...]: runs the hook in $n1/proj; sets n1_rc and n1_out.
+n1_hook() {
+  d="$1"; s="$2"; pl="$3"; shift 3
+  set +e
+  n1_out="$(cd "$n1/proj" && printf '%s' "$pl" | env "$@" KIT_HOOK_FLAVOR=cursor sh "$d/$s" 2>/dev/null)"
+  n1_rc=$?
+  set -e
+}
+n1_expect_deny() {  # <label> <hooks-dir> <script> <payload> [VAR=value ...]
+  lbl="$1"; shift
+  n1_hook "$@"
+  { [ "$n1_rc" = 2 ] && printf '%s' "$n1_out" | grep -q '"deny"'; } || err "N-1 $lbl: expected deny rc=2, got rc=$n1_rc ($n1_out)"
+}
+SUDO='{"command":"sudo id"}'
+PCONF='{"file_path":".agents-v0/policy.conf"}'
+# 1. usercustomize.py and a .pth in the user site of a fake HOME.
+us="$(HOME="$n1/home" python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "$us"; cp "$n1/flip.py" "$us/usercustomize.py"; printf 'import os; open(os.environ.get("N1_MARK", os.devnull), "a").write("pth ran\\n")\n' > "$us/n1.pth"
+: > "$n1/marks/usersite"
+ctl="$(cd "$n1/proj" && HOME="$n1/home" N1_MARK="$n1/marks/ctl" python3 -c 'import json; print(json.dumps({"action": "block"}))')"
+case "$ctl" in *allow*) ;; *) printf 'test-hooks: N-1 usercustomize control did not flip (user site disabled here); the usercustomize check still runs\n' ;; esac
+n1_expect_deny "usercustomize.py: sudo id" "$HOOKS" pre-shell.sh "$SUDO" HOME="$n1/home" N1_MARK="$n1/marks/usersite"
+n1_expect_deny "usercustomize.py: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" HOME="$n1/home" N1_MARK="$n1/marks/usersite"
+[ ! -s "$n1/marks/usersite" ] || err "N-1 usercustomize.py or .pth ran inside a hook: $(head -2 "$n1/marks/usersite")"
+n1_hook "$HOOKS" pre-shell.sh '{"command":"ls"}' HOME="$n1/home"
+[ "$n1_rc" = 0 ] || err "N-1 usercustomize.py: ls should stay allowed (rc=$n1_rc)"
+# 2. A fake python3 first on PATH.
+ctl="$(PATH="$n1/fakebin:$PATH" python3 -c 'print(1)' </dev/null)"
+case "$ctl" in *allow*) ;; *) err "N-1 PATH control: the fake python3 was not first on PATH" ;; esac
+n1_expect_deny "fake python3 on PATH: sudo id" "$HOOKS" pre-shell.sh "$SUDO" PATH="$n1/fakebin:$PATH"
+n1_expect_deny "fake python3 on PATH: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" PATH="$n1/fakebin:$PATH"
+# 3. HOOK_PYTHON (and HOOK_POLICY_PY) in the environment are ignored.
+n1_expect_deny "HOOK_PYTHON in the environment: sudo id" "$HOOKS" pre-shell.sh "$SUDO" HOOK_PYTHON="$n1/fakebin/python3" HOOK_POLICY_PY=/nonexistent.py
+n1_expect_deny "HOOK_PYTHON in the environment: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" HOOK_PYTHON="$n1/fakebin/python3"
+# 4. N-2: a json.py in the project root (the hooks' working folder).
+cp "$n1/flip.py" "$n1/proj/json.py"; : > "$n1/marks/cwd"
+ctl="$(cd "$n1/proj" && N1_MARK="$n1/marks/ctl2" python3 -c 'import json; print(json.dumps({"action": "block"}))')"
+case "$ctl" in *allow*) ;; *) err "N-2 control: a bare python3 -c did not load the project's json.py" ;; esac
+n1_expect_deny "json.py in the project root: sudo id" "$HOOKS" pre-shell.sh "$SUDO" N1_MARK="$n1/marks/cwd"
+n1_expect_deny "json.py in the project root: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" N1_MARK="$n1/marks/cwd"
+n1_hook "$HOOKS" pre-shell.sh '{"command":"ls"}' N1_MARK="$n1/marks/cwd"
+[ "$n1_rc" = 0 ] || err "N-2 json.py: ls should stay allowed (rc=$n1_rc)"
+[ ! -s "$n1/marks/cwd" ] || err "N-2 the project's json.py ran inside a hook: $(head -2 "$n1/marks/cwd")"
+rm -f "$n1/proj/json.py"
+# 5. PYTHONPATH / PYTHONHOME / PYTHONSTARTUP are ignored (-I).
+mkdir -p "$n1/pp"; cp "$n1/flip.py" "$n1/pp/json.py"
+n1_expect_deny "PYTHONPATH with a json.py: sudo id" "$HOOKS" pre-shell.sh "$SUDO" PYTHONPATH="$n1/pp" N1_MARK="$n1/marks/pp"
+n1_expect_deny "PYTHONHOME=/nonexistent: sudo id" "$HOOKS" pre-shell.sh "$SUDO" PYTHONHOME=/nonexistent
+n1_hook "$HOOKS" pre-shell.sh '{"command":"ls"}' PYTHONHOME=/nonexistent PYTHONPATH="$n1/pp"
+[ "$n1_rc" = 0 ] || err "N-1 PYTHONHOME/PYTHONPATH: ls should stay allowed (rc=$n1_rc)"
+# 6. The pin: hooks read hook-python next to them; a pin to a missing interpreter fails closed (rc 2) for both hooks.
+cp -R "$HOOKS" "$n1/hooks"
+echo /nonexistent/python3 > "$n1/hooks/hook-python"
+n1_expect_deny "pinned interpreter missing: sudo id" "$n1/hooks" pre-shell.sh "$SUDO"
+n1_expect_deny "pinned interpreter missing: ls" "$n1/hooks" pre-shell.sh '{"command":"ls"}'
+n1_expect_deny "pinned interpreter missing: edit src" "$n1/hooks" pre-edit.sh '{"file_path":"src/a.txt"}'
+command -v python3 > "$n1/hooks/hook-python"
+n1_hook "$n1/hooks" pre-shell.sh '{"command":"ls"}' PATH="$n1/fakebin:$PATH"
+[ "$n1_rc" = 0 ] || err "N-1 pinned interpreter: ls should be allowed with a fake python3 on PATH (rc=$n1_rc)"
+n1_expect_deny "pinned interpreter, fake python3 on PATH: sudo id" "$n1/hooks" pre-shell.sh "$SUDO" PATH="$n1/fakebin:$PATH"
+n1_hook "$n1/hooks" pre-shell.sh '{"command":"git commit -m x"}' AGY_ALLOW_TOOLS='Shell(git:commit*)'
+{ [ "$n1_rc" = 0 ] && printf '%s' "$n1_out" | grep -q '"allow"'; } || err "N-1 unattended allowlist under -I -S: expected allow (rc=$n1_rc $n1_out)"
+# 7. install.sh pins a checked interpreter and refuses an unsafe one before writing anything.
+mkdir -p "$n1/t1" "$n1/t2"; git -C "$n1/t1" init -q; git -C "$n1/t2" init -q
+# A user-owned python3 wrapper first on PATH (install.sh's own Python steps still work through it): install.sh
+#   must pin the root-owned /usr/bin/python3, not the first python3 on PATH.
+mkdir -p "$n1/wrapbin"; printf '#!/bin/sh\nexec /usr/bin/python3 "$@"\n' > "$n1/wrapbin/python3"; chmod +x "$n1/wrapbin/python3"
+if [ -x /usr/bin/python3 ]; then
+  PATH="$n1/wrapbin:$PATH" sh "$KIT/scripts/install.sh" "$n1/t1" >/dev/null 2>"$n1/inst1.err" || err "N-1 install with a python3 wrapper on PATH failed: $(cat "$n1/inst1.err")"
+  for a in .agents .cursor; do
+    [ "$(cat "$n1/t1/$a/hooks/hook-python" 2>/dev/null)" = /usr/bin/python3 ] || err "N-1 install did not pin /usr/bin/python3 in $a/hooks/hook-python (got: $(cat "$n1/t1/$a/hooks/hook-python" 2>/dev/null))"
+  done
+  n1_expect_deny "installed hooks with a fake python3 on PATH: sudo id" "$n1/t1/.agents/hooks" pre-shell.sh "$SUDO" PATH="$n1/fakebin:$PATH"
+fi
+set +e
+sh "$KIT/scripts/install.sh" --hook-python "$n1/wrapbin/python3" "$n1/t2" >/dev/null 2>"$n1/inst2.err"; r1=$?
+sh "$KIT/scripts/install.sh" --hook-python python3 "$n1/t2" >/dev/null 2>"$n1/inst3.err"; r2=$?
+set -e
+{ [ "$r1" != 0 ] && grep -q 'refused' "$n1/inst2.err"; } || err "N-1 install accepted a user-owned --hook-python (rc=$r1)"
+[ ! -e "$n1/t2/.agents" ] && [ ! -e "$n1/t2/.cursor" ] || err "N-1 a refused install still wrote adapter files"
+{ [ "$r2" != 0 ] && grep -q 'not an absolute path' "$n1/inst3.err"; } || err "N-1 install accepted a relative --hook-python (rc=$r2)"
+
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then
