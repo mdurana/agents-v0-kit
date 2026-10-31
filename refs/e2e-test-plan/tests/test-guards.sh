@@ -337,6 +337,26 @@ rm -f "$SB/hh.mark"; HOME="$HH" /usr/bin/python3 -c 'pass'
 bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/hh.log" \
   && ok "home-hash sees a sourceless usercustomize.pyc added to the user site (Sakura B-1)" || ko "home-hash .pyc: $(cat "$SB/hh.log")"
 rm -rf "$HH" "$SB/hh.mark"
+# Sakura B-3: the harness's own Python runs isolated. run-plan.sh's next-story.py calls (they pick the next story) ran
+#   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools
+#   (prereqs.sh, setup-vm.sh, kit-fix.sh) starts python3 without -I -S. Functional: run-plan.sh's own map line,
+#   with a user site that plants a marker, gives the story map and no marker (the bare control does plant it).
+bare="$(grep -nE '(^|[^[:alnum:]_./-])python3? +(-|"|'\''|\$)' "$HERE"/scripts/*.sh | grep -v 'python3 -I -S' \
+  | grep -vE '^[^:]+/(prereqs|setup-vm|kit-fix)\.sh:' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
+[ -z "$bare" ] && ok "no harness script runs a bare python3 (only prereqs.sh, setup-vm.sh, kit-fix.sh: operator/root setup)" \
+  || ko "harness scripts with a bare python3: $bare"
+NS="$SB/ns"; mkdir -p "$NS/ws/docs/agents-v0/milestones"
+printf '| Story ID | Title | Dependency |\n|---|---|---|\n| P0-A | Skeleton | - |\n| P1-A | Login | P0-A |\n' > "$NS/ws/docs/agents-v0/milestones/p0-plan.md"
+NSS="$(HOME="$NS/home" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"; mkdir -p "$NSS"
+printf 'open(%s, "w").write("ran")\n' "'$NS/mark'" > "$NSS/usercustomize.py"
+mapline="$(grep -m1 -E 'next-story\.py" map "\$MAIN" > "\$RES/stories\.tsv"' "$HERE/scripts/run-plan.sh" | sed 's/^[[:space:]]*//')"
+case "$mapline" in *'python3 -I -S "$HERE/next-story.py"'*) ok "run-plan.sh runs next-story.py with python3 -I -S" ;; *) ko "run-plan.sh map line: $mapline" ;; esac
+( HERE="$HERE/scripts"; MAIN="$NS/ws"; RES="$NS"; HOME="$NS/home"; export HOME; eval "$mapline" )
+[ ! -e "$NS/mark" ] && grep -q 'P1-A' "$NS/stories.tsv" && ok "run-plan.sh's next-story.py map ignores the e2e user site and still maps the plan (Sakura B-3)" \
+  || ko "next-story.py under run-plan.sh: mark=$(cat "$NS/mark" 2>/dev/null) map=$(cat "$NS/stories.tsv" 2>/dev/null)"
+rm -f "$NS/mark"; ( HOME="$NS/home"; export HOME; python3 "$HERE/scripts/next-story.py" map "$NS/ws" > /dev/null 2>&1 )
+[ "$(cat "$NS/mark" 2>/dev/null)" = ran ] && ok "control: a bare python3 next-story.py loads the user site" || ko "control: bare next-story.py did not load the user site"
+rm -rf "$NS"
 echo 'export REQUIRE_FAIL_MODES=0' >> "$VH/.profile"; v3; [ $? != 0 ] && grep -q '^V3 HOME-CHANGED .profile' "$SB/v3.log" && ok "V3 refuses a changed startup file (.profile)" || ko "V3 dotfile: $(cat "$SB/v3.log")"
 sed -i '$d' "$VH/.profile"; mkdir -p "$VH/.local/agents-v0-tools"; echo 'TOOLS_PATH=/x' > "$VH/.local/agents-v0-tools/tools.env"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-ADDED .local/agents-v0-tools/tools.env' "$SB/v3.log" && ok "V3 refuses a new tools.env the record did not have" || ko "V3 tools.env: $(cat "$SB/v3.log")"
