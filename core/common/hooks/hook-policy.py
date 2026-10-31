@@ -630,6 +630,8 @@ def _is_harness_path(p: str) -> bool:
 #   with usercustomize.py and *.pth files), a python* in ~/.local/bin (often first on PATH), and any
 #   usercustomize.py / sitecustomize.py or site-packages *.pth. The hooks no longer load them (-I -S, a pinned
 #   interpreter), so this is the second line: a write there is blocked unattended and asks in supervised mode.
+#   This closes Python start-up injection only (kitfix-20261031-jn4 wording); the shell and session start-up files
+#   follow below (JN-4).
 #   Only spellings the write detection already knows are caught (dd of=, sponge, tar -x are H-5).
 PY_STARTUP_RE = re.compile(
     r"(^|/)\.local/lib/python[^/]*(?:/|$)"
@@ -647,9 +649,70 @@ PY_STARTUP_EDIT_MSG = ("Python start-up file or user site ({}): code there runs 
                        "need the change, make it yourself in a terminal.")
 
 
-def _is_py_startup_path(p: str) -> bool:
+# kitfix-20261031-jn4 (Jiraiya JN-4 with M-1, approved by Sensei 2026-11-01 00:04 Asia/Manila): N-1 closes Python
+#   start-up injection only. The shell and session start-up files of the agent user are the same kind of file: the
+#   login shell, the desktop session, systemd --user, pam or launchd read them before the IDE or agy starts, so a
+#   PATH, LD_PRELOAD, LD_LIBRARY_PATH or other variable written there reaches every later process, the kit hooks
+#   included (the loader acts before a hook's first line, so -I -S cannot help). They get the same rule as Python's
+#   start-up files: a shell write asks in supervised mode and is blocked unattended; an edit-tool write is blocked in
+#   both modes (JN-6). Only paths in the agent user's home count (a project's docker/.bashrc is not a start-up file).
+#   ~/.bash* covers .bashrc, .bash_profile, .bash_login, .bash_logout, .bash_aliases; zsh reads .zshenv, .zprofile,
+#   .zshrc, .zlogin and .zlogout from ~ (a ZDOTDIR elsewhere is a known limit).
+SHELL_STARTUP_REL_RE = re.compile(
+    r"^(?:\.profile|\.bash[^/]*|\.z(?:sh[^/]*|profile|login|logout)|\.pam_environment"
+    r"|\.(?:xprofile|xsessionrc|xsession|xinitrc)|\.(?:cshrc|tcshrc|login|logout)"
+    r"|\.ssh/(?:environment|rc)|\.MacOSX/environment\.plist"
+    r"|\.config/(?:environment\.d|pip|fish|systemd/user|plasma-workspace/env)(?:/.*)?"
+    r"|\.pip(?:/.*)?|Library/LaunchAgents(?:/.*)?)$"
+)
+# Folders a whole tree may land in and so plant those files without naming them (like ~ and ~/.local for the user site).
+SHELL_STARTUP_PARENT_REL_RE = re.compile(r"^(?:\.config|\.config/systemd|\.ssh|\.MacOSX|Library)$")
+SHELL_STARTUP_MSG = ("Shell or session start-up file ({}): the login shell, the desktop session or the IDE reads it at "
+                     "start, so a PATH, LD_PRELOAD or other variable set there reaches every later process, the kit "
+                     "hooks included. Blocked unattended; in supervised mode approve only if you asked for it.")
+SHELL_STARTUP_EDIT_MSG = ("Shell or session start-up file ({}): a PATH, LD_PRELOAD or other variable set there reaches "
+                          "every later process, the kit hooks included. The edit tool cannot ask for approval, so this "
+                          "edit is blocked in every mode; if you need the change, make it yourself in a terminal.")
+
+
+def _home_rel(p: str) -> Optional[str]:
+    """The path relative to the agent user's home (relative paths start at the cd/payload folder), else None."""
+    raw = os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+    if not raw:
+        return None
+    if not raw.startswith("/"):
+        raw = posixpath.join(_BASE_DIR or _base_dir(), raw)
+    cand = posixpath.normpath(raw)
+    home = posixpath.normpath(os.path.expanduser("~"))
+    if home in ("", "/", ".", "~"):
+        return None
+    for h in (home, posixpath.normpath(os.path.realpath(home))):
+        if cand.startswith(h + "/"):
+            return cand[len(h) + 1:]
+    return None
+
+
+def _is_shell_startup_path(p: str) -> bool:
+    rel = _home_rel(p)
+    return rel is not None and bool(SHELL_STARTUP_REL_RE.match(rel))
+
+
+def _is_python_startup_path(p: str) -> bool:
     raw = os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
     return bool(raw) and any(PY_STARTUP_RE.search(c) for c in (raw, posixpath.normpath(raw)))
+
+
+def _is_py_startup_path(p: str) -> bool:
+    """A start-up file under the N-1 rule: Python's (N-1) or the shell's and session's (JN-4)."""
+    return _is_python_startup_path(p) or _is_shell_startup_path(p)
+
+
+def _startup_msg(p: str) -> str:
+    return (PY_STARTUP_MSG if _is_python_startup_path(p) else SHELL_STARTUP_MSG).format(p)
+
+
+def _startup_edit_msg(p: str) -> str:
+    return (PY_STARTUP_EDIT_MSG if _is_python_startup_path(p) else SHELL_STARTUP_EDIT_MSG).format(p)
 
 
 def _segment_writes_py_startup(seg: str) -> Optional[str]:
@@ -665,6 +728,31 @@ def _segment_writes_py_startup(seg: str) -> Optional[str]:
             _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
     return _segment_writes_matching_path(seg, _is_py_startup_path) or \
         _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
+
+
+# kitfix-20261031-jn4: commands that change the environment of the user's session manager without a file: every
+#   process it starts later (the IDE, agy, a new terminal) inherits PATH or LD_PRELOAD from there.
+SESSION_ENV_MSG = ("{} changes the environment of the user's session, so a PATH, LD_PRELOAD or other variable set "
+                   "there reaches every later process, the kit hooks included. Blocked unattended; in supervised mode "
+                   "approve only if you asked for it.")
+
+
+def _segment_sets_session_env(seg: str) -> Optional[str]:
+    try:
+        parts = shlex.split(_strip_env_prefix(seg.strip()), posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    rest = [a for a in parts[1:] if not a.startswith("-")]
+    if bin0 == "systemctl" and rest[:1] and rest[0] in ("set-environment", "import-environment"):
+        return f"systemctl {rest[0]}"
+    if bin0 == "launchctl" and rest[:1] and (rest[0] in ("setenv", "putenv") or rest[:2] == ["config", "user"]):
+        return f"launchctl {rest[0]}"
+    if bin0 == "dbus-update-activation-environment":
+        return bin0
+    return None
 
 
 def _redirect_writes(seg: str, predicate) -> Optional[str]:
@@ -704,7 +792,10 @@ def _is_py_startup_parent(p: str) -> bool:
         cands.append(posixpath.normpath(posixpath.join(_BASE_DIR or _base_dir(), raw)))
     home = posixpath.normpath(os.path.expanduser("~"))
     homes = {home, os.path.realpath(home)} if home not in ("", "/", "~") else set()
-    return any(PY_STARTUP_PARENT_RE.search(c) or c in homes for c in cands)
+    if any(PY_STARTUP_PARENT_RE.search(c) or c in homes for c in cands):
+        return True
+    rel = _home_rel(p)  # JN-4: ~/.config, ~/.ssh, ~/Library and the like hold shell/session start-up files
+    return rel is not None and bool(SHELL_STARTUP_PARENT_REL_RE.match(rel))
 
 
 def _is_py_startup_tree_dest(p: str) -> bool:
@@ -1354,9 +1445,13 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if kpath:
         return "block", KIT_CONTAINER_MSG.format(kpath)
 
-    ppath = _segment_writes_py_startup(seg)  # kitfix-20261031-n1
+    ppath = _segment_writes_py_startup(seg)  # kitfix-20261031-n1, -jn4 (shell/session start-up files too)
     if ppath:
-        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(ppath)
+        return ("block" if unattended_mode() else "ask"), _startup_msg(ppath)
+
+    senv = _segment_sets_session_env(seg)  # kitfix-20261031-jn4
+    if senv:
+        return ("block" if unattended_mode() else "ask"), SESSION_ENV_MSG.format(senv)
 
     # MEM-13: a shell write to lessons.md / lessons-archive.md from a story checkout is blocked.
     lpath = _segment_writes_matching_path(seg, lambda p: lessons_story_block(p) is not None)
@@ -1903,8 +1998,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
             "block",
             f"Protected kit/CI path cannot be modified by agents: {path}",
         )
-    if _is_py_startup_path(path):  # kitfix-20261031-n1
-        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(path)
+    if _is_py_startup_path(path):  # kitfix-20261031-n1, -jn4
+        return ("block" if unattended_mode() else "ask"), _startup_msg(path)
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         if norm.endswith(".phase-result.md"):
@@ -1958,8 +2053,8 @@ def main() -> int:
         if not path and len(sys.argv) > 2:
             path = sys.argv[2]
         action, message = classify_path(path)
-        if action == "ask" and _is_py_startup_path(path):  # JN-6
-            action, message = "block", PY_STARTUP_EDIT_MSG.format(path)
+        if action == "ask" and _is_py_startup_path(path):  # JN-6 (and JN-4: shell/session start-up files)
+            action, message = "block", _startup_edit_msg(path)
         _json_out(action, message)
         return 0
     _json_out("block", f"hook-policy: unknown mode {mode}")

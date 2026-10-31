@@ -1,6 +1,11 @@
 #!/bin/sh
 # session-start.sh — inject delivery context at session start (read-only).
 set -eu
+# kitfix-20261031-jn4 (M-1): the hooks run the system tools only. PATH comes from the IDE, which takes it from the
+#   login shell and its start-up files, so an agent-written ~/.local/bin/cat or a PATH line in ~/.bashrc would
+#   otherwise run inside the hook (Sakura's fake-cat repro). Set before the first command (dirname).
+PATH=/usr/bin:/bin
+export PATH
 
 . "$(dirname "$0")/lib.sh"
 

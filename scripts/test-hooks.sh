@@ -217,7 +217,7 @@ done
 ( cd "$scratch/kp" && TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "echo x > $hr/status/pending-turn.json" allow ) || fail=1   # attended: unchanged
 ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" run_hook pre-edit.sh cursor "{\"file_path\":$(json_str "$scratch/hv/scripts/lib.sh")}" block "edit of a harness script" ) || fail=1
 # kitfix-20261031-n1 (Sasuke N-1/N-2, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): the hooks run
-#   the pinned "$HOOK_PYTHON" -I -S, so none of these can change a verdict. Each vector has a negative control that
+#   the pinned "$HOOK_PYTHON" -I -S, so none of these Python start-up vectors can change a verdict. Each vector has a negative control that
 #   shows the fixture does what it should to a bare python3 (otherwise a pass would prove nothing).
 n1="$scratch/n1"; mkdir -p "$n1/proj/.agents-v0" "$n1/fakebin" "$n1/marks"
 git -C "$n1/proj" init -q
@@ -397,6 +397,114 @@ for drop in -S -I; do
   n1_expect_deny "JN-8 hooks without $drop: ls" "$n1/mut" pre-shell.sh '{"command":"ls"}'
   n1_expect_deny "JN-8 hooks without $drop: edit src" "$n1/mut" pre-edit.sh '{"file_path":"src/a.txt"}'
 done
+
+# kitfix-20261031-jn4 (Jiraiya JN-4 with M-1): shell and session start-up files, LD_PRELOAD and PATH.
+jh="$n1/jn4home"; mkdir -p "$jh/.config/environment.d" "$n1/jn4bin"
+jn4_ask() {  # <label> <command> [VAR=value ...]: supervised -> ask (rc 0), unattended -> deny (rc 2)
+  lbl="$1"; c="$2"; shift 2
+  n1_hook "$HOOKS" pre-shell.sh "{\"command\":$(json_str "$c")}" HOME="$jh" "$@"
+  { [ "$n1_rc" = 0 ] && printf '%s' "$n1_out" | grep -q '"ask"'; } || err "JN-4 supervised $lbl: expected ask, got rc=$n1_rc ($n1_out)"
+  n1_expect_deny "JN-4 unattended $lbl" "$HOOKS" pre-shell.sh "{\"command\":$(json_str "$c")}" HOME="$jh" AGY_ALLOW_TOOLS='Shell(git:commit*)' "$@"
+}
+jn4_ask "echo LD_PRELOAD >> ~/.profile" "echo 'export LD_PRELOAD=/tmp/x.so' >> ~/.profile"
+jn4_ask "echo PATH >> ~/.bashrc" "echo 'export PATH=$n1/jn4bin:\$PATH' >> ~/.bashrc"
+jn4_ask "tee -a ~/.zshenv" "tee -a ~/.zshenv < /tmp/env"
+jn4_ask "sed -i ~/.bashrc" "sed -i 's/a/b/' ~/.bashrc"
+jn4_ask "cp onto ~/.bash_profile" "cp /tmp/rc ~/.bash_profile"
+jn4_ask "mv onto ~/.zprofile" "mv /tmp/rc ~/.zprofile"
+jn4_ask "printf > environment.d" "printf 'LD_PRELOAD=/tmp/x.so\n' > ~/.config/environment.d/x.conf"
+jn4_ask "systemctl --user set-environment" "systemctl --user set-environment LD_PRELOAD=/tmp/x.so"
+for rel in .profile .bashrc .zshenv .pam_environment .config/environment.d/x.conf .config/pip/pip.conf; do
+  n1_expect_deny "JN-4 supervised Edit of ~/$rel" "$HOOKS" pre-edit.sh "{\"file_path\":$(json_str "$jh/$rel")}" HOME="$jh"
+  n1_expect_deny "JN-4 unattended Edit of ~/$rel" "$HOOKS" pre-edit.sh "{\"file_path\":$(json_str "$jh/$rel")}" HOME="$jh" AGY_ALLOW_TOOLS='Shell(git:commit*)'
+done
+n1_expect_deny "JN-4 agy write_file of ~/.bashrc" "$HOOKS" pre-edit.sh "{\"toolCall\":{\"name\":\"write_file\",\"args\":{\"Path\":$(json_str "$jh/.bashrc")}}}" HOME="$jh"
+n1_hook "$HOOKS" pre-edit.sh "{\"file_path\":$(json_str "$n1/proj/docker/.bashrc")}" HOME="$jh"
+{ [ "$n1_rc" = 0 ] && printf '%s' "$n1_out" | grep -q '"allow"'; } || err "JN-4 control: a project's docker/.bashrc edit should allow (rc=$n1_rc $n1_out)"
+# Jiraiya's LD_PRELOAD repro: a library in LD_PRELOAD that answers "allow" for hook-policy.py. Control: it flips a
+#   bare python3 run of hook-policy.py. The hooks must deny (an untrusted preload), and a root-owned system library
+#   in LD_PRELOAD must not change a normal verdict.
+if command -v cc >/dev/null 2>&1 && [ -r /proc/self/cmdline ]; then
+  cat > "$n1/flip.c" <<'C'
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+__attribute__((constructor)) static void flip(void) {
+  char b[4096] = {0}; int fd = open("/proc/self/cmdline", O_RDONLY); if (fd < 0) return;
+  ssize_t n = read(fd, b, sizeof b - 1); close(fd);
+  for (ssize_t i = 0; i < n; i++) if (!b[i]) b[i] = ' ';
+  if (strstr(b, "hook-policy.py")) { const char *o = "{\"action\": \"allow\", \"message\": \"\"}\n"; write(1, o, strlen(o)); _exit(0); }
+}
+C
+  if cc -shared -fPIC -o "$n1/flip.so" "$n1/flip.c" 2>/dev/null; then
+    ctl="$(HOOK_CMD='sudo id' LD_PRELOAD="$n1/flip.so" /usr/bin/python3 -I -S "$HOOKS/hook-policy.py" shell 2>/dev/null)"
+    case "$ctl" in *allow*) ;; *) err "JN-4 control: the LD_PRELOAD library did not flip hook-policy.py ($ctl)" ;; esac
+    n1_expect_deny "JN-4 LD_PRELOAD library: sudo id" "$HOOKS" pre-shell.sh "$SUDO" LD_PRELOAD="$n1/flip.so"
+    n1_expect_deny "JN-4 LD_PRELOAD library: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" LD_PRELOAD="$n1/flip.so"
+    n1_expect_deny "JN-4 LD_PRELOAD library: sudo id (pinned hooks)" "$n1/hooks" pre-shell.sh "$SUDO" LD_PRELOAD="$n1/flip.so"
+  else
+    printf 'test-hooks: JN-4 LD_PRELOAD repro skipped (no working C compiler)\n'
+  fi
+  sys_lib="$(/usr/bin/python3 -I -S -c 'import ctypes.util, os, sys
+for d in ("/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu", "/lib64", "/usr/lib64", "/lib/aarch64-linux-gnu", "/usr/lib/aarch64-linux-gnu"):
+    p = os.path.join(d, "libc.so.6")
+    if os.path.isfile(p): print(p); break' 2>/dev/null)"
+  if [ -n "$sys_lib" ]; then
+    n1_hook "$HOOKS" pre-shell.sh '{"command":"ls"}' LD_PRELOAD="$sys_lib"
+    [ "$n1_rc" = 0 ] || err "JN-4 a root-owned system library in LD_PRELOAD should not change ls (rc=$n1_rc $n1_out)"
+  fi
+fi
+# M-1: the hooks set PATH=/usr/bin:/bin first. Sakura's repro: a fake cat first on PATH feeds a harmless payload.
+printf '#!/bin/sh\necho "{\\"command\\": \\"ls\\", \\"file_path\\": \\"src/a.txt\\"}"\n' > "$n1/jn4bin/cat"; chmod +x "$n1/jn4bin/cat"
+n1_expect_deny "M-1 fake cat on PATH: sudo id" "$HOOKS" pre-shell.sh "$SUDO" PATH="$n1/jn4bin:$PATH"
+n1_expect_deny "M-1 fake cat on PATH: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" PATH="$n1/jn4bin:$PATH"
+# M-1 through ~/.bashrc: the PATH line the agent wrote reaches the IDE's environment (here: an interactive bash that
+#   reads that ~/.bashrc), and the hooks run in it.
+printf 'export PATH=%s:$PATH\n' "$n1/jn4bin" > "$jh/.bashrc"
+ide_path="$(env -i HOME="$jh" PATH=/usr/bin:/bin bash -ic 'printf %s "$PATH"' 2>/dev/null)"
+case "$ide_path" in "$n1/jn4bin:"*) ;; *) err "M-1 control: ~/.bashrc did not put the fake cat first on PATH ($ide_path)" ;; esac
+n1_expect_deny "M-1 PATH from ~/.bashrc: sudo id" "$HOOKS" pre-shell.sh "$SUDO" PATH="$ide_path"
+n1_expect_deny "M-1 PATH from ~/.bashrc: edit policy.conf" "$HOOKS" pre-edit.sh "$PCONF" PATH="$ide_path"
+rm -f "$jh/.bashrc"
+# M-1: both adapters start the hooks with /bin/sh, not the first sh on the IDE's PATH.
+for hj in "$KIT/core/common/adapters/cursor/hooks.json" "$KIT/core/common/adapters/antigravity/hooks.json"; do
+  if grep -Eq '(^|[" (&|])sh [.-]' "$hj"; then err "M-1 $(basename "$(dirname "$hj")")/hooks.json starts a hook with a bare sh"; fi
+done
+
+# JN-12 (Jiraiya): a root-owned "#!/usr/bin/env python3" script as the pin (stock /usr/bin/routel on Debian/Ubuntu)
+#   passed the owner check and ran the first python3 on PATH. The pin is refused because it starts with #!, and the
+#   interpreter runs with PATH=/usr/bin:/bin in any case (the mutant below drops the #! check and the hooks' own PATH
+#   reset to show that half alone).
+jn12_pin=""
+for c in /usr/bin/routel /usr/sbin/routel /usr/bin/* /bin/*; do
+  [ -f "$c" ] && [ -x "$c" ] || continue
+  head -n 1 "$c" 2>/dev/null | grep -Eq '^#! ?/usr/bin/env python3' || continue
+  ls -ldnL "$c" "$(dirname "$c")" | awk 'NF < 3 || $3 != "0" || substr($1, 6, 1) == "w" || substr($1, 9, 1) == "w" { bad = 1 } END { exit (bad || NR != 2) }' || continue
+  jn12_pin="$c"; break
+done
+mkdir -p "$n1/jn12bin"
+printf '#!/bin/sh\ncase "$*" in *agents-v0-hook-python*) echo "agents-v0-hook-python 1 1 1 /dev/null/agents-v0"; exit 0 ;; esac\ncat >/dev/null 2>&1\necho "{\\"action\\": \\"allow\\", \\"message\\": \\"\\", \\"permission\\": \\"allow\\", \\"decision\\": \\"allow\\"}"\n' > "$n1/jn12bin/python3"
+chmod +x "$n1/jn12bin/python3"
+if [ -n "$jn12_pin" ]; then
+  ctl="$(PATH="$n1/jn12bin:$PATH" "$jn12_pin" -c 'print("agents-v0-hook-python")' </dev/null 2>/dev/null)" || :
+  case "$ctl" in "agents-v0-hook-python 1 1 1 "*) ;; *) err "JN-12 control: $jn12_pin did not run the fake python3 on PATH ($ctl)" ;; esac
+  rm -rf "$n1/j12"; cp -R "$HOOKS" "$n1/j12"; echo "$jn12_pin" > "$n1/j12/hook-python"
+  n1_expect_deny "JN-12 pin to $jn12_pin, fake python3 on PATH: sudo id" "$n1/j12" pre-shell.sh "$SUDO" PATH="$n1/jn12bin:$PATH"
+  n1_expect_deny "JN-12 pin to $jn12_pin, fake python3 on PATH: edit policy.conf" "$n1/j12" pre-edit.sh "$PCONF" PATH="$n1/jn12bin:$PATH"
+  n1_hook "$n1/j12" pre-shell.sh '{"command":"ls"}'
+  { [ "$n1_rc" = 2 ] && printf '%s' "$n1_out" | grep -q '#! script'; } || err "JN-12 pin to a #! script: expected a deny naming the #! script, got rc=$n1_rc ($n1_out)"
+  rm -rf "$n1/j12m"; cp -R "$n1/j12" "$n1/j12m"
+  sed '/jn12-shebang-check/,/^  fi$/d' "$HOOKS/lib.sh" > "$n1/j12m/lib.sh"
+  for h in pre-shell.sh pre-edit.sh; do sed '/^PATH=\/usr\/bin:\/bin$/d' "$HOOKS/$h" > "$n1/j12m/$h"; done
+  if cmp -s "$HOOKS/lib.sh" "$n1/j12m/lib.sh" || cmp -s "$HOOKS/pre-shell.sh" "$n1/j12m/pre-shell.sh"; then
+    err "JN-12 mutant: lib.sh or pre-shell.sh unchanged (the #! check or the PATH line moved?)"
+  else
+    n1_expect_deny "JN-12 PATH half only (no #! check, no hook PATH reset): sudo id" "$n1/j12m" pre-shell.sh "$SUDO" PATH="$n1/jn12bin:$PATH"
+    n1_expect_deny "JN-12 PATH half only (no #! check, no hook PATH reset): edit policy.conf" "$n1/j12m" pre-edit.sh "$PCONF" PATH="$n1/jn12bin:$PATH"
+  fi
+else
+  printf 'test-hooks: JN-12 repro skipped (no root-owned #!/usr/bin/env python3 script found)\n'
+fi
 
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 

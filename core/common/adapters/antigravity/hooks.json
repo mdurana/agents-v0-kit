@@ -5,7 +5,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "KIT_HOOK_FLAVOR=antigravity sh -c '[ -f .agents/hooks/session-start.sh ] && sh .agents/hooks/session-start.sh || (cd .. && sh .agents/hooks/session-start.sh)'",
+        "command": "KIT_HOOK_FLAVOR=antigravity /bin/sh -c '[ -f .agents/hooks/session-start.sh ] && /bin/sh .agents/hooks/session-start.sh || (cd .. && /bin/sh .agents/hooks/session-start.sh)'",
         "timeout": 10
       }
     ],
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "KIT_HOOK_FLAVOR=antigravity sh -c '[ -f .agents/hooks/pre-shell.sh ] && sh .agents/hooks/pre-shell.sh || (cd .. && sh .agents/hooks/pre-shell.sh)'",
+            "command": "KIT_HOOK_FLAVOR=antigravity /bin/sh -c '[ -f .agents/hooks/pre-shell.sh ] && /bin/sh .agents/hooks/pre-shell.sh || (cd .. && /bin/sh .agents/hooks/pre-shell.sh)'",
             "timeout": 30
           }
         ]
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "KIT_HOOK_FLAVOR=antigravity sh -c '[ -f .agents/hooks/pre-edit.sh ] && sh .agents/hooks/pre-edit.sh || (cd .. && sh .agents/hooks/pre-edit.sh)'",
+            "command": "KIT_HOOK_FLAVOR=antigravity /bin/sh -c '[ -f .agents/hooks/pre-edit.sh ] && /bin/sh .agents/hooks/pre-edit.sh || (cd .. && /bin/sh .agents/hooks/pre-edit.sh)'",
             "timeout": 15
           }
         ]
@@ -34,7 +34,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "KIT_HOOK_FLAVOR=antigravity sh -c '[ -f .agents/hooks/stop.sh ] && sh .agents/hooks/stop.sh || (cd .. && sh .agents/hooks/stop.sh)'",
+        "command": "KIT_HOOK_FLAVOR=antigravity /bin/sh -c '[ -f .agents/hooks/stop.sh ] && /bin/sh .agents/hooks/stop.sh || (cd .. && /bin/sh .agents/hooks/stop.sh)'",
         "timeout": 15
       }
     ]
