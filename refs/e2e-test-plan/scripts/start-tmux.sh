@@ -29,13 +29,16 @@ esac
 [ -f "${1:-}" ] || { echo "usage: $0 <launch.env> [session]" >&2; exit 64; }
 ENVF="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; S="${2:-e2e}"
 command -v tmux >/dev/null || { echo "tmux not installed" >&2; exit 2; }
+# kitfix-20261031-launch-env: a V3 harness copy (root-owned marker V3-REQUIRED) gets its own tmux server that reads no
+#   ~/.tmux.conf (the agent user can write that file) and is not a server an agent turn could have started earlier.
+TMX=(tmux); [ ! -e "$PLAN/V3-REQUIRED" ] || TMX=(tmux -L e2e-harness -f /dev/null)
 set -a
 # shellcheck source=/dev/null
 . "$ENVF"
 set +a
 : "${RUN_ID:=$(TZ=Asia/Manila date +%Y%m%d-%H%M)}"; : "${TEST_ROOT:=$HOME/agents-v0-e2e/run-$RUN_ID}"; export RUN_ID TEST_ROOT
 . "$HERE/env.sh"
-tmux has-session -t "$S" 2>/dev/null && { echo "tmux session $S already exists" >&2; exit 2; }
+"${TMX[@]}" has-session -t "$S" 2>/dev/null && { echo "tmux session $S already exists" >&2; exit 2; }
 if [ -n "${RESUME_FROM:-}" ]; then
   [ -d "$TEST_ROOT/results" ] || { echo "RESUME_FROM set but $TEST_ROOT/results does not exist (set RUN_ID/TEST_ROOT of the earlier run)" >&2; exit 2; }
   [ ! -e "$TEST_ROOT/RUNNING" ] || { echo "another runner is active ($TEST_ROOT/RUNNING exists)" >&2; exit 2; }
@@ -46,8 +49,8 @@ else
   [ ! -e "$TEST_ROOT/work" ] || { echo "TEST_ROOT $TEST_ROOT already has a workspace" >&2; exit 2; }
   mkdir -p "$TEST_ROOT/status"; cp "$ENVF" "$TEST_ROOT/status/launch.env"
 fi
-tmux new-session -d -s "$S" -n runner -e RUN_ID="$RUN_ID" -e TEST_ROOT="$TEST_ROOT" "bash '$HERE/start-tmux.sh' --runner '$ENVF'; exec bash"
+"${TMX[@]}" new-session -d -s "$S" -n runner -e RUN_ID="$RUN_ID" -e TEST_ROOT="$TEST_ROOT" "bash '$HERE/start-tmux.sh' --runner '$ENVF'; exec bash"
 if [ "$(resolve_driver)" = antigravity ]; then
-  tmux new-window -t "$S" -n agy -e RUN_ID="$RUN_ID" -e TEST_ROOT="$TEST_ROOT" "bash '$HERE/start-tmux.sh' --loop '$ENVF'; exec bash"
+  "${TMX[@]}" new-window -t "$S" -n agy -e RUN_ID="$RUN_ID" -e TEST_ROOT="$TEST_ROOT" "bash '$HERE/start-tmux.sh' --loop '$ENVF'; exec bash"
 fi
-echo "started: tmux session $S, TEST_ROOT=$TEST_ROOT, driver=$(resolve_driver). Follow: tail -f $TEST_ROOT/status/progress.log"
+echo "started: tmux session $S (${TMX[*]}), TEST_ROOT=$TEST_ROOT, driver=$(resolve_driver). Follow: tail -f $TEST_ROOT/status/progress.log"

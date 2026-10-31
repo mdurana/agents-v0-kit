@@ -12,6 +12,8 @@
 #   harness_locked / harness_integrity_check / agy-ws-exec.sh / agy-ipc-turn.sh (kitfix-20261031-harness-lock): the
 #      agent user cannot write or replace the harness, and a changed harness or allowlist file is caught.
 #   run-plan.sh `modes_preflight early` (kitfix-20261031-preflight-first): a refused launch counts no resume.
+#   v3_launch_ok / escalation_none_ok / escalation-check.sh / home-hash.sh (kitfix-20261031-launch-env, -escalation-none):
+#      a V3 launch cannot be weakened through files the agent user can write, and that user has no escalation path.
 # Usage: bash tests/test-guards.sh   (exit 0 when every case passes)
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -254,6 +256,81 @@ FA="$SB/fa.tsv"; printf 'a\t1\t4\tharness-fix\tk\tFAIL\tH1\na\t2\t4\tharness-fix
   RESUME_STEP=4 RESUME_REASON=harness-fix; eval "$(grep -m1 '^  nfail=' "$HERE/scripts/run-plan.sh")"; eval "$(grep -m1 '^  nstep=' "$HERE/scripts/run-plan.sh")"
   [ "$(awk -F'\t' 'NR==2{print $6}' "$RES/fix-attempts.tsv")" = REFUSED ] && [ "$nfail" = 1 ] && [ "$nstep" = 1 ] ) \
   && ok "a row the full preflight refused is marked REFUSED and not counted" || ko "REFUSED row counted"
+
+echo "-- V3 launch env and escalation records (kitfix-20261031-launch-env, kitfix-20261031-escalation-none)"
+# a V3 harness copy in the sandbox: the marker V3-REQUIRED and a HARNESS-FROM older than the records
+HV3="$SB/hv3"; mkdir -p "$HV3"; cp -r "$HERE/scripts" "$HERE/fixtures" "$HV3/"; echo v3 > "$HV3/V3-REQUIRED"
+echo test > "$HV3/HARNESS-FROM"; touch -d '1 hour ago' "$HV3/HARNESS-FROM"
+VH="$SB/v3home"; mkdir -p "$VH/.config" "$SB/v3rec" "$SB/escroot"; echo 'export PATH=$PATH' > "$VH/.profile"; echo k=v > "$VH/.config/e2e-secrets.env"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/v3rec/home.sha256" "$VH" > /dev/null
+printf 'ESC groups ok\nESCALATION-NONE user=%s uid=%s mode=full at=2026-10-31 13:30:00 Asia/Manila host=t\n' "$(id -un)" "$(id -u)" > "$SB/v3rec/esc.txt"
+# v3 [VAR=value ...]: v3_launch_ok from the V3 copy's lib.sh. Records are sandbox files (_root_owned is tested on its
+#   own below), the live escalation check reads an empty ESC_ROOT tree, and the home is the sandbox home.
+v3(){ ( . "$HV3/scripts/lib.sh"; PLAN_DIR="$HV3" HOME="$VH" REQUIRE_FAIL_MODES=1 HOME_HASH_RECORD="$SB/v3rec/home.sha256" ESCALATION_RECORD="$SB/v3rec/esc.txt"
+        unset KIT_SCAN_ROOTS KIT_SOURCE_PATHS HARNESS_LOCK_PATHS AGENT_USER
+        _root_owned(){ [ -f "$1" ]; }; _home_of(){ echo "$VH"; }; _esc_live(){ ESC_ROOT="$SB/escroot" bash "$HV3/scripts/escalation-check.sh" --live "$1"; }
+        for a in "$@"; do export "${a?}"; done; v3_launch_ok ) > "$SB/v3.log" 2>&1; }
+v3 && grep -q '^V3 launch ok' "$SB/v3.log" && grep -q '^ESCALATION ok' "$SB/v3.log" && grep -q '^V3 HOME-HASH-OK' "$SB/v3.log" && ok "a clean V3 launch passes" || ko "clean V3: $(cat "$SB/v3.log")"
+v3 REQUIRE_FAIL_MODES=0; [ $? != 0 ] && grep -q 'V3 REFUSED REQUIRE_FAIL_MODES=0' "$SB/v3.log" && ok "V3 refuses REQUIRE_FAIL_MODES=0" || ko "V3 rfm: $(cat "$SB/v3.log")"
+v3 PLAN_DIR="$HERE"; [ $? != 0 ] && grep -q 'V3 REFUSED PLAN_DIR=' "$SB/v3.log" && ok "V3 refuses a PLAN_DIR that is not the harness it runs from" || ko "V3 plan_dir: $(cat "$SB/v3.log")"
+v3 HOME="$SB"; [ $? != 0 ] && grep -q 'V3 REFUSED HOME=' "$SB/v3.log" && ok "V3 refuses a HOME that is not the agent user's" || ko "V3 home: $(cat "$SB/v3.log")"
+v3 KIT_SCAN_ROOTS="$SB/scan"; [ $? != 0 ] && grep -q 'V3 REFUSED KIT_SCAN_ROOTS drops default' "$SB/v3.log" && ok "V3 refuses KIT_SCAN_ROOTS without its defaults" || ko "V3 scan roots: $(cat "$SB/v3.log")"
+v3 KIT_SCAN_ROOTS="$VH $TEST_ROOT /tmp $SB/scan" && ok "V3 accepts KIT_SCAN_ROOTS that only adds a place" || ko "V3 scan roots add: $(cat "$SB/v3.log")"
+v3 KIT_SOURCE_PATHS="$SB/elsewhere"; [ $? != 0 ] && grep -q 'V3 REFUSED KIT_SOURCE_PATHS drops default' "$SB/v3.log" && ok "V3 refuses KIT_SOURCE_PATHS without its defaults" || ko "V3 source paths: $(cat "$SB/v3.log")"
+v3 HARNESS_LOCK_PATHS=/usr/bin; [ $? != 0 ] && grep -q 'V3 REFUSED HARNESS_LOCK_PATHS drops the harness' "$SB/v3.log" && ok "V3 refuses HARNESS_LOCK_PATHS without the harness" || ko "V3 lock paths: $(cat "$SB/v3.log")"
+mkdir -p "$SB/fakebin"; printf '#!/bin/sh\nexec /usr/bin/git "$@"\n' > "$SB/fakebin/git"; chmod +x "$SB/fakebin/git"
+v3 PATH="$SB/fakebin:$PATH"; [ $? != 0 ] && grep -q 'V3 REFUSED tool git .* writable by' "$SB/v3.log" && ok "V3 refuses a PATH that puts an agent-writable git first" || ko "V3 path: $(cat "$SB/v3.log")"
+echo 'export REQUIRE_FAIL_MODES=0' >> "$VH/.profile"; v3; [ $? != 0 ] && grep -q '^V3 HOME-CHANGED .profile' "$SB/v3.log" && ok "V3 refuses a changed startup file (.profile)" || ko "V3 dotfile: $(cat "$SB/v3.log")"
+sed -i '$d' "$VH/.profile"; mkdir -p "$VH/.local/agents-v0-tools"; echo 'TOOLS_PATH=/x' > "$VH/.local/agents-v0-tools/tools.env"
+v3; [ $? != 0 ] && grep -q '^V3 HOME-ADDED .local/agents-v0-tools/tools.env' "$SB/v3.log" && ok "V3 refuses a new tools.env the record did not have" || ko "V3 tools.env: $(cat "$SB/v3.log")"
+mv "$VH/.local/agents-v0-tools/tools.env" "$SB/tools.env.moved"
+touch -d '2 hours ago' "$SB/v3rec/home.sha256"; v3; [ $? != 0 ] && grep -q 'home-hash record is older than this harness copy' "$SB/v3.log" && ok "V3 refuses a home-hash record older than the harness copy" || ko "V3 old record: $(cat "$SB/v3.log")"
+touch "$SB/v3rec/home.sha256"
+cp "$SB/v3rec/esc.txt" "$SB/esc.good"; sed -i 's/^ESCALATION-NONE/ESCALATION-FOUND/' "$SB/v3rec/esc.txt"
+v3; [ $? != 0 ] && grep -q 'ESCALATION record has no ESCALATION-NONE' "$SB/v3.log" && ok "V3 refuses an escalation record without ESCALATION-NONE" || ko "V3 esc record: $(cat "$SB/v3.log")"
+cp "$SB/esc.good" "$SB/v3rec/esc.txt"; mkdir -p "$SB/escroot/run"; : > "$SB/escroot/run/docker.sock"
+v3; [ $? != 0 ] && grep -q 'ESCALATION live: ESC sockets HIT' "$SB/v3.log" && ok "V3 refuses when the live check finds a docker socket" || ko "V3 esc live: $(cat "$SB/v3.log")"
+mv "$SB/escroot/run/docker.sock" "$SB/docker.sock.moved"
+( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; _root_owned /etc/passwd && ! _root_owned "$SB/v3rec/esc.txt" ) && ok "_root_owned accepts a root-owned file and refuses one the agent user owns" || ko "_root_owned"
+( . "$HV3/scripts/lib.sh"; PLAN_DIR="$HV3" HOME="$VH" HOME_HASH_RECORD="$SB/v3rec/home.sha256"; REQUIRE_FAIL_MODES=0; unset KIT_SCAN_ROOTS KIT_SOURCE_PATHS HARNESS_LOCK_PATHS
+  _root_owned(){ [ -f "$1" ]; }; _home_of(){ echo "$VH"; }; _esc_live(){ ESC_ROOT="$SB/escroot" bash "$HV3/scripts/escalation-check.sh" --live "$1"; }
+  ESCALATION_RECORD="$SB/v3rec/esc.txt"; modes_preflight early ) >/dev/null 2>&1; r=$?
+[ "$r" != 0 ] && grep -q 'V3 REFUSED REQUIRE_FAIL_MODES=0' "$RES/modes-preflight.log" && ok "modes_preflight runs v3_launch_ok on a V3 copy even with REQUIRE_FAIL_MODES=0" || ko "v3 wiring rc=$r: $(cat "$RES/modes-preflight.log")"
+( ESCALATION_CHECK=1 ESCALATION_RECORD="$SB/no-such-record"; unset REQUIRE_FAIL_MODES; _esc_live(){ ESC_ROOT="$SB/escroot" bash "$HERE/scripts/escalation-check.sh" --live "$1"; }; modes_preflight early ) >/dev/null 2>&1 \
+  && ko "ESCALATION_CHECK=1 passed without a record" || { grep -q 'ESCALATION record missing' "$RES/modes-preflight.log" && ok "ESCALATION_CHECK=1 checks the record without a V3 copy" || ko "esc check alone: $(cat "$RES/modes-preflight.log")"; }
+( . "$HV3/scripts/lib.sh"; PLAN_DIR="$HV3" HOME="$VH"; RUN="$SB/v3run"; mkdir -p "$RUN"; : > "$RUN/kit-tamper.txt.none"
+  harness_integrity > "$RUN/harness-integrity-before-1.tsv"; grep -q '^home/.profile' "$RUN/harness-integrity-before-1.tsv" || exit 9
+  echo 'alias git=true' >> "$VH/.bashrc"; harness_integrity_check 1; grep -q 'added harness home/.bashrc\|changed harness home/.bashrc' "$RUN/kit-tamper.txt" ); r=$?
+[ "$r" = 0 ] && ok "per turn, a V3 copy also hashes the startup files (a .bashrc written in a turn is an H10 finding)" || ko "v3 home per turn rc=$r"
+mv "$VH/.bashrc" "$SB/bashrc.moved"
+grep -q 'TMX=(tmux -L e2e-harness -f /dev/null)' "$HERE/scripts/start-tmux.sh" && grep -q '"${TMX\[@\]}" new-session' "$HERE/scripts/start-tmux.sh" \
+  && ok "start-tmux.sh uses its own tmux server without ~/.tmux.conf on a V3 copy" || ko "start-tmux isolation"
+
+echo "-- escalation-check.sh (kitfix-20261031-escalation-none)"
+ER="$SB/er"; EB="$SB/erbin"; mkdir -p "$ER/etc" "$ER/proc/net" "$EB"
+printf '#!/bin/sh\ncase "$*" in "-u e2e") echo 1001;; "-nG e2e") echo "${STUB_GROUPS:-e2e}";; *) exec /usr/bin/id "$@";; esac\n' > "$EB/id"
+printf '#!/bin/sh\necho "${STUB_SUDO:-User e2e is not allowed to run sudo on vm.}"\n' > "$EB/sudo"; chmod +x "$EB/id" "$EB/sudo"
+printf '  sl  local_address rem_address   st\n   0: 0100007F:0947 00000000:0000 01 0\n' > "$ER/proc/net/tcp"
+esc(){ env "$@" ESC_ROOT="$ER" PATH="$EB:$PATH" bash "$HERE/scripts/escalation-check.sh" --record "$SB/esc-rec.txt" e2e > "$SB/esc.out" 2>&1; }
+esc; r=$?; [ "$r" = 0 ] && tail -1 "$SB/esc.out" | grep -q '^ESCALATION-NONE user=e2e uid=1001 mode=full ' && cmp -s "$SB/esc.out" "$SB/esc-rec.txt" \
+  && ok "a clean user is ESCALATION-NONE and the record is written (an established :2375 connection is not a listener)" || ko "esc clean rc=$r: $(cat "$SB/esc.out")"
+esc STUB_SUDO='User e2e may run the following commands on vm: (ALL) NOPASSWD: ALL'; [ $? = 1 ] && grep -q '^ESC sudo HIT' "$SB/esc.out" && tail -1 "$SB/esc.out" | grep -q '^ESCALATION-FOUND' && ok "sudo rules are a hit" || ko "esc sudo: $(cat "$SB/esc.out")"
+esc STUB_SUDO='sudo: something odd'; [ $? = 1 ] && grep -q '^ESC sudo HIT unclear' "$SB/esc.out" && ok "unclear sudo -l output is a hit (fail closed)" || ko "esc sudo unclear"
+esc STUB_GROUPS='e2e docker'; [ $? = 1 ] && grep -q '^ESC groups HIT e2e is in: docker' "$SB/esc.out" && ok "the docker group is a hit" || ko "esc docker group: $(cat "$SB/esc.out")"
+esc STUB_GROUPS='e2e lxd'; [ $? = 1 ] && grep -q '^ESC groups HIT e2e is in: lxd' "$SB/esc.out" && ok "the lxd group is a hit" || ko "esc lxd"
+printf '# permit e2e as root\npermit persist :wheel\n' > "$ER/etc/doas.conf"; esc; [ $? = 0 ] && grep -q '^ESC doas ok' "$SB/esc.out" && ok "doas.conf naming only other groups and comments is ok" || ko "esc doas ok: $(cat "$SB/esc.out")"
+printf 'permit nopass e2e as root\n' > "$ER/etc/doas.conf"; esc; [ $? = 1 ] && grep -q '^ESC doas HIT' "$SB/esc.out" && ok "a doas rule for the user is a hit" || ko "esc doas hit"
+mv "$ER/etc/doas.conf" "$SB/doas.conf.moved"; mkdir -p "$ER/etc/polkit-1/rules.d"
+printf 'polkit.addRule(function(a, s) { if (s.user == "e2e") return polkit.Result.YES; });\n' > "$ER/etc/polkit-1/rules.d/50-e2e.rules"
+esc; [ $? = 1 ] && grep -q '^ESC polkit HIT' "$SB/esc.out" && ok "a polkit rule naming the user is a hit" || ko "esc polkit: $(cat "$SB/esc.out")"
+mv "$ER/etc/polkit-1/rules.d/50-e2e.rules" "$SB/50-e2e.rules.moved"; mkdir -p "$ER/var/run"; : > "$ER/var/run/docker.sock"
+esc; [ $? = 1 ] && grep -q '^ESC sockets HIT docker socket present: /var/run/docker.sock' "$SB/esc.out" && ok "/var/run/docker.sock is a hit" || ko "esc sock"
+mv "$ER/var/run/docker.sock" "$SB/docker.sock2.moved"; printf '  sl  local_address rem_address   st\n   0: 00000000:0948 00000000:0000 0A 0\n' > "$ER/proc/net/tcp6"
+esc; [ $? = 1 ] && grep -q '^ESC ports HIT listening on: 2376' "$SB/esc.out" && ok "a listener on 2376 is a hit" || ko "esc port: $(cat "$SB/esc.out")"
+mv "$ER/proc/net/tcp6" "$SB/tcp6.moved"
+( env ESC_ROOT="$ER" PATH="$EB:$PATH" STUB_SUDO='User e2e may run the following commands on vm: ALL' bash "$HERE/scripts/escalation-check.sh" --live e2e ) > "$SB/esc.out" 2>&1; r=$?
+[ "$r" = 0 ] && ! grep -q 'ESC sudo' "$SB/esc.out" && tail -1 "$SB/esc.out" | grep -q 'mode=live' && ok "--live skips the root-only checks" || ko "esc live rc=$r: $(cat "$SB/esc.out")"
+( env -u ESC_ROOT bash "$HERE/scripts/escalation-check.sh" e2e ) > "$SB/esc.out" 2>&1; [ $? = 2 ] && grep -q 'needs root' "$SB/esc.out" && ok "a full check as non-root refuses (exit 2)" || ko "esc nonroot"
 
 mk='# >>> kit-test'; mk="$mk-override"
 grep -q 'kit_installed_ok "$MAIN"' "$HERE/scripts/run-plan.sh" && ! grep -rlF --include='*.sh' -- "$mk" "$HERE/scripts" "$HERE/tests" | grep -q . \

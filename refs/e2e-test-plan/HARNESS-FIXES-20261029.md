@@ -344,3 +344,61 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 - **Tests:** `tests/test-guards.sh` is now 80 cases (up from 63): 14 harness-lock cases (root-owned harness passes; writable harness refused; read-only harness in a writable folder refused; `REQUIRE_FAIL_MODES=1` and `HARNESS_LOCK=1` each run it; an agent user it cannot test as is refused; unchanged harness no finding; a fixture change and a pending-tamper file are H10 findings; `run_turn` wiring; the wrapper runs a matching command and refuses a widened allowlist; the IPC bridge records a change and keeps a copy, and records nothing for an untouched file) and 3 refused-launch cases (`run-plan.sh --resume-from 2` in a sandbox with `MAX_RESUMES_TOTAL=2` and one existing row: two refused launches leave one row and no `attempt-2` folder, then a good launch reaches `RUN-START` with no `FIX-LIMIT`; and `attempt_refused` marks a row that the counts then skip).
 - **Mutation checks** (`test-guards.sh`): `harness_locked` always passing → 6 FAIL; the early preflight removed → 3 FAIL; the wrapper cross-check off → 1 FAIL; `harness_integrity_check` off → 2 FAIL; `attempt_refused` a no-op → 1 FAIL.
 - **Limits:** the runtime state under `$T` outside `work/` (`status/`, `results/`, `evidence/`, `run-*/`) is still writable by e2e, because the runner is e2e. An agent that gets past the hooks could still fake a turn reply (`turn-<k>.done` and its response) or edit results and evidence; the per-turn hashes cover the harness code and the control file only. Closing that needs the runner as root with the agent under `runuser -u e2e` (follow-up). The harness lock is checked on this box only with `/usr/bin` as a root-owned stand-in; it has not run on the VM.
+
+## 2026-10-31 13:25 Asia/Manila — supervised vs unattended; root escalation check; root-owned launch env (kitfix-20261031-escalation-none, kitfix-20261031-launch-env; reviews by Sai and Sakura, approved by Marlon)
+
+- **(A) Supervised vs unattended.** `test-plan.md` §9, `v3-rerun-procedure.md` §1 and `refs/kit-fixes.md` now say that the no-Docker and no-sudo rules are for unattended agent runs (the e2e VM). People using the kit may use Docker, and sudo on their own machine. The docs also say what the hooks do to agent commands in each mode. Checked against `hook-policy.py`:
+  - blocked in both modes: `sudo`, `doas`, `run0` and the Docker TCP API on `localhost:2375`;
+  - allowed in both modes: `docker`, `docker compose` and `podman`;
+  - blocked unattended only: `su` and `pkexec`.
+
+  Hook behaviour is unchanged: the docs were made to match it.
+- **(B) Root escalation check (`scripts/escalation-check.sh`).** It runs as root at lock time (§4 step 9) and writes `/opt/harness-v3-env/escalation-check.txt`. The checks:
+  - `sudo -l -U e2e` lists no rule (sudo absent is ok; unclear output is a hit);
+  - `id -nG` has none of `sudo`, `wheel`, `admin`, `docker` or `lxd`;
+  - no `/etc/doas.conf` line and no polkit rule (`rules.d`, `localauthority`) names the user or its groups;
+  - there is no `/var/run/docker.sock`, `/run/docker.sock` or rootless `/run/user/<uid>/docker.sock`;
+  - nothing listens on 2375 or 2376 (`/proc/net/tcp`, `tcp6`).
+
+  The last line is `ESCALATION-NONE …` (exit 0) or `ESCALATION-FOUND …` (exit 1). Any hit is a STOP. **Also a preflight check:** `escalation_none_ok` needs the record root-owned, not writable by the agent user, newer than the harness copy's `HARNESS-FROM`, and saying `ESCALATION-NONE user=<AGENT_USER> … mode=full`. `--live` re-runs the groups, sockets and listener checks as the runner. It runs on every launch from a V3 copy, or with `ESCALATION_CHECK=1`.
+- **(C) Launch env and startup files.** Verified first: §5 wrote the env file to e2e's home, §6 launched with `su - e2e -c`, a login shell that re-sources `~/.profile` and `~/.bashrc`, and sourced `~/.config/e2e-secrets.env`. `env.sh` sources `tools.env`. `KIT_SCAN_ROOTS`, `KIT_SOURCE_PATHS` and `HARNESS_LOCK_PATHS` replace their defaults. Now:
+  - **Procedure:**
+    - The env file, a secrets copy (`root:e2e 640`) and the `v3-stop-after.sh` watcher live in the root-owned `/opt/harness-v3-env/`.
+    - The launch runs `env -i … runuser -u e2e -- bash --noprofile --norc …`, with system folders first on `PATH`, and sources only root-owned files.
+    - §8 checks the startup files (`home-hash.sh --check`) before any `su - e2e` command of the next segment.
+  - **Marker:** step 7 writes `V3-REQUIRED` into the root-owned harness copy.
+  - **Preflight (`v3_launch_ok`):** it runs on every launch from a copy with the marker, whatever `REQUIRE_FAIL_MODES` says, and refuses (`V3 REFUSED …`) unless:
+    - `REQUIRE_FAIL_MODES=1`;
+    - `PLAN_DIR` is the harness `lib.sh` was loaded from;
+    - `HOME` is the agent user's home;
+    - the three path variables keep their defaults (they may only add);
+    - the tools the preflight runs are neither writable by the agent user nor in a folder it can write;
+    - the startup files match the root-owned `e2e-home.sha256` (`home-hash.sh`: `.profile`, `.bashrc`, `.bash_profile`, `.tmux.conf`, `.gitconfig`, `.config/e2e-secrets.env`, `tools.env` and others; absent files recorded as absent);
+    - `escalation_none_ok` passes.
+  - **Per turn:** on a V3 copy, `harness_integrity` also hashes those startup files, so one written in a turn is an H10 finding.
+  - **tmux:** on a V3 copy, `start-tmux.sh` uses its own server (`tmux -L e2e-harness -f /dev/null`), which reads no `~/.tmux.conf`.
+- **Tests:** `tests/test-guards.sh` is now 111 cases (up from 80):
+  - 19 V3 launch cases: clean pass; `REQUIRE_FAIL_MODES=0`; foreign `PLAN_DIR`; foreign `HOME`; narrowed `KIT_SCAN_ROOTS` refused and added-to accepted; narrowed `KIT_SOURCE_PATHS` and `HARNESS_LOCK_PATHS`; a writable fake `git` first on `PATH`; a changed `.profile`; a new `tools.env`; a stale home record; an escalation record without `ESCALATION-NONE`; a live docker socket; `_root_owned`; wiring with `REQUIRE_FAIL_MODES=0`; `ESCALATION_CHECK=1` alone; a `.bashrc` written in a turn is H10; tmux isolation;
+  - 12 `escalation-check.sh` cases against a stub tree (`ESC_ROOT`, stub `sudo` and `id`): clean with record; sudo rules; unclear sudo output; the docker and lxd groups; doas comments and other groups ok, a doas rule for the user a hit; a polkit rule; `/var/run/docker.sock`; a listener on 2376, with an established 2375 connection not counted; `--live` skips the root checks; a full check as non-root refuses.
+- **Mutation checks** (`trash/mut-v3-1343/`, test-guards FAIL counts):
+
+  | Mutation | test-guards FAIL |
+  |---|---|
+  | `REQUIRE_FAIL_MODES` check off | 2 |
+  | `_covers` (defaults kept) off | 3 |
+  | `PLAN_DIR` check off | 1 |
+  | tool check off | 1 |
+  | home-hash compare off | 2 |
+  | escalation record checks off | 2 |
+  | groups off | 2 |
+  | sockets off | 2 |
+  | ports off | 1 |
+  | `v3_launch_ok` not wired into `modes_preflight` | 1 |
+  | sudo output ignored | 2 |
+
+  Changing only the "may run" pattern fails no case: by design, the output then counts as unclear, which is still a hit.
+- **Limits:**
+  - **Still e2e's:** `tools.env` and the toolchain folder (`~/.local/agents-v0-tools`), `~/.local/bin/agy` and agy's own settings. `env.sh` puts `TOOLS_PATH` first on `PATH`. A changed `tools.env` and a fake preflight tool are caught; a changed `java` or `node` is not.
+  - **Changes during a segment** take effect in the runner at once. They are caught per turn (H10, startup files) or at the next launch, not prevented.
+  - **The escalation check reads what root can see at lock time.** A rule added later (for example by a package) is caught only at the next step 9; the live part re-checks groups, sockets and listeners at each launch.
+  - **Tested on this box only**, with stubs for `sudo` and `id`, and with `_root_owned` and the record owner stubbed (`_root_owned` itself is tested on `/etc/passwd`). Not run on the VM.

@@ -725,9 +725,16 @@ kit_integrity_check(){ local k="$1" b="$RUN/kit-integrity-before-$k.tsv" a="$RUN
 #   harness the agent user can write (harness_locked). As a detector, like H10 for the kit: harness_integrity hashes
 #   the harness files before and after every turn, and agy-ipc-turn.sh records a pending-turn.json that changed during
 #   the turn (pending-tamper-<k>.txt). Either goes to kit-tamper.txt with a FINDING, so H10 fails the story.
+# kitfix-20261031-launch-env (review by Sakura, approved by Marlon 2026-10-31 13:25): _LIB_PLAN is the harness this
+#   lib.sh was loaded from (not $PLAN_DIR, which the launch env could point elsewhere). A V3 harness copy holds the
+#   root-owned marker V3-REQUIRED (v3-rerun-procedure.md §4 step 7); with it, v3_launch_ok runs at every launch.
+_LIB_PLAN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+v3_required(){ [ -e "$_LIB_PLAN/V3-REQUIRED" ]; }
 harness_integrity(){ local f
   find "$PLAN_DIR/scripts" "$PLAN_DIR/fixtures" -type f ! -name '*.pyc' 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do
-    printf '%s\t%s\n' "${f#$PLAN_DIR/}" "$(sha256_cmd "$f" | cut -c1-64)"; done; }
+    printf '%s\t%s\n' "${f#$PLAN_DIR/}" "$(sha256_cmd "$f" | cut -c1-64)"; done
+  # V3: the agent user's startup files too (home-hash.sh list), so a change during a turn is an H10 finding
+  if v3_required; then bash "$_LIB_PLAN/scripts/home-hash.sh" "$HOME" 2>/dev/null | awk '{print "home/" $2 "\t" $1}'; fi; }
 harness_integrity_check(){ local k="$1" b="$RUN/harness-integrity-before-$k.tsv" out=""
   if [ -s "$b" ]; then
     out="$(harness_integrity | awk -F'\t' 'NR==FNR{b[$1]=$2; next} {if(!($1 in b)) print "added harness " $1; else if(b[$1]!=$2) print "changed harness " $1; delete b[$1]}
@@ -756,6 +763,60 @@ harness_locked(){ local u="${AGENT_USER:-$(id -un)}" me d c p w bad=0; me="$(id 
     done
     [ -n "$w" ] || [ "$bad" != 0 ] || echo "HARNESS ok $d (owner $(stat -c %U "$d"), not writable or replaceable by $u)"
   done
+  [ "$bad" = 0 ]; }
+# _root_owned <file>: owned by root and neither it nor its folder writable by AGENT_USER (records written at lock time).
+_root_owned(){ local u="${AGENT_USER:-$(id -un)}" me; me="$(id -un)"
+  [ -f "$1" ] && [ "$(stat -c %u "$1")" = 0 ] && [ "$(stat -c %u "$(dirname "$1")")" = 0 ] || return 1
+  if [ "$me" = "$u" ]; then ! test -w "$1" && ! test -w "$(dirname "$1")"
+  elif [ "$(id -u)" = 0 ]; then ! runuser -u "$u" -- test -w "$1" && ! runuser -u "$u" -- test -w "$(dirname "$1")"
+  else return 1; fi; }
+# kitfix-20261031-escalation-none (review by Sai, approved by Marlon 2026-10-31 13:25): escalation_none_ok needs the
+#   root-owned record of escalation-check.sh (run as root at lock time, after the harness copy: §4 step 9) to say
+#   ESCALATION-NONE for AGENT_USER in full mode, and the live part (groups, docker sockets, 2375/2376) to pass now.
+_esc_live(){ env -u ESC_ROOT bash "$_LIB_PLAN/scripts/escalation-check.sh" --live "$1"; }
+escalation_none_ok(){ local u="${AGENT_USER:-$(id -un)}" rec="${ESCALATION_RECORD:-/opt/harness-v3-env/escalation-check.txt}" bad=0
+  if ! _root_owned "$rec"; then echo "ESCALATION record missing, not root-owned or writable by $u: $rec"; bad=1
+  elif ! grep -Eq "^ESCALATION-NONE user=$u uid=[0-9]+ mode=full " "$rec"; then echo "ESCALATION record has no ESCALATION-NONE user=$u mode=full: $rec"; bad=1
+  elif [ -e "$_LIB_PLAN/HARNESS-FROM" ] && [ ! "$rec" -nt "$_LIB_PLAN/HARNESS-FROM" ]; then echo "ESCALATION record is older than this harness copy (re-run §4 step 9): $rec"; bad=1; fi
+  _esc_live "$u" | sed 's/^/ESCALATION live: /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1
+  [ "$bad" = 0 ] && echo "ESCALATION ok: record $rec says ESCALATION-NONE for $u, live check passed"
+  [ "$bad" = 0 ]; }
+# _covers <list> <path>...: every path (resolved) is in the list (resolved). For the lock and scan variables, which
+#   replace their defaults when set: in V3 they may only add places.
+_covers(){ local list="$1" p q hit; shift
+  for p in "$@"; do [ -n "$p" ] || continue; hit=0
+    for q in $list; do [ "$(realpath -m "$q")" = "$(realpath -m "$p")" ] && { hit=1; break; }; done
+    [ "$hit" = 1 ] || { echo "$p"; }; done; }
+# v3_launch_ok (V3 marker present; kitfix-20261031-launch-env): the launch could not have been weakened through files
+#   the agent user can write (its dotfiles, tools.env, an old launch env): REQUIRE_FAIL_MODES=1; PLAN_DIR is this
+#   harness; HOME is the agent user's home; KIT_SCAN_ROOTS, KIT_SOURCE_PATHS and HARNESS_LOCK_PATHS keep their
+#   defaults; the tools the preflight runs are not writable by the agent user; the startup files match the root-owned
+#   record (home-hash.sh, §4 step 9); and escalation_none_ok.
+# fixed list, not read from the environment
+V3_TOOLS="bash sh env git find stat sha256sum python3 jq awk sed grep sort diff realpath getent id tmux cat cp mv"
+_home_of(){ getent passwd "$1" | cut -d: -f6; }
+v3_launch_ok(){ local u="${AGENT_USER:-$(id -un)}" me bad=0 miss t p hh rec="${HOME_HASH_RECORD:-/opt/harness-v3-env/e2e-home.sha256}"; me="$(id -un)"
+  _va(){ if [ "$me" = "$u" ]; then "$@"; elif [ "$(id -u)" = 0 ]; then runuser -u "$u" -- "$@"; else return 125; fi; }
+  [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] || { echo "V3 REFUSED REQUIRE_FAIL_MODES=${REQUIRE_FAIL_MODES:-unset} (V3 harness copy: need 1)"; bad=1; }
+  [ "$(cd "${PLAN_DIR:-/nonexistent}" 2>/dev/null && pwd -P)" = "$_LIB_PLAN" ] || { echo "V3 REFUSED PLAN_DIR=${PLAN_DIR:-unset} is not this harness $_LIB_PLAN"; bad=1; }
+  hh="$(_home_of "$u")"
+  [ -n "$hh" ] && [ "$(realpath -m "$HOME")" = "$(realpath -m "$hh")" ] || { echo "V3 REFUSED HOME=$HOME is not the home of $u (${hh:-unknown})"; bad=1; }
+  miss="$(_covers "${KIT_SCAN_ROOTS:-$HOME $TEST_ROOT /tmp}" "$HOME" "$TEST_ROOT" /tmp)"
+  [ -z "$miss" ] || { echo "V3 REFUSED KIT_SCAN_ROOTS drops default(s): $(echo $miss) (it may only add places)"; bad=1; }
+  miss="$(_covers "${KIT_SOURCE_PATHS:-$KIT $TEST_ROOT/calib/kit $HOME/kit-src}" "$KIT" "$TEST_ROOT/calib/kit" "$HOME/kit-src")"
+  [ -z "$miss" ] || { echo "V3 REFUSED KIT_SOURCE_PATHS drops default(s): $(echo $miss) (it may only add places)"; bad=1; }
+  miss="$(_covers "${HARNESS_LOCK_PATHS:-$_LIB_PLAN}" "$_LIB_PLAN")"
+  [ -z "$miss" ] || { echo "V3 REFUSED HARNESS_LOCK_PATHS drops the harness $_LIB_PLAN"; bad=1; }
+  for t in $V3_TOOLS; do p="$(command -v "$t" 2>/dev/null)"
+    case "$p" in /*) ;; *) echo "V3 REFUSED tool $t not found as a file (got: ${p:-nothing})"; bad=1; continue;; esac
+    p="$(realpath "$p")"; _va test -w "$p"; case $? in 125) echo "V3 cannot test as $u from $me"; return 1;; 0) echo "V3 REFUSED tool $t ($p) is writable by $u"; bad=1; continue;; esac
+    if _va test -w "$(dirname "$p")"; then echo "V3 REFUSED tool $t ($p) is in a folder writable by $u"; bad=1; fi
+  done
+  if ! _root_owned "$rec"; then echo "V3 REFUSED home-hash record missing, not root-owned or writable by $u: $rec"; bad=1
+  elif [ -e "$_LIB_PLAN/HARNESS-FROM" ] && [ ! "$rec" -nt "$_LIB_PLAN/HARNESS-FROM" ]; then echo "V3 REFUSED home-hash record is older than this harness copy (re-run §4 step 9): $rec"; bad=1
+  else bash "$_LIB_PLAN/scripts/home-hash.sh" --check "$rec" "$HOME" | sed 's/^/V3 /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1; fi
+  escalation_none_ok || bad=1
+  [ "$bad" = 0 ] && echo "V3 launch ok: REQUIRE_FAIL_MODES=1, PLAN_DIR=$_LIB_PLAN, lock and scan paths keep their defaults, tools and startup files unchanged"
   [ "$bad" = 0 ]; }
 # kit_policy_apply <why>: KIT_TRACE_MODE=warn|fail (launch env, harness-owned) is written as trace_mode=<mode> into
 #   .agents-v0/policy.conf of main and every kit worktree, with one harness commit per checkout that changed. The
@@ -862,6 +923,10 @@ modes_preflight(){ local phase="${1:-full}" w bad=0 log="$RES/modes-preflight.lo
   if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] || [ "${KIT_SOURCE_LOCK:-0}" = 1 ]; then kit_source_locked >> "$log" 2>&1 || bad=1; fi
   if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] || [ "${HARNESS_LOCK:-0}" = 1 ]; then harness_locked >> "$log" 2>&1 || bad=1; fi
   if [ "${REQUIRE_FAIL_MODES:-0}" = 1 ] && [ -n "${KIT_MANIFEST:-}" ] && [ ! -s "$KIT_MANIFEST" ]; then echo "MANIFEST-MISSING $KIT_MANIFEST" >> "$log"; bad=1; fi
+  # kitfix-20261031-launch-env / -escalation-none: a V3 harness copy refuses any launch v3_launch_ok rejects, whatever
+  #   REQUIRE_FAIL_MODES says; ESCALATION_CHECK=1 runs escalation_none_ok on its own
+  if v3_required; then v3_launch_ok >> "$log" 2>&1 || bad=1
+  elif [ "${ESCALATION_CHECK:-0}" = 1 ]; then escalation_none_ok >> "$log" 2>&1 || bad=1; fi
   if [ "$phase" = early ]; then
     post MODES-EARLY "require_fail=${REQUIRE_FAIL_MODES:-0} $([ "$bad" = 0 ] && echo OK || echo REFUSED) (before any resume bookkeeping)"
     [ "$bad" = 0 ] && MODES_EARLY_DONE=1; [ "$bad" = 0 ]; return; fi
