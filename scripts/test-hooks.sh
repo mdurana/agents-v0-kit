@@ -328,7 +328,21 @@ set -e
 { [ "$r1" != 0 ] && grep -q 'refused' "$n1/inst2.err"; } || err "N-1 install accepted a user-owned --hook-python (rc=$r1)"
 [ ! -e "$n1/t2/.agents" ] && [ ! -e "$n1/t2/.cursor" ] || err "N-1 a refused install still wrote adapter files"
 { [ "$r2" != 0 ] && grep -q 'not an absolute path' "$n1/inst3.err"; } || err "N-1 install accepted a relative --hook-python (rc=$r2)"
-
+# kitfix-20261031-n1, Jiraiya's N-1 review (JN-2, JN-5, JN-6, JN-7, JN-8).
+# JN-2 (a): the pins are per-machine state; a gate commit (git add -A) must not stage them, fresh or brownfield.
+if [ -x /usr/bin/python3 ]; then
+  git -C "$n1/t1" add -A >/dev/null 2>&1 || :
+  [ -z "$(git -C "$n1/t1" ls-files -- .cursor/hooks/hook-python .agents/hooks/hook-python)" ] \
+    || err "JN-2 git add -A staged the hook-python pin(s) of a fresh install: $(git -C "$n1/t1" ls-files -- '*hook-python' | tr '\n' ' ')"
+  mkdir -p "$n1/t3"; git -C "$n1/t3" init -q; printf 'node_modules/' > "$n1/t3/.gitignore"
+  sh "$KIT/scripts/install.sh" "$n1/t3" >"$n1/inst4.out" 2>&1 || err "JN-2 brownfield install failed: $(tail -3 "$n1/inst4.out")"
+  git -C "$n1/t3" add -A >/dev/null 2>&1 || :
+  [ -z "$(git -C "$n1/t3" ls-files -- .cursor/hooks/hook-python .agents/hooks/hook-python)" ] \
+    || err "JN-2 git add -A staged the hook-python pin(s) of a brownfield install (existing .gitignore)"
+  grep -qx 'node_modules/' "$n1/t3/.gitignore" || err "JN-2 install changed the project's own .gitignore lines"
+  KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --update --quick --allow-in-flight "$n1/t3" >/dev/null 2>&1 || err "JN-2 --update of the brownfield install failed"
+  [ "$(grep -c 'hooks/hook-python$' "$n1/t3/.gitignore")" = 2 ] || err "JN-2 --update added the pin lines to .gitignore twice"
+fi
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then
