@@ -835,6 +835,34 @@ _covers(){ local list="$1" p q hit; shift
 #   harness; HOME is the agent user's home; KIT_SCAN_ROOTS, KIT_SOURCE_PATHS and HARNESS_LOCK_PATHS keep their
 #   defaults; the tools the preflight runs are not writable by the agent user; the startup files match the root-owned
 #   record (home-hash.sh, §4 step 9); and escalation_none_ok.
+# kitfix-20261031-n1 (Sasuke N-1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): the hooks run
+#   "$HOOK_PYTHON" -I -S, the path install.sh pinned in <checkout>/.agents/hooks/hook-python and .cursor/hooks/hook-python
+#   (/usr/bin/python3 without that file). hook_python_locked <py> prints why AGENT_USER could change what that
+#   interpreter runs (empty = locked): not an absolute executable, or it, its real file or a folder on its sys.path
+#   under -I -S is not root-owned, is writable by that user, or can be replaced (the _locked_path rule).
+hook_python_locked(){ local py="$1" p why paths
+  case "$py" in /*) ;; *) echo "hook interpreter '$py' is not an absolute path"; return;; esac
+  [ -f "$py" ] && [ -x "$py" ] || { echo "hook interpreter $py is not an executable file"; return; }
+  paths="$("$py" -I -S -c 'import os, sys
+r = os.path.realpath(sys.executable)
+print(r); print(os.path.dirname(r))
+for p in sys.path:
+    if p and os.path.isdir(p):
+        print(os.path.realpath(p))' 2>/dev/null)" || { echo "hook interpreter $py does not run with -I -S"; return; }
+  while IFS= read -r p; do [ -n "$p" ] || continue
+    [ "$(stat -Lc %u "$p" 2>/dev/null)" = 0 ] || { echo "hook interpreter $py: $p is not owned by root"; return; }
+    why="$(_locked_path "$p" 0)"; [ -z "$why" ] || { echo "hook interpreter $py: $why"; return; }
+  done <<<"$py
+$(dirname "$py")
+$paths"; }
+# hook_pythons: the interpreters the installed hooks of main use (the pinned ones, or the hooks' default).
+hook_pythons(){ local f out=""
+  for f in "${MAIN:-/nonexistent}/.agents/hooks/hook-python" "${MAIN:-/nonexistent}/.cursor/hooks/hook-python"; do
+    [ -f "$f" ] && out="$out$(head -n 1 "$f")
+"; done
+  [ -n "$out" ] || out="/usr/bin/python3
+"
+  printf '%s' "$out" | awk 'NF && !s[$0]++'; }
 # fixed list, not read from the environment
 V3_TOOLS="bash sh env git find stat sha256sum python3 jq awk sed grep sort diff realpath getent id tmux cat cp mv"
 _home_of(){ getent passwd "$1" | cut -d: -f6; }
@@ -868,11 +896,14 @@ v3_launch_ok(){ local u="${AGENT_USER:-$(id -un)}" me bad=0 miss t p hh rec="${H
   for d in "${pd[@]}"; do case "$d" in /usr/local/sbin|/usr/local/bin|/usr/sbin|/usr/bin|/sbin|/bin) break;; esac
     why="$(_locked_path "$d" 1)"; [ -z "$why" ] || { echo "V3 REFUSED PATH folder ahead of the system folders: $why"; bad=1; }
   done
+  local hp
+  while IFS= read -r hp; do why="$(hook_python_locked "$hp")"; [ -z "$why" ] || { echo "V3 REFUSED $why"; bad=1; }
+  done < <(hook_pythons)
   if ! _root_owned "$rec"; then echo "V3 REFUSED home-hash record missing, not root-owned or writable by $u: $rec"; bad=1
   elif [ -e "$_LIB_PLAN/HARNESS-FROM" ] && [ ! "$rec" -nt "$_LIB_PLAN/HARNESS-FROM" ]; then echo "V3 REFUSED home-hash record is older than this harness copy (re-run §4 step 9): $rec"; bad=1
   else bash "$_LIB_PLAN/scripts/home-hash.sh" --check "$rec" "$HOME" | sed 's/^/V3 /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1; fi
   escalation_none_ok || bad=1
-  [ "$bad" = 0 ] && echo "V3 launch ok: REQUIRE_FAIL_MODES=1, PLAN_DIR=$_LIB_PLAN, lock and scan paths keep their defaults, TOOLS_DIR, AGY_BIN, the env file and PATH out of reach, tools and startup files unchanged"
+  [ "$bad" = 0 ] && echo "V3 launch ok: REQUIRE_FAIL_MODES=1, PLAN_DIR=$_LIB_PLAN, lock and scan paths keep their defaults, TOOLS_DIR, AGY_BIN, the env file, PATH and the hook interpreter out of reach, tools and startup files unchanged"
   [ "$bad" = 0 ]; }
 # kit_policy_apply <why>: KIT_TRACE_MODE=warn|fail (launch env, harness-owned) is written as trace_mode=<mode> into
 #   .agents-v0/policy.conf of main and every kit worktree, with one harness commit per checkout that changed. The
