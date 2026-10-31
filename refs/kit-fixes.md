@@ -278,3 +278,11 @@ From Sasuke's round-2 review, approved by Marlon 2026-10-31 13:40 Asia/Manila. T
   | the new allow-variable rules | 5 |
 - **Limits:** text matching only. An indirect `env -u "$X"` is not caught. The wrapper's own fail-closed checks and the root-owned harness and tools are the real fence.
 
+
+## kitfix-20261031-n1 (REVIEW-NOTES: merge order with Y-1, Jiraiya JN-1)
+
+- **Do not merge the N-1 and Y-1 tips side by side.** `git merge-tree` of N-1 (448ca86) and Y-1 (61deabe) is textually clean in either order, but the merged tree fails: every fresh install is `HASH-FAIL` with `EXTRA .cursor/hooks/hook-python` and `EXTRA .agents/hooks/hook-python` (Y-1's `scripts/check-installed-kit.sh` `extras()` does not know the N-1 pin), `test-install-integrity` exits 1, and `test-guards` gives 169 passed / 14 failed (modes_preflight, manifest, manifest drift, "clean main refused", kio). The first V3 preflight after such a merge would refuse every install. Source: `proposals/jiraiya-review-of-n1-20261031.md`, JN-1.
+- **Order:** N-1 merges first. Y-1 is then rebased on it together with Sakura's M-2: `check-installed-kit.sh` adds `hook-python` to `expected` in both hook folders and validates it there (absolute, root-owned, not group/other-writable, the same value in both adapters). Y-1's hook-side bytecode change (Yamato's addendum, `KIT_PY`) builds on `hook_py` in `core/common/hooks/lib.sh`, which already runs `-I -S -B -X pycache_prefix=…` (JN-7); `KIT_PY` stays for `templates/.agents-v0/scripts` only.
+- **After the rebase:** re-run all suites on the rebased Y-1 (at least test-install-integrity, test-guards, test-hooks, test-hook-policy) and re-read `scripts/install.sh`, `refs/e2e-test-plan/scripts/lib.sh`, `refs/e2e-test-plan/tests/test-guards.sh` and `refs/e2e-test-plan/v3-rerun-procedure.md` by hand; both branches touch them.
+- **V3:** the home-hash record format changed with JN-3 (NUL-safe names, symlinks), so record it again (§4 step 9) after N-1 lands.
+- Nothing in Y-1 is changed on this branch.
