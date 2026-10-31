@@ -622,6 +622,32 @@ def _is_harness_path(p: str) -> bool:
     return any(c and HARNESS_PATH_RE.search(c) for c in cands)
 
 
+# kitfix-20261031-n1 (Sasuke N-1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): Python start-up
+#   files run inside every Python process of the user that owns them: the user site (~/.local/lib/python*/,
+#   with usercustomize.py and *.pth files), a python* in ~/.local/bin (often first on PATH), and any
+#   usercustomize.py / sitecustomize.py or site-packages *.pth. The hooks no longer load them (-I -S, a pinned
+#   interpreter), so this is the second line: a write there is blocked unattended and asks in supervised mode.
+#   Only spellings the write detection already knows are caught (dd of=, sponge, tar -x are H-5).
+PY_STARTUP_RE = re.compile(
+    r"(^|/)\.local/lib/python[^/]*(?:/|$)"
+    r"|(^|/)\.local/bin/python[^/]*$"
+    r"|(^|/)(?:usercustomize|sitecustomize)\.py$"
+    r"|(^|/)(?:site|dist)-packages/[^/]+\.pth$"
+)
+PY_STARTUP_MSG = ("Python start-up file or user site ({}): code there runs inside every Python process of this user, "
+                  "the kit hooks included. Blocked unattended; in supervised mode approve only if you asked for it.")
+
+
+def _is_py_startup_path(p: str) -> bool:
+    raw = os.path.expandvars(os.path.expanduser(p.replace("\\", "/").strip().strip("'\"")))
+    return bool(raw) and any(PY_STARTUP_RE.search(c) for c in (raw, posixpath.normpath(raw)))
+
+
+def _segment_writes_py_startup(seg: str) -> Optional[str]:
+    return _segment_writes_matching_path(seg, _is_py_startup_path) or \
+        _segment_changes_container(seg, _is_py_startup_path)
+
+
 def _segment_changes_harness(seg: str) -> Optional[str]:
     w = _segment_writes_matching_path(seg, _is_harness_path)
     if w:
@@ -1010,6 +1036,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     kpath = _segment_changes_kit_container(seg)
     if kpath:
         return "block", KIT_CONTAINER_MSG.format(kpath)
+
+    ppath = _segment_writes_py_startup(seg)  # kitfix-20261031-n1
+    if ppath:
+        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(ppath)
 
     # MEM-13: a shell write to lessons.md / lessons-archive.md from a story checkout is blocked.
     lpath = _segment_writes_matching_path(seg, lambda p: lessons_story_block(p) is not None)
@@ -1549,6 +1579,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
             "block",
             f"Protected kit/CI path cannot be modified by agents: {path}",
         )
+    if _is_py_startup_path(path):  # kitfix-20261031-n1
+        return ("block" if unattended_mode() else "ask"), PY_STARTUP_MSG.format(path)
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         if norm.endswith(".phase-result.md"):
