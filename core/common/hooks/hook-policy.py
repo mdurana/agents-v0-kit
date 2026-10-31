@@ -657,6 +657,8 @@ def _segment_writes_py_startup(seg: str) -> Optional[str]:
 PY_STARTUP_PARENT_RE = re.compile(r"(^|/)\.local(?:/(?:lib|bin))?/*$")
 # Judged on the whole command (an env prefix or `env` wrapper is gone by the time a segment is classified).
 PIP_USER_RE = re.compile(r"\bPIP_USER\s*=\s*['\"]?(?!0\b|false\b|no\b|off\b)[^\s;&|'\"]", re.I)
+# N-1 follow-up (Sakura re-review): PIP_TARGET / PIP_PREFIX / PIP_ROOT pointing into the user site or its parents.
+PIP_PATH_ENV_RE = re.compile(r"\bPIP_(?:TARGET|PREFIX|ROOT)\s*=\s*['\"]?([^\s;&|'\"]+)", re.I)
 _PIP_PATH_OPTS = ("--target", "-t", "--prefix", "--root", "--home")
 
 
@@ -689,16 +691,145 @@ def _existing_dir(p: str) -> bool:
     return os.path.isdir(raw if raw.startswith("/") else os.path.join(_base_dir(), raw))
 
 
+def _python_module(parts: List[str]) -> Optional[Tuple[str, List[str]]]:
+    """(module, its arguments) for python* -m <mod> in any spelling (-m mod, -mmod, -Im mod, -I -m mod); else None."""
+    if not re.fullmatch(r"python[0-9.]*", parts[0].split("/")[-1]):
+        return None
+    i = 1
+    while i < len(parts):
+        a = parts[i]
+        if a == "--" or a == "-" or not a.startswith("-"):
+            return None
+        if a.startswith("--"):
+            i += 1
+            continue
+        cl = a[1:]
+        for k, ch in enumerate(cl):
+            if ch == "m":
+                if cl[k + 1:]:
+                    return cl[k + 1:], parts[i + 1:]
+                return (parts[i + 1], parts[i + 2:]) if i + 1 < len(parts) else None
+            if ch == "c":
+                return None
+            if ch in "WX":  # takes a value: the rest of the cluster or the next word
+                if not cl[k + 1:]:
+                    i += 1
+                break
+        i += 1
+    return None
+
+
+def _python_c_body(parts: List[str]) -> Optional[str]:
+    """The program text of python* -c <body> (also -Ic, -I -S -c); None when there is no -c."""
+    if not re.fullmatch(r"python[0-9.]*", parts[0].split("/")[-1]):
+        return None
+    for i, a in enumerate(parts[1:], 1):
+        if a == "--" or not a.startswith("-") or a.startswith("--"):
+            if a.startswith("--"):
+                continue
+            return None
+        k = a.find("c", 1)
+        if k > 0:
+            return a[k + 1:] or (parts[i + 1] if i + 1 < len(parts) else None)
+    return None
+
+
+# Python calls that copy, move or unpack: name -> (index of the destination argument, does it place a whole tree).
+_PY_TREE_CALLS = {"copytree": (1, True), "copy_tree": (1, True), "move": (1, True), "unpack_archive": (1, True),
+                  "extractall": (0, True), "symlink": (1, True), "symlink_to": (0, True), "rename": (1, True),
+                  "replace": (1, True), "copy": (1, False), "copy2": (1, False), "copyfile": (1, False)}
+
+
+def _call_args(text: str, start: int) -> List[str]:
+    """Top-level comma-separated arguments of the call whose '(' is at text[start]."""
+    args, depth, cur, q, i = [], 0, "", None, start + 1
+    while i < len(text):
+        ch = text[i]
+        if q:
+            cur += ch
+            if ch == "\\" and i + 1 < len(text):
+                cur += text[i + 1]
+                i += 1
+            elif ch == q:
+                q = None
+        elif ch in "'\"":
+            q = ch
+            cur += ch
+        elif ch in "([{":
+            depth += 1
+            cur += ch
+        elif ch in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+            cur += ch
+        elif ch == "," and depth == 0:
+            args.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+        i += 1
+    if cur.strip():
+        args.append(cur.strip())
+    return args
+
+
+def _py_code_tree_dest(body: str) -> Optional[str]:
+    """A shutil/zipfile/os/Path call in Python source whose destination is a start-up path or (for a tree) a parent
+    of the user site. String literals of the destination argument are joined with '/', so
+    os.path.join(os.path.expanduser('~'), '.local', 'lib') and Path.home() / '.local' / 'lib' are seen."""
+    for m in re.finditer(r"\b(" + "|".join(_PY_TREE_CALLS) + r")\s*\(", body):
+        idx, tree = _PY_TREE_CALLS[m.group(1)]
+        args = _call_args(body, m.end() - 1)
+        kw = [a.split("=", 1)[1] for a in args if re.match(r"(?:dst|path|extract_dir|target)\s*=", a)]
+        pos = [a for a in args if not re.match(r"[A-Za-z_]\w*\s*=(?!=)", a)]
+        dest = kw[0] if kw else (pos[idx] if idx < len(pos) else None)
+        if m.group(1) in ("symlink_to",):  # Path(dest).symlink_to(src): the destination is before the call
+            pre = body[max(0, m.start() - 200):m.start()]
+            lit = re.findall(r"['\"]([^'\"]+)['\"]", pre)
+            dest = "'" + "/".join(lit[-3:]) + "'" if lit else None
+        if not dest:
+            continue
+        lits = re.findall(r"['\"]([^'\"]*)['\"]", dest)
+        if not lits:
+            continue
+        joined = "/".join(x.strip("/") if j else x.rstrip("/") for j, x in enumerate(lits) if x)
+        for cand in (joined, lits[-1]):
+            if _is_py_startup_path(cand) or (tree and _is_py_startup_parent(cand)):
+                return cand
+    return None
+
+
+def _brace_expand(s: str, limit: int = 64) -> List[str]:
+    m = re.search(r"\{([^{}]*,[^{}]*)\}", s)
+    if not m:
+        return [s]
+    out: List[str] = []
+    for alt in m.group(1).split(","):
+        out.extend(_brace_expand(s[:m.start()] + alt + s[m.end():], limit))
+        if len(out) >= limit:
+            break
+    return out[:limit]
+
+
+def _is_home(p: str) -> bool:
+    raw = _py_startup_expand(p)
+    if not raw:
+        return False
+    full = posixpath.normpath(raw if raw.startswith("/") else posixpath.join(_BASE_DIR or _base_dir(), raw))
+    home = posixpath.normpath(os.path.expanduser("~"))
+    return home not in ("", "/", "~") and full in (home, os.path.realpath(home))
+
+
 def _pip_install_args(parts: List[str]) -> Optional[List[str]]:
     """The arguments after `install` for pip/pip3/pip3.X, python* -m pip, or uv pip; None when it is not a pip install."""
     bin0 = parts[0].split("/")[-1]
     rest: Optional[List[str]] = None
+    mod = _python_module(parts)
     if re.fullmatch(r"pip[0-9.]*", bin0):
         rest = parts[1:]
-    elif re.fullmatch(r"python[0-9.]*", bin0) and "-m" in parts:
-        i = parts.index("-m")
-        if i + 1 < len(parts) and re.fullmatch(r"pip[0-9.]*", parts[i + 1]):
-            rest = parts[i + 2:]
+    elif mod and re.fullmatch(r"pip[0-9.]*", mod[0]):
+        rest = mod[1]
     elif bin0 == "uv" and len(parts) > 1 and parts[1] == "pip":
         rest = parts[2:]
     if rest is None:
@@ -718,9 +849,11 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
     if not parts:
         return None
     bin0 = parts[0].split("/")[-1]
-    if re.fullmatch(r"pip[0-9.]*", bin0) and len(parts) > 3 and parts[1:3] == ["config", "set"] and \
-            re.search(r"\.user$", parts[3]):
-        return "pip config set " + parts[3]
+    if re.fullmatch(r"pip[0-9.]*", bin0) and len(parts) > 3 and parts[1:3] == ["config", "set"]:
+        if re.search(r"\.user$", parts[3]):
+            return "pip config set " + parts[3]
+        if re.search(r"\.(?:target|prefix|root)$", parts[3]) and len(parts) > 4 and _is_py_startup_tree_dest(parts[4]):
+            return parts[4]
     pip = _pip_install_args(parts)
     if pip is not None:
         if "--user" in pip:
@@ -728,9 +861,21 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
         for i, a in enumerate(pip):
             for o in _PIP_PATH_OPTS:
                 v = pip[i + 1] if a == o and i + 1 < len(pip) else (a.split("=", 1)[1] if a.startswith(o + "=") else None)
+                if v is None and o == "-t" and a.startswith("-t") and len(a) > 2:
+                    v = a[2:]  # -t<path>
                 if v and _is_py_startup_tree_dest(v):
                     return v
         return None
+    mod = _python_module(parts)
+    if mod and mod[0] in ("zipfile", "tarfile") and any(a in ("-e", "--extract") for a in mod[1]):
+        ops = [a for a in mod[1] if not a.startswith("-")]
+        dest = ops[1] if len(ops) >= 2 else "."
+        return dest if _is_py_startup_tree_dest(dest) else None
+    body = _python_c_body(parts)
+    if body:
+        hit = _py_code_tree_dest(body)
+        if hit:
+            return hit
     if re.fullmatch(r"python[0-9.]*", bin0) and "setup.py" in parts and "install" in parts and "--user" in parts:
         return "setup.py install --user"
     if bin0 == "unzip":
@@ -747,13 +892,21 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
     longs = [a for a in parts[1:] if a.startswith("--")]
     recursive = bin0 in ("mv", "ln", "ditto") or bool(re.search(r"[rRa]", shorts)) or \
         any(a in ("--recursive", "--archive") for a in longs)
-    tgt = None
+    tgt, used = None, set()
     for i, a in enumerate(parts[1:], 1):
-        if a in ("-t", "--target-directory") and i + 1 < len(parts):
+        if a == "--target-directory" and i + 1 < len(parts):
             tgt = parts[i + 1]
+            used.add(i + 1)
         elif a.startswith("--target-directory="):
             tgt = a.split("=", 1)[1]
-    ops = [a for a in parts[1:] if not a.startswith("-") and a != tgt]
+        elif bin0 != "rsync" and a.startswith("-") and not a.startswith("--") and "t" in a[1:]:
+            rest = a[a.index("t", 1) + 1:]  # -t DIR, -tDIR, -rt DIR, -rtDIR (rsync -t is --times)
+            if rest:
+                tgt = rest
+            elif i + 1 < len(parts):
+                tgt = parts[i + 1]
+                used.add(i + 1)
+    ops = [a for j, a in enumerate(parts[1:], 1) if not a.startswith("-") and j not in used]
     if tgt is None:
         if len(ops) < 2:
             return None
@@ -761,10 +914,18 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
     else:
         srcs = ops
     lands = []
-    for src in srcs:
+    # N-1 follow-up (Sakura re-review): a brace source is expanded, and a glob source counts as its contents (it
+    #   lands on the destination itself). Into ~ only a glob that can match a dot name counts (.[!.]*, .l*): a plain
+    #   * skips .local unless dotglob is set.
+    for src in [b for x in srcs for b in _brace_expand(x)]:
         s = src.rstrip("/")
+        base = posixpath.basename(s)
+        if re.search(r"[*?\[]", base):
+            if base.startswith(".") or base.startswith("[.") or not _is_home(tgt):
+                lands.append(tgt)
+            continue
         contents = (bin0 == "rsync" and src.endswith("/")) or s.endswith("/.") or s in (".", "")
-        lands.append(tgt if contents else posixpath.join(tgt, posixpath.basename(s)))
+        lands.append(tgt if contents else posixpath.join(tgt, base))
     if not _existing_dir(tgt):
         lands.append(tgt)
     for land in lands:
@@ -1516,11 +1677,13 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         if action == "ask" and worst != "block":
             worst = "ask"
             msg = message or msg
-    if PIP_USER_RE.search(cmd):  # kitfix-20261031-n1 rework (Sakura B-2): pip then installs into the user site
+    pip_env = "PIP_USER" if PIP_USER_RE.search(cmd) else next(
+        (m.group(0) for m in PIP_PATH_ENV_RE.finditer(cmd) if _is_py_startup_tree_dest(m.group(1))), None)
+    if pip_env:  # kitfix-20261031-n1 rework (Sakura B-2) and follow-up: pip then installs into the user site
         if unattended:
-            return "block", PY_STARTUP_MSG.format("PIP_USER")
+            return "block", PY_STARTUP_MSG.format(pip_env)
         if worst != "block":
-            worst, msg = "ask", PY_STARTUP_MSG.format("PIP_USER")
+            worst, msg = "ask", PY_STARTUP_MSG.format(pip_env)
     # sudo is unwrapped when segments are split, and a pipe splits a download from its interpreter,
     # so both are judged on the whole command. A block above still wins.
     if SUDO_RE.search(cmd):

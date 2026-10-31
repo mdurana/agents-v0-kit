@@ -738,6 +738,63 @@ def n1_python_startup_cases(tmp: str) -> list:
             ("cp README.md ~/.local/share/", "cp into ~/.local/share"), ("mkdir -p ~/.local/lib", "mkdir ~/.local/lib")]:
         add("shell", cmd, UH, "allow", "unattended " + label)
         add("shell", cmd, AH, "allow", "attended " + label)
+    # N-1 follow-up (Sakura re-review of 942f076): the realistic home, where ~/.local/lib and ~/.local/bin exist.
+    #   Glob, brace and dot-glob sources, -t folded into -rt, pip -t<path>, -mpip, PIP_TARGET/PIP_PREFIX,
+    #   python -m zipfile/tarfile -e, and shutil/zipfile calls in python -c. Every block/ask case here is allowed by
+    #   the 942f076 policy.
+    fh1 = os.path.join(tmp, "n1home1")
+    for d in (".local/lib", ".local/bin"):
+        os.makedirs(os.path.join(fh1, d), exist_ok=True)
+    site1 = os.path.join(fh1, ".local/lib/python3.13/site-packages")
+    U1, A1 = dict(U, HOME=fh1), dict(A, HOME=fh1)
+    for cmd, label in [
+            ("cp -r /tmp/stage/* ~/.local/lib/", "cp -r a glob into an existing ~/.local/lib"),
+            ("cp -r /tmp/fakehome/* ~/.local/", "cp -r a glob into ~/.local"),
+            ("mv /tmp/stage/* ~/.local/", "mv a glob into ~/.local"),
+            ("rsync -a /tmp/stage/* ~/.local/", "rsync a glob into ~/.local"),
+            ("cp -r /tmp/stage/python3.1? ~/.local/lib/", "cp -r a ? glob into ~/.local/lib"),
+            ("cp -r /tmp/fakehome/.[!.]* ~", "cp -r a dot-glob into ~"),
+            ("cp -r /tmp/fakehome/.l* ~/", "cp -r .l* into ~"),
+            ("cp -r /tmp/stage/{python3.13,x} ~/.local/lib/", "cp -r a brace source into ~/.local/lib"),
+            ("cp -rt ~/.local/lib /tmp/stage/python3.13", "cp -rt DIR"),
+            ("cp -rt~/.local/lib /tmp/stage/python3.13", "cp -rtDIR"),
+            ("mv -t ~/.local/ /tmp/stage/lib", "mv -t ~/.local"),
+            ("pip install -t~/.local/lib/python3.13/site-packages x", "pip -t<path>"),
+            ("python3 -mpip install --user x", "python3 -mpip --user"),
+            ("python3 -Impip install --user x", "python3 -Impip --user"),
+            ("PIP_TARGET=~/.local/lib/python3.13/site-packages pip install x", "PIP_TARGET into the user site"),
+            ("PIP_PREFIX=~/.local pip install x", "PIP_PREFIX=~/.local"),
+            ("export PIP_TARGET=$HOME/.local/lib/python3.13/site-packages", "export PIP_TARGET"),
+            (f"pip config set global.target {site1}", "pip config set global.target"),
+            ("python3 -m zipfile -e x.zip ~/.local/lib", "python3 -m zipfile -e into ~/.local/lib"),
+            ("python3 -m tarfile -e x.tar ~/.local", "python3 -m tarfile -e into ~/.local"),
+            (f"python3 -c 'import shutil; shutil.copytree(\"/tmp/stage\", \"{fh1}/.local/lib/python3.13\")'",
+             "shutil.copytree to a literal user-site path"),
+            ("python3 -c 'import shutil,os; shutil.copytree(\"/tmp/s\", os.path.join(os.path.expanduser(\"~\"), "
+             "\".local\", \"lib\"), dirs_exist_ok=True)'", "shutil.copytree to os.path.join(~, .local, lib)"),
+            ("python3 -c 'import shutil; from pathlib import Path; shutil.copytree(\"/tmp/s\", Path.home() / "
+             "\".local\" / \"lib\", dirs_exist_ok=True)'", "shutil.copytree to Path.home() / .local / lib"),
+            (f"python3 -c 'import zipfile; zipfile.ZipFile(\"x.zip\").extractall(\"{fh1}/.local\")'",
+             "ZipFile.extractall into ~/.local"),
+            (f"python3 -I -S -c 'import shutil; shutil.copy(\"/tmp/u.py\", \"{site1}/usercustomize.py\")'",
+             "shutil.copy onto usercustomize.py")]:
+        add("shell", cmd, U1, "block", "unattended " + label)
+        add("shell", cmd, A1, "ask", "attended " + label)
+    for cmd, label in [
+            ("cp -r src/* build/", "cp -r a glob in the project"), ("cp src/*.txt ~/", "cp a glob of files into ~"),
+            ("cp -r /tmp/stage/* ~/", "cp -r a plain * glob into ~ (it skips .local)"),
+            ("mv downloads/* ~/", "mv a plain * glob into ~"), ("cp -r /tmp/stage/{a,b} build/", "a brace source into the project"),
+            ("cp -r /tmp/stage ~/.local/", "cp -r a folder into ~/.local (lands as ~/.local/stage)"),
+            ("cp -rt build src", "cp -rt in the project"), ("rsync -rt src/ build/", "rsync -rt (times, not a target)"),
+            ("rsync -a -t src/ build/", "rsync -t"), ("pip install -tvendor x", "pip -tvendor"),
+            ("python3 -mpip install -r requirements.txt", "python3 -mpip -r"), ("PIP_TARGET=vendor pip install x", "PIP_TARGET=vendor"),
+            ("python3 -m zipfile -e x.zip vendor", "zipfile -e into the project"), ("python3 -m zipfile -l x.zip", "zipfile -l"),
+            ("python3 -c 'import shutil; shutil.copytree(\"src\", \"build\")'", "shutil.copytree in the project"),
+            ("python3 -c 'import shutil,os; shutil.copytree(os.path.expanduser(\"~/.local/lib\"), \"/tmp/backup\")'",
+             "shutil.copytree that backs up ~/.local/lib"),
+            ("cp -r ~/.local/lib /tmp/backup", "cp -r a backup of ~/.local/lib"), ("rsync -a ~/ /tmp/backup/", "rsync a backup of ~")]:
+        add("shell", cmd, U1, "allow", "unattended " + label)
+        add("shell", cmd, A1, "allow", "attended " + label)
     return c
 
 
