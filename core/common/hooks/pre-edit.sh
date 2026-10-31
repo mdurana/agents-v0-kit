@@ -1,12 +1,18 @@
 #!/bin/sh
 # pre-edit.sh — block writes to protected kit/CI paths (preToolUse / PreToolUse Edit|Write).
 set -eu
+# kitfix-20261031-jn4 (M-1): the hooks run the system tools only. PATH comes from the IDE, which takes it from the
+#   login shell and its start-up files, so an agent-written ~/.local/bin/cat or a PATH line in ~/.bashrc would
+#   otherwise run inside the hook (Sakura's fake-cat repro). Set before the first command (dirname).
+PATH=/usr/bin:/bin
+export PATH
 
 . "$(dirname "$0")/lib.sh"
 
 # N-1, JN-2/JN-5: checked before the payload is read, so an untrusted or non-working interpreter (missing, not
 #   root-owned, a folder, /bin/true: no path read) is not an allow.
 [ -z "$HOOK_PYTHON_WHY" ] || hook_deny_literal "kit hook interpreter not trusted: $HOOK_PYTHON_WHY"
+[ -z "$HOOK_ENV_WHY" ] || hook_deny_literal "untrusted preload in the hook environment: $HOOK_ENV_WHY"
 
 payload="$(cat || true)"
 path="$(hook_extract_file_path "$payload")"

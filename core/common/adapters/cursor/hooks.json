@@ -3,13 +3,13 @@
   "hooks": {
     "sessionStart": [
       {
-        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/session-start.sh",
+        "command": "KIT_HOOK_FLAVOR=cursor /bin/sh .cursor/hooks/session-start.sh",
         "timeout": 10
       }
     ],
     "beforeShellExecution": [
       {
-        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-shell.sh",
+        "command": "KIT_HOOK_FLAVOR=cursor /bin/sh .cursor/hooks/pre-shell.sh",
         "failClosed": true,
         "timeout": 30
       }
@@ -17,14 +17,14 @@
     "preToolUse": [
       {
         "matcher": "Edit|Write|Delete",
-        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/pre-edit.sh",
+        "command": "KIT_HOOK_FLAVOR=cursor /bin/sh .cursor/hooks/pre-edit.sh",
         "failClosed": true,
         "timeout": 15
       }
     ],
     "stop": [
       {
-        "command": "KIT_HOOK_FLAVOR=cursor sh .cursor/hooks/stop.sh",
+        "command": "KIT_HOOK_FLAVOR=cursor /bin/sh .cursor/hooks/stop.sh",
         "timeout": 15
       }
     ]
