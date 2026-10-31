@@ -349,7 +349,7 @@ rm -f "$SB/r1.mark"; ( cd "$SB" && HOME="$R1" /usr/bin/python3 -c 'import legit'
 [ "$(cat "$SB/r1.mark" 2>/dev/null)" = ran ] && ok "control: a swapped __pycache__ .pyc of a user-site module runs in a bare python3 (R-1)" \
   || ko "control: the swapped __pycache__ .pyc did not run"
 bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
-[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED: .*\.local/lib holds 1 Python source' "$SB/r1.log" && [ ! -e "$SB/r1.sha256" ] \
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED: .*\.local/lib/python\* holds 1 Python source' "$SB/r1.log" && [ ! -e "$SB/r1.sha256" ] \
   && ok "home-hash --record refuses a user site that holds a .py, and writes no record (Sakura R-1)" || ko "home-hash R-1 .py: rc=$r $(cat "$SB/r1.log")"
 rm -rf "$R1S/legit"; echo 'import os' > "$R1S/x.pth"
 bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
@@ -357,6 +357,15 @@ bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2
 rm -f "$R1S/x.pth"; mkdir -p "$R1S/__pycache__"; : > "$R1S/__pycache__/stale.cpython-313.pyc"; : > "$R1S/data.txt"
 bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1 && grep -q '^HOME-HASH recorded' "$SB/r1.log" \
   && ok "home-hash --record accepts a user site with only __pycache__ and data files" || ko "home-hash R-1 allow: $(cat "$SB/r1.log")"
+# N-1 final round: a .py outside .local/lib/python*/ (npm prefix ~/.local: node-gyp's gyp_main.py) is not on
+#   sys.path: the record is written, and a later change there is still a HOME change (all of .local/lib is hashed).
+rm -rf "$R1S/__pycache__" "$R1S/data.txt" "$SB/r1.sha256"; NG="$R1/.local/lib/node_modules/npm/node_modules/node-gyp/gyp"
+mkdir -p "$NG"; echo 'import sys' > "$NG/gyp_main.py"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1 && grep -q '^HOME-HASH recorded' "$SB/r1.log" \
+  && ok "home-hash --record accepts a .py outside .local/lib/python*/ (node-gyp gyp_main.py)" || ko "home-hash node-gyp: $(cat "$SB/r1.log")"
+echo '# changed' >> "$NG/gyp_main.py"
+bash "$HV3/scripts/home-hash.sh" --check "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/r1.log" \
+  && ok "home-hash still hashes all of .local/lib (a changed node_modules .py is HOME-CHANGED)" || ko "home-hash node_modules change: $(cat "$SB/r1.log")"
 rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
 # Sakura B-3: the harness's own Python runs isolated. run-plan.sh's next-story.py calls (they pick the next story) ran
 #   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools

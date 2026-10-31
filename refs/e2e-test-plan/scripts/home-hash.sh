@@ -15,6 +15,8 @@
 #   imports (a tampered cached .pyc of a real module runs and is not hashed). So --record refuses (exit 2) when
 #   .local/lib holds any *.py or *.pth outside __pycache__/: the V3 user site must be empty of Python source
 #   (PyYAML from apt's python3-yaml, not pip --user). After that, any .py or .pth that appears is a HOME change.
+#   N-1 final round: only .local/lib/python*/ is ever on sys.path, so only *.py/*.pth there refuse the record (a
+#   node-gyp gyp_main.py under .local/lib/node_modules does not); all of .local/lib is still hashed.
 set -u
 FILES=".profile .bash_profile .bash_login .bashrc .bash_logout .bash_aliases .zshenv .zprofile .zshrc .inputrc
 .tmux.conf .config/tmux/tmux.conf .gitconfig .config/git/config .config/git/attributes .ssh/rc .ssh/environment
@@ -27,9 +29,9 @@ list(){ local h="$1" f
   done; }
 case "${1:-}" in
   --record) [ $# = 3 ] || { echo "usage: $0 --record <file> <home>" >&2; exit 2; }
-            src=""; [ ! -d "$3/.local/lib" ] || src="$(find "$3/.local/lib" -type f \( -name '*.py' -o -name '*.pth' \) \
-                ! -path '*/__pycache__/*' 2>/dev/null | LC_ALL=C sort)"
-            [ -z "$src" ] || { printf 'HOME-HASH REFUSED: %s/.local/lib holds %s Python source or .pth file(s), first %s. Their cached bytecode under __pycache__/ is not hashed, so it could be swapped unseen. Remove the user-site packages (PyYAML comes from apt python3-yaml) and record again.\n' \
+            src=""; [ ! -d "$3/.local/lib" ] || src="$(find "$3/.local/lib" -mindepth 1 -maxdepth 1 -name 'python*' \
+                -exec find {} -type f \( -name '*.py' -o -name '*.pth' \) ! -path '*/__pycache__/*' \; 2>/dev/null | LC_ALL=C sort)"
+            [ -z "$src" ] || { printf 'HOME-HASH REFUSED: %s/.local/lib/python* holds %s Python source or .pth file(s), first %s. Their cached bytecode under __pycache__/ is not hashed, so it could be swapped unseen. Remove the user-site packages (PyYAML comes from apt python3-yaml) and record again.\n' \
                 "$3" "$(printf '%s\n' "$src" | wc -l | tr -d ' ')" "$(printf '%s\n' "$src" | head -n 1)"; exit 2; }
             (umask 022; list "$3" > "$2") || exit 2; echo "HOME-HASH recorded $(grep -vc '^absent' "$2") files of $3 in $2";;
   --check)  [ $# = 3 ] || { echo "usage: $0 --check <file> <home>" >&2; exit 2; }
