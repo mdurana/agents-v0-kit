@@ -694,7 +694,12 @@ def n1_python_startup_cases(tmp: str) -> list:
         add("shell", cmd, A, "allow", "attended " + label)
     up = os.path.expanduser("~/.local/lib/python3.13/site-packages/usercustomize.py")
     add("path", up, U, "block", "unattended edit of usercustomize.py")
-    add("path", up, A, "ask", "attended edit of usercustomize.py")
+    # JN-6 (Jiraiya's N-1 review): an edit-tool "ask" was a silent allow, so the edit tool is blocked in both modes.
+    add("path", up, A, "block", "attended edit of usercustomize.py (JN-6)")
+    add("path", os.path.expanduser("~/.local/lib/python3.13/site-packages/a b.pth"), A, "block", "attended edit of a user-site .pth (JN-6)")
+    add("path", os.path.expanduser("~/.local/bin/python3"), A, "block", "attended edit of ~/.local/bin/python3 (JN-6)")
+    add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), A, "block", "attended edit of a site-packages .pth (JN-6)")
+    add("path", os.path.join(proj, "src/app.py"), A, "allow", "attended edit of project code (JN-6 control)")
     add("path", os.path.join(proj, "venv/lib/python3.13/site-packages/evil.pth"), U, "block", "unattended edit of a site-packages .pth")
     add("path", os.path.join(proj, "src/app.py"), U, "allow", "unattended edit of project code")
     # Sakura B-2 (N-1 rework): trees copied, moved, synced or unpacked into the user site or its parents, and

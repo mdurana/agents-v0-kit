@@ -366,6 +366,10 @@ rm -f "$n1/jn/hook-python"
 n1_expect_deny "JN-5 edit payload with no readable path" "$n1/jn" pre-edit.sh '{"tool_name":"Write","tool_input":{"contents":"x"}}'
 n1_hook "$n1/jn" pre-edit.sh '{"file_path":"src/a.txt"}'
 { [ "$n1_rc" = 0 ] && printf '%s' "$n1_out" | grep -q '"allow"'; } || err "JN-5 control: edit of src/a.txt with the default interpreter should allow (rc=$n1_rc $n1_out)"
+# JN-6: the Edit tool cannot prompt (pre-edit "ask" was a silent allow), so a supervised edit of a Python start-up
+#   file is denied; the developer makes that change in a terminal.
+n1_expect_deny "JN-6 supervised edit of usercustomize.py" "$n1/jn" pre-edit.sh "{\"file_path\":$(json_str "$us/usercustomize.py")}" HOME="$n1/home"
+n1_expect_deny "JN-6 supervised edit of a user-site .pth" "$n1/jn" pre-edit.sh "{\"file_path\":$(json_str "$us/x.pth")}" HOME="$n1/home"
 # JN-7: a planted __pycache__/hook-policy.<tag>.pyc next to the hooks is never loaded. hook_shell_permission_ask
 #   loads hook-policy.py by path; the planted copy splits every command into one allowlisted segment.
 if [ -x /usr/bin/python3 ]; then

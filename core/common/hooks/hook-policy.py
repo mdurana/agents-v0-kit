@@ -639,6 +639,12 @@ PY_STARTUP_RE = re.compile(
 )
 PY_STARTUP_MSG = ("Python start-up file or user site ({}): code there runs inside every Python process of this user, "
                   "the kit hooks included. Blocked unattended; in supervised mode approve only if you asked for it.")
+# JN-6 (Jiraiya's N-1 review): the Edit/Write tool cannot prompt. pre-edit.sh turns "ask" into a recorded allow
+#   (Cursor does not enforce "ask" for preToolUse), so for a start-up path an edit is blocked in both modes. An agent
+#   never needs the Edit tool there; a shell write still asks in supervised mode, and a developer edits in a terminal.
+PY_STARTUP_EDIT_MSG = ("Python start-up file or user site ({}): code there runs inside every Python process of this "
+                       "user. The edit tool cannot ask for approval, so this edit is blocked in every mode; if you "
+                       "need the change, make it yourself in a terminal.")
 
 
 def _is_py_startup_path(p: str) -> bool:
@@ -1952,6 +1958,8 @@ def main() -> int:
         if not path and len(sys.argv) > 2:
             path = sys.argv[2]
         action, message = classify_path(path)
+        if action == "ask" and _is_py_startup_path(path):  # JN-6
+            action, message = "block", PY_STARTUP_EDIT_MSG.format(path)
         _json_out(action, message)
         return 0
     _json_out("block", f"hook-policy: unknown mode {mode}")
