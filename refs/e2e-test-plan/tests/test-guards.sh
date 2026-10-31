@@ -306,6 +306,22 @@ v3 KIT_SOURCE_PATHS="$SB/elsewhere"; [ $? != 0 ] && grep -q 'V3 REFUSED KIT_SOUR
 v3 HARNESS_LOCK_PATHS=/usr/bin; [ $? != 0 ] && grep -q 'V3 REFUSED HARNESS_LOCK_PATHS drops the harness' "$SB/v3.log" && ok "V3 refuses HARNESS_LOCK_PATHS without the harness" || ko "V3 lock paths: $(cat "$SB/v3.log")"
 mkdir -p "$SB/fakebin"; printf '#!/bin/sh\nexec /usr/bin/git "$@"\n' > "$SB/fakebin/git"; chmod +x "$SB/fakebin/git"
 v3 PATH="$SB/fakebin:$PATH"; [ $? != 0 ] && grep -q 'V3 REFUSED tool git .* writable by' "$SB/v3.log" && ok "V3 refuses a PATH that puts an agent-writable git first" || ko "V3 path: $(cat "$SB/v3.log")"
+# kitfix-20261031-n1: the hook interpreter main's installed hooks pin (hook-python) must be out of the agent user's reach,
+#   with every folder on its -I -S sys.path; a user-site usercustomize.py is a startup-file change (home-hash .local/lib).
+printf '#!/bin/sh\nexec /usr/bin/python3 "$@"\n' > "$SB/fakebin/python3"; chmod +x "$SB/fakebin/python3"
+mkdir -p "$SB/v3main/.agents/hooks" "$SB/v3main/.cursor/hooks"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"; echo /usr/bin/python3 > "$SB/v3main/.cursor/hooks/hook-python"
+v3 MAIN="$SB/v3main" && grep -q '^V3 launch ok' "$SB/v3.log" && ok "V3 accepts hooks pinned to the root-owned /usr/bin/python3" || ko "V3 hook python ok: $(cat "$SB/v3.log")"
+echo "$SB/fakebin/python3" > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter $SB/fakebin/python3: .* not owned by root" "$SB/v3.log" && ok "V3 refuses hooks pinned to an interpreter the agent user owns (N-1)" || ko "V3 hook python user-owned: $(cat "$SB/v3.log")"
+echo python3 > "$SB/v3main/.agents/hooks/hook-python"
+v3 MAIN="$SB/v3main"; [ $? != 0 ] && grep -q "V3 REFUSED hook interpreter 'python3' is not an absolute path" "$SB/v3.log" && ok "V3 refuses a relative hook interpreter (N-1)" || ko "V3 hook python relative: $(cat "$SB/v3.log")"
+echo /usr/bin/python3 > "$SB/v3main/.agents/hooks/hook-python"
+( . "$HV3/scripts/lib.sh"; AGENT_USER="$(id -un)"; [ -z "$(hook_python_locked /usr/bin/python3)" ] && hook_python_locked "$SB/fakebin/python3" | grep -q 'not owned by root' ) \
+  && ok "hook_python_locked accepts /usr/bin/python3 and refuses a user-owned one" || ko "hook_python_locked"
+mkdir -p "$VH/.local/lib/python3.13/site-packages"; echo 'import os' > "$VH/.local/lib/python3.13/site-packages/usercustomize.py"
+v3; [ $? != 0 ] && grep -q '^V3 HOME-.*\.local/lib' "$SB/v3.log" && ok "V3 refuses a usercustomize.py added to the user site (home-hash .local/lib, N-1)" || ko "V3 user site: $(cat "$SB/v3.log")"
+rm -rf "$VH/.local/lib"
 echo 'export REQUIRE_FAIL_MODES=0' >> "$VH/.profile"; v3; [ $? != 0 ] && grep -q '^V3 HOME-CHANGED .profile' "$SB/v3.log" && ok "V3 refuses a changed startup file (.profile)" || ko "V3 dotfile: $(cat "$SB/v3.log")"
 sed -i '$d' "$VH/.profile"; mkdir -p "$VH/.local/agents-v0-tools"; echo 'TOOLS_PATH=/x' > "$VH/.local/agents-v0-tools/tools.env"
 v3; [ $? != 0 ] && grep -q '^V3 HOME-ADDED .local/agents-v0-tools/tools.env' "$SB/v3.log" && ok "V3 refuses a new tools.env the record did not have" || ko "V3 tools.env: $(cat "$SB/v3.log")"
