@@ -117,7 +117,9 @@ calib_turn(){ # <name> <message> <allow> -> sets RUN TURN_CLASS
   CHAT="$(create_agent_chat "$WS" 2>>"$RUN/create-chat.err")"; RUN_DEADLINE=$(( $(now) + 900 )); run_turn 1 "$2" "$3"; }
 s1(){ local ok=1 c0 c1
   bash "$HERE/prereqs.sh" --install | tee "$RES/prereqs-install.txt"
-  [ -f "$TOOLS_DIR/tools.env" ] && . "$TOOLS_DIR/tools.env"
+  # kitfix-20261031-tools-root: same rule as env.sh (no tools.env the agent's user can write in V3/unattended mode)
+  if [ -f "$TOOLS_DIR/tools.env" ] && ! { { [ -e "$PLAN_DIR/V3-REQUIRED" ] || [ "${REQUIRE_FAIL_MODES:-0}" = 1 ]; } && { [ -w "$TOOLS_DIR/tools.env" ] || [ -w "$TOOLS_DIR" ]; }; }; then
+    . "$TOOLS_DIR/tools.env"; fi
   bash "$HERE/prereqs.sh" --check | tee "$RES/prereqs-after.txt"; c0=${PIPESTATUS[0]}
   chk 1 - P1 "every prerequisite present (DEGRADED allowed)" -- test "$c0" = 0 || ok=0
   [ "$ok" = 1 ] || { post NEEDS-HUMAN "$(awk '$3=="HUMAN"||$3=="FAILED"||$3=="MISSING"{printf "%s(%s) ",$2,$3}' "$RES/prereqs-after.txt")"; return 1; }

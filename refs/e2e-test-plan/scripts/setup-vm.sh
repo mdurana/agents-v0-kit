@@ -136,6 +136,8 @@ Setup done for $RUN_USER. Next, in this order (test-plan.md §12):
   3. boot; as $RUN_USER: run 'agy' once over SSH and complete the Google sign-in; check: agy -p 'Reply with exactly: ok'
   4. if the OWASP data was deferred: bash $SELF_COPY --after-image   (as root)
   5. as $RUN_USER: cd ~/kit-src/refs/e2e-test-plan && bash scripts/start-tmux.sh ~/launch.env
+     (supervised runs only; an unattended V3 rerun copies the toolchain and agy to the root-owned
+      /opt/agents-v0-tools first and never uses ~/launch.env: v3-rerun-procedure.md §4 step 10, §5)
 Versions: $LOG_DIR/versions.txt
 NEXT
 }

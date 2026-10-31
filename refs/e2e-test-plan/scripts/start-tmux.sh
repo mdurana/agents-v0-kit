@@ -16,7 +16,7 @@
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"; PLAN="$(cd "$HERE/.." && pwd)"
 # shellcheck source=/dev/null
-load(){ set -a; . "$1"; set +a; export RUN_ID TEST_ROOT; . "$HERE/env.sh"; }
+load(){ set -a; . "$1"; set +a; LAUNCH_ENV_FILE="$(realpath "$1")"; export RUN_ID TEST_ROOT LAUNCH_ENV_FILE; . "$HERE/env.sh"; }  # LAUNCH_ENV_FILE: checked by v3_launch_ok
 case "${1:-}" in
   --runner) load "$2"; mkdir -p "$TEST_ROOT/status"; cd "$PLAN"
             set -- ; [ -z "${RESUME_FROM:-}" ] || set -- --resume-from "$RESUME_FROM" --test-root "$TEST_ROOT" --reason "${RESUME_REASON:-}"

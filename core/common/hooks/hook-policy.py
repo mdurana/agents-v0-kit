@@ -530,12 +530,61 @@ HARNESS_PATH_RE = re.compile(
 )
 HARNESS_MSG = ("unattended mode: the e2e harness and its run-root control files ({}) are not the agent's to change; "
                "work only in your checkout under work/. Report the problem instead.")
+# kitfix-20261031-ws-exec (Sasuke round 2): also AGY_TURN_WS and TEST_ROOT, which agy-ws-exec.sh trusts, and the
+#   spellings `typeset +x NAME`, `declare +x NAME`, `export -n NAME` and an indirect `unset ${A}_TOOLS`.
+_ALLOW_VAR_NAMES = r"(?:AGY_ALLOW_TOOLS|CURSOR_CONFIG_DIR|AGY_TURN_WS|TEST_ROOT)"
 ALLOW_VAR_RE = re.compile(
-    r"\b(?:AGY_ALLOW_TOOLS|CURSOR_CONFIG_DIR)\s*\+?="
-    r"|(?:\bunset|(?:^|\s)-u|--unset[=\s])\s*(?:\w+\s+)*(?:AGY_ALLOW_TOOLS|CURSOR_CONFIG_DIR)\b"
+    r"\b" + _ALLOW_VAR_NAMES + r"\s*\+?="
+    r"|(?:\bunset|(?:^|\s)-u|--unset[=\s])\s*(?:\w+\s+)*" + _ALLOW_VAR_NAMES + r"\b"
+    r"|\b(?:typeset|declare|export|readonly|local)\b[^;&|\n]*\b" + _ALLOW_VAR_NAMES + r"\b"
+    r"|\bunset\b[^;&|\n]*\$"
 )
-ALLOW_VAR_MSG = ("unattended mode: the per-turn allowlist (AGY_ALLOW_TOOLS, CURSOR_CONFIG_DIR) is set by the harness "
-                 "only; an agent command must not set or unset it.")
+ALLOW_VAR_MSG = ("unattended mode: the per-turn allowlist and turn context (AGY_ALLOW_TOOLS, CURSOR_CONFIG_DIR, AGY_TURN_WS, "
+                 "TEST_ROOT) are set by the harness only; an agent command must not set, unset or un-export them "
+                 "(nor unset a variable by an expanded name).")
+ENV_I_MSG = ("unattended mode: `env -i` / `env --ignore-environment` drops the per-turn allowlist the hooks rely on; "
+             "run the command without it.")
+WS_EXEC_MSG = ("unattended mode: agy-ws-exec.sh {} (kitfix-20261031-ws-exec). Run it with this turn's TEST_ROOT and "
+               "a --ws under $TEST_ROOT/work only.")
+
+
+ENV_I_RE = re.compile(
+    r"(?:^|[^\w./-])(?:/usr/bin/|/bin/|\\)?env\s+"
+    r"(?:(?:-u|--unset|-C|--chdir)\s+\S+\s+|[A-Za-z_]\w*=\S*\s+|-[A-Za-hj-zA-Z]+\s+|--[a-z-]+=\S+\s+)*"
+    r"(?:-[A-Za-z]*i[A-Za-z]*|--ignore-environment|-)(?=\s|$)"
+)
+
+
+def _segment_ws_exec(seg: str) -> Tuple[Optional[str], Optional[str]]:
+    """agy-ws-exec.sh in a segment: (refusal reason, inner command). The inner command (its quoted argument) is
+    classified like any other command; --test-root must be this turn's TEST_ROOT and --ws under $TEST_ROOT/work."""
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        return None, None
+    idx = next((i for i, a in enumerate(parts) if a.split("/")[-1] == "agy-ws-exec.sh"), None)
+    if idx is None:
+        return None, None
+    tr_env = os.environ.get("TEST_ROOT", "").strip()
+    rest = parts[idx + 1:]
+    tr, ws = None, None
+    while rest and rest[0] in ("--test-root", "--ws"):
+        if len(rest) < 2:
+            return "has an option without a value", None
+        if rest[0] == "--test-root":
+            tr = rest[1]
+        else:
+            ws = rest[1]
+        rest = rest[2:]
+    real = lambda x: os.path.realpath(os.path.join(_base_dir(), os.path.expanduser(x)))
+    if tr is not None and (not tr_env or real(tr) != os.path.realpath(tr_env)):
+        return f"--test-root {tr} is not this turn's TEST_ROOT", None
+    if ws is not None:
+        root = tr_env or tr or ""
+        work = os.path.join(os.path.realpath(root), "work") if root else ""
+        if "$" in ws or not work or not (real(ws) == work or real(ws).startswith(work + "/")):
+            return f"--ws {ws} is not under $TEST_ROOT/work", None
+    return None, " ".join(rest)
 
 
 def _harness_roots() -> List[Tuple[str, str]]:
@@ -1271,6 +1320,8 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     if unattended:
         if ALLOW_VAR_RE.search(cmd):
             return "block", ALLOW_VAR_MSG
+        if ENV_I_RE.search(cmd):  # judged on the raw command: segment splitting already unwraps `env`
+            return "block", ENV_I_MSG
         if re.search(r"\b(?:python3?|node|perl|ruby)\b[^\n|;&]*(?:\s-\s*)?<<-?\s*['\"]?\w+", cmd) and SCRIPT_WRITE_HINT.search(cmd):
             for lit in re.findall(r"['\"]([^'\"\n]+)['\"]", cmd):
                 if _is_harness_path(lit):
@@ -1284,6 +1335,17 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
             _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(cd_to)))
             continue
         if unattended:
+            why, inner = _segment_ws_exec(seg)
+            if why:
+                return "block", WS_EXEC_MSG.format(why)
+            if inner:
+                saved = _BASE_DIR
+                ia, im = classify_command(inner)
+                _BASE_DIR = saved
+                if ia == "block":
+                    return "block", "agy-ws-exec.sh command: " + im
+                if ia == "ask" and worst != "block":
+                    worst, msg = "ask", im or msg
             hp = _segment_changes_harness(seg)
             if hp:
                 return "block", HARNESS_MSG.format(hp)

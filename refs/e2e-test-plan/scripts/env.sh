@@ -77,7 +77,15 @@ WORK="$TEST_ROOT/work"; MAIN="$WORK/portal"; KIT="$TEST_ROOT/kit"
 EVID="$TEST_ROOT/evidence"; SNAP="$TEST_ROOT/snapshots"; RES="$TEST_ROOT/results"; STATUS_LOG="$TEST_ROOT/status/progress.log"
 DISCOVERY_REL="user-requirements/Finance-Back-Office-Portal-Discovery-Requirements.md"
 export WORK MAIN KIT EVID SNAP RES STATUS_LOG DISCOVERY_REL
-[ -f "$TOOLS_DIR/tools.env" ] && . "$TOOLS_DIR/tools.env"
+# kitfix-20261031-tools-root (Sasuke round 2): on a V3 harness copy (root-owned marker V3-REQUIRED) or with
+#   REQUIRE_FAIL_MODES=1, tools.env is sourced only when neither it nor its folder is writable by this user (the agent's
+#   user): TOOLS_DIR must be the root-owned /opt/agents-v0-tools. Otherwise it is skipped and TOOLS_ENV_REFUSED names
+#   it, and the V3 preflight (v3_launch_ok) refuses the launch.
+if [ -f "$TOOLS_DIR/tools.env" ]; then
+  if { [ -e "$PLAN_DIR/V3-REQUIRED" ] || [ "${REQUIRE_FAIL_MODES:-0}" = 1 ]; } && { [ -w "$TOOLS_DIR/tools.env" ] || [ -w "$TOOLS_DIR" ]; }; then
+    TOOLS_ENV_REFUSED="$TOOLS_DIR/tools.env"; export TOOLS_ENV_REFUSED
+  else . "$TOOLS_DIR/tools.env"; fi
+fi
 # HARNESS-FIX 2026-10-29 (VM): tools.env sets JAVA_HOME and TOOLS_PATH but not PATH. On Marlon's box ~/.bashrc set
 #   JAVA_HOME, so it worked by accident; on a fresh VM nothing does. Put the user-folder tools first on PATH so every
 #   process started from here (runner, agy-turn-loop.sh, agy and its shell commands) finds JDK 21, Node 22 and PG 17.

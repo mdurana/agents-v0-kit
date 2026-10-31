@@ -414,6 +414,8 @@ What it does, in order:
 
 **After the image, in this order:** boot the image; sign in to agy as `e2e` (run `agy` once over SSH, paste the code back; prove it with `agy -p 'Reply with exactly: ok'`); Cursor (`CURSOR_API_KEY` in the environment) only if that driver is used; if deferred, copy a prebuilt `odc-data` to `~e2e/odc-data` and run `setup-vm.sh --after-image` as root. Step 1 (CAL-AUTH) proves the sign-in again. No sign-in ever happens before the image, so the image holds no credential.
 
+**Unattended V3 reruns (kitfix-20261031-tools-root):** the user-folder toolchain, `tools.env` and `~/.local/bin/agy` above are for supervised runs. Before an unattended run, root copies them once to `/opt/agents-v0-tools` (owner root, `go-w`), rewrites `tools.env` to the `/opt` paths and pins `AGY_BIN=/opt/agents-v0-tools/bin/agy` in a root-owned env file. With `V3-REQUIRED` or `REQUIRE_FAIL_MODES=1` the harness loads no `tools.env` e2e can write, puts no e2e-writable folder ahead of the system folders on `PATH`, and refuses an unpinned or writable agy (`v3-rerun-procedure.md` §4 step 10, §5).
+
 **No browser needed:** the frontend `verify` uses vitest with jsdom; Playwright is only an optional peer dependency in the lockfile.
 
 **Network (outbound):** api.adoptium.net, nodejs.org, repo1.maven.org / repo.maven.apache.org, archive.apache.org, registry.npmjs.org (`npm audit`), dependency-check.github.io, and agy's Google endpoints. GitHub is not needed with the bundle (github.com only for the https + token path); antigravity.google and cursor.com for the CLI installers.

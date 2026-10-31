@@ -398,7 +398,76 @@ harness, then resume with `--resume-from-story` at the next story after P1-E, P2
 
   Changing only the "may run" pattern fails no case: by design, the output then counts as unclear, which is still a hit.
 - **Limits:**
-  - **Still e2e's:** `tools.env` and the toolchain folder (`~/.local/agents-v0-tools`), `~/.local/bin/agy` and agy's own settings. `env.sh` puts `TOOLS_PATH` first on `PATH`. A changed `tools.env` and a fake preflight tool are caught; a changed `java` or `node` is not.
+  - **Still e2e's:** `tools.env` and the toolchain folder (`~/.local/agents-v0-tools`), `~/.local/bin/agy` and agy's own settings. `env.sh` puts `TOOLS_PATH` first on `PATH`. A changed `tools.env` and a fake preflight tool are caught; a changed `java` or `node` is not. (Closed by the 13:40 entry below: the toolchain and agy are now root-owned in `/opt/agents-v0-tools`.)
   - **Changes during a segment** take effect in the runner at once. They are caught per turn (H10, startup files) or at the next launch, not prevented.
   - **The escalation check reads what root can see at lock time.** A rule added later (for example by a package) is caught only at the next step 9; the live part re-checks groups, sockets and listeners at each launch.
   - **Tested on this box only**, with stubs for `sudo` and `id`, and with `_root_owned` and the record owner stubbed (`_root_owned` itself is tested on `/etc/passwd`). Not run on the VM.
+
+## 2026-10-31 13:40 Asia/Manila — state file read without eval; root-owned toolchain and agy; fail-closed turn wrapper (kitfix-20261031-state-file, kitfix-20261031-tools-root, kitfix-20261031-ws-exec; Sakura's round-2 blocker and Sasuke's round-2 wrapper findings, approved by Marlon)
+
+- **(1) State file (`load_state` in `lib.sh`).** It used to run each line of `status/runner-state.env` (and the snapshot `.state.env` files) through `eval`. e2e, and so the agent, can write those files, so a line such as `N2=x;cmd` ran `cmd`, and `REQUIRE_FAIL_MODES=0`, `NATIVE_VERIFY=0`, `MAX_RESUMES_TOTAL=99` or `PATH=…` replaced the launch value. Now:
+  - no `eval` and no `source`. A line is accepted only if it matches `^NAME=value$`, the name is in `STATE_VARS`, and the value is the plain `printf %q` word `save_state` writes (letters, digits, `._:@/+,=%^-` and backslash-escaped characters). It is set with `printf -v`;
+  - anything else is skipped and logged (`STATE-SKIP <file>:<line> …` in `progress.log`). That includes every mode, `REQUIRE_FAIL_MODES`, `NATIVE_VERIFY`, `MAX_RESUMES_TOTAL`, the lock and scan paths and `PATH`, none of which are in `STATE_VARS`;
+  - the two calibration results in `STATE_VARS` take only their known values (`CONFIG_MODE` `perturn`/`global`, `ASK_MODE` `allowlist`/`harness`/`auto`). A value set in the launch env wins (`STATE-KEEP` when the file differs). The V3 env file sets both (`v3-rerun-procedure.md` §5).
+- **(2a) Toolchain and agy out of e2e's reach.**
+  - **Procedure:** new `v3-rerun-procedure.md` §4 step 10. Once, as root, before any agent runs on the VM: copy `~/.local/agents-v0-tools` and agy to `/opt/agents-v0-tools` (agy in `bin/`), rewrite `tools.env` to the `/opt` paths, then `chown -R root:root` and `chmod -R go-w,a+rX`. Never copy them again from e2e's home. The env file sets `TOOLS_DIR=/opt/agents-v0-tools` and `AGY_BIN=/opt/agents-v0-tools/bin/agy`, and its `PATH` no longer has `/home/e2e/.local/bin`. `setup-vm.sh` (NEXT text) and `test-plan.md` §12 point to it.
+  - **Runner:** in V3 or unattended mode (`V3-REQUIRED` or `REQUIRE_FAIL_MODES=1`):
+    - `env.sh`, step 1 of `run-plan.sh` and `agy-ws-exec.sh` do not source a `tools.env` that e2e can write, or one in a folder e2e can write. `env.sh` records it in `TOOLS_ENV_REFUSED`;
+    - `agy-turn-loop.sh` refuses (exit 2) a writable `tools.env`, an `AGY_BIN` that is unset (so no `PATH` or `~/.local/bin/agy` fallback), under `$HOME`, writable, or in a writable folder;
+    - `run_turn` no longer puts `~/.local/bin` ahead of the system folders, and an empty `TOOLS_PATH` no longer adds an empty (current-folder) `PATH` entry.
+  - **Preflight (`v3_launch_ok`):** it also refuses (`V3 REFUSED …`) when:
+    - `env.sh` skipped a writable `tools.env`;
+    - `TOOLS_DIR` (the whole tree) is not locked;
+    - `AGY_BIN` is not absolute, is under `HOME`, or is not locked;
+    - the launch env file (`LAUNCH_ENV_FILE`, which `start-tmux.sh` now exports) is not locked;
+    - any `PATH` folder before the first system folder is not locked.
+
+    "Locked" (`_locked_path`) means the path exists, neither it nor anything under it (for `TOOLS_DIR`) is writable by the agent user, and no parent folder up to `/` lets that user swap it.
+- **(2b) Turn wrapper fails closed (`agy-ws-exec.sh`).** It now refuses (`HOOK DENIED (…)`, exit 2, logged in `agy-driver/ws-exec-denied.log`) when:
+  - the workspace has no `.agents/hooks/pre-shell.sh`. Before, the hook step was skipped, so `--ws /tmp` ran any command;
+  - the workspace (from `--ws` or `pending-turn.json`) is not under `$TEST_ROOT/work/`;
+  - `--test-root` differs from a set `TEST_ROOT`;
+  - `AGY_ALLOW_TOOLS` or `AGY_TURN_WS` is unset. The turn loop now starts agy with `AGY_ALLOW_TOOLS`, `AGY_TURN_WS` and `TEST_ROOT`;
+  - `pending-turn.json`'s `.allow` or `.workspace` differs from the turn's. The allow check is no longer optional.
+
+  Sasuke's probe `bash …/agy-ws-exec.sh --test-root /x --ws /tmp 'sudo id'` is refused.
+- **(2b) Hooks (`core/common/hooks/hook-policy.py`, unattended only; attended is unchanged).** Blocked:
+  - `env -i …`;
+  - `typeset`, `declare`, `export`, `readonly` or `local` on `AGY_ALLOW_TOOLS`, `CURSOR_CONFIG_DIR`, `AGY_TURN_WS` or `TEST_ROOT` (so `typeset +x AGY_ALLOW_TOOLS` is caught);
+  - `unset` with a `$`-built name (`unset ${A}_TOOLS`);
+  - an `agy-ws-exec.sh` call with `--ws` outside `$TEST_ROOT/work` or with a `$` in it, or with a `--test-root` other than `TEST_ROOT`.
+
+  An allowed wrapper call has its quoted command classified as if run directly, so `agy-ws-exec.sh --ws <work>/x 'sudo id'` is blocked and an inner ask still asks.
+- **Tests:**
+  - `tests/test-guards.sh` is now 137 cases (up from 111):
+    - wrapper (7): no pre-shell hook; `--ws` outside `work/`; a foreign `--test-root`; `AGY_ALLOW_TOOLS` unset; a `pending-turn.json` workspace that differs from the turn's; Sasuke's probe; a writable `tools.env` not loaded with `REQUIRE_FAIL_MODES=1` but loaded when attended;
+    - V3 toolchain (13): refused are a writable `TOOLS_DIR`, an unset `AGY_BIN`, one under `HOME`, a writable one, a writable env file, no recorded env file, a writable `PATH` folder ahead of `/usr/bin`, and a skipped writable `tools.env`; a writable `PATH` folder after the system folders is accepted; `env.sh` skips a writable `tools.env` unattended and sources it attended (2); the turn loop refuses the fallback, a writable agy and a writable `tools.env`; `run_turn`'s `PATH`;
+    - state file (6): injected `;`, `$(…)` and backtick lines do not run; mode and safety lines are ignored; a normal resume's values come back intact (including a label with spaces and quotes); every skip is logged; `STATE-KEEP`; unknown mode values; no `eval` or `source` left in `load_state`; and a relaunch after a refused launch with a forged `runner-state.env` runs and applies none of its lines (`STATE-SKIP`).
+  - `scripts/test-hook-policy.py` is now 575 cases (up from 542): 22 unattended blocks (including Sasuke's probe), 8 unattended allows and 3 attended cases left unchanged.
+- **Mutation checks** (`trash/mut-t3-1359/`):
+
+  | Mutation | Suite | FAIL |
+  |---|---|---|
+  | `load_state` with `eval` back | test-guards | 6 |
+  | `STATE_VARS` filter off | test-guards | 3 |
+  | `CONFIG_MODE` enum and `STATE-KEEP` off | test-guards | 2 |
+  | wrapper: pre-shell hook required off | test-guards | 1 |
+  | wrapper: `work/` check off | test-guards | 1 |
+  | wrapper: `--test-root` check off | test-guards | 2 |
+  | wrapper: `AGY_ALLOW_TOOLS` unset check off | test-guards | 1 |
+  | wrapper: workspace compare off | test-guards | 1 |
+  | wrapper: writable `tools.env` loaded | test-guards | 1 |
+  | `_locked_path` always "locked" | test-guards | 5 |
+  | turn loop: `AGY_BIN` check off | test-guards | 1 |
+  | `env.sh`: `tools.env` guard off | test-guards | 1 |
+  | `run_turn`: `~/.local/bin` kept | test-guards | 1 |
+  | hook: `env -i` rule off | test-hook-policy | 7 |
+  | hook: wrapper unwrap and `--ws`/`--test-root` check off | test-hook-policy | 7 |
+  | hook: `typeset`/`declare` and `unset $` rules off | test-hook-policy | 5 |
+- **Limits:**
+  - **Still e2e's:** the runtime state under `$T` outside `work/`, agy's settings and sign-in in `~/.gemini`, and the runner process itself (the runner runs as e2e; runner as root is a follow-up).
+  - **Mode values in the state file:** `CONFIG_MODE` and `ASK_MODE` can still be changed within their allowed values unless the env file sets them. The V3 env file does.
+  - **agy self-update** into the root-owned `/opt/agents-v0-tools` is untested. If agy is a launcher that needs files next to it, §4 step 10's `agy --version` check fails and the run stops.
+  - **The hook is text matching:** an indirect `env -u "$X"`, or a script written in `work/` and then run, is not caught. The wrapper's own checks and the OS ownership are the real fence.
+  - **Tested on this box only**, with root-owned stand-ins (`/usr/share/misc`, `/usr/bin/true`, `/etc/hostname`). Not run on the VM.
+  - **Not approved, so not done:** Sasuke's other items (killing the process group per turn, moving `pending-turn.json` and the H10 baseline, `perl`/`dd`/`tar`/`sponge` write checks, the transcript copy), Sakura's other should-fix items, Sai's commit-on-every-gate gaps, and Sonnet findings 4-6.

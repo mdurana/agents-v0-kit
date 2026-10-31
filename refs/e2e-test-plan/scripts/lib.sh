@@ -74,7 +74,31 @@ result(){ printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$(ts)" "${4:-}" "${K
 # runner state that later steps need (story ids, calibration, kit) — saved with every snapshot and step boundary
 STATE_VARS="P0A_SLUG N1 N1_SLUG N2 N2_SLUG N3 N3_SLUG CONFIG_MODE ASK_MODE KIT_SHA KIT_LABEL"
 save_state(){ local v; : > "$1"; for v in $STATE_VARS; do [ -n "${!v:-}" ] && printf '%s=%q\n' "$v" "${!v}" >> "$1"; done; return 0; }
-load_state(){ [ -f "$1" ] || return 1; local v; while IFS= read -r v; do case "$v" in [A-Z0-9_]*=*) eval "export $v";; esac; done < "$1"; }
+# kitfix-20261031-state-file (Sakura round 2): a state file lives under $TEST_ROOT (snapshots/, status/), which the
+#   agent's OS user can write, and load_state runs at relaunch between the early and the full preflight. It used to
+#   `eval "export <line>"`, so `N2=x;cmd` ran cmd and any NAME=value line (REQUIRE_FAIL_MODES=0, NATIVE_VERIFY=0,
+#   MAX_RESUMES_TOTAL, PATH, ...) replaced the launch value. Now there is no eval and no source: a line is accepted
+#   only as NAME=value with NAME in STATE_VARS and a value in the printf %q form save_state writes for plain words
+#   (letters, digits, ._:@/+,=%^- and backslash-escaped characters); anything else is skipped with a STATE-SKIP line.
+#   The two mode names in STATE_VARS take only their known values (CONFIG_MODE perturn|global, ASK_MODE
+#   allowlist|harness|auto), and a value the launch env set explicitly is kept (STATE-KEEP when the file differs).
+_LAUNCH_CONFIG_MODE="${_LAUNCH_CONFIG_MODE-${CONFIG_MODE:-}}"
+_LAUNCH_ASK_MODE="${_LAUNCH_ASK_MODE-$( [ "${ASK_MODE:-auto}" = auto ] || echo "$ASK_MODE")}"
+_state_skip(){ post STATE-SKIP "$1" 2>/dev/null || echo "STATE-SKIP $1" >&2; }
+load_state(){ [ -f "$1" ] || return 1; local line name val n=0 re='^([A-Z][A-Z0-9_]*)=(([A-Za-z0-9._:@/+,=%^-]|\\.)*)$'
+  while IFS= read -r line || [ -n "$line" ]; do n=$((n+1))
+    [ -n "$line" ] || continue
+    if ! [[ "$line" =~ $re ]]; then _state_skip "${1##*/}:$n not NAME=plain-value: ${line:0:80}"; continue; fi
+    name="${BASH_REMATCH[1]}"; val="$(printf '%s' "${BASH_REMATCH[2]}" | sed -E 's/\\(.)/\1/g')"
+    case " $STATE_VARS " in *" $name "*) ;; *) _state_skip "${1##*/}:$n $name is not a state variable (ignored)"; continue;; esac
+    case "$name" in
+      CONFIG_MODE) case "$val" in perturn|global) ;; *) _state_skip "${1##*/}:$n CONFIG_MODE=$val is not perturn|global"; continue;; esac
+                   if [ -n "$_LAUNCH_CONFIG_MODE" ]; then [ "$val" = "$_LAUNCH_CONFIG_MODE" ] || _state_skip "${1##*/}:$n CONFIG_MODE=$val ignored, the launch env set $_LAUNCH_CONFIG_MODE (STATE-KEEP)"; continue; fi;;
+      ASK_MODE)    case "$val" in allowlist|harness|auto) ;; *) _state_skip "${1##*/}:$n ASK_MODE=$val is not allowlist|harness|auto"; continue;; esac
+                   if [ -n "$_LAUNCH_ASK_MODE" ]; then [ "$val" = "$_LAUNCH_ASK_MODE" ] || _state_skip "${1##*/}:$n ASK_MODE=$val ignored, the launch env set $_LAUNCH_ASK_MODE (STATE-KEEP)"; continue; fi;;
+    esac
+    printf -v "$name" '%s' "$val"; export "${name?}"
+  done < "$1"; return 0; }
 
 # ---------- fixtures ----------
 approval_for(){ awk -F'\t' -v g="$1" '!/^#/ && $1==g {print $2 "\t" $3; exit}' "$PLAN_DIR/fixtures/approvals.tsv"; }
@@ -241,8 +265,11 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   local k="$1" msg="$2" allow="$3" rem cap pid rc sz last=0 lastch st=0 mark drv
   rem=$(( RUN_DEADLINE - $(now) )); cap=$TURN_CAP; [ "$rem" -lt "$cap" ] && cap=$rem; [ "$cap" -gt 60 ] || { TURN_CLASS=CAP; return; }
   printf '%s\n' "$msg" > "$RUN/turn-$k.prompt"; printf '%s\n' "$allow" > "$RUN/turn-$k.allow"
+  # kitfix-20261031-tools-root: on a V3 copy or with REQUIRE_FAIL_MODES=1 the turn loop gets no ~/.local/bin (the agent's
+  #   user can write it) ahead of the system folders; TOOLS_PATH is then the root-owned /opt/agents-v0-tools one.
+  local hlb="$HOME/.local/bin:"; { v3_required || [ "${REQUIRE_FAIL_MODES:-0}" = 1 ]; } && hlb=""
   local envv=(HOME="$HOME" USER="${USER:-tester}" LANG=C.UTF-8 TZ="${AGENT_TZ:-Asia/Manila}" TERM=xterm
-    PATH="${TOOLS_PATH:-}:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" JAVA_HOME="${JAVA_HOME:-}" PG_HOME="${PG_HOME:-}"
+    PATH="${TOOLS_PATH:+$TOOLS_PATH:}${hlb}/usr/local/bin:/usr/bin:/bin" JAVA_HOME="${JAVA_HOME:-}" PG_HOME="${PG_HOME:-}"
     TESTCONTAINERS_RYUK_DISABLED=true MAVEN_OPTS=-Xmx1536m TEST_ROOT="$TEST_ROOT" PLAN_DIR="$PLAN_DIR")
   [ -z "${CURSOR_API_KEY:-}" ] || envv+=(CURSOR_API_KEY="$CURSOR_API_KEY")
   if [ "$CONFIG_MODE" = perturn ]; then
@@ -781,6 +808,22 @@ escalation_none_ok(){ local u="${AGENT_USER:-$(id -un)}" rec="${ESCALATION_RECOR
   _esc_live "$u" | sed 's/^/ESCALATION live: /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1
   [ "$bad" = 0 ] && echo "ESCALATION ok: record $rec says ESCALATION-NONE for $u, live check passed"
   [ "$bad" = 0 ]; }
+# _locked_path <path> <depth>: prints why AGENT_USER could change <path> (empty = locked): it is missing, it or (for a
+#   folder) anything up to <depth> levels inside it is writable by that user, or a folder above it is writable (not
+#   sticky, or sticky with a child that user owns), so it could be moved aside and replaced. Same rule as harness_locked.
+_locked_path(){ local p="$1" n="${2:-0}" u="${AGENT_USER:-$(id -un)}" me c q w; me="$(id -un)"
+  _la(){ if [ "$me" = "$u" ]; then "$@"; elif [ "$(id -u)" = 0 ]; then runuser -u "$u" -- "$@"; else return 125; fi; }
+  [ -n "$p" ] || { echo "not set"; return; }
+  [ -e "$p" ] || { echo "$p does not exist"; return; }
+  p="$(realpath "$p")"
+  _la test -e "$p"; [ $? != 125 ] || { echo "cannot test as $u from $me"; return; }
+  w="$(_la find "$p" -maxdepth "$n" -writable -print 2>/dev/null | head -3 | tr '\n' ' ')"
+  [ -z "$w" ] || { echo "writable by $u: $w"; return; }
+  c="$p"; q="$(dirname "$p")"
+  while :; do
+    if _la test -w "$q" && { [ ! -k "$q" ] || [ "$(stat -c %U "$c" 2>/dev/null)" = "$u" ]; }; then echo "$q is writable by $u, so $c can be replaced"; return; fi
+    [ "$q" != / ] || break; c="$q"; q="$(dirname "$q")"
+  done; }
 # _covers <list> <path>...: every path (resolved) is in the list (resolved). For the lock and scan variables, which
 #   replace their defaults when set: in V3 they may only add places.
 _covers(){ local list="$1" p q hit; shift
@@ -812,11 +855,24 @@ v3_launch_ok(){ local u="${AGENT_USER:-$(id -un)}" me bad=0 miss t p hh rec="${H
     p="$(realpath "$p")"; _va test -w "$p"; case $? in 125) echo "V3 cannot test as $u from $me"; return 1;; 0) echo "V3 REFUSED tool $t ($p) is writable by $u"; bad=1; continue;; esac
     if _va test -w "$(dirname "$p")"; then echo "V3 REFUSED tool $t ($p) is in a folder writable by $u"; bad=1; fi
   done
+  # kitfix-20261031-tools-root (Sasuke round 2): the toolchain, agy, the launch env file and every PATH folder ahead of
+  #   the system folders must be out of the agent user's reach (not writable, no writable parent that lets it be swapped)
+  [ -z "${TOOLS_ENV_REFUSED:-}" ] || { echo "V3 REFUSED $TOOLS_ENV_REFUSED is writable by $u and was not sourced (use the root-owned /opt/agents-v0-tools)"; bad=1; }
+  local why
+  why="$(_locked_path "${TOOLS_DIR:-}" 99)"; [ -z "$why" ] || { echo "V3 REFUSED TOOLS_DIR: $why"; bad=1; }
+  case "${AGY_BIN:-}" in /*) ;; *) echo "V3 REFUSED AGY_BIN is not set to an absolute path (no PATH or ~/.local/bin fallback)"; bad=1;; esac
+  case "$(realpath -m "${AGY_BIN:-/}")/" in "$(realpath -m "$HOME")"/*) echo "V3 REFUSED AGY_BIN $AGY_BIN is under HOME"; bad=1;; esac
+  why="$(_locked_path "${AGY_BIN:-}" 0)"; [ -z "$why" ] || { echo "V3 REFUSED AGY_BIN: $why"; bad=1; }
+  why="$(_locked_path "${LAUNCH_ENV_FILE:-}" 0)"; [ -z "$why" ] || { echo "V3 REFUSED launch env file: $why"; bad=1; }
+  local d pd; IFS=: read -ra pd <<<"$PATH"
+  for d in "${pd[@]}"; do case "$d" in /usr/local/sbin|/usr/local/bin|/usr/sbin|/usr/bin|/sbin|/bin) break;; esac
+    why="$(_locked_path "$d" 1)"; [ -z "$why" ] || { echo "V3 REFUSED PATH folder ahead of the system folders: $why"; bad=1; }
+  done
   if ! _root_owned "$rec"; then echo "V3 REFUSED home-hash record missing, not root-owned or writable by $u: $rec"; bad=1
   elif [ -e "$_LIB_PLAN/HARNESS-FROM" ] && [ ! "$rec" -nt "$_LIB_PLAN/HARNESS-FROM" ]; then echo "V3 REFUSED home-hash record is older than this harness copy (re-run §4 step 9): $rec"; bad=1
   else bash "$_LIB_PLAN/scripts/home-hash.sh" --check "$rec" "$HOME" | sed 's/^/V3 /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1; fi
   escalation_none_ok || bad=1
-  [ "$bad" = 0 ] && echo "V3 launch ok: REQUIRE_FAIL_MODES=1, PLAN_DIR=$_LIB_PLAN, lock and scan paths keep their defaults, tools and startup files unchanged"
+  [ "$bad" = 0 ] && echo "V3 launch ok: REQUIRE_FAIL_MODES=1, PLAN_DIR=$_LIB_PLAN, lock and scan paths keep their defaults, TOOLS_DIR, AGY_BIN, the env file and PATH out of reach, tools and startup files unchanged"
   [ "$bad" = 0 ]; }
 # kit_policy_apply <why>: KIT_TRACE_MODE=warn|fail (launch env, harness-owned) is written as trace_mode=<mode> into
 #   .agents-v0/policy.conf of main and every kit worktree, with one harness commit per checkout that changed. The

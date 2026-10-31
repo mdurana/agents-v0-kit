@@ -256,3 +256,25 @@ Found by the same review (finding 2c). The hook now protects the harness and its
 ## kitfix-20261031-escalation-none and kitfix-20261031-launch-env (harness only)
 
 Reviews by Sai (should-fix: a root check that e2e has no escalation or Docker access) and Sakura (medium: e2e can write the launch env, the secrets file and its dotfiles, which a relaunch re-sources), approved by Marlon 2026-10-31 13:25 Asia/Manila. No kit code changed. The harness side is in `refs/e2e-test-plan/HARNESS-FIXES-20261029.md` (2026-10-31 13:25): `scripts/escalation-check.sh`, `scripts/home-hash.sh`, `v3_launch_ok` and `escalation_none_ok` in `lib.sh`, an isolated tmux server in `start-tmux.sh`, and the root-owned `/opt/harness-v3-env/` in `v3-rerun-procedure.md` §4 step 9, §5, §6 and §8.
+
+## kitfix-20261031-ws-exec (hook part)
+
+From Sasuke's round-2 review, approved by Marlon 2026-10-31 13:40 Asia/Manila. The harness side is in `refs/e2e-test-plan/HARNESS-FIXES-20261029.md` (2026-10-31 13:40): the state file read without `eval`, the root-owned `/opt/agents-v0-tools`, and the turn wrapper `agy-ws-exec.sh`, which now fails closed.
+
+- `core/common/hooks/hook-policy.py`, **unattended mode only** (attended is unchanged). Blocked:
+  - `env -i` (checked on the whole command, because segment splitting already unwraps `env`);
+  - `typeset`, `declare`, `export`, `readonly` or `local` naming `AGY_ALLOW_TOOLS`, `CURSOR_CONFIG_DIR`, `AGY_TURN_WS` or `TEST_ROOT`;
+  - `unset` with a `$` in the name;
+  - an `agy-ws-exec.sh` call (`_segment_ws_exec`) whose `--ws` is not under `$TEST_ROOT/work` (or holds a `$`), or whose `--test-root` is not `TEST_ROOT`.
+
+  An allowed wrapper call has its quoted command classified as if run directly, so an inner block blocks and an inner ask asks.
+- **Tests:** `scripts/test-hook-policy.py` has 33 new cases (575 in all): 22 unattended blocks, including Sasuke's probe `bash …/agy-ws-exec.sh --test-root /x --ws /tmp 'sudo id'`, 8 unattended allows, and 3 attended cases that stay unchanged.
+- **Mutation check:**
+
+  | Rule off | test-hook-policy FAIL |
+  |---|---|
+  | `env -i` | 7 |
+  | wrapper unwrap | 7 |
+  | the new allow-variable rules | 5 |
+- **Limits:** text matching only. An indirect `env -u "$X"` is not caught. The wrapper's own fail-closed checks and the root-owned harness and tools are the real fence.
+

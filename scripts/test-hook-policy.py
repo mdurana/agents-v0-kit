@@ -724,6 +724,37 @@ def harness_escalation_cases(tmp: str) -> list:
     add("path", os.path.join(hv, "scripts", "lib.sh"), U, "block", "unattended edit of a harness script")
     add("path", os.path.join(proj, "notes.md"), U, "allow", "unattended edit in the checkout")
     add("path", pend, A, "allow", "attended edit (unchanged)")
+    # kitfix-20261031-ws-exec (Sasuke round 2): env -i, agy-ws-exec.sh outside the turn's root, its quoted command,
+    #   and the other spellings of dropping the allowlist
+    wx = "/opt/harness-v3/scripts/agy-ws-exec.sh"
+    for cmd, label in [
+            (f"bash {wx} --test-root /x --ws /tmp 'sudo id'", "Sasuke's probe (--test-root /x --ws /tmp 'sudo id')"),
+            (f"bash {wx} --test-root {tr} --ws /tmp 'ls'", "ws-exec --ws outside work/"),
+            (f"bash {wx} --test-root /x 'ls'", "ws-exec --test-root of another run"),
+            (f"bash {wx} --ws '$HOME' 'ls'", "ws-exec --ws with a variable"),
+            (f"bash {wx} --test-root {tr} 'sudo id'", "ws-exec quoted sudo"),
+            (f"bash {wx} --test-root {tr} 'su -c id'", "ws-exec quoted su"),
+            (f"bash {wx} --test-root {tr} 'echo x > {pend}'", "ws-exec quoted write of the allowlist file"),
+            (f"bash {wx} --test-root {tr} 'rm -rf /'", "ws-exec quoted rm -rf"),
+            ("env -i bash", "env -i"), ("env -i PATH=/bin sh -c id", "env -i with PATH"), ("/usr/bin/env -i sh", "/usr/bin/env -i"),
+            ("env - sh", "env -"), ("env --ignore-environment sh", "env --ignore-environment"), ("env -u X -i sh", "env -u X -i"),
+            ("nohup env -i sh", "nohup env -i"),
+            ("typeset +x AGY_ALLOW_TOOLS", "typeset +x"), ("declare +x AGY_ALLOW_TOOLS", "declare +x"),
+            ("export -n AGY_ALLOW_TOOLS", "export -n"), ("A=AGY_ALLOW; unset ${A}_TOOLS", "indirect unset"),
+            ("unset -v \"$v\"", "unset of an expanded name"), ("TEST_ROOT=/x ls", "set TEST_ROOT"),
+            ("export AGY_TURN_WS=/tmp", "export AGY_TURN_WS")]:
+        add("shell", cmd, U, "block", "unattended " + label)
+    for cmd, label in [
+            (f"bash {wx} --test-root {tr} 'git status'", "ws-exec git status"),
+            (f"bash {wx} --test-root {tr} --ws {tr}/work/portal-feat 'ls'", "ws-exec --ws a worktree under work/"),
+            (f"bash {wx} 'ls'", "ws-exec without options"),
+            ("env FOO=1 ls", "env with an assignment"), ("env -u FOO ls", "env -u another name"), ("unset FOO", "unset another name"),
+            ("echo $AGY_ALLOW_TOOLS", "read AGY_ALLOW_TOOLS"), ("sort -u $f", "sort -u")]:
+        add("shell", cmd, U, "allow", "unattended " + label)
+    for cmd, label in [
+            ("env -i bash", "env -i"), (f"bash {wx} --test-root /x --ws /tmp 'ls'", "ws-exec elsewhere"),
+            ("typeset +x AGY_ALLOW_TOOLS", "typeset +x")]:
+        add("shell", cmd, A, "allow", "attended " + label + " (unchanged)")
     return c
 
 

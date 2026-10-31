@@ -220,14 +220,35 @@ RUN="$EVID/S4-s1-harness-2"; mkdir -p "$RUN"; echo "harness status/pending-turn.
 grep -q '^turn-1 harness status/pending-turn.json changed' "$RUN/kit-tamper.txt" 2>/dev/null && ok "a changed allowlist file is an H10 finding" || ko "pending tamper not reported"
 grep -q 'harness_integrity_check "$k"' "$HERE/scripts/lib.sh" && grep -q 'harness_integrity > "$RUN/harness-integrity-before-$k.tsv"' "$HERE/scripts/lib.sh" && ok "run_turn checks the harness before and after every turn" || ko "harness integrity not wired"
 # agy-ipc-turn.sh records a pending-turn.json changed during the turn; agy-ws-exec.sh refuses a file that differs from the turn's allowlist
-IR="$SB/ipc"; mkdir -p "$IR/status" "$IR/evidence/S4-x-1" "$IR/ws" "$IR/agy-driver"; IRUN="$IR/evidence/S4-x-1"
-( TEST_ROOT="$IR" bash "$HERE/scripts/agy-ipc-turn.sh" chat "$IR/ws" m "hello" 'Shell(git:commit*)' "$IRUN" 1 > /dev/null ) & ipid=$!
+IR="$SB/ipc"; IWS="$IR/work/ws"; mkdir -p "$IR/status" "$IR/evidence/S4-x-1" "$IWS/.agents/hooks" "$IR/agy-driver"; IRUN="$IR/evidence/S4-x-1"
+printf '#!/bin/sh\ncat > /dev/null; echo "{\\"permission\\": \\"allow\\"}"\n' > "$IWS/.agents/hooks/pre-shell.sh"   # stub hook: allow
+wx(){ env TEST_ROOT="$IR" AGY_ALLOW_TOOLS='Shell(git:commit*)' AGY_TURN_WS="$IWS" "$@"; }
+( TEST_ROOT="$IR" bash "$HERE/scripts/agy-ipc-turn.sh" chat "$IWS" m "hello" 'Shell(git:commit*)' "$IRUN" 1 > /dev/null ) & ipid=$!
 for _ in $(seq 1 50); do [ -s "$IR/status/pending-turn.json" ] && break; sleep 0.1; done
-AGY_ALLOW_TOOLS='Shell(git:commit*)' bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-ok' > "$SB/wx.out" 2>&1 && grep -q ran-ok "$SB/wx.out" && ok "the wrapper runs a command when the file matches the turn's allowlist" || ko "wrapper match: $(cat "$SB/wx.out")"
+wx bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-ok' > "$SB/wx.out" 2>&1 && grep -q ran-ok "$SB/wx.out" && ok "the wrapper runs a command when the file matches the turn's allowlist" || ko "wrapper match: $(cat "$SB/wx.out")"
+WTD="$SB/wtools"; mkdir -p "$WTD"; echo 'export JAVA_HOME=/pwned-jh' > "$WTD/tools.env"
+wx env -u JAVA_HOME TOOLS_DIR="$WTD" REQUIRE_FAIL_MODES=1 bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo "jh=${JAVA_HOME:-}"' > "$SB/wxt.out" 2>&1
+wx env -u JAVA_HOME TOOLS_DIR="$WTD" REQUIRE_FAIL_MODES=0 bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo "jh=${JAVA_HOME:-}"' > "$SB/wxt0.out" 2>&1
+grep -q '^jh=' "$SB/wxt.out" && ! grep -q pwned-jh "$SB/wxt.out" && grep -q '^jh=/pwned-jh' "$SB/wxt0.out" \
+  && ok "the wrapper loads no writable tools.env with REQUIRE_FAIL_MODES=1 (still loads it when attended)" || ko "wrapper tools.env: $(cat "$SB/wxt.out" "$SB/wxt0.out")"
+# kitfix-20261031-ws-exec (Sasuke round 2): the wrapper fails closed
+wxr(){ "$@" > "$SB/wx.out" 2>&1; local r=$?; [ "$r" = 2 ] && ! grep -q ran-bad "$SB/wx.out"; }
+wxr env TEST_ROOT="$IR" AGY_ALLOW_TOOLS='Shell(git:commit*)' AGY_TURN_WS="$IWS" bash "$HERE/scripts/agy-ws-exec.sh" --test-root /x --ws /tmp 'sudo id; echo ran-bad' \
+  && ! grep -q 'uid=' "$SB/wx.out" && ok "Sasuke's probe --test-root /x --ws /tmp 'sudo id' fails without running" || ko "probe: $(cat "$SB/wx.out")"
+wxr env -u TEST_ROOT AGY_ALLOW_TOOLS='Shell(git:commit*)' AGY_TURN_WS="$IWS" bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" --ws /tmp 'echo ran-bad' \
+  && grep -q 'is not under' "$SB/wx.out" && ok "the wrapper refuses --ws outside \$TEST_ROOT/work" || ko "ws outside: $(cat "$SB/wx.out")"
+mkdir -p "$IR/work/nohook"; wxr wx bash "$HERE/scripts/agy-ws-exec.sh" --ws "$IR/work/nohook" 'echo ran-bad' && grep -q 'no .agents/hooks/pre-shell.sh' "$SB/wx.out" \
+  && ok "the wrapper refuses a workspace without pre-shell.sh" || ko "no hook: $(cat "$SB/wx.out")"
+wxr env TEST_ROOT="$IR" AGY_TURN_WS="$IWS" bash "$HERE/scripts/agy-ws-exec.sh" 'echo ran-bad' && grep -q 'AGY_ALLOW_TOOLS is not set' "$SB/wx.out" \
+  && ok "the wrapper refuses when AGY_ALLOW_TOOLS is unset" || ko "allow unset: $(cat "$SB/wx.out")"
+wxr env TEST_ROOT="$IR" AGY_ALLOW_TOOLS='Shell(git:commit*)' AGY_TURN_WS="$IR/work/other" bash "$HERE/scripts/agy-ws-exec.sh" 'echo ran-bad' && grep -q 'workspace mismatch' "$SB/wx.out" \
+  && ok "the wrapper refuses a pending-turn.json whose workspace differs from the turn's" || ko "ws mismatch: $(cat "$SB/wx.out")"
+wxr wx bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$SB/root" 'echo ran-bad' && grep -q 'differs from this turn' "$SB/wx.out" \
+  && ok "the wrapper refuses a --test-root that differs from TEST_ROOT" || ko "test-root differs: $(cat "$SB/wx.out")"
 python3 - "$IR/status/pending-turn.json" <<'PY'
 import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["allow"]="Shell(*)"; open(p,"w").write(json.dumps(d))
 PY
-AGY_ALLOW_TOOLS='Shell(git:commit*)' bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-bad' > "$SB/wx.out" 2>&1; wrc=$?
+wx bash "$HERE/scripts/agy-ws-exec.sh" --test-root "$IR" 'echo ran-bad' > "$SB/wx.out" 2>&1; wrc=$?
 [ "$wrc" = 2 ] && ! grep -q ran-bad "$SB/wx.out" && grep -q 'allowlist mismatch' "$IR/agy-driver/ws-exec-denied.log" && ok "the wrapper refuses a pending-turn.json whose allowlist was widened" || ko "wrapper mismatch rc=$wrc: $(cat "$SB/wx.out")"
 echo 0 > "$IRUN/turn-1.done"; wait "$ipid"
 grep -q 'pending-turn.json changed during turn 1' "$IRUN/pending-tamper-1.txt" 2>/dev/null && [ -s "$IRUN/pending-turn-1.changed.json" ] && ok "agy-ipc-turn.sh records the changed allowlist file and keeps a copy" || ko "ipc tamper not recorded"
@@ -247,7 +268,11 @@ echo bundle > "$SB/pf-home/kit.bundle"; launch H6_MODE=fail KIT_TRACE_MODE=fail;
 mv "$SB/pf-home/kit.bundle" "$SB/kit.bundle.moved"
 [ "$r1" = 3 ] && [ "$r2" = 3 ] && [ "$(grep -c . "$PR/results/fix-attempts.tsv")" = 1 ] && [ ! -e "$PR/results/attempt-2" ] \
   && ok "two refused launches write no fix-attempts row and no attempt archive" || ko "refused launches counted (rc $r1/$r2): $(cat "$PR/results/fix-attempts.tsv")"
+printf 'N2=x;touch %s/pwned-state\nREQUIRE_FAIL_MODES=0\nN3=$(touch %s/pwned-state2)\nN1=P1-X\n' "$SB" "$SB" > "$PR/status/runner-state.env"
 launch H6_MODE=fail KIT_TRACE_MODE=fail; r3=$?
+[ ! -e "$SB/pwned-state" ] && [ ! -e "$SB/pwned-state2" ] && grep -q 'STATE-SKIP runner-state.env:1 not NAME=plain-value' "$PR/status/progress.log" \
+  && grep -q 'STATE-SKIP runner-state.env:2 REQUIRE_FAIL_MODES is not a state variable' "$PR/status/progress.log" \
+  && ok "a relaunch does not run or apply forged state-file lines (STATE-SKIP)" || ko "state file at relaunch: $(grep STATE "$PR/status/progress.log")"
 ! grep -q FIX-LIMIT "$PR/results/stop.txt" "$SB/pf.out" 2>/dev/null && [ "$(grep -c . "$PR/results/fix-attempts.tsv")" = 2 ] && grep -q 'RUN-START' "$PR/status/progress.log" \
   && ok "the next good launch starts (no FIX-LIMIT with MAX_RESUMES_TOTAL = counted rows + 1)" || ko "good launch rc=$r3: $(tail -3 "$PR/results/stop.txt" 2>/dev/null) $(tail -2 "$SB/pf.out")"
 # a launch the full preflight refuses after the resume preparation: its row is marked REFUSED and counts nowhere
@@ -267,6 +292,7 @@ printf 'ESC groups ok\nESCALATION-NONE user=%s uid=%s mode=full at=2026-10-31 13
 # v3 [VAR=value ...]: v3_launch_ok from the V3 copy's lib.sh. Records are sandbox files (_root_owned is tested on its
 #   own below), the live escalation check reads an empty ESC_ROOT tree, and the home is the sandbox home.
 v3(){ ( . "$HV3/scripts/lib.sh"; PLAN_DIR="$HV3" HOME="$VH" REQUIRE_FAIL_MODES=1 HOME_HASH_RECORD="$SB/v3rec/home.sha256" ESCALATION_RECORD="$SB/v3rec/esc.txt"
+        TOOLS_DIR=/usr/share/misc AGY_BIN=/usr/bin/true LAUNCH_ENV_FILE=/etc/hostname PATH=/usr/local/bin:/usr/bin:/bin; unset TOOLS_ENV_REFUSED
         unset KIT_SCAN_ROOTS KIT_SOURCE_PATHS HARNESS_LOCK_PATHS AGENT_USER
         _root_owned(){ [ -f "$1" ]; }; _home_of(){ echo "$VH"; }; _esc_live(){ ESC_ROOT="$SB/escroot" bash "$HV3/scripts/escalation-check.sh" --live "$1"; }
         for a in "$@"; do export "${a?}"; done; v3_launch_ok ) > "$SB/v3.log" 2>&1; }
@@ -305,6 +331,55 @@ mv "$SB/escroot/run/docker.sock" "$SB/docker.sock.moved"
 mv "$VH/.bashrc" "$SB/bashrc.moved"
 grep -q 'TMX=(tmux -L e2e-harness -f /dev/null)' "$HERE/scripts/start-tmux.sh" && grep -q '"${TMX\[@\]}" new-session' "$HERE/scripts/start-tmux.sh" \
   && ok "start-tmux.sh uses its own tmux server without ~/.tmux.conf on a V3 copy" || ko "start-tmux isolation"
+
+echo "-- V3 toolchain, agy and env file out of the agent user's reach (kitfix-20261031-tools-root)"
+mkdir -p "$SB/tw"; echo 'export TOOLS_PATH=/x' > "$SB/tw/tools.env"; printf '#!/bin/sh\n' > "$SB/fakebin/agy"; chmod +x "$SB/fakebin/agy"
+v3 TOOLS_DIR="$SB/tw"; [ $? != 0 ] && grep -q 'V3 REFUSED TOOLS_DIR: writable by' "$SB/v3.log" && ok "V3 refuses a TOOLS_DIR the agent user can write" || ko "V3 tools dir: $(cat "$SB/v3.log")"
+v3 AGY_BIN="$VH/agy"; [ $? != 0 ] && grep -q 'V3 REFUSED AGY_BIN .* is under HOME' "$SB/v3.log" && ok "V3 refuses an AGY_BIN under HOME" || ko "V3 agy home: $(cat "$SB/v3.log")"
+v3 AGY_BIN="$SB/fakebin/agy"; [ $? != 0 ] && grep -q 'V3 REFUSED AGY_BIN: writable by' "$SB/v3.log" && ok "V3 refuses an AGY_BIN the agent user can write" || ko "V3 agy writable: $(cat "$SB/v3.log")"
+v3 AGY_BIN=; [ $? != 0 ] && grep -q 'V3 REFUSED AGY_BIN is not set' "$SB/v3.log" && ok "V3 refuses an unset AGY_BIN (no fallback)" || ko "V3 agy unset"
+v3 LAUNCH_ENV_FILE="$SB/tw/tools.env"; [ $? != 0 ] && grep -q 'V3 REFUSED launch env file: writable by' "$SB/v3.log" && ok "V3 refuses a launch env file the agent user can write" || ko "V3 env file: $(cat "$SB/v3.log")"
+v3 LAUNCH_ENV_FILE=; [ $? != 0 ] && grep -q 'V3 REFUSED launch env file: not set' "$SB/v3.log" && ok "V3 refuses a launch without a recorded env file" || ko "V3 env file unset"
+v3 PATH="/usr/share/misc:$SB/tw:/usr/bin:/bin"; [ $? != 0 ] && grep -q "V3 REFUSED PATH folder ahead of the system folders: writable by .*$SB/tw" "$SB/v3.log" && ok "V3 refuses a writable PATH folder ahead of /usr/bin" || ko "V3 path dir: $(cat "$SB/v3.log")"
+v3 PATH="/usr/bin:/bin:$SB/tw" && ok "V3 accepts a writable PATH folder after the system folders" || ko "V3 path after: $(cat "$SB/v3.log")"
+v3 TOOLS_ENV_REFUSED="$SB/tw/tools.env"; [ $? != 0 ] && grep -q 'was not sourced' "$SB/v3.log" && ok "V3 refuses when env.sh skipped a writable tools.env" || ko "V3 tools.env refused"
+( env -i HOME="$SB" PATH=/usr/bin:/bin REQUIRE_FAIL_MODES=1 TOOLS_DIR="$SB/tw" bash -c '. "$1/scripts/env.sh"; echo "R=${TOOLS_ENV_REFUSED:-} T=${TOOLS_PATH:-}"' _ "$HERE" ) > "$SB/envsh.out" 2>&1
+grep -q "R=$SB/tw/tools.env T=\$" "$SB/envsh.out" && ok "env.sh does not source a writable tools.env with REQUIRE_FAIL_MODES=1" || ko "env.sh tools.env: $(cat "$SB/envsh.out")"
+( env -i HOME="$SB" PATH=/usr/bin:/bin TOOLS_DIR="$SB/tw" bash -c '. "$1/scripts/env.sh"; echo "R=${TOOLS_ENV_REFUSED:-} T=${TOOLS_PATH:-}"' _ "$HERE" ) > "$SB/envsh.out" 2>&1
+grep -q "R= T=/x" "$SB/envsh.out" && ok "env.sh still sources tools.env outside V3/unattended" || ko "env.sh normal: $(cat "$SB/envsh.out")"
+mkdir -p "$SB/tl/status"
+( env -i HOME="$SB" PATH=/usr/bin:/bin REQUIRE_FAIL_MODES=1 TOOLS_DIR="$SB/notools" bash "$HERE/scripts/agy-turn-loop.sh" "$SB/tl" "$HERE" 999999 ) > "$SB/tl.out" 2>&1; r1=$?
+( env -i HOME="$SB" PATH=/usr/bin:/bin REQUIRE_FAIL_MODES=1 TOOLS_DIR="$SB/notools" AGY_BIN="$SB/fakebin/agy" bash "$HERE/scripts/agy-turn-loop.sh" "$SB/tl" "$HERE" 999999 ) > "$SB/tl2.out" 2>&1; r2=$?
+( env -i HOME="$SB" PATH=/usr/bin:/bin REQUIRE_FAIL_MODES=1 TOOLS_DIR="$SB/tw" AGY_BIN=/usr/bin/true bash "$HERE/scripts/agy-turn-loop.sh" "$SB/tl" "$HERE" 999999 ) > "$SB/tl3.out" 2>&1; r3=$?
+[ "$r1" = 2 ] && grep -q 'needs AGY_BIN set' "$SB/tl.out" && [ "$r2" = 2 ] && grep -q 'is under \$HOME\|is writable by' "$SB/tl2.out" && [ "$r3" = 2 ] && grep -q 'tools.env is writable' "$SB/tl3.out" \
+  && ok "agy-turn-loop.sh refuses the PATH/~/.local/bin fallback, a writable agy and a writable tools.env (V3/unattended)" || ko "turn loop: $r1 $r2 $r3 $(cat "$SB/tl.out" "$SB/tl2.out" "$SB/tl3.out")"
+
+echo "-- state file without eval (kitfix-20261031-state-file)"
+SF="$SB/state.env"
+( N1=P1-E N1_SLUG=p1-e-x N2=P2-A N3=P2-F P0A_SLUG=p0-a KIT_LABEL="kit (x) a'b" KIT_SHA=abc123 CONFIG_MODE=global ASK_MODE=harness; save_state "$SF" )
+printf 'N2=x;touch %s/pwned-sf\nN3=$(touch %s/pwned-sf2)\nN3_SLUG=`touch %s/pwned-sf3`\nREQUIRE_FAIL_MODES=0\nNATIVE_VERIFY=0\nMAX_RESUMES_TOTAL=99\nPATH=/tmp\nKIT_SCAN_ROOTS=/nowhere\nH6_MODE=warn\nN1_SLUG=$'"'"'\\x41'"'"'\n' "$SB" "$SB" "$SB" >> "$SF"
+( unset N1 N1_SLUG N2 N3 N3_SLUG P0A_SLUG KIT_LABEL KIT_SHA; REQUIRE_FAIL_MODES=1 NATIVE_VERIFY=1 MAX_RESUMES_TOTAL=3 H6_MODE=fail KIT_SCAN_ROOTS=/keep CONFIG_MODE=perturn ASK_MODE=auto
+  _LAUNCH_CONFIG_MODE= _LAUNCH_ASK_MODE=; P0=$PATH
+  load_state "$SF" || exit 9
+  [ ! -e "$SB/pwned-sf" ] && [ ! -e "$SB/pwned-sf2" ] && [ ! -e "$SB/pwned-sf3" ] || exit 1
+  [ "$REQUIRE_FAIL_MODES" = 1 ] && [ "$NATIVE_VERIFY" = 1 ] && [ "$MAX_RESUMES_TOTAL" = 3 ] && [ "$H6_MODE" = fail ] && [ "$KIT_SCAN_ROOTS" = /keep ] && [ "$PATH" = "$P0" ] || exit 2
+  [ "$N1" = P1-E ] && [ "$N1_SLUG" = p1-e-x ] && [ "$N2" = P2-A ] && [ "$N3" = P2-F ] && [ "$KIT_LABEL" = "kit (x) a'b" ] && [ "$CONFIG_MODE" = global ] && [ "$ASK_MODE" = harness ] || exit 3 ) > "$SB/sf.out" 2>&1; r=$?
+[ "$r" = 0 ] && ok "load_state: injected commands do not run, mode and safety lines are ignored, saved values come back intact" || ko "load_state rc=$r: $(cat "$SB/sf.out")"
+grep -c 'STATE-SKIP' "$STATUS_LOG" > "$SB/sf.n"; [ "$(cat "$SB/sf.n")" -ge 10 ] && grep -q "STATE-SKIP state.env:.* REQUIRE_FAIL_MODES is not a state variable" "$STATUS_LOG" \
+  && ok "every skipped state line is logged (STATE-SKIP)" || ko "state skips logged: $(cat "$SB/sf.n")"
+printf 'CONFIG_MODE=global\nASK_MODE=allowlist\n' > "$SB/sf2.env"
+( CONFIG_MODE=perturn ASK_MODE=harness _LAUNCH_CONFIG_MODE=perturn _LAUNCH_ASK_MODE=harness; load_state "$SB/sf2.env"; [ "$CONFIG_MODE" = perturn ] && [ "$ASK_MODE" = harness ] ) \
+  && grep -q 'CONFIG_MODE=global ignored, the launch env set perturn (STATE-KEEP)' "$STATUS_LOG" && ok "a mode the launch env set is kept (STATE-KEEP)" || ko "state keep"
+printf 'CONFIG_MODE=shared\nASK_MODE=none\n' > "$SB/sf3.env"
+( CONFIG_MODE=perturn ASK_MODE=auto _LAUNCH_CONFIG_MODE= _LAUNCH_ASK_MODE=; load_state "$SB/sf3.env"; [ "$CONFIG_MODE" = perturn ] && [ "$ASK_MODE" = auto ] ) \
+  && ok "unknown CONFIG_MODE / ASK_MODE values are skipped" || ko "state enum"
+! sed -n '/^load_state(){/,/^  done < "\$1"; return 0; }/p' "$HERE/scripts/lib.sh" | grep -Eq '(^|[^_])eval |(^|[[:space:]])(\.|source) ' && sed -n '/^load_state(){/p' "$HERE/scripts/lib.sh" | grep -q . && ok "lib.sh has no eval of state-file lines" || ko "eval still in lib.sh"
+
+T_HLB="$(sed -n 's/^ *\(local hlb=.*\)$/\1/p' "$HERE/scripts/lib.sh")"; [ -n "$T_HLB" ] || T_HLB=missing
+eval "hlbt(){ $T_HLB; echo \"[\$hlb]\"; }"
+[ "$(HOME=/h REQUIRE_FAIL_MODES=1 hlbt 2>&1)" = "[]" ] && [ "$(HOME=/h REQUIRE_FAIL_MODES=0 hlbt 2>&1)" = "[/h/.local/bin:]" ] \
+  && grep -q 'PATH="${TOOLS_PATH:+$TOOLS_PATH:}${hlb}/usr/local/bin:/usr/bin:/bin"' "$HERE/scripts/lib.sh" \
+  && ok "run_turn puts no ~/.local/bin ahead of the system folders with REQUIRE_FAIL_MODES=1 (kept when attended)" || ko "run_turn PATH: $(HOME=/h REQUIRE_FAIL_MODES=1 hlbt 2>&1)"
 
 echo "-- escalation-check.sh (kitfix-20261031-escalation-none)"
 ER="$SB/er"; EB="$SB/erbin"; mkdir -p "$ER/etc" "$ER/proc/net" "$EB"

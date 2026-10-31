@@ -18,10 +18,24 @@
 set -u
 TR="$1"; PLAN="$2"; RPID="$3"
 : "${TOOLS_DIR:=$HOME/.local/agents-v0-tools}"
-[ -f "$TOOLS_DIR/tools.env" ] && . "$TOOLS_DIR/tools.env"
+if [ -f "$TOOLS_DIR/tools.env" ]; then
+  # kitfix-20261031-tools-root: V3/unattended never sources a tools.env this user (the agent's) can write
+  if { [ -e "$PLAN/V3-REQUIRED" ] || [ "${REQUIRE_FAIL_MODES:-0}" = 1 ]; } && { [ -w "$TOOLS_DIR/tools.env" ] || [ -w "$TOOLS_DIR" ]; }; then
+    echo "agy-turn-loop: $TOOLS_DIR/tools.env is writable by $(id -un); V3 needs the root-owned /opt/agents-v0-tools" >&2; exit 2; fi
+  . "$TOOLS_DIR/tools.env"
+fi
 [ -z "${TOOLS_PATH:-}" ] || export PATH="$TOOLS_PATH:$PATH"
 [ -z "${JAVA_HOME:-}" ] || export JAVA_HOME
 AGY="${AGY_BIN:-$(command -v agy 2>/dev/null || echo "$HOME/.local/bin/agy")}"
+# kitfix-20261031-tools-root (Sasuke round 2): on a V3 harness copy (V3-REQUIRED) or with REQUIRE_FAIL_MODES=1, agy must
+#   be the root-owned binary pinned in AGY_BIN (e.g. /opt/agents-v0-tools/bin/agy): no PATH or ~/.local/bin fallback,
+#   nothing under $HOME, and neither the file nor its folder writable by this user (the agent's user).
+if [ -e "$PLAN/V3-REQUIRED" ] || [ "${REQUIRE_FAIL_MODES:-0}" = 1 ]; then
+  ar="$(realpath -m "$AGY")"
+  case "${AGY_BIN:-}" in /*) ;; *) echo "agy-turn-loop: V3/unattended needs AGY_BIN set to a root-owned agy (no PATH or ~/.local/bin fallback)" >&2; exit 2;; esac
+  case "$ar/" in "$(realpath -m "$HOME")"/*) echo "agy-turn-loop: AGY_BIN $AGY is under \$HOME; V3 needs a root-owned agy" >&2; exit 2;; esac
+  if [ -w "$ar" ] || [ -w "$(dirname "$ar")" ]; then echo "agy-turn-loop: AGY_BIN $AGY (or its folder) is writable by $(id -un)" >&2; exit 2; fi
+fi
 [ -x "$AGY" ] || { echo "agy-turn-loop: agy not found (set AGY_BIN; tried $AGY)" >&2; exit 2; }
 DRV="$TR/agy-driver"; BRAIN_SRC="$HOME/.gemini/antigravity-cli/brain"; BRAIN_COPY="$DRV/brain"
 AGY_TURN_TIMEOUT="${AGY_TURN_TIMEOUT:-1680}"
@@ -51,7 +65,7 @@ $MSG"
   log "turn start run=${RUN##*/} k=$K chat=$CHAT conv=${CONV:-new} ws=$WS allow=$ALLOW msg=$(head -c 120 <<<"$MSG" | tr '\n' ' ')"
   printf '%s\n' "$PROMPT" > "$RUN/turn-$K.agy.prompt"
   # own process group (setsid) so the runner can stop the whole agy turn via agy-turn.pid (HARNESS-FIX 2026-10-29)
-  ( cd "$WS" && exec env AGY_ALLOW_TOOLS="$ALLOW" TZ="${AGENT_TZ:-Asia/Manila}" setsid timeout -k 30 "$AGY_TURN_TIMEOUT" "$AGY" "${ARGS[@]}" -p "$PROMPT" ) > "$RUN/turn-$K.agy.jsonl" 2> "$RUN/turn-$K.agy.stderr" < /dev/null &
+  ( cd "$WS" && exec env AGY_ALLOW_TOOLS="$ALLOW" AGY_TURN_WS="$WS" TEST_ROOT="$TR" TZ="${AGENT_TZ:-Asia/Manila}" setsid timeout -k 30 "$AGY_TURN_TIMEOUT" "$AGY" "${ARGS[@]}" -p "$PROMPT" ) > "$RUN/turn-$K.agy.jsonl" 2> "$RUN/turn-$K.agy.stderr" < /dev/null &
   APID=$!; echo "$APID" > "$DRV/agy-turn.pid"
   wait "$APID"; rc=$?; rm -f "$DRV/agy-turn.pid"
   NEWCONV="$(jq -r 'select(.event=="init") | .conversation_id' "$RUN/turn-$K.agy.jsonl" 2>/dev/null | head -1)"
