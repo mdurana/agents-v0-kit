@@ -334,7 +334,10 @@ def _segment_writes_protected_path(seg: str) -> Optional[str]:
 
 def _segment_writes_ask_path(seg: str) -> Optional[Tuple[str, str]]:
     """Detect shell redirection or cp/mv/tee/sed/interpreter writes targeting ask-level paths."""
-    target = _segment_writes_matching_path(seg, lambda p: classify_path(p)[0] == "ask")
+    # N-1 final round: Python start-up paths are judged by _segment_writes_py_startup (it runs first and knows that a
+    #   cp/rsync source is a read); here they would ask for a backup copy out of the user site in supervised mode.
+    target = _segment_writes_matching_path(
+        seg, lambda p: not _is_py_startup_path(p) and classify_path(p)[0] == "ask")
     if target:
         return target, classify_path(target)[1]
     return None
@@ -644,8 +647,26 @@ def _is_py_startup_path(p: str) -> bool:
 
 
 def _segment_writes_py_startup(seg: str) -> Optional[str]:
+    # N-1 final round (Sakura 7e91af9 nit): a cp/rsync SOURCE under the user site is a read, not a write
+    #   (cp -r ~/.local/lib/python3.13 /tmp/backup/). For those two only the redirections and where each source
+    #   lands (the destination) are judged; every other program keeps the operand check.
+    try:
+        first = shlex.split(_strip_env_prefix(seg.strip()), posix=True)[:1]
+    except ValueError:
+        first = seg.split()[:1]
+    if first and first[0].split("/")[-1] in ("cp", "rsync"):
+        return _redirect_writes(seg, _is_py_startup_path) or \
+            _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
     return _segment_writes_matching_path(seg, _is_py_startup_path) or \
         _segment_changes_container(seg, _is_py_startup_path) or _segment_py_startup_tree(seg)
+
+
+def _redirect_writes(seg: str, predicate) -> Optional[str]:
+    for m in re.finditer(r">+\s*([^\s;|&]+)", _strip_env_prefix(seg.strip())):
+        target = m.group(1).strip().strip("'\"")
+        if predicate(target):
+            return target
+    return None
 
 
 # kitfix-20261031-n1 rework (Sakura B-2): a whole tree copied, moved, synced or unpacked into the user site's
@@ -914,10 +935,13 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
     else:
         srcs = ops
     lands = []
+    tgt_dir = _existing_dir(tgt)
     # N-1 follow-up (Sakura re-review): a brace source is expanded, and a glob source counts as its contents (it
     #   lands on the destination itself). Into ~ only a glob that can match a dot name counts (.[!.]*, .l*): a plain
     #   * skips .local unless dotglob is set.
-    for src in [b for x in srcs for b in _brace_expand(x)]:
+    all_srcs = [b for x in srcs for b in _brace_expand(x)]
+    into = tgt_dir or len(all_srcs) > 1 or tgt.endswith("/")  # else one source onto a new name: it lands as tgt
+    for src in all_srcs:
         s = src.rstrip("/")
         base = posixpath.basename(s)
         if re.search(r"[*?\[]", base):
@@ -925,8 +949,9 @@ def _segment_py_startup_tree(seg: str) -> Optional[str]:
                 lands.append(tgt)
             continue
         contents = (bin0 == "rsync" and src.endswith("/")) or s.endswith("/.") or s in (".", "")
-        lands.append(tgt if contents else posixpath.join(tgt, base))
-    if not _existing_dir(tgt):
+        if contents or into:
+            lands.append(tgt if contents else posixpath.join(tgt, base))
+    if not tgt_dir:
         lands.append(tgt)
     for land in lands:
         if _is_py_startup_path(land) or (recursive and _is_py_startup_parent(land)):

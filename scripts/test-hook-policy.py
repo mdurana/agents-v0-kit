@@ -795,6 +795,26 @@ def n1_python_startup_cases(tmp: str) -> list:
             ("cp -r ~/.local/lib /tmp/backup", "cp -r a backup of ~/.local/lib"), ("rsync -a ~/ /tmp/backup/", "rsync a backup of ~")]:
         add("shell", cmd, U1, "allow", "unattended " + label)
         add("shell", cmd, A1, "allow", "attended " + label)
+    # N-1 final round (Sakura 7e91af9 nit): a cp/rsync source under the user site is a read. The user site exists.
+    os.makedirs(site1, exist_ok=True)
+    for cmd, label in [
+            ("cp -r ~/.local/lib/python3.13 /tmp/backup/", "cp -r the user site to a backup folder"),
+            ("cp -r ~/.local/lib/python3.13 /tmp/backup", "cp -r the user site to a new backup name"),
+            ("cp -a ~/.local/lib/python3.13/site-packages /tmp/bk", "cp -a site-packages out"),
+            ("rsync -a ~/.local/lib/python3.13/ /tmp/backup/", "rsync the user site out"),
+            ("cp ~/.local/lib/python3.13/site-packages/usercustomize.py /tmp/uc.txt", "cp usercustomize.py out to a new name"),
+            ("cp -t /tmp/backup ~/.local/lib/python3.13/site-packages/a.pth", "cp -t a .pth out")]:
+        add("shell", cmd, U1, "allow", "unattended " + label)
+        add("shell", cmd, A1, "allow", "attended " + label)
+    for cmd, label in [
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages/usercustomize.py", "cp onto usercustomize.py (site exists)"),
+            ("cp /tmp/u.py ~/.local/lib/python3.13/site-packages", "cp into the existing site folder"),
+            ("cp -t ~/.local/lib/python3.13/site-packages /tmp/a.pth", "cp -t into the site"),
+            ("rsync /tmp/a.pth ~/.local/lib/python3.13/site-packages/", "rsync a .pth into the site"),
+            ("cp -r ~/.local/lib/python3.13 ~/.local/lib/python3.14", "cp -r inside the user site"),
+            ("mv ~/.local/lib/python3.13 /tmp/backup", "mv the user site (mv keeps the operand check)")]:
+        add("shell", cmd, U1, "block", "unattended " + label)
+        add("shell", cmd, A1, "ask", "attended " + label)
     return c
 
 
