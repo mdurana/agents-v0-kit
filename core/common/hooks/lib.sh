@@ -34,13 +34,16 @@ export PYTHONNOUSERSITE
 #   root too), so the source is always compiled, and -B never writes a cache (PYTHONDONTWRITEBYTECODE is ignored
 #   under -I). Python 3.7 and older ignore pycache_prefix; the check below accepts them without it.
 HOOK_PYCACHE_PREFIX=/dev/null/agents-v0
-_hook_py_run() { "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
+# JN-12 (Jiraiya): the interpreter always runs with PATH=/usr/bin:/bin (as the hooks themselves do since M-1), so even
+#   a pin that is a "#!/usr/bin/env python3" script could not reach a python3 the agent put on the IDE's PATH.
+HOOK_SAFE_PATH=/usr/bin:/bin
+_hook_py_run() { PATH="$HOOK_SAFE_PATH" "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
 hook_py() { [ -z "$HOOK_PYTHON_WHY" ] || return 126; _hook_py_run "$@"; }
 # JN-2 / JN-5 / JN-8 (Jiraiya's N-1 review): hook_python_problem prints why HOOK_PYTHON must not be trusted, nothing
 #   when it may. The pin can arrive through git (a pulled or merged hook-python) or be rewritten (H-5), so it is
 #   checked at every hook run, not only by install.sh:
-#   - it is an executable file, and it (followed through a symlink) and its folder are owned by root and not writable
-#     by group or others (one ls, one awk);
+#   - it is an executable file that does not start with #! (JN-12), and it (followed through a symlink) and its
+#     folder are owned by root and not writable by group or others (one ls, one awk);
 #   - it is a working Python that runs as hook_py runs it: a fixed snippet must print the marker with isolated=1,
 #     no_site=1, dont_write_bytecode=1 and the pycache prefix. /bin/true, /usr/bin/env or a folder print nothing,
 #     and dropping -I, -S, -B or -X from hook_py changes the line, so the hooks fail closed (JN-8 at run time).
@@ -49,6 +52,11 @@ hook_py() { [ -z "$HOOK_PYTHON_WHY" ] || return 126; _hook_py_run "$@"; }
 hook_python_problem() {
   if [ ! -f "$HOOK_PYTHON" ] || [ ! -x "$HOOK_PYTHON" ]; then
     printf '%s is missing or not an executable file' "$HOOK_PYTHON"; return 0
+  fi
+  # JN-12 (Jiraiya): a root-owned script (for example /usr/bin/routel, "#! /usr/bin/env python3") passes the owner
+  #   check but hands the work to another program; only an interpreter binary is accepted.
+  if [ "$(head -c 2 "$HOOK_PYTHON" 2>/dev/null)" = '#!' ]; then  # jn12-shebang-check
+    printf '%s is a #! script, not an interpreter binary' "$HOOK_PYTHON"; return 0
   fi
   if ! ls -ldnL "$HOOK_PYTHON" "$(dirname "$HOOK_PYTHON")" 2>/dev/null | awk '
       NF < 3 || $3 != "0" || substr($1, 6, 1) == "w" || substr($1, 9, 1) == "w" { bad = 1 }

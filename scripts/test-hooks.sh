@@ -471,6 +471,41 @@ for hj in "$KIT/core/common/adapters/cursor/hooks.json" "$KIT/core/common/adapte
   if grep -Eq '(^|[" (&|])sh [.-]' "$hj"; then err "M-1 $(basename "$(dirname "$hj")")/hooks.json starts a hook with a bare sh"; fi
 done
 
+# JN-12 (Jiraiya): a root-owned "#!/usr/bin/env python3" script as the pin (stock /usr/bin/routel on Debian/Ubuntu)
+#   passed the owner check and ran the first python3 on PATH. The pin is refused because it starts with #!, and the
+#   interpreter runs with PATH=/usr/bin:/bin in any case (the mutant below drops the #! check and the hooks' own PATH
+#   reset to show that half alone).
+jn12_pin=""
+for c in /usr/bin/routel /usr/sbin/routel /usr/bin/* /bin/*; do
+  [ -f "$c" ] && [ -x "$c" ] || continue
+  head -n 1 "$c" 2>/dev/null | grep -Eq '^#! ?/usr/bin/env python3' || continue
+  ls -ldnL "$c" "$(dirname "$c")" | awk 'NF < 3 || $3 != "0" || substr($1, 6, 1) == "w" || substr($1, 9, 1) == "w" { bad = 1 } END { exit (bad || NR != 2) }' || continue
+  jn12_pin="$c"; break
+done
+mkdir -p "$n1/jn12bin"
+printf '#!/bin/sh\ncase "$*" in *agents-v0-hook-python*) echo "agents-v0-hook-python 1 1 1 /dev/null/agents-v0"; exit 0 ;; esac\ncat >/dev/null 2>&1\necho "{\\"action\\": \\"allow\\", \\"message\\": \\"\\", \\"permission\\": \\"allow\\", \\"decision\\": \\"allow\\"}"\n' > "$n1/jn12bin/python3"
+chmod +x "$n1/jn12bin/python3"
+if [ -n "$jn12_pin" ]; then
+  ctl="$(PATH="$n1/jn12bin:$PATH" "$jn12_pin" -c 'print("agents-v0-hook-python")' </dev/null 2>/dev/null)" || :
+  case "$ctl" in "agents-v0-hook-python 1 1 1 "*) ;; *) err "JN-12 control: $jn12_pin did not run the fake python3 on PATH ($ctl)" ;; esac
+  rm -rf "$n1/j12"; cp -R "$HOOKS" "$n1/j12"; echo "$jn12_pin" > "$n1/j12/hook-python"
+  n1_expect_deny "JN-12 pin to $jn12_pin, fake python3 on PATH: sudo id" "$n1/j12" pre-shell.sh "$SUDO" PATH="$n1/jn12bin:$PATH"
+  n1_expect_deny "JN-12 pin to $jn12_pin, fake python3 on PATH: edit policy.conf" "$n1/j12" pre-edit.sh "$PCONF" PATH="$n1/jn12bin:$PATH"
+  n1_hook "$n1/j12" pre-shell.sh '{"command":"ls"}'
+  { [ "$n1_rc" = 2 ] && printf '%s' "$n1_out" | grep -q '#! script'; } || err "JN-12 pin to a #! script: expected a deny naming the #! script, got rc=$n1_rc ($n1_out)"
+  rm -rf "$n1/j12m"; cp -R "$n1/j12" "$n1/j12m"
+  sed '/jn12-shebang-check/,/^  fi$/d' "$HOOKS/lib.sh" > "$n1/j12m/lib.sh"
+  for h in pre-shell.sh pre-edit.sh; do sed '/^PATH=\/usr\/bin:\/bin$/d' "$HOOKS/$h" > "$n1/j12m/$h"; done
+  if cmp -s "$HOOKS/lib.sh" "$n1/j12m/lib.sh" || cmp -s "$HOOKS/pre-shell.sh" "$n1/j12m/pre-shell.sh"; then
+    err "JN-12 mutant: lib.sh or pre-shell.sh unchanged (the #! check or the PATH line moved?)"
+  else
+    n1_expect_deny "JN-12 PATH half only (no #! check, no hook PATH reset): sudo id" "$n1/j12m" pre-shell.sh "$SUDO" PATH="$n1/jn12bin:$PATH"
+    n1_expect_deny "JN-12 PATH half only (no #! check, no hook PATH reset): edit policy.conf" "$n1/j12m" pre-edit.sh "$PCONF" PATH="$n1/jn12bin:$PATH"
+  fi
+else
+  printf 'test-hooks: JN-12 repro skipped (no root-owned #!/usr/bin/env python3 script found)\n'
+fi
+
 python3 "$KIT/scripts/test-hook-policy.py" || fail=1
 
 if [ "$fail" -eq 1 ]; then
