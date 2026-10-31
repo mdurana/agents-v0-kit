@@ -303,7 +303,7 @@ echo /nonexistent/python3 > "$n1/hooks/hook-python"
 n1_expect_deny "pinned interpreter missing: sudo id" "$n1/hooks" pre-shell.sh "$SUDO"
 n1_expect_deny "pinned interpreter missing: ls" "$n1/hooks" pre-shell.sh '{"command":"ls"}'
 n1_expect_deny "pinned interpreter missing: edit src" "$n1/hooks" pre-edit.sh '{"file_path":"src/a.txt"}'
-command -v python3 > "$n1/hooks/hook-python"
+echo /usr/bin/python3 > "$n1/hooks/hook-python"
 n1_hook "$n1/hooks" pre-shell.sh '{"command":"ls"}' PATH="$n1/fakebin:$PATH"
 [ "$n1_rc" = 0 ] || err "N-1 pinned interpreter: ls should be allowed with a fake python3 on PATH (rc=$n1_rc)"
 n1_expect_deny "pinned interpreter, fake python3 on PATH: sudo id" "$n1/hooks" pre-shell.sh "$SUDO" PATH="$n1/fakebin:$PATH"
@@ -343,6 +343,29 @@ if [ -x /usr/bin/python3 ]; then
   KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --update --quick --allow-in-flight "$n1/t3" >/dev/null 2>&1 || err "JN-2 --update of the brownfield install failed"
   [ "$(grep -c 'hooks/hook-python$' "$n1/t3/.gitignore")" = 2 ] || err "JN-2 --update added the pin lines to .gitignore twice"
 fi
+# JN-2 (b): a pin that arrived through git (pull, merge) and names an interpreter the agent can write (user-owned, or
+#   in a user-owned folder) is not trusted at hook time: every verdict is a literal deny, not allow.
+cp -R "$HOOKS" "$n1/jn"; mkdir -p "$n1/lnk"; ln -s /usr/bin/python3 "$n1/lnk/python3"
+for pin in "$n1/fakebin/python3" "$n1/wrapbin/python3" "$n1/lnk/python3"; do
+  echo "$pin" > "$n1/jn/hook-python"
+  n1_expect_deny "JN-2 pin to $pin: sudo id" "$n1/jn" pre-shell.sh "$SUDO"
+  n1_expect_deny "JN-2 pin to $pin: ls (fail closed)" "$n1/jn" pre-shell.sh '{"command":"ls"}'
+  n1_expect_deny "JN-2 pin to $pin: edit policy.conf" "$n1/jn" pre-edit.sh "$PCONF"
+  n1_expect_deny "JN-2 pin to $pin: edit src (fail closed)" "$n1/jn" pre-edit.sh '{"file_path":"src/a.txt"}'
+done
+# JN-5: a pin that runs but is not a working Python (root-owned, so the owner check passes) gives no verdict; both
+#   hooks must still print a deny with rc 2 (agy has no failClosed: rc 0 without JSON would be an allow).
+for pin in /bin/true /bin/false /usr/bin/env /usr/bin; do
+  [ -e "$pin" ] || continue
+  echo "$pin" > "$n1/jn/hook-python"
+  n1_expect_deny "JN-5 pin to $pin: sudo id" "$n1/jn" pre-shell.sh "$SUDO"
+  n1_expect_deny "JN-5 pin to $pin: edit policy.conf" "$n1/jn" pre-edit.sh "$PCONF"
+  n1_expect_deny "JN-5 pin to $pin: edit src" "$n1/jn" pre-edit.sh '{"file_path":"src/a.txt"}'
+done
+rm -f "$n1/jn/hook-python"
+n1_expect_deny "JN-5 edit payload with no readable path" "$n1/jn" pre-edit.sh '{"tool_name":"Write","tool_input":{"contents":"x"}}'
+n1_hook "$n1/jn" pre-edit.sh '{"file_path":"src/a.txt"}'
+{ [ "$n1_rc" = 0 ] && printf '%s' "$n1_out" | grep -q '"allow"'; } || err "JN-5 control: edit of src/a.txt with the default interpreter should allow (rc=$n1_rc $n1_out)"
 # JN-7: a planted __pycache__/hook-policy.<tag>.pyc next to the hooks is never loaded. hook_shell_permission_ask
 #   loads hook-policy.py by path; the planted copy splits every command into one allowlisted segment.
 if [ -x /usr/bin/python3 ]; then

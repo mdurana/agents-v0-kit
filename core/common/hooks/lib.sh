@@ -29,9 +29,48 @@ export PYTHONNOUSERSITE
 #   hook_shell_permission_ask) from reading a planted __pycache__/hook-policy.cpython-*.pyc next to the hooks.
 #   -X pycache_prefix points every bytecode lookup at a folder that cannot exist (/dev/null is not a folder, for
 #   root too), so the source is always compiled, and -B never writes a cache (PYTHONDONTWRITEBYTECODE is ignored
-#   under -I). Python 3.7 and older ignore pycache_prefix.
+#   under -I). Python 3.7 and older ignore pycache_prefix; the check below accepts them without it.
 HOOK_PYCACHE_PREFIX=/dev/null/agents-v0
-hook_py() { "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
+_hook_py_run() { "$HOOK_PYTHON" -I -S -B -X pycache_prefix="$HOOK_PYCACHE_PREFIX" "$@"; }
+hook_py() { [ -z "$HOOK_PYTHON_WHY" ] || return 126; _hook_py_run "$@"; }
+# JN-2 / JN-5 / JN-8 (Jiraiya's N-1 review): hook_python_problem prints why HOOK_PYTHON must not be trusted, nothing
+#   when it may. The pin can arrive through git (a pulled or merged hook-python) or be rewritten (H-5), so it is
+#   checked at every hook run, not only by install.sh:
+#   - it is an executable file, and it (followed through a symlink) and its folder are owned by root and not writable
+#     by group or others (one ls, one awk);
+#   - it is a working Python that runs as hook_py runs it: a fixed snippet must print the marker with isolated=1,
+#     no_site=1, dont_write_bytecode=1 and the pycache prefix. /bin/true, /usr/bin/env or a folder print nothing,
+#     and dropping -I, -S, -B or -X from hook_py changes the line, so the hooks fail closed (JN-8 at run time).
+#   It runs once, when this file is sourced (HOOK_PYTHON_WHY, never read from the environment). pre-shell.sh and
+#   pre-edit.sh deny with a literal JSON line when it is set, and hook_py refuses to run an untrusted pin (rc 126).
+hook_python_problem() {
+  if [ ! -f "$HOOK_PYTHON" ] || [ ! -x "$HOOK_PYTHON" ]; then
+    printf '%s is missing or not an executable file' "$HOOK_PYTHON"; return 0
+  fi
+  if ! ls -ldnL "$HOOK_PYTHON" "$(dirname "$HOOK_PYTHON")" 2>/dev/null | awk '
+      NF < 3 || $3 != "0" || substr($1, 6, 1) == "w" || substr($1, 9, 1) == "w" { bad = 1 }
+      END { exit (bad || NR != 2) }'; then
+    printf '%s or its folder is not owned by root, or is writable by group or others' "$HOOK_PYTHON"; return 0
+  fi
+  hp_marker="$(_hook_py_run -c 'import sys
+f = sys.flags
+p = getattr(sys, "pycache_prefix", None) if sys.version_info >= (3, 8) else "pre-3.8"
+print("agents-v0-hook-python %d %d %d %s" % (f.isolated, f.no_site, f.dont_write_bytecode, p))' </dev/null 2>/dev/null)" || hp_marker=""
+  case "$hp_marker" in
+    "agents-v0-hook-python 1 1 1 $HOOK_PYCACHE_PREFIX"|"agents-v0-hook-python 1 1 1 pre-3.8") ;;
+    *) printf '%s is not a working Python run with -I -S -B (marker: %s)' "$HOOK_PYTHON" "${hp_marker:-none}" ;;
+  esac
+}
+HOOK_PYTHON_WHY=""
+HOOK_PYTHON_WHY="$(hook_python_problem)"
+# hook_deny_literal <reason>: a deny verdict that needs no Python; exits 2. The reason may hold the pin's text (from
+#   git), so quotes, backslashes and control characters are dropped before it goes into the JSON line.
+hook_deny_literal() {
+  hd_r="$(printf '%s' "$1" | tr -d '"\\\000-\037')"
+  printf 'BLOCK: %s (fail-closed)\n' "$hd_r" >&2
+  printf '{"permission": "deny", "decision": "deny", "reason": "%s (fail-closed)"}\n' "$hd_r"
+  exit 2
+}
 
 # Read hook JSON from stdin; print a string field (supports nested keys with dots).
 # Tries common Cursor payload shapes when the top-level key is missing.

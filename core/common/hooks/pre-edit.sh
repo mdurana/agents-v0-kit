@@ -4,12 +4,9 @@ set -eu
 
 . "$(dirname "$0")/lib.sh"
 
-# N-1: checked before the payload is read, so a missing interpreter (no path read) is not an allow.
-if [ ! -x "$HOOK_PYTHON" ]; then
-  printf 'BLOCK: the hook interpreter %s is missing (path guardrails fail closed)\n' "$HOOK_PYTHON" >&2
-  printf '{"permission": "deny", "decision": "deny", "reason": "kit hook interpreter missing (fail-closed)"}\n'
-  exit 2
-fi
+# N-1, JN-2/JN-5: checked before the payload is read, so an untrusted or non-working interpreter (missing, not
+#   root-owned, a folder, /bin/true: no path read) is not an allow.
+[ -z "$HOOK_PYTHON_WHY" ] || hook_deny_literal "kit hook interpreter not trusted: $HOOK_PYTHON_WHY"
 
 payload="$(cat || true)"
 path="$(hook_extract_file_path "$payload")"
@@ -30,13 +27,21 @@ if isinstance(ti,dict):
             print(ti[k]); raise SystemExit(0)
 ' 2>/dev/null || true)"
 
-[ -n "$path" ] || exit 0
+# JN-5: an empty payload has nothing to judge; a payload with no path we can read is denied, not allowed.
+if [ -z "$path" ]; then
+  [ -n "$(printf '%s' "$payload" | tr -d ' \t\r\n')" ] || exit 0
+  hook_deny_literal "edit payload has no file path the guardrail can read"
+fi
 
-result="$(HOOK_PATH="$path" hook_py "$HOOK_POLICY_PY" path 2>/dev/null)" || exit 2
-[ -n "$result" ] || exit 2
+result="$(HOOK_PATH="$path" hook_py "$HOOK_POLICY_PY" path 2>/dev/null)" || hook_deny_literal "path guardrail failed to run"
+[ -n "$result" ] || hook_deny_literal "path guardrail returned no verdict"
 
-action="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("action","allow"))')"
-message="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("message",""))')"
+action="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("action","block"))' 2>/dev/null)" || action=block
+message="$(printf '%s' "$result" | hook_py -c 'import json,sys; print(json.load(sys.stdin).get("message",""))' 2>/dev/null)" || message=""
+case "$action" in
+  allow|ask) ;;
+  *) action=block; [ -n "$message" ] || message="path guardrail returned no verdict (fail-closed)" ;;
+esac
 
 if [ "$action" = "block" ]; then
   hook_audit_log "path" "$path" "block" "$message"
@@ -45,7 +50,7 @@ if [ "$action" = "block" ]; then
 import json, os
 msg = os.environ.get("HOOK_DENY_MSG", "")
 print(json.dumps({"permission": "deny", "decision": "deny", "reason": msg, "user_message": msg}))
-'
+' || hook_deny_literal "$message"
   exit 2
 fi
 
@@ -57,5 +62,7 @@ if [ "$action" = "ask" ]; then
   hook_audit_log "path" "$path" "allow-flagged" "$message"
 fi
 
-hook_shell_permission_allow
-exit 0
+# JN-5: exit 0 only with the allow line printed; no verdict is a deny (agy has no failClosed).
+allow_out="$(hook_shell_permission_allow)"
+case "$allow_out" in *'"permission": "allow"'*) printf '%s\n' "$allow_out"; exit 0 ;; esac
+hook_deny_literal "path guardrail produced no allow verdict"

@@ -4,12 +4,9 @@ set -eu
 
 . "$(dirname "$0")/lib.sh"
 
-if [ ! -x "$HOOK_PYTHON" ]; then
-  # block() prints its JSON with Python, so print the deny here directly (N-1: fail closed without an interpreter).
-  printf 'BLOCK: the hook interpreter %s is missing (fail-closed).\n' "$HOOK_PYTHON" >&2
-  printf '{"permission": "deny", "decision": "deny", "reason": "kit hook interpreter missing (fail-closed)"}\n'
-  exit 2
-fi
+# N-1, JN-2/JN-5: block() prints its JSON with Python, so an untrusted or non-working interpreter (missing, not
+#   root-owned, a folder, /bin/true) is denied here with a literal JSON line.
+[ -z "$HOOK_PYTHON_WHY" ] || hook_deny_literal "kit hook interpreter not trusted: $HOOK_PYTHON_WHY"
 
 payload="$(cat || true)"
 cmd="$(hook_extract_command "$payload")"
@@ -45,11 +42,17 @@ case "$action" in
     hook_audit_log "shell" "$cmd" "ask" "$message"
     printf '%s\n' "$agent_msg" >&2
     rc=0
-    hook_shell_permission_ask "$user_msg" "$agent_msg" "$cmd" || rc=$?
-    exit "$rc"
+    ask_out="$(hook_shell_permission_ask "$user_msg" "$agent_msg" "$cmd")" || rc=$?
+    # JN-5: rc 0 or 2 with a verdict line is passed on; anything else (a crash, no output) is a deny.
+    case "$rc:$ask_out" in
+      0:*'"permission": "'*|2:*'"permission": "deny"'*) printf '%s\n' "$ask_out"; exit "$rc" ;;
+    esac
+    hook_deny_literal "ask-level command: the guardrail produced no verdict"
     ;;
 esac
 
 hook_audit_log "shell" "$cmd" "allow" ""
-hook_shell_permission_allow
-exit 0
+# JN-5: exit 0 only with the allow line printed; no verdict is a deny (agy has no failClosed).
+allow_out="$(hook_shell_permission_allow)"
+case "$allow_out" in *'"permission": "allow"'*) printf '%s\n' "$allow_out"; exit 0 ;; esac
+hook_deny_literal "shell guardrail produced no allow verdict"
