@@ -394,9 +394,18 @@ rm -rf "$PQ"
 #   with a user site that plants a marker, gives the story map and no marker (the bare control does plant it).
 # N-1 follow-up (Sakura re-review): tests/py-call-guard.py checks each call, not each line, and also catches
 #   /usr/bin/python3, python3.13, "$PY"/${PYTHON} and a *.py run through its shebang.
-bare="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" $(ls "$HERE"/scripts/*.sh | grep -vE '/(prereqs|setup-vm|kit-fix)\.sh$'))"
-[ -z "$bare" ] && ok "no harness script runs a bare python3 (only prereqs.sh, setup-vm.sh, kit-fix.sh: operator/root setup)" \
-  || ko "harness scripts with a bare python3: $bare"
+# N-1 final round (Sakura 7e91af9): fail closed. Clean means rc 0 AND the guard scanned every file passed, at least
+#   PG_MIN (12; the harness has 14 today). A crash, a missing file or zero files is rc 2, never a pass.
+PG_MIN=12; pgfiles="$(ls "$HERE"/scripts/*.sh | grep -vE '/(prereqs|setup-vm|kit-fix)\.sh$')"; pgn="$(printf '%s\n' "$pgfiles" | grep -c .)"
+bare="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" --min-files "$PG_MIN" $pgfiles 2> "$SB/pg.err")"; pgrc=$?
+[ "$pgrc" = 0 ] && [ -z "$bare" ] && grep -qx "py-call-guard: scanned $pgn file(s)" "$SB/pg.err" && [ "$pgn" -ge "$PG_MIN" ] \
+  && ok "no harness script runs a bare python3: rc 0, $pgn files scanned (>= $PG_MIN; prereqs.sh, setup-vm.sh, kit-fix.sh excluded)" \
+  || ko "py-call-guard on the harness: rc=$pgrc files=$pgn $(cat "$SB/pg.err") $bare"
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$HERE/scripts/lib.sh" "$SB/no-such-file.sh" > /dev/null 2>&1; r1=$?
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" > /dev/null 2>&1; r2=$?
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" --min-files 99 "$HERE/scripts/lib.sh" > /dev/null 2>&1; r3=$?
+[ "$r1" = 2 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && ok "py-call-guard fails closed: a missing file, no files and too few files are rc 2" \
+  || ko "py-call-guard fail-closed: missing=$r1 none=$r2 few=$r3"
 PG="$SB/pg"; mkdir -p "$PG"
 cat > "$PG/bad.sh" <<'EOF'
 /usr/bin/python3 -c 'print(1)'
@@ -412,6 +421,11 @@ env python3 -c x
 chk 3 plan L2 "x" -- "$HERE/next-story.py" map "$MAIN"
 mapfile -t rows < <("$HERE"/next-story.py chain "$MAIN")
 if ./tool.py; then :; fi
+x | python3
+python3 <<'PY'
+"${PY:-python3}" -c x
+$(command -v python3) -c x
+out="$(printf x | python3 | cat)"
 python - <<'PY'
 EOF
 cat > "$PG/good.sh" <<'EOF'
@@ -429,11 +443,17 @@ post FAIL "no story in the plan (next-story.py chain)"
 say pyyaml MISSING "use python3 for x"
 for f in a.py b.py; do :; done
 [ -f "$d/x.py" ] && echo ok
+x | python3 -I -S
+python3 -I -S <<'PY'
+"${PY:-python3}" -I -S -c x
+command -v python3 > /dev/null
+for t in git jq python3 curl; do :; done
 EOF
-got="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" | sed -E 's/^[^:]+:([0-9]+):.*/\1/' | sort -un | tr '\n' ' ')"
-[ "$got" = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 " ] && ok "py-call-guard catches /usr/bin/python3, python3.13, \"\$PY\", shebang runs and a bare call beside a good one" \
+/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" > /dev/null 2>&1; [ $? = 1 ] || ko "py-call-guard: bad lines did not give rc 1"
+got="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/bad.sh" 2>/dev/null | sed -E 's/^[^:]+:([0-9]+):.*/\1/' | sort -un | tr '\n' ' ')"
+[ "$got" = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 " ] && ok "py-call-guard catches /usr/bin/python3, python3.13, \"\$PY\", \"\${PY:-python3}\", \$(command -v python3), | python3, python3 <<, shebang runs and a bare call beside a good one" \
   || ko "py-call-guard bad lines caught: $got"
-gg="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/good.sh")"; [ -z "$gg" ] && ok "py-call-guard allows -I -S calls, strings, comments and .py arguments" || ko "py-call-guard false positives: $gg"
+gg="$(/usr/bin/python3 -I -S "$HERE/tests/py-call-guard.py" "$PG/good.sh" 2>/dev/null)"; ggrc=$?; [ "$ggrc" = 0 ] && [ -z "$gg" ] && ok "py-call-guard allows -I -S calls, strings, comments and .py arguments" || ko "py-call-guard false positives: $gg"
 old="$(grep -nE '(^|[^[:alnum:]_./-])python3? +(-|"|'\''|\$)' "$PG/bad.sh" | grep -v 'python3 -I -S' | cut -d: -f1 | tr '\n' ' ')"
 case " $old " in *" 1 "*|*" 2 "*|*" 3 "*|*" 4 "*) ko "control: the 942f076 regex unexpectedly caught one of lines 1-4 ($old)" ;;
   *) ok "control: the 942f076 regex missed /usr/bin/python3, python3.13, \"\$PY\" and the shebang run (caught only: $old)" ;; esac
