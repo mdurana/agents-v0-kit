@@ -11,6 +11,10 @@
 #   kitfix-20261031-n1: also .local/lib (the user site-packages: usercustomize.py, *.pth). Only files under a
 #   __pycache__/ folder are left out of folder hashes (a cache refresh is not a change; Python never imports a
 #   sourceless .pyc from there). Any other .pyc is hashed: a sourceless usercustomize.pyc runs (Sakura B-1).
+#   N-1 follow-up (Sakura R-1): skipping __pycache__/ is safe only while the user site holds no .py a bare python3
+#   imports (a tampered cached .pyc of a real module runs and is not hashed). So --record refuses (exit 2) when
+#   .local/lib holds any *.py or *.pth outside __pycache__/: the V3 user site must be empty of Python source
+#   (PyYAML from apt's python3-yaml, not pip --user). After that, any .py or .pth that appears is a HOME change.
 set -u
 FILES=".profile .bash_profile .bash_login .bashrc .bash_logout .bash_aliases .zshenv .zprofile .zshrc .inputrc
 .tmux.conf .config/tmux/tmux.conf .gitconfig .config/git/config .config/git/attributes .ssh/rc .ssh/environment
@@ -23,6 +27,10 @@ list(){ local h="$1" f
   done; }
 case "${1:-}" in
   --record) [ $# = 3 ] || { echo "usage: $0 --record <file> <home>" >&2; exit 2; }
+            src=""; [ ! -d "$3/.local/lib" ] || src="$(find "$3/.local/lib" -type f \( -name '*.py' -o -name '*.pth' \) \
+                ! -path '*/__pycache__/*' 2>/dev/null | LC_ALL=C sort)"
+            [ -z "$src" ] || { printf 'HOME-HASH REFUSED: %s/.local/lib holds %s Python source or .pth file(s), first %s. Their cached bytecode under __pycache__/ is not hashed, so it could be swapped unseen. Remove the user-site packages (PyYAML comes from apt python3-yaml) and record again.\n' \
+                "$3" "$(printf '%s\n' "$src" | wc -l | tr -d ' ')" "$(printf '%s\n' "$src" | head -n 1)"; exit 2; }
             (umask 022; list "$3" > "$2") || exit 2; echo "HOME-HASH recorded $(grep -vc '^absent' "$2") files of $3 in $2";;
   --check)  [ $# = 3 ] || { echo "usage: $0 --check <file> <home>" >&2; exit 2; }
             [ -s "$2" ] || { echo "HOME-HASH record missing: $2"; exit 1; }

@@ -325,8 +325,9 @@ rm -rf "$VH/.local/lib"
 # Sakura B-1: a sourceless usercustomize.pyc in the user site runs in every bare python3 of that user, so home-hash
 #   must hash it; only __pycache__/ (a cache Python never imports sourceless) is left out.
 HH="$SB/hh"; HHS="$(HOME="$HH" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
-mkdir -p "$HHS"; echo 'X = 1' > "$HHS/plain.py"; bash "$HV3/scripts/home-hash.sh" --record "$SB/hh.sha256" "$HH" > /dev/null
-mkdir -p "$HHS/__pycache__"; HOME="$HH" /usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$HHS/plain.py" "$HHS/__pycache__/plain.cpython-0.pyc"
+mkdir -p "$HHS"; echo 'not python' > "$HHS/README.txt"; echo 'X = 1' > "$SB/plain.py"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/hh.sha256" "$HH" > /dev/null || ko "home-hash --record refused a user site without Python source"
+mkdir -p "$HHS/__pycache__"; HOME="$HH" /usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2])' "$SB/plain.py" "$HHS/__pycache__/plain.cpython-0.pyc"
 bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1 && grep -q '^HOME-HASH-OK' "$SB/hh.log" \
   && ok "home-hash ignores a __pycache__/ refresh under .local/lib" || ko "home-hash __pycache__: $(cat "$SB/hh.log")"
 printf 'open(%s, "w").write("ran")\n' "'$SB/hh.mark'" > "$SB/hh-uc.py"
@@ -337,6 +338,26 @@ rm -f "$SB/hh.mark"; HOME="$HH" /usr/bin/python3 -c 'pass'
 bash "$HV3/scripts/home-hash.sh" --check "$SB/hh.sha256" "$HH" > "$SB/hh.log" 2>&1; [ $? != 0 ] && grep -q '^HOME-CHANGED .local/lib' "$SB/hh.log" \
   && ok "home-hash sees a sourceless usercustomize.pyc added to the user site (Sakura B-1)" || ko "home-hash .pyc: $(cat "$SB/hh.log")"
 rm -rf "$HH" "$SB/hh.mark"
+# Sakura R-1 (N-1 follow-up): with a real module in the user site, a swapped __pycache__ .pyc runs and is not hashed.
+#   --record therefore refuses while .local/lib holds any .py or .pth outside __pycache__/ (942f076 recorded it).
+R1="$SB/r1"; R1S="$(HOME="$R1" /usr/bin/python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "$R1S/legit/__pycache__"; echo 'OK = 1' > "$R1S/legit/__init__.py"
+printf 'open(%s, "w").write("ran")\nOK = 1\n' "'$SB/r1.mark'" > "$SB/r1-evil.py"
+/usr/bin/python3 -c 'import sys, py_compile; py_compile.compile(sys.argv[1], cfile=sys.argv[2], invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)' \
+  "$SB/r1-evil.py" "$R1S/legit/__pycache__/__init__.$(/usr/bin/python3 -c 'import sys; print(sys.implementation.cache_tag)').pyc"
+rm -f "$SB/r1.mark"; ( cd "$SB" && HOME="$R1" /usr/bin/python3 -c 'import legit' ) 2>/dev/null
+[ "$(cat "$SB/r1.mark" 2>/dev/null)" = ran ] && ok "control: a swapped __pycache__ .pyc of a user-site module runs in a bare python3 (R-1)" \
+  || ko "control: the swapped __pycache__ .pyc did not run"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED: .*\.local/lib holds 1 Python source' "$SB/r1.log" && [ ! -e "$SB/r1.sha256" ] \
+  && ok "home-hash --record refuses a user site that holds a .py, and writes no record (Sakura R-1)" || ko "home-hash R-1 .py: rc=$r $(cat "$SB/r1.log")"
+rm -rf "$R1S/legit"; echo 'import os' > "$R1S/x.pth"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1; r=$?
+[ "$r" = 2 ] && grep -q '^HOME-HASH REFUSED' "$SB/r1.log" && ok "home-hash --record refuses a user site that holds a .pth (Sakura R-1)" || ko "home-hash R-1 .pth: rc=$r $(cat "$SB/r1.log")"
+rm -f "$R1S/x.pth"; mkdir -p "$R1S/__pycache__"; : > "$R1S/__pycache__/stale.cpython-313.pyc"; : > "$R1S/data.txt"
+bash "$HV3/scripts/home-hash.sh" --record "$SB/r1.sha256" "$R1" > "$SB/r1.log" 2>&1 && grep -q '^HOME-HASH recorded' "$SB/r1.log" \
+  && ok "home-hash --record accepts a user site with only __pycache__ and data files" || ko "home-hash R-1 allow: $(cat "$SB/r1.log")"
+rm -rf "$R1" "$SB/r1.mark" "$SB/r1.sha256"
 # Sakura B-3: the harness's own Python runs isolated. run-plan.sh's next-story.py calls (they pick the next story) ran
 #   bare python3 and loaded the e2e user site. Static: no harness script outside the operator/root setup tools
 #   (prereqs.sh, setup-vm.sh, kit-fix.sh) starts python3 without -I -S. Functional: run-plan.sh's own map line,
