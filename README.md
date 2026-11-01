@@ -55,7 +55,7 @@ Different features may proceed in one checkout only while each writes its own `d
 
 
 
-**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.6 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
+**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.7 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
 
 ## Install
 

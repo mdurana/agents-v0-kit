@@ -13,7 +13,7 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 # ./scripts/install.sh --pack <id> --with-starters /path/to/existing-repo
 ```
 
-**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.6 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
+**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.7 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
 
 On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the first build or maintain verify. Missing host tools named by the pack's `hostChecks` are installed with MacPorts when a port exists (JDK 21, Node, npm, Python, Go). The .NET SDK comes from the pack image, not MacPorts. PyYAML uses that script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts) ([gold-standards.md](gold-standards.md)).
 

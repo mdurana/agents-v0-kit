@@ -65,7 +65,7 @@ cp /path/to/agents-v0/templates/docs/agents-v0/milestones/p0-platform-skeleton.m
 
 The manual path without bootstrap does not fill Layout. Set the **This repo** rows in `docs/agents-v0/project-profile.md`, or re-run bootstrap with `--profile`.
 
-**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.6 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
+**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.7 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
 
 On an Intel Mac, before the first verify command, run `sh .agents-v0/scripts/host-tools-macports.sh` to check tools named by the pack's `hostChecks` and PyYAML. Exit 2 means a tool is missing. Approve `sh .agents-v0/scripts/host-tools-macports.sh --install` ([gold-standards.md](gold-standards.md)).
 

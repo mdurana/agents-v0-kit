@@ -36,7 +36,7 @@ Check `git status` (`workflow-orchestration.mdc` Parallel Features). Stop if ano
    - **After the merge, the story branch is finished.** Do not commit to `feature/<feature>` (or `maintain/<id>`), and do not run `sync-feature-state.sh` or edit its state, phase-result, or evidence in the feature or maintain worktree, not even to make it "show" the released state. Release approval happens only on the integration branch: `sync-feature-state.sh --approve release` refuses on any other branch. After the release-state commit, run `sh .agents-v0/scripts/check-release-evidence.sh <artifact>` in the integration checkout (feature stories). Exit 1 (for example `feature/<feature>` is not fully merged): report its `FAIL` lines and stop; do not merge again and do not name the next story.
    - **Final summary:** list every commit you made in this turn (short SHA, branch, subject), on every branch and worktree, and nothing else as committed.
    - When `docs/agents-v0/project-profile.md` has a **Deploy** table, follow `release-deploy`: one explicit authorization per environment, a smoke check, and a rollback command. Until the last smoke check is recorded, the story is not complete.
-   - Do not call `glab` or push to a remote: the hook refuses push and `glab` writes; the user pushes from their own terminal, or runs `/v0-release`.
+   - Do not call `glab` or push to a remote: the hook refuses push and `glab` writes; the user pushes from their own terminal, or runs `/v0-release`, which gives them the push and MR commands.
 
 ## Rules
 `workflow-orchestration.mdc`, `ai-agent-conduct.mdc`, `project-delivery-core.mdc`.
