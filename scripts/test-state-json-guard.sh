@@ -204,6 +204,26 @@ L=.git/agents-v0/gate-ledger
 judge cursor-shell block "N3A: append to the gate ledger" "printf x >> $L"
 judge cursor-shell block "N3A: cut the gate ledger" "sed -i '\$d' $L"
 judge cursor-shell block "N3A: write the reopen grant" "printf x > .git/agents-v0/reopen-grant"
+# Iruka and Jiraiya (on 2e1f6629): appending is the main attack, so every append form, for both files, and inside
+#   $( ), ( ), { } and if bodies.
+G=.git/agents-v0/reopen-grant
+for f in "$L" "$G"; do
+  b=${f##*/}
+  judge cursor-shell block "N3A append: printf >> $b" "printf x >> $f"
+  judge cursor-shell block "N3A append: echo >> $b" "echo x >> $f"
+  judge cursor-shell block "N3A append: cat x >> $b" "cat /tmp/x >> $f"
+  judge cursor-shell block "N3A append: cat >> $b (stdin)" "cat >> $f"
+  judge cursor-shell block "N3A append: fd 1>> $b" "printf x 1>>$f"
+  judge cursor-shell block "N3A append: tee -a $b" "printf x | tee -a $f"
+  judge cursor-shell block "N3A append: tee --append $b" "printf x | tee --append $f"
+  judge cursor-shell block "N3A append: in \$( ) $b" "y=\$(printf x >> $f)"
+  judge cursor-shell block "N3A append: in ( ) $b" "( echo x >> $f )"
+  judge cursor-shell block "N3A append: in { } $b" "{ cat /tmp/x >> $f; }"
+  judge cursor-shell block "N3A append: in if $b" "if true; then printf x | tee -a $f; fi"
+  judge agy-shell block "N3A append: unattended >> $b" "printf x >> $f" "$UA"
+done
+judge cursor-shell block "N3A append: case variant" "printf x >> .GIT/Agents-V0/Reopen-Grant"
+judge cursor-shell block "N3A append: worktrees form" "echo x >> .git/worktrees/wt1/agents-v0/gate-ledger"
 judge cursor-shell block "N3A: move the agents-v0 folder" "mv .git/agents-v0 /tmp/x"
 judge cursor-shell block "N3A: case variant" "printf x > .GIT/AGENTS-V0/GATE-LEDGER"
 judge cursor-shell block "N3A: run-time target" 'printf x >> "$(git rev-parse --git-path agents-v0/gate-ledger)"'
