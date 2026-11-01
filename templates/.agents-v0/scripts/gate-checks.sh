@@ -34,7 +34,7 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok ledger_ok ledger_turn_ok"
+WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok ledger_ok ledger_turn_ok"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok ledger_turn_ok"
 
 usage() {
@@ -114,9 +114,15 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #                             any gate commit does, is at least as long as each recorded count, its first n lines
 #                             hash to each recorded sha256, and every line after the newest anchor is well formed
 #                             (each GRANT-USED names a line of the grant file, once, with the FAIL count before it;
-#                             a second reopen appends its grant, so an older GRANT-USED line still finds its own)
-#   trailer                   check, then print the trailer for the next gate commit (creates the empty ledger
-#                             when no gate commit exists yet and nothing has written it)
+#                             a second reopen appends its grant, so an older GRANT-USED line still finds its own),
+#                             and the grant file (a regular file, never a symlink) still starts with the grant lines
+#                             the ledger named, in ledger order (no named line edited, removed or reordered)
+#   trailer                   check, name every grant line no ledger line names yet as stale (REOPEN-REFUSED
+#                             grant=<sha> stale: ...), then print the trailer for the next gate commit, so a grant
+#                             that was in the file at a gate commit can never be used after it (creates the empty
+#                             ledger when no gate commit exists yet and nothing has written it)
+#   reopen <phase> <max age>  check, then judge the last grant line (reopen_grant_ok) and append GRANT-USED on
+#                             success or one REOPEN-REFUSED line on refusal
 #   commit <msg file>         check, and the message's own trailer still anchors the ledger (commit_msg_ok)
 #   mark                      print "lines=<n> sha256=<hash>" or "absent" (the harness, before an unattended turn)
 #   turn <mark> <fails> <refusals>
@@ -124,7 +130,11 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #                             appended, exactly as many as the harness saw (N84)
 # Lines are newline-terminated; the line grammar (the kit writers must follow it):
 #   FAIL[ <text>]   GRANT-USED <sha256 of the grant line, without its newline> count=<n>   REOPEN-REFUSED <text>
-# The grant file holds one grant line per approved reopen, appended, the newest last (the grant in force).
+#   REOPEN-REFUSED grant=<sha256 of the grant line> <text>   (a refused or stale grant line: named, so used up)
+# The grant file holds one grant line per approved reopen, appended, the newest last (the grant in force):
+#   grant <YYYY-MM-DDTHH:MM:SS+HH:MM> phase=<phase> reason="<text>" by=<name>
+# Each grant line is named by exactly one ledger line (GRANT-USED or REOPEN-REFUSED grant=) and the named lines
+# are the start of the grant file, in ledger order; only the last line may still be unnamed, and only it is used.
 # where <text> has no control characters. The newest anchor is the largest recorded count over all onboard-v<n>
 # tags (the ledger is shared by every worktree, so is every tag).
 ledger_py() {
@@ -138,6 +148,10 @@ KEY_RE = re.compile(r"^\s*" + re.escape(key) + r"\s*:", re.I)
 FAIL_RE = re.compile(r"^FAIL(?: [^\x00-\x1f\x7f]+)?$")
 GRANT_RE = re.compile(r"^GRANT-USED ([0-9a-f]{64}) count=(0|[1-9][0-9]*)$")
 REFUSED_RE = re.compile(r"^REOPEN-REFUSED [^\x00-\x1f\x7f]+$")
+REFGRANT_RE = re.compile(r"^REOPEN-REFUSED grant=([0-9a-f]{64}) [^\x00-\x1f\x7f]+$")
+GLINE_RE = re.compile(r'^grant ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})([+-][0-9]{2}):?([0-9]{2}) '
+                      r'phase=([a-z][a-z-]*) reason=("[^"\x00-\x1f\x7f]+"|[^"\s\x00-\x1f\x7f]+) '
+                      r'by=("[^"\x00-\x1f\x7f]+"|[^"\s\x00-\x1f\x7f]+)$')
 MARK_RE = re.compile(r"^lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 EMPTY = hashlib.sha256(b"").hexdigest()
 
@@ -215,21 +229,76 @@ def check_anchors(lines, anc):
     t, n, _ = max(anc, key=lambda a: a[1])
     return t, n
 
-def grant_hashes():
-    # every grant line in the grant file, each hashed without its newline. The person appends each new grant as
-    # its own line (the newest last), so the grant that was in force for each GRANT-USED line is still there.
-    if not os.path.isfile(grant):
-        return None
-    with open(grant, "rb") as f:
-        return set(hashlib.sha256(x).hexdigest() for x in f.read().split(b"\n") if x)
+def sha(x):
+    return hashlib.sha256(x).hexdigest()
 
-def check_appended(lines, start):
-    fails, used, gh = 0, {}, False
-    for x in lines:
+def read_grant():
+    # the grant file's lines (each without its newline) and its bytes, or (None, None) when there is no file.
+    # The person writes it in their own terminal; a symlink or anything but a regular file is refused.
+    if not os.path.lexists(grant):
+        return None, None
+    if os.path.islink(grant):
+        out(1, "the grant file %s is a symlink; it must be a regular file that the person appends to" % grant)
+    if not os.path.isfile(grant):
+        out(1, "the grant file %s is not a regular file" % grant)
+    with open(grant, "rb") as f:
+        data = f.read()
+    parts = data.split(b"\n")
+    return (parts[:-1] if data.endswith(b"\n") else parts) if data else [], data
+
+def named_grants(lines):
+    # (ledger line number, grant sha, kind) for every GRANT-USED and REOPEN-REFUSED grant= line, in ledger order
+    found = []
+    for i, x in enumerate(lines):
         s = text(x)
         m = GRANT_RE.match(s) if s is not None else None
         if m:
-            used[m.group(1)] = used.get(m.group(1), 0) + 1
+            found.append((i + 1, m.group(1), "GRANT-USED"))
+            continue
+        m = REFGRANT_RE.match(s) if s is not None else None
+        if m:
+            found.append((i + 1, m.group(1), "REOPEN-REFUSED"))
+    return found
+
+def check_grants(lines):
+    # every named grant is a grant-file line, named once, and the named lines are the start of the grant file in
+    # ledger order. Returns (grant lines, grant bytes, named).
+    named = named_grants(lines)
+    g, data = read_grant()
+    if not named:
+        return g, data, named
+    if g is None:
+        i, _, k = named[0]
+        out(1, "ledger line %d is a %s line, but there is no grant file (%s)" % (i, k, grant))
+    seen = {}
+    for i, h, k in named:
+        seen.setdefault(h, []).append(k)
+    for i, h, k in named:
+        if len(seen[h]) > 1:
+            if all(x == "GRANT-USED" for x in seen[h]):
+                out(1, "ledger line %d names a grant that another GRANT-USED line already used" % i)
+            out(1, "ledger line %d names a grant that another ledger line already named (each grant line is named once)" % i)
+    hs = [sha(x) for x in g]
+    where = {}
+    for j, h in enumerate(hs):
+        where.setdefault(h, j)
+    for o, (i, h, k) in enumerate(named):
+        if h in where:
+            continue
+        msg = "ledger line %d is a %s line that names no grant in %s" % (i, k, grant)
+        if not g:
+            msg += " (the grant file is empty)"
+        elif any(h2 in where and where[h2] < o2 for o2, (i2, h2, _) in enumerate(named) if o2 > o):
+            # a grant named after this one now sits higher in the file than its place: lines above it are gone
+            msg += " (an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+        out(1, msg)
+    for o, (i, h, k) in enumerate(named):
+        if o >= len(hs) or hs[o] != h:
+            out(1, "grant line %d of %s is not the grant that ledger line %d named (grant lines were reordered, or a line was inserted or duplicated before it)" % (o + 1, grant, i))
+    return g, data, named
+
+def check_appended(lines, start):
+    fails = 0
     for i, x in enumerate(lines):
         s = text(x)
         if i >= start:
@@ -238,20 +307,23 @@ def check_appended(lines, start):
                 out(1, bad)
             m = GRANT_RE.match(s)
             if m:
-                if gh is False:
-                    gh = grant_hashes()
-                if gh is None:
-                    out(1, "ledger line %d is a GRANT-USED line, but there is no grant file (%s)" % (i + 1, grant))
-                if m.group(1) not in gh:
-                    out(1, "ledger line %d is a GRANT-USED line that names no grant in %s (each grant stays there as its own line; a grant that was overwritten instead of appended cannot be checked)" % (i + 1, grant))
-                if used[m.group(1)] > 1:
-                    out(1, "ledger line %d names a grant that another GRANT-USED line already used" % (i + 1))
                 if int(m.group(2)) != fails:
                     out(1, "ledger line %d says count=%s, but the FAIL lines before it give %d" % (i + 1, m.group(2), fails))
             elif not FAIL_RE.match(s) and not REFUSED_RE.match(s):
                 out(1, bad)
+            elif s.startswith("REOPEN-REFUSED grant=") and not REFGRANT_RE.match(s):
+                out(1, bad)
         if s is not None and FAIL_RE.match(s):
             fails += 1
+
+def append_ledger(entries):
+    os.makedirs(os.path.dirname(ledger), exist_ok=True)
+    with open(ledger, "ab") as f:
+        for e in entries:
+            f.write(e.encode("utf-8") + b"\n")
+
+def clean(msg):
+    return re.sub(r"[\x00-\x1f\x7f]", "?", msg)[:300]
 
 def full_check():
     anc = anchors()
@@ -259,6 +331,7 @@ def full_check():
     t, n = check_anchors(lines, anc)
     if lines is not None:
         check_appended(lines, n)
+    check_grants(lines if lines is not None else [])
     return anc, lines, t, n
 
 if mode == "check":
@@ -275,6 +348,14 @@ elif mode == "trailer":
         with open(ledger, "xb"):
             pass
         lines = []
+    g, data, named = check_grants(lines)
+    if g:
+        nxt = max([int(a[0][len("onboard-v"):]) for a in anc] + [0]) + 1
+        stale = ["REOPEN-REFUSED grant=%s stale: in the grant file at gate commit onboard-v%d, so never usable after it" % (sha(x), nxt)
+                 for x in g[len(named):]]
+        if stale:
+            append_ledger(stale)
+            lines = read_ledger()
     out(0, "%s: lines=%d sha256=%s" % (key, len(lines), prefix_sha(lines, len(lines))))
 elif mode == "commit" and len(args) == 1:
     anc, lines, t, n = full_check()
@@ -289,6 +370,80 @@ elif mode == "commit" and len(args) == 1:
     if mn < n or mn > len(lines) or prefix_sha(lines, mn) != mh:
         out(1, "the commit message's %s trailer (lines=%d) no longer matches the ledger (%d lines)" % (key, mn, len(lines)))
     out(0, "the commit message's %s trailer matches the ledger" % key)
+elif mode == "reopen" and len(args) == 2:
+    import datetime, time
+    phase, max_age = args[0], int(args[1])
+    anc, lines, t, n = full_check()
+    lines = lines if lines is not None else []
+    g, data, named = check_grants(lines)
+    cmd = ("To grant a reopen, the person appends one new line in their own terminal (append with >>, never >; "
+           "an overwrite is refused): printf '%%s\\n' \"grant $(date +%%Y-%%m-%%dT%%H:%%M:%%S%%z) phase=%s "
+           "reason=\\\"<why>\\\" by=<your-name>\" >> '%s'" % (phase, grant))
+    def refused(reason, name=None, how=cmd):
+        append_ledger(["REOPEN-REFUSED " + ("grant=%s " % name if name else "") + clean(reason)])
+        out(1, "%s. One REOPEN-REFUSED line was written to the ledger%s; the retry count is kept. %s"
+            % (reason, " (it names this grant line, so it can never be used)" if name else "", how))
+    if g is None:
+        refused("there is no grant file (%s)" % grant)
+    if not g:
+        refused("the grant file %s has no grant line" % grant)
+    last = len(g)
+    if len(named) >= last:
+        i, h, k = named[last - 1]
+        if k == "GRANT-USED":
+            refused("the last grant line (grant line %d) was already used (ledger line %d); each grant is used once" % (last, i))
+        refused("the last grant line (grant line %d) was already refused or went stale at a gate commit (ledger line %d)" % (last, i))
+    if not data.endswith(b"\n"):
+        refused("the last grant line (grant line %d) has no newline, so it was not written whole by the printf command" % last,
+                how="The person first ends it with: printf '\\n' >> '%s'; then appends a new grant. %s" % (grant, cmd))
+    if last - len(named) > 1:
+        refused("grant line %d is an unused grant line before the last one; only the last grant line may be used, and each "
+                "earlier line must be used or refused first (this refusal names grant line %d)" % (len(named) + 1, len(named) + 1),
+                name=sha(g[len(named)]))
+    cand = g[-1]
+    h = sha(cand)
+    if b"\r" in cand:
+        refused("grant line %d holds a carriage return (a CRLF line ending, as some editors write); the kit refuses it "
+                "rather than strip it" % last, name=h)
+    s = text(cand)
+    m = GLINE_RE.match(s) if s is not None else None
+    dt = None
+    if m:
+        try:
+            dt = datetime.datetime.fromisoformat("%s%s:%s" % (m.group(1), m.group(2), m.group(3)))
+        except ValueError:
+            dt = None
+    if dt is None:
+        refused("grant line %d is not a well-formed grant line (it must read exactly: grant <YYYY-MM-DDTHH:MM:SS+HH:MM> "
+                "phase=<phase> reason=\"<text>\" by=<name>)" % last, name=h)
+    if m.group(4) != phase:
+        refused("grant line %d grants phase=%s, not %s" % (last, m.group(4), phase), name=h)
+    ts, now = dt.timestamp(), time.time()
+    if ts > now:
+        refused("grant line %d is dated in the future (%s)" % (last, m.group(1)), name=h)
+    if now - ts > max_age:
+        refused("grant line %d is %ds old, older than gate-rules grant_max_age_seconds (%d)" % (last, int(now - ts), max_age), name=h)
+    if anc:
+        gt = max(anc, key=lambda a: int(a[0][len("onboard-v"):]))[0]
+        r = git("log", "-1", "--format=%ct", gt + "^{commit}")
+        try:
+            gts = int(r.stdout.decode().strip())
+        except ValueError:
+            out(1, "git could not read the time of the gate commit %s" % gt)
+        if ts < gts:
+            refused("grant line %d (%s) is older than the last gate commit %s; a grant must be newer than the last gate" % (last, m.group(1), gt), name=h)
+    for blob in (cand + b"\n", data):
+        r = subprocess.run(["git", "hash-object", "--stdin"], input=blob, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        oid = r.stdout.decode().strip()
+        if r.returncode != 0 or not oid:
+            out(1, "git could not hash the grant line")
+        r = git("log", "--all", "-1", "--format=%h", "--find-object=" + oid)
+        if r.returncode != 0 or r.stdout.strip():
+            refused("grant line %d is in git history (commit %s); a committed grant is not a fresh grant" % (last, r.stdout.decode().strip() or "?"), name=h)
+    fails = sum(1 for x in lines if text(x) is not None and FAIL_RE.match(text(x)))
+    append_ledger(["GRANT-USED %s count=%d" % (h, fails)])
+    out(0, "grant line %d (%s, by=%s) is the last line, unused, newer than the last gate, %ds old (at most %d) and not in git history; "
+        "GRANT-USED was written with count=%d" % (last, m.group(1), m.group(6), int(now - ts), max_age, fails))
 elif mode == "mark" and not args:
     lines = read_ledger()
     out(0, "absent" if lines is None else "lines=%d sha256=%s" % (len(lines), prefix_sha(lines, len(lines))))
@@ -660,13 +815,25 @@ commit_msg_ok() {
   [ "$cm_rc" = 0 ] || refuse commit_msg_ok "ledger changed, ask the user (${cm_led:-the ledger check could not run}); the commit is refused"
   ok commit_msg_ok "the commit message and the index are the ones staged_secret_scan passed"
 }
-# 4A, N5A, 1A (1A-gap B): the grant parses, names <phase>, is newer than the last gate of <phase>, is at most
-# grant_max_age_seconds old, is unused (no GRANT-USED line, not in git history) and the run is attended.
+# 4A, N5A, 1A (1A-gap B): the last line of the grant file (a regular file) is the grant; it parses strictly (no CR,
+# no control characters), names <phase>, is not in the future, is newer than the last onboard gate commit and was
+# not in the grant file at it (the gate commit names every unnamed line stale), is at most grant_max_age_seconds
+# old, is unused (no ledger line names it, not in git history) and every earlier grant line is named in order.
+# Success appends GRANT-USED <sha> count=<FAIL lines>; a refusal after the ledger check appends one REOPEN-REFUSED
+# line and prints the person's grant command (>>, never >). "The run is attended" is not visible here: the harness
+# catches a GRANT-USED line written in an unattended turn (ledger_turn_ok, N84). Only onboard is wired.
 reopen_grant_ok() {
   need_phase reopen_grant_ok "${1:-}"
   ledger_guard reopen_grant_ok
   age="$(rule grant_max_age_seconds)"
-  not_wired reopen_grant_ok "the grant for $1 must be newer than the last $1 gate and at most ${age}s old, unused and attended" "the reopen grant and ledger fix (4A, N5A, 1A; needs JO-10 and Sasuke's hook patterns)"
+  [ "$1" = onboard ] || not_wired reopen_grant_ok "the grant for $1 must be newer than the last $1 gate and at most ${age}s old, unused and attended" "the fix turn of phase $1"
+  git rev-parse --git-common-dir >/dev/null 2>&1 || refuse reopen_grant_ok "not a git repository, so there is no grant file or gate ledger"
+  rg_rc=0; rg_out="$(ledger_py reopen "$1" "$age")" || rg_rc=$?
+  case "$rg_rc" in
+    0) ok reopen_grant_ok "$rg_out" ;;
+    1) refuse reopen_grant_ok "$rg_out" ;;
+    *) die "reopen_grant_ok: ${rg_out:-the grant check could not run}" ;;
+  esac
 }
 # 5A, N2A: .agents-v0/greenfield-record.json is valid only in the repo's single root commit.
 greenfield_record_ok() {

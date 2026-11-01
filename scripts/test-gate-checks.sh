@@ -392,8 +392,8 @@ q "$ss" G . reset -q
 # ===== N3A ledger integrity (design rev 6 "Ledger integrity (N3A)"; test cases N80-N84) ===========================
 # The gate commit records the ledger (lines and sha256) in its Agents-V0-Ledger trailer; ledger_ok and every gate
 # check refuse "ledger changed, ask the user" when the ledger is cut, missing or edited, or an appended line is
-# not a well-formed kit line. No kit script writes FAIL or GRANT-USED lines yet (gap 10, reopen_grant_ok), so the
-# tests append them as stand-ins for those writers.
+# not a well-formed kit line. No kit script writes FAIL lines yet (gap 10); reopen_grant_ok writes GRANT-USED and
+# REOPEN-REFUSED (tested below, RG-*), and these tests append such lines by hand to test the ledger check alone.
 lg="$(onb_repo lg)"
 LG_LED="$(cd "$lg" && cd "$(git rev-parse --git-common-dir)" && pwd)/agents-v0/gate-ledger"
 LG_GRANT="${LG_LED%/gate-ledger}/reopen-grant"
@@ -511,14 +511,152 @@ out_has "N80 second reopen names the reuse" "ledger line 3 names a grant that an
 lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$(printf '%064d' 7)" "$lg_h2" >> "$LG_LED"
 expect_fail "N80 second reopen: a forged older grant hash is refused" "$lg" sh "$GC" ledger_ok
 out_has "N80 second reopen names the forged line" "ledger line 3 is a GRANT-USED line that names no grant in $LG_GRANT"
+lacks "N80 (6) no overwritten hint on a forged hash" "$T1_TMP/out.txt" "overwritten"
 lg_back; printf 'GRANT-USED %s count=1\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
 expect_fail "N80 second reopen: a wrong count on the older line is refused" "$lg" sh "$GC" ledger_ok
 out_has "N80 second reopen names the count" "ledger line 3 says count=1, but the FAIL lines before it give 2"
 printf '%s\n' "$lg_g2" > "$LG_GRANT"; lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
 expect_fail "N80 second reopen: an overwritten (not appended) grant file is refused" "$lg" sh "$GC" ledger_ok
-out_has "N80 second reopen says why" "a grant that was overwritten instead of appended cannot be checked"
+out_has "N80 second reopen says why" "(an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
 lg_back
 mv "$LG_GRANT" "$T1_TMP/lg/reopen-grant.moved"
+
+# ===== reopen_grant_ok (4A, N5A, 1A; design line 277 checklist) =================================================
+# The last line of the grant file is the grant; it must be newer than the last gate (a grant line already in the file
+# at a gate commit is named stale by that commit), unused, strictly formatted, CR-free, in a regular file; every
+# earlier grant line is named in order by a ledger line (GRANT-USED or REOPEN-REFUSED grant=). Grant times are
+# relative to now (the age rule is checked against the clock).
+rg="$(onb_repo rg)"
+RG_LED="$(cd "$rg" && cd "$(git rev-parse --git-common-dir)" && pwd)/agents-v0/gate-ledger"
+RG_GRANT="${RG_LED%/gate-ledger}/reopen-grant"
+mkdir -p "$T1_TMP/rg"
+rg_t() { python3 -c 'import sys,datetime; print((datetime.datetime.now().astimezone()+datetime.timedelta(seconds=int(sys.argv[1]))).isoformat(timespec="seconds"))' "$1"; }
+rg_line() { printf 'grant %s phase=%s reason="FAKE-why %s" by=FAKE-person' "$(rg_t "$1")" "${2:-onboard}" "$3"; }
+rg_h() { printf '%s' "$1" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'; }
+rg_last() { tail -n 1 "$RG_LED"; }
+rg_run() { sh "$GC" reopen_grant_ok onboard; }
+to_awaiting "$rg"; q "$rg" sh "$SFS" "$REP" --approve onboard
+expect_pass "RG setup: the first gate commit" "$rg" lg_gate "$rg" 1
+expect_pass "RG list: reopen_grant_ok is wired" "$rg" sh "$GC" list
+out_has "RG list says wired" "reopen_grant_ok wired"
+expect_fail "RG-0 no grant file is refused" "$rg" rg_run
+out_has "RG-0 names the missing file" "REFUSED reopen_grant_ok: there is no grant file ($RG_GRANT)"
+out_has "RG-0 (5) the grant command appends with >>" "phase=onboard reason=\\\"<why>\\\" by=<your-name>\" >> '$RG_GRANT'"
+lacks "RG-0 (5) no overwrite command" "$T1_TMP/out.txt" "\" > '"
+is_eq "RG-0 the refusal is a REOPEN-REFUSED ledger line" "$(rg_last)" "REOPEN-REFUSED there is no grant file ($RG_GRANT)"
+expect_fail "RG-0 sync --reopen onboard is refused" "$rg" sh "$SFS" "$REP" --reopen onboard
+out_has "RG-0 sync passes the reason on" "REFUSED reopen_grant_ok: there is no grant file"
+printf 'FAIL docs check\nFAIL docs check\n' >> "$RG_LED"
+rg_l1="$(rg_line 0 onboard one)"; printf '%s\n' "$rg_l1" > "$RG_GRANT"
+expect_pass "RG-1 a fresh last grant line passes" "$rg" rg_run
+out_has "RG-1 says why" "OK reopen_grant_ok: grant line 1 ("
+is_eq "RG-1 GRANT-USED with count= every FAIL line" "$(rg_last)" "GRANT-USED $(rg_h "$rg_l1") count=2"
+expect_pass "RG-1 ledger_ok passes after the use" "$rg" sh "$GC" ledger_ok
+expect_fail "RG-2 a used grant is refused (single use)" "$rg" rg_run
+out_has "RG-2 names the use" "REFUSED reopen_grant_ok: the last grant line (grant line 1) was already used (ledger line 5)"
+# (1) only the last line may be used: an unused line before it refuses (and is named), then the last line passes
+rg_l2="$(rg_line -5 onboard two)"; rg_l3="$(rg_line 0 onboard three)"; printf '%s\n%s\n' "$rg_l2" "$rg_l3" >> "$RG_GRANT"
+expect_fail "RG-3 (1) an unused grant line before the last is refused" "$rg" rg_run
+out_has "RG-3 names it" "grant line 2 is an unused grant line before the last one; only the last grant line may be used"
+is_eq "RG-3 the refusal names that line" "$(rg_last | cut -c1-98)" "REOPEN-REFUSED grant=$(rg_h "$rg_l2") grant line 2"
+expect_pass "RG-3 (1) the last line passes once the earlier one is named" "$rg" rg_run
+is_eq "RG-3 the last line is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rg_l3") count=2"
+cp "$RG_GRANT" "$T1_TMP/rg/grant.keep"
+# (2) any change to earlier lines, used or unused, refuses; (6) the overwritten hint only on a removal
+printf '%s\n%s\n%s\n' "$(rg_line 0 onboard one-edited)" "$rg_l2" "$rg_l3" > "$RG_GRANT"
+expect_fail "RG-4 (2) an edited used line is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 names the edited used line" "ledger line 5 is a GRANT-USED line that names no grant in $RG_GRANT"
+lacks "RG-4 (6) no overwritten hint on an edit" "$T1_TMP/out.txt" "overwritten"
+expect_fail "RG-4 reopen_grant_ok refuses ledger first" "$rg" rg_run
+out_has "RG-4 says ledger changed" "REFUSED reopen_grant_ok: ledger changed, ask the user (ledger line 5 is a GRANT-USED line"
+printf '%s\n%s\n%s\n' "$rg_l1" "$(rg_line 0 onboard two-edited)" "$rg_l3" > "$RG_GRANT"
+expect_fail "RG-4 (2) an edited unused (refused) line is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 names the edited unused line" "ledger line 7 is a REOPEN-REFUSED line that names no grant in $RG_GRANT"
+lacks "RG-4 (6) no overwritten hint on the unused edit" "$T1_TMP/out.txt" "overwritten"
+printf '%s\n%s\n' "$rg_l2" "$rg_l3" > "$RG_GRANT"
+expect_fail "RG-4 (2) a removed used line is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 (6) the removal shows the overwritten hint" "ledger line 5 is a GRANT-USED line that names no grant in $RG_GRANT (an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+printf '%s\n%s\n' "$rg_l1" "$rg_l3" > "$RG_GRANT"
+expect_fail "RG-4 (2) a removed unused line is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 (6) names it with the hint" "ledger line 7 is a REOPEN-REFUSED line that names no grant in $RG_GRANT (an earlier grant line is gone"
+printf '%s\n%s\n%s\n' "$rg_l2" "$rg_l1" "$rg_l3" > "$RG_GRANT"
+expect_fail "RG-4 (2) reordered lines are refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 names the order" "grant line 1 of $RG_GRANT is not the grant that ledger line 5 named (grant lines were reordered"
+printf '%s\n%s\n%s\n' "$rg_l1" "$rg_l3" "$rg_l2" > "$RG_GRANT"
+expect_fail "RG-4 (2) an unused line moved after the last used one is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 names the moved line" "grant line 2 of $RG_GRANT is not the grant that ledger line 7 named"
+: > "$RG_GRANT"
+expect_fail "RG-4 an empty grant file is refused" "$rg" sh "$GC" ledger_ok
+out_has "RG-4 (6) says empty" "ledger line 5 is a GRANT-USED line that names no grant in $RG_GRANT (the grant file is empty)"
+lacks "RG-4 (6) no overwritten hint on an empty file" "$T1_TMP/out.txt" "overwritten"
+cp "$T1_TMP/rg/grant.keep" "$RG_GRANT"
+expect_pass "RG-4 the restored grant file passes" "$rg" sh "$GC" ledger_ok
+# (1) newer than the last gate: a grant line in the file at a gate commit is named stale by it
+rg_l4="$(rg_line 0 onboard four)"; printf '%s\n' "$rg_l4" >> "$RG_GRANT"
+printf '\nRevision.\n' >> "$rg/docs/agents-v0/architecture.md"
+expect_pass "RG-5 the next gate commit chain runs with an unused grant line" "$rg" lg_gate "$rg" 2
+is_eq "RG-5 the gate commit named it stale" "$(rg_last)" "REOPEN-REFUSED grant=$(rg_h "$rg_l4") stale: in the grant file at gate commit onboard-v2, so never usable after it"
+case "$(git -C "$rg" log -1 --format=%B onboard-v2)" in *"Agents-V0-Ledger: lines=$(wc -l < "$RG_LED" | tr -d ' ') sha256=$(lg_sha "$RG_LED")"*) pass "RG-5 the gate trailer anchors the stale line" ;;
+  *) fail "RG-5 the gate trailer anchors the stale line" ;; esac
+expect_fail "RG-5 (1) the stale pre-gate grant is refused" "$rg" rg_run
+out_has "RG-5 names the stale grant" "the last grant line (grant line 4) was already refused or went stale at a gate commit"
+printf '%s\n' "$(rg_line -3600 onboard five)" >> "$RG_GRANT"
+expect_fail "RG-6 (1) a grant dated before the last gate commit is refused" "$rg" rg_run
+out_has "RG-6 names the gate" "is older than the last gate commit onboard-v2; a grant must be newer than the last gate"
+printf '%s\n' "$(rg_line 3600 onboard six)" >> "$RG_GRANT"
+expect_fail "RG-7 a grant dated in the future is refused" "$rg" rg_run
+out_has "RG-7 says future" "grant line 6 is dated in the future"
+printf '%s\n' "$(rg_line -90000 onboard seven)" >> "$RG_GRANT"
+expect_fail "RG-8 a grant older than grant_max_age_seconds is refused" "$rg" rg_run
+out_has "RG-8 names the rule" "older than gate-rules grant_max_age_seconds (86400)"
+printf '%s\n' "$(rg_line 0 design eight)" >> "$RG_GRANT"
+expect_fail "RG-9 a grant for another phase is refused" "$rg" rg_run
+out_has "RG-9 names the phase" "grant line 8 grants phase=design, not onboard"
+# (3) CRLF: refused, never stripped
+rg_cr="$(rg_line 0 onboard nine)"; printf '%s\r\n' "$rg_cr" >> "$RG_GRANT"
+expect_fail "RG-10 (3) a CRLF grant line is refused" "$rg" rg_run
+out_has "RG-10 says carriage return" "grant line 9 holds a carriage return (a CRLF line ending, as some editors write); the kit refuses it rather than strip it"
+is_eq "RG-10 the refusal names the line with its CR (not stripped)" "$(rg_last | cut -c1-85)" "REOPEN-REFUSED grant=$(printf '%s\r' "$rg_cr" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
+# (5) strict format
+rg_n=9
+for rg_bad in "grant $(rg_t 0)" "grant $(rg_t 0) phase=onboard reason=\"FAKE why\" by=FAKE-person extra" \
+  "grant  $(rg_t 0) phase=onboard reason=FAKE by=FAKE" "Grant $(rg_t 0) phase=onboard reason=FAKE by=FAKE" \
+  "grant 2026-13-02T06:00:00+08:00 phase=onboard reason=FAKE by=FAKE" "grant $(rg_t 0 | cut -c1-19) phase=onboard reason=FAKE by=FAKE" \
+  "grant $(rg_t 0) phase=onboard reason=\"FAKE by=FAKE" "grant $(rg_t 0) phase=onboard reason=FAKE	by=FAKE"; do
+  rg_n=$((rg_n + 1)); printf '%s\n' "$rg_bad" >> "$RG_GRANT"
+  expect_fail "RG-11 (5) a malformed grant line is refused: '$rg_bad'" "$rg" rg_run
+  out_has "RG-11 names line $rg_n as malformed" "grant line $rg_n is not a well-formed grant line (it must read exactly: grant <YYYY-MM-DDTHH:MM:SS+HH:MM> phase=<phase> reason=\"<text>\" by=<name>)"
+done
+expect_pass "RG-11 every refused line is named: ledger_ok passes" "$rg" sh "$GC" ledger_ok
+# (4) a symlink grant file is refused
+mv "$RG_GRANT" "$T1_TMP/rg/grant.real"; ln -s "$T1_TMP/rg/grant.real" "$RG_GRANT"
+expect_fail "RG-12 (4) ledger_ok refuses a symlink grant file" "$rg" sh "$GC" ledger_ok
+out_has "RG-12 names the symlink" "the grant file $RG_GRANT is a symlink; it must be a regular file that the person appends to"
+expect_fail "RG-12 (4) reopen_grant_ok refuses a symlink grant file" "$rg" rg_run
+out_has "RG-12 reopen names the symlink" "REFUSED reopen_grant_ok: ledger changed, ask the user (the grant file $RG_GRANT is a symlink"
+mv "$RG_GRANT" "$T1_TMP/rg/grant.symlink"; mv "$T1_TMP/rg/grant.real" "$RG_GRANT"
+# a last line with no newline is refused unnamed; the person ends it, appends a new grant, and the next run names it
+printf '%s' "$(rg_line 0 onboard partial)" >> "$RG_GRANT"
+expect_fail "RG-13 a last grant line with no newline is refused" "$rg" rg_run
+out_has "RG-13 says no newline" "has no newline, so it was not written whole by the printf command"
+out_has "RG-13 tells the person to end it" "The person first ends it with: printf '\\n' >> '$RG_GRANT'"
+case "$(rg_last)" in "REOPEN-REFUSED the last grant line"*) pass "RG-13 the refusal does not name the partial line" ;; *) fail "RG-13 the refusal does not name the partial line ($(rg_last))" ;; esac
+printf '\n' >> "$RG_GRANT"
+rg_l5="grant $(python3 -c 'import datetime; print(datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z"))') phase=onboard reason=FAKE-ten by=\"FAKE person\""
+printf '%s\n' "$rg_l5" >> "$RG_GRANT"
+expect_fail "RG-13 the ended line is named first" "$rg" rg_run
+out_has "RG-13 names the ended line" "is an unused grant line before the last one"
+printf 'FAIL docs check\n' >> "$RG_LED"
+expect_pass "RG-14 a +HHMM time, unquoted reason and quoted by pass" "$rg" rg_run
+is_eq "RG-14 count= every FAIL line in the ledger" "$(rg_last)" "GRANT-USED $(rg_h "$rg_l5") count=3"
+expect_pass "RG-14 ledger_ok passes" "$rg" sh "$GC" ledger_ok
+# a grant line that is in git history is refused
+rg_l6="$(rg_line 0 onboard eleven)"; printf '%s\n' "$rg_l6" >> "$RG_GRANT"; printf '%s\n' "$rg_l6" > "$rg/FAKE-grant.txt"
+q "$rg" G . add FAKE-grant.txt; q "$rg" lg_env git commit -q -m "FAKE grant in history"
+expect_fail "RG-15 a grant line in git history is refused" "$rg" rg_run
+out_has "RG-15 names git history" "grant line 20 is in git history (commit"
+expect_fail "RG-16 another phase is not wired yet" "$rg" sh "$GC" reopen_grant_ok design
+out_has "RG-16 not wired" "NOT-WIRED reopen_grant_ok:"
 
 # N84: unattended turns. The harness marks the ledger before a turn and compares after it.
 expect_pass "N84 ledger_mark prints the mark" "$lg" sh "$GC" ledger_mark

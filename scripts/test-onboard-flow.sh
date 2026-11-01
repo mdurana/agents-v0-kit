@@ -22,8 +22,9 @@
 #   FL-10 the resume refusal (JO-10): resume while in_progress (E9), restart / blocked / clear-active / plain
 #         sync / --reopen while awaiting_approval (N8 N28 N29 N19), restart after the approval, and a moved or
 #         corrupt state after the gate commit (N30).
-# Open (not built yet, so not tested here): the gate_committed range re-scan (N40), the granted --reopen
-# (reopen_grant_ok), N27 (baseline output never committed; needs JO-8), the unattended run, and the tier 2 replay.
+# Open (not built yet, so not tested here): the gate_committed range re-scan (N40), a granted --reopen through
+# sync (reopen_grant_ok itself is tested in test-gate-checks.sh), N27 (baseline output never committed; needs
+# JO-8), the unattended run, and the tier 2 replay.
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -341,8 +342,11 @@ out_has "FL-10 N8 the refusal comes from the helper" "REFUSED no_restart_without
 expect_fail "FL-10 N29 set blocked while awaiting_approval is refused" "$r" sh "$SFS" --active-phase onboard --status blocked --reason "stuck" "$REP"
 expect_fail "FL-10 N28 --clear-active while awaiting_approval is refused" "$r" sh "$SFS" --clear-active "$REP"
 expect_fail "FL-10 SKO-2 a plain sync while awaiting_approval is refused" "$r" sh "$SFS" "$REP"
+fl_led="$(cd "$r" && cd "$(git rev-parse --git-common-dir)" && pwd)/agents-v0/gate-ledger"
 expect_fail "FL-10 N19 --reopen onboard without a grant is refused" "$r" sh "$SFS" --reopen onboard "$REP"
 out_has "FL-10 N19 sync names the grant" "FAIL: --reopen onboard refused: no valid reopen grant (gate-checks.sh reopen_grant_ok)"
+out_has "FL-10 N19 reopen_grant_ok names the missing grant file" "REFUSED reopen_grant_ok: there is no grant file"
+has "FL-10 N19 the refusal wrote one REOPEN-REFUSED ledger line" "$fl_led" "REOPEN-REFUSED there is no grant file"
 is_eq "FL-10 the refusals recorded nothing" "$(cksum < "$r/$ST")" "$fl10_ck"
 # Step 7: approval
 expect_pass "FL-7 sync --approve onboard" "$r" sh "$SFS" --approve onboard "$REP"
@@ -425,9 +429,10 @@ out_has "FL-8 CM the commit step's re-check passes on the normal path" "OK commi
 out_has "FL-8 N7 other dirty files are listed, not swept in" "other uncommitted files, not in this commit: src/app.py src/stray.txt"
 is_eq "FL-8 one new commit on top of the old HEAD (no amend)" "$(git -C "$r" rev-parse HEAD^)" "$fl8_head"
 is_eq "FL-8 the commit message" "$(git -C "$r" log -1 --format=%s)" "onboarding: onboard approved"
-case "$(git -C "$r" log -1 --format=%B)" in *"Agents-V0-Ledger: lines=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"*)
-  pass "FL-8 N3A the gate commit carries the ledger trailer (empty ledger: lines=0)" ;;
-  *) fail "FL-8 N3A the gate commit carries the ledger trailer (empty ledger: lines=0)" ;; esac
+fl_lsha="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$fl_led")"
+case "$(git -C "$r" log -1 --format=%B)" in *"Agents-V0-Ledger: lines=1 sha256=$fl_lsha"*)
+  pass "FL-8 N3A the gate commit carries the ledger trailer (lines=1: the REOPEN-REFUSED line of the refused FL-10 --reopen)" ;;
+  *) fail "FL-8 N3A the gate commit carries the ledger trailer (lines=1: the REOPEN-REFUSED line of the refused FL-10 --reopen)" ;; esac
 expect_pass "FL-8 N3A ledger_ok passes after the gate commit" "$r" sh "$GC" ledger_ok
 has "FL-8 N3A v0-onboard step 6 says stop on a changed ledger" "$r/.cursor/commands/v0-onboard.md" "If any gate check says \`ledger changed, ask the user\`, stop"
 is_eq "FL-8 the tag is on the gate commit" "$(git -C "$r" rev-parse 'onboard-v1^{commit}')" "$(git -C "$r" rev-parse HEAD)"
