@@ -108,13 +108,15 @@ if [ "$approval_set" = 1 ] || [ "$accepted_set" = 1 ]; then
     exit 2
   fi
 fi
+# The secret rules live in secret_scan.py beside this script (one rule set with the staged scan, SOC-9).
+CL_SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 if [ -n "$root" ]; then
   cd "$root" || { printf 'FAIL: --root not found: %s\n' "$root" >&2; exit 2; }
 fi
 
 CL_APPROVAL="$approval" CL_APPROVAL_SET="$approval_set" CL_ACCEPTED="$accepted_list" CL_ACCEPTED_SET="$accepted_set" \
 CL_PRS="$prs" CL_DECIDED="$decided" CL_SINCE="$since" CL_TIP="$tip" CL_NEXT="$next_id" \
-CL_MAX_ACTIVE="$max_active" CL_MAX_CHARS="$max_chars" python3 - <<'PY'
+CL_MAX_ACTIVE="$max_active" CL_MAX_CHARS="$max_chars" CL_SCRIPTS="$CL_SCRIPTS" python3 - <<'PY'
 import os
 import re
 import subprocess
@@ -136,19 +138,23 @@ HEAD_RE = re.compile(r"^### (L-(\d{3,}))\s+·\s+(\d{4}-\d{2}-\d{2})\s+·\s+([a-z
 POINTER_RE = re.compile(r"docs/agents-v0/(project-profile\.md|adr/\S+\.md|design/\S+\.md)")
 
 # Plain secret patterns. A match fails the check; the message names the line, not the value.
-SECRET_RES = [
-    ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
-    ("AWS access key id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{30,}\b")),
-    ("GitLab token", re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b")),
-    ("Slack token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b")),
-    ("API secret key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
-    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
-    ("JSON Web Token", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
-    ("credential in URL", re.compile(r"\b[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]{3,}@", re.I)),
-    ("password/secret/token assignment",
-     re.compile(r"\b(?:password|passwd|pwd|secret|client[_-]?secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)\b\s*[:=]\s*[\"']?(?![<$*{\[(]|x{3,}|\.\.\.|redacted|changeme|example|none|null|placeholder)[^\s\"'`]{8,}", re.I)),
-]
+# SOC-9: the patterns are secret_scan.py's CONTENT_RULES (one rule set for lessons, pre-push and the staged scan).
+def _load_secret_rules():
+    import importlib.util
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.environ.get("CL_SCRIPTS", ""), "secret_scan.py")
+    try:
+        spec = importlib.util.spec_from_file_location("agents_v0_secret_scan", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return [(label, rx) for _rid, label, rx in mod.CONTENT_RULES]
+    except Exception as exc:  # fail closed: no rules means no secret check
+        print(f"FAIL: cannot load the secret rules from {path} ({type(exc).__name__}); reinstall the kit "
+              f"(install.sh --update)", file=sys.stderr)
+        sys.exit(2)
+
+
+SECRET_RES = _load_secret_rules()
 
 errors = []
 
