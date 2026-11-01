@@ -14,9 +14,10 @@
 #         from the parsed prose).
 #   BR-n  helper briefs in docs/agents-v0/onboarding/briefs/ (and its subfolders) and the archive folder
 #         (JO-7; BR-10..13 are Iruka's 03:23 follow-up findings).
+#   FL-9  the next phase (intake) refuses before the onboard gate commit and starts after it (JO-9).
 #   TP-n  the minimal install seeds the templates the skill points to (JO-6, E21).
 # Open (not built yet, so not tested here): the step 8 commit chain and the planted fake secret (JO-8; FL-8
-# stands in with a narrowed commit), the next-phase prerequisite (JO-9), the script-level resume refusal
+# stands in with a narrowed commit), the script-level resume refusal
 # (JO-10), N27 (baseline output never committed; needs JO-8), the unattended run, and the tier 2 replay.
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
@@ -326,10 +327,19 @@ is_eq "FL-6 state is awaiting_approval" "$(state_val "$r" activeStatus)" "awaiti
 # Step 7: approval
 expect_pass "FL-7 sync --approve onboard" "$r" sh "$SFS" --approve onboard "$REP"
 case " $(state_val "$r" approvedPhases) " in *" onboard "*) pass "FL-7 onboard is in approvedPhases" ;; *) fail "FL-7 onboard is in approvedPhases" ;; esac
+# Step 9 before the gate commit (JO-9): the next phase refuses while onboard is approved but not committed
+mkdir -p "$T1_TMP/fl9" && printf '# orders\n' > "$T1_TMP/fl9/orders.md"
+fl9_req="docs/agents-v0/requirements/orders.md"
+expect_fail "FL-9 prereq_approved intake refuses before the onboard gate commit" "$r" sh "$GC" prereq_approved intake
+out_has "FL-9 names the uncommitted approval" "the onboard approval in $ST is not committed"
 # Step 8 stand-in until JO-8: a commit narrowed to docs/agents-v0, then the tag; gate_committed must pass
 G "$r" add -- docs/agents-v0 && G "$r" commit -qm "onboarding: onboard approved" && G "$r" tag -a onboard-v1 -m "onboard approved"
 expect_pass "FL-8 gate_committed onboard passes after the gate commit (JO-8 stand-in)" "$r" sh "$GC" gate_committed onboard
 outside="$(git -C "$r" show --name-only --format= HEAD | grep -v '^docs/agents-v0/' || :)"
 is_eq "FL-8 the gate commit holds only docs/agents-v0 files" "$outside" ""
+# Step 9 after the gate commit (JO-9): the next phase starts
+expect_pass "FL-9 prereq_approved intake passes after the onboard gate commit" "$r" sh "$GC" prereq_approved intake
+mkdir -p "$r/docs/agents-v0/requirements" && cp "$T1_TMP/fl9/orders.md" "$r/$fl9_req"
+expect_pass "FL-9 sync --active-phase intake in_progress starts after the onboard gate commit" "$r" sh "$SFS" --active-phase intake --status in_progress "$fl9_req"
 
 t1_done test-onboard-flow

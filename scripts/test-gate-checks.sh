@@ -209,10 +209,77 @@ q "$c" cp -R .agents-v0 "$ng/.agents-v0"; q "$c" cp "$REP" "$ST" "$ng/docs/agent
 expect_fail "GC-7 gate_committed refuses outside a git work tree" "$ng" sh "$GC" gate_committed onboard
 out_has "GC-7 names the missing repo" "REFUSED gate_committed: not a git work tree, so the onboard gate cannot be committed"
 
+# ===== JO-9 prereq_approved ===================================================================================
+# Design rev 6 flow step 9, lines 29, 73, 84, 97, 171, gap 1 (brownfield only) and gap 9 (the brownfield record):
+# roadmap, intake, plan, architecture, deliver (and triage, maintain: Sensei 20:45; gate-rules
+# prereq_approved_phases) refuse to start until onboard is approved and committed.
+# PA-1 pass: a repo with no brownfield record (no onboarding state, report or baseline-audit record)
+gf="$(t1_repo pa-green --commit)"; t1_install "$gf" || fail "install.sh into pa-green"
+expect_pass "PA-1 prereq_approved passes with no brownfield record" "$gf" sh "$GC" prereq_approved intake
+out_has "PA-1 says why" "OK prereq_approved: no brownfield record"
+# PA-2 refusal: brownfield (onboarding state exists), onboard not approved
+p2="$(onb_repo pa)"
+q "$p2" sh "$SFS" "$REP" --active-phase onboard --status in_progress
+for ph_ in roadmap intake plan architecture deliver triage maintain; do
+  expect_fail "PA-2 prereq_approved $ph_ refuses while onboard is not approved" "$p2" sh "$GC" prereq_approved "$ph_"
+done
+out_has "PA-2 names the missing approval" "REFUSED prereq_approved: maintain needs onboard approved and committed first; onboard is not approved in $ST"
+# PA-3 a phase that is not a next phase of onboard has no prerequisite here
+expect_pass "PA-3 prereq_approved design passes (not in gate-rules prereq_approved_phases)" "$p2" sh "$GC" prereq_approved design
+out_has "PA-3 names the list" "OK prereq_approved: design is not in gate-rules prereq_approved_phases"
+# PA-4 sync: each next phase refuses to start, and nothing is written
+mkdir -p "$p2/docs/agents-v0/requirements" "$p2/docs/agents-v0/roadmap" "$p2/docs/agents-v0/milestones" "$p2/docs/agents-v0/maintain/fix-1"
+printf '# orders\n' > "$p2/docs/agents-v0/requirements/orders.md"
+printf '# roadmap\n' > "$p2/docs/agents-v0/roadmap/prog.md"
+printf '# plan\n' > "$p2/docs/agents-v0/milestones/plan.md"
+printf '# note\n\ntier: standard\n' > "$p2/docs/agents-v0/maintain/fix-1/note.md"
+for pa_ in "intake docs/agents-v0/requirements/orders.md" "roadmap docs/agents-v0/roadmap/prog.md" \
+  "architecture docs/agents-v0/architecture.md" "plan docs/agents-v0/milestones/plan.md" \
+  "maintain docs/agents-v0/maintain/fix-1/note.md"; do
+  ph_="${pa_%% *}"; ar_="${pa_#* }"
+  expect_fail "PA-4 sync --active-phase $ph_ in_progress refuses before onboard is approved" "$p2" sh "$SFS" --active-phase "$ph_" --status in_progress "$ar_"
+  out_has "PA-4 $ph_ refusal comes from prereq_approved" "REFUSED prereq_approved: $ph_ needs onboard approved and committed first"
+done
+if [ -f "$p2/docs/agents-v0/requirements/orders.state.json" ]; then fail "PA-4 no intake state written"; else pass "PA-4 no intake state written"; fi
+expect_pass "PA-4 recording intake blocked is still allowed" "$p2" sh "$SFS" --active-phase intake --status blocked --reason "onboard first" docs/agents-v0/requirements/orders.md
+# PA-5 refusal: approved but not committed
+q "$p2" sh "$SFS" "$REP" --active-phase onboard --status awaiting_approval
+pr_result "$p2"
+q "$p2" sh "$SFS" "$REP" --approve onboard
+is_eq "PA-5 setup: onboard approved" "$(state_val "$p2" lastApprovedPhase)" "onboard"
+expect_fail "PA-5 prereq_approved refuses an approved but uncommitted onboard" "$p2" sh "$GC" prereq_approved intake
+out_has "PA-5 names the uncommitted approval" "REFUSED prereq_approved: intake needs onboard approved and committed first; the onboard approval in $ST is not committed"
+# PA-5b refusal: committed, but no onboard-v<n> tag
+q "$p2" G . add -- docs/agents-v0/onboarding; q "$p2" G . commit -qm "onboarding: onboard approved"
+expect_fail "PA-5b prereq_approved refuses a committed onboard without an onboard-v<n> tag" "$p2" sh "$GC" prereq_approved intake
+out_has "PA-5b names the missing tag" "REFUSED prereq_approved: intake needs onboard approved and committed first; no onboard-v<n> tag on the onboard gate commit"
+# PA-6 pass: approved, committed and tagged (repo c from GC-6)
+expect_pass "PA-6 prereq_approved intake passes once onboard is approved, committed and tagged" "$c" sh "$GC" prereq_approved intake
+out_has "PA-6 prints the rule" "OK prereq_approved: intake: onboard is approved and committed (state.json committed, tagged onboard-v2)"
+mkdir -p "$c/docs/agents-v0/requirements"; printf '# orders\n' > "$c/docs/agents-v0/requirements/orders.md"
+expect_pass "PA-6 sync --active-phase intake in_progress starts after the onboard gate commit" "$c" sh "$SFS" --active-phase intake --status in_progress docs/agents-v0/requirements/orders.md
+q "$c" mv docs/agents-v0/requirements "$T1_TMP/pa6-requirements"
+# PA-7 refusal: only the baseline-audit record marks the repo brownfield (onboard never ran)
+p7="$(t1_repo pa-audit --commit)"; t1_install "$p7" || fail "install.sh into pa-audit"
+mkdir -p "$p7/docs/agents-v0/discovery"; printf 'result: pass\n' > "$p7/docs/agents-v0/discovery/baseline-audit.txt"
+expect_fail "PA-7 prereq_approved refuses when only the baseline-audit record exists" "$p7" sh "$GC" prereq_approved roadmap
+out_has "PA-7 says onboard has not run" "REFUSED prereq_approved: roadmap needs onboard approved and committed first; onboard has not run ($ST is missing)"
+# PA-8 refusal: a corrupt onboarding state is never read as not brownfield
+mkdir -p "$p7/docs/agents-v0/onboarding"; printf '{not json' > "$p7/$ST"
+expect_fail "PA-8 prereq_approved refuses on a corrupt onboarding state" "$p7" sh "$GC" prereq_approved intake
+out_has "PA-8 asks the user" "is not valid JSON; stop and ask the user"
+# PA-9 refusal: the helper is missing on a repo with a brownfield record (fail closed)
+mkdir -p "$p7/docs/agents-v0/requirements"; printf '# orders\n' > "$p7/docs/agents-v0/requirements/orders.md"
+q "$p7" mv .agents-v0/scripts/gate-checks.sh "$T1_TMP/pa9-gate-checks.sh"
+expect_fail "PA-9 sync refuses intake when gate-checks.sh is missing and a brownfield record exists" "$p7" sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status in_progress docs/agents-v0/requirements/orders.md
+out_has "PA-9 names the missing helper" "to check the onboard prerequisite (docs/agents-v0/onboarding/state.json exists); reinstall the kit"
+q "$p7" mv "$T1_TMP/pa9-gate-checks.sh" .agents-v0/scripts/gate-checks.sh
+
 # list reports the two wired checks
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"
+out_has "list: prereq_approved is wired" "prereq_approved wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.

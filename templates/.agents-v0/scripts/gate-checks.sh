@@ -32,7 +32,7 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed"
+WIRED="approval_evidence gate_committed prereq_approved"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
@@ -152,6 +152,33 @@ approval_evidence() {
   fi
   ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed (--gate)"
 }
+# onb_tag_check <check>: the newest onboard-v<n> tag is on this branch and holds the current onboard approval
+# (state.json approval at the tag equals HEAD's). Sets gc_tag; refuses as <check> otherwise.
+onb_tag_check() {
+  gc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  [ -n "$gc_n" ] || refuse "$1" "no onboard-v<n> tag on the onboard gate commit; tag it: git tag -a onboard-v1 -m \"onboard approved\""
+  gc_tag="onboard-v$gc_n"
+  git merge-base --is-ancestor "$gc_tag^{commit}" HEAD 2>/dev/null || refuse "$1" "$gc_tag is not on this branch (not an ancestor of HEAD)"
+  if ! python3 - "$gc_tag" "$ONB_STATE" <<'PYGT'
+import json, subprocess, sys
+tag, path = sys.argv[1], sys.argv[2]
+def approval(rev):
+    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True, check=False)
+    try:
+        d = json.loads(out.stdout) if out.returncode == 0 else None
+    except ValueError:
+        d = None
+    if not isinstance(d, dict) or "onboard" not in (d.get("approvedPhases") or []):
+        return None
+    return ((d.get("lastApprovedPhase") or "").lower(), sorted(d.get("approvedPhases") or []),
+            (d.get("phaseTimes") or {}).get("onboard"), (d.get("phaseDates") or {}).get("onboard"))
+at_tag, at_head = approval(tag), approval("HEAD")
+sys.exit(0 if at_tag is not None and at_tag == at_head else 1)
+PYGT
+  then
+    refuse "$1" "$gc_tag does not hold the current onboard approval; tag the new gate commit onboard-v$((gc_n + 1))"
+  fi
+}
 # JO-1 (design rev 6 lines 69, 84, 96, 168): the approved <phase> has its gate commit. For onboard: onboard is in
 # approvedPhases, check-gate-commit.sh (unchanged) passes on the onboarding report (the approval is in HEAD and
 # the tree is clean), and the newest onboard-v<n> tag is on this branch and holds the current approval.
@@ -176,39 +203,49 @@ gate_committed() {
   case "$gc_out" in *"skipped (kit test override)"*)
     refuse gate_committed "check-gate-commit.sh skipped its check (kit test override); a skipped check is not a gate commit" ;;
   esac
-  gc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
-  [ -n "$gc_n" ] || refuse gate_committed "no onboard-v<n> tag on the onboard gate commit; tag it: git tag -a onboard-v1 -m \"onboard approved\""
-  gc_tag="onboard-v$gc_n"
-  git merge-base --is-ancestor "$gc_tag^{commit}" HEAD 2>/dev/null || refuse gate_committed "$gc_tag is not on this branch (not an ancestor of HEAD)"
-  if ! python3 - "$gc_tag" "$ONB_STATE" <<'PYGT'
-import json, subprocess, sys
-tag, path = sys.argv[1], sys.argv[2]
-def approval(rev):
-    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True, check=False)
-    try:
-        d = json.loads(out.stdout) if out.returncode == 0 else None
-    except ValueError:
-        d = None
-    if not isinstance(d, dict) or "onboard" not in (d.get("approvedPhases") or []):
-        return None
-    return ((d.get("lastApprovedPhase") or "").lower(), sorted(d.get("approvedPhases") or []),
-            (d.get("phaseTimes") or {}).get("onboard"), (d.get("phaseDates") or {}).get("onboard"))
-at_tag, at_head = approval(tag), approval("HEAD")
-sys.exit(0 if at_tag is not None and at_tag == at_head else 1)
-PYGT
-  then
-    refuse gate_committed "$gc_tag does not hold the current onboard approval; tag the new gate commit onboard-v$((gc_n + 1))"
-  fi
+  onb_tag_check gate_committed
   ok gate_committed "onboard is approved, committed (check-gate-commit.sh) and tagged $gc_tag (path subset and range re-scan: JO-8, not checked yet)"
 }
-# JO-9: <next-phase> in prereq_approved_phases needs onboard approved and committed (brownfield only).
+# JO-9 (design rev 6 flow step 9, lines 29, 73, 84, 97, 171; gap 1 brownfield only; gap 9): a <next-phase> listed
+# in gate-rules prereq_approved_phases starts only after onboard is approved (onboarding/state.json) and its gate
+# is committed (gate_committed onboard, which runs check-gate-commit.sh). A phase not in the list has no
+# prerequisite here. Brownfield signal (any one): the onboarding state, the onboarding report, or the baseline-audit
+# record (discovery/baseline-audit.txt, JO-15a). With none of them the repo is treated as not brownfield and the
+# check passes.
+# TODO(gap 9 / N2A, 5A): the content-rule fallback (a brownfield repo where onboard was skipped and no record was
+#   written) and the greenfield record (greenfield_record_ok) are not built; until then a repo with no record passes.
+PA_AUDIT="docs/agents-v0/discovery/baseline-audit.txt"
 prereq_approved() {
   need_phase prereq_approved "${1:-}"
-  phases="$(rule prereq_approved_phases)"
-  case " $phases " in
-    *" $1 "*) not_wired prereq_approved "$1 needs onboard approved and committed first (gate-rules prereq_approved_phases)" "JO-9 with the gap 9 content rule" ;;
-    *) not_wired prereq_approved "$1 is not in gate-rules prereq_approved_phases ($phases)" "JO-9" ;;
+  pa_phases="$(rule prereq_approved_phases)" || exit 2
+  case " $pa_phases " in
+    *" $1 "*) ;;
+    *) ok prereq_approved "$1 is not in gate-rules prereq_approved_phases ($pa_phases), so it needs no onboard approval" ;;
   esac
+  to_root
+  pa_need="$1 needs onboard approved and committed first"
+  if [ ! -e "$ONB_STATE" ] && [ ! -e "$ONB_REPORT" ] && [ ! -e "$PA_AUDIT" ]; then
+    ok prereq_approved "no brownfield record ($ONB_STATE, $ONB_REPORT, $PA_AUDIT), so $1 needs no onboard approval (brownfield only)"
+  fi
+  [ -f "$ONB_STATE" ] || refuse prereq_approved "$pa_need; onboard has not run ($ONB_STATE is missing). Run /v0-onboard first"
+  pa_approved="$(state_field "$ONB_STATE" approvedPhases)" || refuse prereq_approved "$pa_need; $ONB_STATE is not valid JSON; stop and ask the user"
+  case " $pa_approved " in
+    *" onboard "*) ;;
+    *) refuse prereq_approved "$pa_need; onboard is not approved in $ONB_STATE. Finish /v0-onboard and its approval first" ;;
+  esac
+  # The onboard gate commit: the approval in state.json is committed and unchanged since HEAD, and the newest
+  # onboard-v<n> tag on this branch holds it. Unlike gate_committed, other uncommitted files do not refuse here:
+  # the next command writes its own artifact (requirements/<feature>.md, roadmap/<program>.md, ...) before it
+  # sets in_progress, and check-gate-commit.sh would count that file as uncommitted onboard work.
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse prereq_approved "$pa_need; not a git work tree, so the onboard gate cannot be committed"
+  pa_committed=0
+  if git ls-files --error-unmatch -- "$ONB_STATE" >/dev/null 2>&1 && git diff --quiet HEAD -- "$ONB_STATE" 2>/dev/null; then pa_committed=1; fi
+  [ "$pa_committed" = 1 ] || refuse prereq_approved "$pa_need; the onboard approval in $ONB_STATE is not committed. Commit the onboard gate and tag it onboard-v<n> first"
+  if ! pa_msg="$(onb_tag_check prereq_approved)"; then
+    printf '%s\n' "$pa_msg" | sed "s/^REFUSED prereq_approved: /REFUSED prereq_approved: $pa_need; /"; exit 1
+  fi
+  pa_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  ok prereq_approved "$1: onboard is approved and committed (state.json committed, tagged onboard-v$pa_n)"
 }
 # JO-10: no state change on an onboard report awaiting review or approved, unless --reopen with a valid grant.
 no_restart_without_reopen() {

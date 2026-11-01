@@ -170,6 +170,32 @@ case "$art" in
     ;;
 esac
 
+# Next-phase prerequisite (onboard fix JO-9, design rev 6 flow step 9): starting, finishing or approving a phase
+# listed in gate-rules prereq_approved_phases needs onboard approved and committed on a brownfield repo
+# (gate-checks.sh prereq_approved). Recording a blocked state is allowed. A missing helper refuses when a
+# brownfield record exists.
+pa_phase=""
+if [ "$set_active" = 1 ] && [ "$active_status" != blocked ]; then pa_phase="$active_phase"; fi
+[ -z "$approve_lc" ] || pa_phase="$approve_lc"
+case "$pa_phase" in ""|onboard) pa_phase="" ;; esac
+if [ -n "$pa_phase" ]; then
+  pa_script="$(dirname "$0")/gate-checks.sh"
+  pa_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  if [ ! -f "$pa_script" ]; then
+    # Without the helper, a repo with a brownfield record refuses (fail closed); any other repo goes on.
+    for pa_rec in onboarding/state.json onboarding/report.md discovery/baseline-audit.txt; do
+      if [ -e "$pa_root/docs/agents-v0/$pa_rec" ]; then
+        printf 'FAIL: %s needs %s to check the onboard prerequisite (docs/agents-v0/%s exists); reinstall the kit (install.sh --update).\n' "$pa_phase" "$pa_script" "$pa_rec" >&2
+        exit 1
+      fi
+    done
+  elif ! pa_out="$(sh "$pa_script" prereq_approved "$pa_phase" 2>&1)"; then
+    printf '%s\n' "$pa_out" >&2
+    printf 'FAIL: %s refused: onboard must be approved and committed first (gate-checks.sh prereq_approved). Nothing was recorded.\n' "$pa_phase" >&2
+    exit 1
+  fi
+fi
+
 # Feature-branch guard (kitfix-20261031-branch-guard). Design, Build, Verify and the pre-merge
 # Release work of a feature story happen only on feature/<feature>, in the worktree that
 # feature-worktree.sh created after the user authorised the branch (v0-intake step 7). Run
