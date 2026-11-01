@@ -347,6 +347,11 @@ for f in scripts/lib/tier1-vars.sh scripts/lib/tier1-harness.sh scripts/tier1.sh
   [ -f "$f" ] || err "$f missing (tier 1 harness)"
 done
 sh scripts/test-tier1-harness.sh || err "scripts/test-tier1-harness.sh failed"
+# Onboard fix JO-15a: the two audit copies stay identical, and the baseline record test runs.
+cmp -s scripts/audit-brownfield-baseline.sh templates/.agents-v0/scripts/audit-brownfield-baseline.sh \
+  || err "scripts/audit-brownfield-baseline.sh and templates/.agents-v0/scripts/audit-brownfield-baseline.sh differ (JO-15a)"
+[ -f scripts/test-baseline-record.sh ] || err "scripts/test-baseline-record.sh missing (JO-15a)"
+sh scripts/test-baseline-record.sh || err "scripts/test-baseline-record.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
