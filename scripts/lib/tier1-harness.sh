@@ -7,31 +7,35 @@
 
 [ -n "${KIT:-}" ] || { printf 'tier1-harness: set KIT before sourcing\n' >&2; exit 2; }
 
-# The seven AGENTS_V0_* test switches (refs/kit-fixes.md, kitfix-20261031-installed-no-overrides).
-T1_OVERRIDE_VARS="AGENTS_V0_SKIP_BRANCH_GUARD AGENTS_V0_SKIP_COMMIT_CHECK AGENTS_V0_COMMIT_CHECK_IGNORE AGENTS_V0_NOW AGENTS_V0_TZ AGENTS_V0_TRACE_MODE AGENTS_V0_TRACE_NO_WRITE"
+. "$KIT/scripts/lib/tier1-vars.sh"
+# The switch guard runs first, as soon as the harness is sourced (N20).
+t1_guard_env || exit 2
 
-# t1_guard_env: refuse to run when any test switch is set in the environment.
-t1_guard_env() {
-  for v in $T1_OVERRIDE_VARS; do
-    if eval "[ -n \"\${$v+x}\" ]"; then
-      printf 'tier1: refusing to run: %s is set in the environment (unset every AGENTS_V0_* test switch first)\n' "$v" >&2
-      return 1
-    fi
-  done
-  return 0
-}
-
-T1_TMP="$(mktemp -d "${TMPDIR:-/tmp}/kit-tier1.XXXXXX")"
-: > "$T1_TMP/.kit-tier1-owned"
-# t1_cleanup: remove only the folder made above, and only while it still carries this run's marker.
+# One temp folder per run. T1_TMP is readonly, the folder must be a direct child of the temp root, and
+# the marker holds a random token for this run, so cleanup can only ever remove this run's own folder.
+T1_ROOT="$(cd "${TMPDIR:-/tmp}" && pwd -P)" || { printf 'tier1-harness: no temp folder\n' >&2; exit 2; }
+T1_TMP="$(mktemp -d "$T1_ROOT/kit-tier1.XXXXXX")" || { printf 'tier1-harness: mktemp failed\n' >&2; exit 2; }
+[ -d "$T1_TMP" ] || { printf 'tier1-harness: mktemp made no folder\n' >&2; exit 2; }
+readonly T1_TMP T1_ROOT
+T1_TOKEN="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')$$"
+readonly T1_TOKEN
+printf '%s\n' "$T1_TOKEN" > "$T1_TMP/.kit-tier1-owned"
+# t1_cleanup: remove $T1_TMP only if it is still a real folder (not a symlink) named kit-tier1.<6 chars>
+# directly under the temp root, with no `..`, and its marker still holds this run's token.
 t1_cleanup() {
-  case "$T1_TMP" in "${TMPDIR:-/tmp}"/kit-tier1.*) ;; *) return 0 ;; esac
-  [ -f "$T1_TMP/.kit-tier1-owned" ] && rm -rf "$T1_TMP"
-  return 0
+  case "$T1_TMP" in *..*|*//*) return 0 ;; esac
+  [ "${T1_TMP%/*}" = "$T1_ROOT" ] || return 0
+  b_="${T1_TMP##*/}"
+  case "$b_" in kit-tier1.??????) ;; *) return 0 ;; esac
+  case "${b_#kit-tier1.}" in */*) return 0 ;; esac
+  [ -d "$T1_TMP" ] && [ ! -L "$T1_TMP" ] || return 0
+  [ "$(cat "$T1_TMP/.kit-tier1-owned" 2>/dev/null)" = "$T1_TOKEN" ] || return 0
+  rm -rf "$T1_TMP"
 }
 trap 'rc=$?; t1_cleanup; exit $rc' EXIT
 trap 't1_cleanup; exit 130' INT
 trap 't1_cleanup; exit 143' TERM
+trap 't1_cleanup; exit 129' HUP
 
 T1_STATUS=0; T1_N=0; T1_FAILS=0
 pass() { T1_N=$((T1_N + 1)); printf 'ok: %s\n' "$1"; }
@@ -65,19 +69,34 @@ t1_hash_ok() {
   sh "$KIT/scripts/check-installed-kit.sh" "$1" > "$T1_TMP/hash.txt" 2>&1 && grep -q '^HASH-OK' "$T1_TMP/hash.txt"
 }
 
-# t1_snapshot <repo> <out>: one line per tracked and untracked file (sha256 + path), plus every ref and the
-# staged entries (git ls-files -s, not the raw index, whose stat data git rewrites on any status) and the
-# config hash. Two equal snapshots mean the repo is byte-identical (E37, E38).
+# t1_snapshot <repo> <out>: everything a kit run could change, for the byte-identical check (E37, E38):
+#   F <sha256> <mode> <path>   every file in the work tree (tracked and untracked), with its mode
+#   L <target> <path>          every symlink, with its target
+#   A <sha256> <mode> <path>   every file under .git/agents-v0 (ledger, grant), .git/hooks and .git/info
+#   R / H / S / G / T          every ref, HEAD, the staged entries (git ls-files -s, not the raw index,
+#                              whose stat data git rewrites on any status), the config, and the stash list
+# Works in a main checkout and in a linked worktree (it reads .git paths through git rev-parse).
 t1_snapshot() {
   r_="$1"; o_="$2"
-  ( cd "$r_" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | while IFS= read -r f_; do
-      printf 'F %s %s\n' "$(t1_sha < "$f_")" "$f_"; done
+  gd_="$(git -C "$r_" rev-parse --absolute-git-dir)" || return 1
+  cd_="$(cd "$r_" && cd "$(git rev-parse --git-common-dir)" && pwd -P)" || return 1
+  {
+    ( cd "$r_" && find . -name .git -prune -o \( -type f -o -type l \) -print | LC_ALL=C sort | while IFS= read -r f_; do
+        if [ -L "$f_" ]; then printf 'L %s %s\n' "$(readlink "$f_")" "$f_"
+        else printf 'F %s %s %s\n' "$(t1_sha < "$f_")" "$(t1_mode "$f_")" "$f_"; fi; done )
+    for d_ in "$cd_/agents-v0" "$cd_/hooks" "$cd_/info" "$gd_/agents-v0"; do
+      [ -d "$d_" ] || continue
+      ( cd "$d_" && find . -type f -print | LC_ALL=C sort | while IFS= read -r f_; do
+          printf 'A %s %s %s/%s\n' "$(t1_sha < "$f_")" "$(t1_mode "$f_")" "$d_" "$f_"; done )
+    done
     git -C "$r_" for-each-ref --format='R %(objectname) %(refname)' | LC_ALL=C sort
-    printf 'H %s\n' "$(git -C "$r_" symbolic-ref -q HEAD || git -C "$r_" rev-parse HEAD)"
+    printf 'H %s\n' "$(git -C "$r_" symbolic-ref -q HEAD || git -C "$r_" rev-parse -q --verify HEAD || echo none)"
     git -C "$r_" ls-files -s | sed 's/^/S /'
-    [ -f "$r_/.git/config" ] && printf 'G %s config\n' "$(t1_sha < "$r_/.git/config")"
-  ) > "$o_"
+    [ -f "$cd_/config" ] && printf 'G %s config\n' "$(t1_sha < "$cd_/config")"
+    git -C "$r_" stash list --format='T %H' 2>/dev/null
+  } > "$o_"
 }
+t1_mode() { if stat -c %a "$1" >/dev/null 2>&1; then stat -c %a "$1"; else stat -f %Lp "$1"; fi; }
 t1_sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
 
 # t1_done <suite name>: print the summary and exit with the suite status.
