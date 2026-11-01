@@ -498,6 +498,25 @@ expect_fail "N80 a last line with no newline fails closed" "$lg" sh "$GC" ledger
 out_has "N80 names the missing newline" "has no newline (every kit write ends in one)"
 lg_back; printf 'REOPEN-REFUSED no valid grant\nFAIL docs check\n' >> "$LG_LED"
 expect_pass "N80 appended REOPEN-REFUSED and FAIL lines pass" "$lg" sh "$GC" ledger_ok
+# N80 second reopen: each reopen appends its own grant line; every GRANT-USED line is checked against the grant
+# line that was in force when it was written, single use and the count rule unchanged
+lg_g2="grant 2026-11-02T06:30:00+08:00 phase=onboard reason=FAKE-retry-two by=FAKE-person"
+lg_h2="$(printf '%s' "$lg_g2" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
+printf '%s\n%s\n' "$lg_gl" "$lg_g2" > "$LG_GRANT"
+lg_back; printf 'FAIL docs check\nGRANT-USED %s count=3\nFAIL docs check\nGRANT-USED %s count=4\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
+expect_pass "N80 two reopens with different grants pass (the older GRANT-USED line keeps its grant)" "$lg" sh "$GC" ledger_ok
+lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$lg_h2" "$lg_h2" >> "$LG_LED"
+expect_fail "N80 second reopen: the newer grant used twice is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 second reopen names the reuse" "ledger line 3 names a grant that another GRANT-USED line already used"
+lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$(printf '%064d' 7)" "$lg_h2" >> "$LG_LED"
+expect_fail "N80 second reopen: a forged older grant hash is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 second reopen names the forged line" "ledger line 3 is a GRANT-USED line that names no grant in $LG_GRANT"
+lg_back; printf 'GRANT-USED %s count=1\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
+expect_fail "N80 second reopen: a wrong count on the older line is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 second reopen names the count" "ledger line 3 says count=1, but the FAIL lines before it give 2"
+printf '%s\n' "$lg_g2" > "$LG_GRANT"; lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
+expect_fail "N80 second reopen: an overwritten (not appended) grant file is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 second reopen says why" "a grant that was overwritten instead of appended cannot be checked"
 lg_back
 mv "$LG_GRANT" "$T1_TMP/lg/reopen-grant.moved"
 

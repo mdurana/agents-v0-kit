@@ -113,7 +113,8 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #   check                     every onboard-v<n> gate commit has one well-formed trailer, the ledger exists once
 #                             any gate commit does, is at least as long as each recorded count, its first n lines
 #                             hash to each recorded sha256, and every line after the newest anchor is well formed
-#                             (each GRANT-USED names the grant file's line, once, with the FAIL count before it)
+#                             (each GRANT-USED names a line of the grant file, once, with the FAIL count before it;
+#                             a second reopen appends its grant, so an older GRANT-USED line still finds its own)
 #   trailer                   check, then print the trailer for the next gate commit (creates the empty ledger
 #                             when no gate commit exists yet and nothing has written it)
 #   commit <msg file>         check, and the message's own trailer still anchors the ledger (commit_msg_ok)
@@ -123,6 +124,7 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #                             appended, exactly as many as the harness saw (N84)
 # Lines are newline-terminated; the line grammar (the kit writers must follow it):
 #   FAIL[ <text>]   GRANT-USED <sha256 of the grant line, without its newline> count=<n>   REOPEN-REFUSED <text>
+# The grant file holds one grant line per approved reopen, appended, the newest last (the grant in force).
 # where <text> has no control characters. The newest anchor is the largest recorded count over all onboard-v<n>
 # tags (the ledger is shared by every worktree, so is every tag).
 ledger_py() {
@@ -213,11 +215,13 @@ def check_anchors(lines, anc):
     t, n, _ = max(anc, key=lambda a: a[1])
     return t, n
 
-def grant_hash():
+def grant_hashes():
+    # every grant line in the grant file, each hashed without its newline. The person appends each new grant as
+    # its own line (the newest last), so the grant that was in force for each GRANT-USED line is still there.
     if not os.path.isfile(grant):
         return None
     with open(grant, "rb") as f:
-        return hashlib.sha256(f.read().split(b"\n", 1)[0]).hexdigest()
+        return set(hashlib.sha256(x).hexdigest() for x in f.read().split(b"\n") if x)
 
 def check_appended(lines, start):
     fails, used, gh = 0, {}, False
@@ -235,11 +239,11 @@ def check_appended(lines, start):
             m = GRANT_RE.match(s)
             if m:
                 if gh is False:
-                    gh = grant_hash()
+                    gh = grant_hashes()
                 if gh is None:
                     out(1, "ledger line %d is a GRANT-USED line, but there is no grant file (%s)" % (i + 1, grant))
-                if m.group(1) != gh:
-                    out(1, "ledger line %d is a GRANT-USED line that names no grant in %s" % (i + 1, grant))
+                if m.group(1) not in gh:
+                    out(1, "ledger line %d is a GRANT-USED line that names no grant in %s (each grant stays there as its own line; a grant that was overwritten instead of appended cannot be checked)" % (i + 1, grant))
                 if used[m.group(1)] > 1:
                     out(1, "ledger line %d names a grant that another GRANT-USED line already used" % (i + 1))
                 if int(m.group(2)) != fails:
