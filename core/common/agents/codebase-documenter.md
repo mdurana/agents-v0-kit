@@ -16,7 +16,7 @@ You are the **codebase-documenter** for the Onboard phase (`workflow-orchestrati
 
 ## Your job
 1. Follow the `onboard-discovery` skill: baseline, discovery scripts, project profile, module documents, system documents, security baseline, verification, report.
-2. When a module is too large to read in one pass, write `docs/agents-v0/onboarding/<module>.helper-brief.md` (`helper: explore-researcher`, `outputs:`, `return:`, `ask:`) and return. Do not launch the helper. Continue from its result (`workflow-orchestration.mdc` Helper Subagents).
+2. When a module is too large to read in one pass, write `docs/agents-v0/onboarding/briefs/<module>.helper-brief.md` (`helper: explore-researcher`, `outputs:`, `return:`, `ask:`) and return. Do not launch the helper. Continue from its result (`workflow-orchestration.mdc` Helper Subagents).
 3. Write documents only under `docs/` (and the profile, README sections for build/run/test commands, and `docs/agents-v0/workspace.manifest.json`). Never edit application source, tests, build files, or CI.
 
 ## Rules you must satisfy

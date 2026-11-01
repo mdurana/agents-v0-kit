@@ -816,32 +816,67 @@ base_commit = prev_bc or rep_parent or head_bc
 prior_hashes = list(prev.get("helperBriefHashes") or [])
 skip_brief_dedup = bool(cli_approve) or os.environ.get("HOOK_CLEAR_ACTIVE") == "1"
 if Path("docs/agents-v0").is_dir() and not skip_brief_dedup:
+    # Onboard fix JO-7: onboarding briefs live in docs/agents-v0/onboarding/briefs/ (a brief straight under
+    # onboarding/ is still read). A used brief moves to briefs/archive/, which is never read. An onboarding
+    # brief that cannot be read, or has no helper:/ask: line, stops the sync (fail closed, path named).
+    ob_dir = Path("docs/agents-v0/onboarding")
+    ob_briefs = ob_dir / "briefs"
+    ob_archive = ob_briefs / "archive"
     extra_briefs = set()
-    if onboarding and Path("docs/agents-v0/onboarding").is_dir():
-        extra_briefs |= set(Path("docs/agents-v0/onboarding").glob("*.helper-brief.md"))
+    if onboarding and ob_dir.is_dir():
+        extra_briefs |= set(ob_dir.glob("*.helper-brief.md"))
+        if ob_briefs.is_dir():
+            extra_briefs |= set(ob_briefs.glob("*.helper-brief.md"))
     if program_doc and Path("docs/agents-v0/design/system").is_dir():
         extra_briefs |= set(Path("docs/agents-v0/design/system").glob("*.helper-brief.md"))
     brief_candidates = sorted(
-        set(Path("docs/agents-v0").rglob(f"{feature_id}.helper-brief.md"))
-        | set(Path("docs/agents-v0").rglob(f"{feature_id}/helper-brief.md"))
-        | extra_briefs
+        b for b in (
+            set(Path("docs/agents-v0").rglob(f"{feature_id}.helper-brief.md"))
+            | set(Path("docs/agents-v0").rglob(f"{feature_id}/helper-brief.md"))
+            | extra_briefs
+        )
+        if ob_archive not in b.parents
     )
     for brief in brief_candidates:
+        strict = bool(onboarding) and brief.parent in (ob_dir, ob_briefs)
         try:
             b_text = brief.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, ValueError) as exc:
+            if strict:
+                print(
+                    f"FAIL: helper brief {brief} cannot be read ({type(exc).__name__}). Fix it, or move it to "
+                    f"{ob_archive}/ if its helper has run, then sync again.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
+            if not isinstance(exc, OSError):
+                raise
             continue
         m_helper = re.search(r"^helper:\s*(.+)$", b_text, re.M)
         m_ask = re.search(r"^ask:\s*(.+)$", b_text, re.M) or re.search(r"^(?:outputs|return):\s*(.+)$", b_text, re.M)
+        if strict and not (m_helper and m_ask):
+            print(
+                f"FAIL: helper brief {brief} has no helper: line or no ask: line. Fix it, or move it to "
+                f"{ob_archive}/ if its helper has run, then sync again.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
         if m_helper and m_ask:
             digest = hashlib.sha256(
                 f"{brief.name}:{brief.parent.name}:{m_helper.group(1).strip()}:{m_ask.group(1).strip()}".encode("utf-8")
             ).hexdigest()[:16]
             if digest in prior_hashes:
-                print(
-                    f"FAIL: Duplicate helper brief ask detected ({digest}) in {brief}. Stop loop and escalate to user.",
-                    file=sys.stderr,
-                )
+                if strict:
+                    print(
+                        f"FAIL: Duplicate helper brief ask detected ({digest}) in {brief}. If its helper has run, move "
+                        f"{brief} to {ob_archive}/ and sync again; otherwise stop the loop and escalate to the user.",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"FAIL: Duplicate helper brief ask detected ({digest}) in {brief}. Stop loop and escalate to user.",
+                        file=sys.stderr,
+                    )
                 raise SystemExit(2)
             prior_hashes.append(digest)
 

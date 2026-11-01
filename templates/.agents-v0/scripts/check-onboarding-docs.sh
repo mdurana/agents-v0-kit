@@ -27,6 +27,9 @@
 #     that does not exist;
 #   - a `commit:` stamp in a checked document is not a commit of this repo or not in the history of HEAD.
 # In --gate every _*.md file (_template.md, _*.template.md) is a template: never scanned, never a gate document.
+# Helper briefs (onboard fix JO-7) are never scanned: not docs/agents-v0/onboarding/briefs/ (nor its archive/),
+# not any *.helper-brief.md. --gate fails while a brief waits in briefs/ or straight under onboarding/, and
+# names docs/agents-v0/onboarding/briefs/archive/, where a used brief goes.
 # Citations also accept more extensions and extensionless build files (Dockerfile, Makefile, ...); a
 # citation-like `path.ext:N` that is not backticked is not checked and is reported as a WARN line (no failure).
 # The gate document list lives only in gate-rules (read through gate-checks.sh rules; any error there fails
@@ -128,16 +131,30 @@ def is_template(name):
     return name.startswith("_") and name.endswith(".template.md")
 
 
+# JO-7: helper briefs are not documents. The briefs folder (and its archive) is never scanned, and no
+# *.helper-brief.md file is; --gate instead fails on a brief still waiting in briefs/ (below).
+BRIEFS = "docs/agents-v0/onboarding/briefs"
+BRIEF_ARCHIVE = BRIEFS + "/archive"
+
+
+def is_brief_path(path):
+    p = os.path.normpath(path)
+    return p == BRIEFS or p.startswith(BRIEFS + os.sep) or p.endswith(".helper-brief.md")
+
+
 docs = []
 for raw in os.environ["CHECK_PATHS"].splitlines():
     if not raw:
         continue
     if os.path.isdir(raw):
-        for dirpath, _dirs, names in os.walk(raw):
+        for dirpath, dirs, names in os.walk(raw):
+            dirs[:] = [d for d in dirs if not is_brief_path(os.path.join(dirpath, d))]
+            if is_brief_path(dirpath):
+                continue
             for name in sorted(names):
-                if name.endswith(".md") and not is_template(name):
+                if name.endswith(".md") and not is_template(name) and not name.endswith(".helper-brief.md"):
                     docs.append(os.path.join(dirpath, name))
-    elif os.path.isfile(raw) and not (GATE and is_template(os.path.basename(raw))):
+    elif os.path.isfile(raw) and not (GATE and is_template(os.path.basename(raw))) and not is_brief_path(raw):
         docs.append(raw)
 
 def count_unverified_statements(body):
@@ -244,6 +261,14 @@ def is_md_doc(name):
 
 
 if GATE:
+    # JO-7: a helper brief still waiting (in briefs/, or straight under onboarding/) means a helper result
+    # was not folded in; the gate fails and names the folder a used brief moves to.
+    waiting = []
+    for folder in ("docs/agents-v0/onboarding", BRIEFS):
+        if os.path.isdir(folder):
+            waiting += sorted(os.path.join(folder, n) for n in os.listdir(folder) if n.endswith(".helper-brief.md"))
+    for brief in waiting:
+        failures.append(f"{brief}: a helper brief is still waiting; fold in its helper result and move it to {BRIEF_ARCHIVE}/")
     # JO-3: every gate document of gate-rules onboard_gate_docs is present.
     for entry in os.environ.get("GATE_DOCS", "").split():
         if entry.startswith("/") or ".." in entry.split("/"):

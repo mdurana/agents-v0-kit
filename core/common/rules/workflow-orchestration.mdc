@@ -75,7 +75,7 @@ Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `d
 Phase subagents do not spawn subagents directly. When a phase agent needs codebase exploration, root-cause debugging, schema authoring, or doc drafting:
 1. Write the helper brief (`docs/agents-v0/<phase-dir>/<slug>.helper-brief.md`) with `helper:`, `outputs:`, `return:`, and `ask:`.
 2. Return. The main session runs `sh .agents-v0/scripts/sync-feature-state.sh <artifact>` to record the `ask:` digest in `helperBriefHashes` (exits 2 if the identical `ask:` was already run). Verify is the exception: `test-engineer` and `quality-gate` run that sync before they return, and the main session does not sync the same brief again.
-3. The main session runs the helper once, re-launches the phase agent, and deletes the brief upon completion.
+3. The main session runs the helper once, re-launches the phase agent, and deletes the brief upon completion. Onboarding is the exception: its briefs live in `docs/agents-v0/onboarding/briefs/` and a used brief moves to `docs/agents-v0/onboarding/briefs/archive/` (`/v0-onboard` step 4).
 
 ## Phase Attempt & Bounce Budgets
 
