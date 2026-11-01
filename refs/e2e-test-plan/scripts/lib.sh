@@ -772,7 +772,7 @@ _lg_pin(){ local k="$1" c r h w
     h="$(_lg_hash "$r")"; [ -n "$h" ] || { ledger_stop "$k" "python3 at $r cannot be hashed"; return 1; }
     _LG_PY="$r" _LG_PYSHA="$h"; fi
   h="$(_lg_hash "$_LG_PY")"
-  [ -n "$h" ] && [ "$h" = "$_LG_PYSHA" ] || { ledger_stop "$k" "the pinned python3 $_LG_PY is missing or changed (sha256 ${h:-absent}, pinned $_LG_PYSHA)"; return 1; }; }
+  [ -n "$h" ] && [ "$h" = "$_LG_PYSHA" ] || { ledger_stop "$k" "the pinned interpreter $_LG_PY is missing or changed (sha256 ${h:-absent}, pinned $_LG_PYSHA)"; return 1; }; }
 # _lg_gc <dir> <snapshot gate-checks.sh> <args>: runs the snapshot in <dir> with the pinned python3 (see above)
 _lg_gc(){ local d="$1" gc="$2" b; shift 2
   b="$(dirname "$gc")/py.$$.$RANDOM"; mkdir "$b" && ln -s "$_LG_PY" "$b/python3" && [ "$(readlink "$b/python3")" = "$_LG_PY" ] \

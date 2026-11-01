@@ -174,7 +174,7 @@ islg && [ ! -e "$RUN/stub-ran-1" ] && grep -q "python3 resolves to $MAIN/.lt-bin
   && ok "python3 inside the workspace -> refused before the turn" || ko "pyinside: class=$TURN_CLASS ran=$([ -e "$RUN/stub-ran-1" ] && echo yes) $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
 _LG_PY=""; pywrap "$SB/pybin"; PATH="$SB/pybin:$SAVE_PATH"
 newrun; setledger; turn 1 "pyswap:$SB/pybin/python3"
-islg && grep -q "the pinned python3 $SB/pybin/python3 is missing or changed" "$RUN/LEDGER-CHANGED" && ok "the pinned python3 changed during the turn -> LEDGER" \
+islg && grep -q "the pinned interpreter $SB/pybin/python3 is missing or changed" "$RUN/LEDGER-CHANGED" && ok "the pinned python3 changed during the turn -> LEDGER" \
   || ko "pyswap: class=$TURN_CLASS $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
 PATH="$SAVE_PATH"; _LG_PY=""
 
