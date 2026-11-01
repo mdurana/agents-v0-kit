@@ -416,4 +416,7 @@ out_has "FL-10 N30 corrupt: asks the user" "REFUSED no_restart_without_reopen: $
 mv "$r/$ST" "$T1_TMP/fl10/corrupt-state.json"; mv "$T1_TMP/fl10/state.json" "$r/$ST"
 is_eq "FL-10 N30 the committed state is back unchanged" "$(git -C "$r" status --porcelain -- "$ST")" ""
 
+# Wired into validate-kit next to test-onboard.sh (Kakashi, 2026-11-02).
+has "validate-kit runs this suite" "$KIT/scripts/validate-kit.sh" "sh scripts/test-onboard-flow.sh"
+
 t1_done test-onboard-flow
