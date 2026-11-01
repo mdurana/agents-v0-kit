@@ -373,6 +373,8 @@ done
   || err "scripts/lib/retired-files.sh holds rm or unlink (N69: the cleanup moves files to trash/, it never removes)"
 sh scripts/test-update-retired-cleanup.sh || err "scripts/test-update-retired-cleanup.sh failed"
 sh scripts/test-gitlab-retired.sh || err "scripts/test-gitlab-retired.sh failed"
+[ -f scripts/test-no-bytecode.sh ] || err "scripts/test-no-bytecode.sh missing"
+sh scripts/test-no-bytecode.sh || err "scripts/test-no-bytecode.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"

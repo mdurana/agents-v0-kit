@@ -3,6 +3,7 @@
 # under sh and dash, plus hook-policy.py unit tests. Runs in a scratch directory so
 # audit logs never land in the kit repo.
 set -eu
+export PYTHONDONTWRITEBYTECODE=1  # run alone, still leave no __pycache__ in templates/ or core/ (test-no-bytecode.sh)
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOKS="$KIT/core/common/hooks"

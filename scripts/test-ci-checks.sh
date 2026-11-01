@@ -3,6 +3,7 @@
 # backend verify runner, attempt budgets, state synchronization, and audit pack export (no network).
 # Run by validate-kit.sh. Needs git and python3.
 set -eu
+export PYTHONDONTWRITEBYTECODE=1  # run alone, still leave no __pycache__ in templates/ or core/ (test-no-bytecode.sh)
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 SC="$KIT/templates/.agents-v0/scripts"

@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # importing hook-policy.py must leave no __pycache__ in core/ (test-no-bytecode.sh)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POLICY = os.path.join(ROOT, "core", "common", "hooks", "hook-policy.py")
 
