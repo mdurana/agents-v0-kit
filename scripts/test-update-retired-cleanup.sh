@@ -13,6 +13,8 @@
 #   E36 the step is general: synthetic list entries for the Cursor and agy /v0-release copies, no code change
 #   plus safety cases: a missing or malformed list, `..`, absolute and trash/ paths are refused before anything
 #   changes; symlinked retired paths, symlinked parents and a symlinked trash/ are left alone.
+#   J1 (Jiraiya review of fc5dd399): --update adds trash/agents-v0-retired/ to .gitignore once, like ._*
+#   J2 (same review): the committed ci/__pycache__ .pyc the old rm -rf removed are kit-managed retired files
 # Fixture: a real 36b86cf-era install (git archive 36b86cf from the kit's history, or KIT_HISTORY_GIT) plus the
 # :319 files from 4103a544^. Without that history those cases print SKIP and the rest still run. Tier 1: offline, no agent, temp folders only. Run by validate-kit.sh.
 set -eu
@@ -272,5 +274,57 @@ cp "$T1_TMP/syn.sh" "$P2/$SYN"; ln -s "$OUT/trash" "$P2/trash"
 upd "$KS" "$P2" "$T1_TMP/P1.log" || fail "trashlink: --update runs (see $T1_TMP/P1.log)"
 here "trashlink: with trash/ a symlink the retired file stays in place" "$P2/$SYN"
 [ -z "$(ls -A "$OUT/trash")" ] && pass "trashlink: nothing is moved out of the repo through trash/" || fail "trashlink: nothing is moved out of the repo through trash/"
+
+# --- Jiraiya review of fc5dd399 (1): --update keeps trash/agents-v0-retired/ out of git -------------------
+# Same way as the ._* rule: an existing .gitignore gains the line once, a second --update adds nothing.
+G1="$(t1_repo gitignore --commit)"
+t1_install "$G1" || fail "gitignore: fresh install"
+upd "$KIT" "$G1" "$T1_TMP/G1a.log" || fail "gitignore: first --update runs (see $T1_TMP/G1a.log)"
+[ "$(grep -cx "$TR/" "$G1/.gitignore" || true)" = 1 ] && pass "J1: --update adds $TR/ to .gitignore" || fail "J1: --update adds $TR/ to .gitignore ($(grep -cx "$TR/" "$G1/.gitignore" || true) lines)"
+has "J1: --update says the .gitignore gained $TR/" "$T1_TMP/G1a.log" ".gitignore gained $TR/"
+cp "$G1/.gitignore" "$T1_TMP/gi-after1"
+upd "$KIT" "$G1" "$T1_TMP/G1b.log" || fail "gitignore: second --update runs (see $T1_TMP/G1b.log)"
+same_file "J1: a second --update leaves .gitignore byte-identical (no duplicate line)" "$T1_TMP/gi-after1" "$G1/.gitignore"
+lacks "J1: a second --update reports no .gitignore change" "$T1_TMP/G1b.log" ".gitignore gained $TR/"
+mkdir -p "$G1/$TR/.agents-v0/scripts"; printf 'x\n' > "$G1/$TR/.agents-v0/scripts/old.sh"
+if git -C "$G1" status --porcelain --untracked-files=all | grep -q 'trash/'; then
+  fail "J1: files under $TR/ do not show in git status"; else pass "J1: files under $TR/ do not show in git status"; fi
+G2="$(t1_repo gitignore-own --commit)"
+t1_install "$G2" || fail "gitignore-own: fresh install"
+printf '# ours\n%s/\n' "$TR" >> "$G2/.gitignore"; cp "$G2/.gitignore" "$T1_TMP/gi-own"
+upd "$KIT" "$G2" "$T1_TMP/G2.log" || fail "gitignore-own: --update runs (see $T1_TMP/G2.log)"
+grep -v -e '^\._\*$' -e '^\.AppleDouble/$' -e '^# --- macOS AppleDouble metadata ---$' -e '^$' "$G2/.gitignore" > "$T1_TMP/gi-own-now"
+grep -v -e '^\._\*$' -e '^\.AppleDouble/$' -e '^# --- macOS AppleDouble metadata ---$' -e '^$' "$T1_TMP/gi-own" > "$T1_TMP/gi-own-was"
+same_file "J1: a .gitignore that already ignores $TR/ gets no second line" "$T1_TMP/gi-own-was" "$T1_TMP/gi-own-now"
+
+# --- Jiraiya review of fc5dd399 (2): the compiled .pyc the old rm -rf removed ----------------------------
+# templates/.agents-v0/ci/__pycache__/{endpoint_scan,packlib}.cpython-313.pyc were committed in the kit
+# (2026-10-12 to 10-17), so an install of that time holds those exact bytes: they are kit-managed retired files.
+PYC_E=.agents-v0/ci/__pycache__/endpoint_scan.cpython-313.pyc
+PYC_P=.agents-v0/ci/__pycache__/packlib.cpython-313.pyc
+for h_p in "3e5e2b56dd6cde050bbc53e45748022bc664db1856cdce6e20f07aa6bd104bd7 $PYC_E" "6dc5c4a138d16d2c731f26d02507af7100f8dc4838c987520b6d6ff0394215f8 $PYC_E" \
+  "ad9c7c61d2d267ebeb9dbec8e91810823fdc06f5d894ca7ae6a94e13e490d5a5 $PYC_P" "d8d899e3d24029069faa965ac36e14edc2c8373e5300847ded908a69a55fe25d $PYC_P" \
+  "7f7424c90008933f70978603d3da50be76ea23ecc0cd132368d1d3c6746615e8 $PYC_P"; do
+  if grep -Fqx "kit-managed $h_p" "$KIT/$LIST"; then pass "J2: $LIST lists kit-managed $h_p"; else fail "J2: $LIST lists kit-managed $h_p"; fi
+done
+PYC_C=8b65a2d3
+if git -C "$HIST" cat-file -e "$PYC_C:templates/$PYC_E" 2>/dev/null && git -C "$HIST" cat-file -e "$PYC_C:templates/$PYC_P" 2>/dev/null; then
+  Y="$(t1_repo pyc --commit)"
+  t1_install "$Y" || fail "pyc: fresh install"
+  mkdir -p "$Y/.agents-v0/ci/__pycache__" "$T1_TMP/pycbytes"
+  for p_ in "$PYC_E" "$PYC_P"; do git -C "$HIST" show "$PYC_C:templates/$p_" > "$Y/$p_"; cp "$Y/$p_" "$T1_TMP/pycbytes/$(basename "$p_")"; done
+  ck "$KIT" "$Y" "$T1_TMP/Y0.ck" && fail "J2: check-installed-kit fails while the old .pyc are in place" || pass "J2: check-installed-kit fails while the old .pyc are in place"
+  has "J2: check-installed-kit names the old .pyc" "$T1_TMP/Y0.ck" "RETIRED-LEFT $PYC_P"
+  upd "$KIT" "$Y" "$T1_TMP/Y1.log" || fail "pyc: --update runs (see $T1_TMP/Y1.log)"
+  for p_ in "$PYC_E" "$PYC_P"; do
+    gone "J2: --update moves $p_ away" "$Y/$p_"
+    same_file "J2: $p_ sits in $TR/ with the same bytes" "$T1_TMP/pycbytes/$(basename "$p_")" "$Y/$TR/$p_"
+  done
+  ck "$KIT" "$Y" "$T1_TMP/Y2.ck" && pass "J2: check-installed-kit passes after the move" || fail "J2: check-installed-kit passes after the move ($(tr '\n' ' ' < "$T1_TMP/Y2.ck"))"
+elif [ -n "${KIT_HISTORY_GIT:-}" ]; then
+  fail "KIT_HISTORY_GIT=$KIT_HISTORY_GIT has no $PYC_C with the old .pyc (it must be a full clone of the kit)"
+else
+  printf 'SKIP: J2 (moves): the old .pyc bytes need %s (no git history; set KIT_HISTORY_GIT to a full clone)\n' "$PYC_C"
+fi
 
 t1_done test-update-retired-cleanup

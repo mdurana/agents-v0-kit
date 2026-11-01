@@ -329,6 +329,11 @@ install_templates() {
       printf '\n# --- macOS AppleDouble metadata ---\n._*\n.AppleDouble/\n' >> "$t/.gitignore"
       printf 'MIGRATED (project-owned file edited): .gitignore gained ._* and .AppleDouble/\n'
     fi
+    # Retired kit files moved by the cleanup above sit in trash/agents-v0-retired/; keep them out of git the same way.
+    if [ -f "$t/.gitignore" ] && ! grep -Eq '^/?trash/agents-v0-retired/?$' "$t/.gitignore"; then
+      printf '\n# --- agents-v0 retired kit files (install.sh --update) ---\ntrash/agents-v0-retired/\n' >> "$t/.gitignore"
+      printf 'MIGRATED (project-owned file edited): .gitignore gained trash/agents-v0-retired/\n'
+    fi
   fi
   # MEM-07: the cross-story memory adds two scripts (stories-status.sh, check-lessons.sh) and two
   # project-owned docs (lessons.md, lessons-archive.md). The scripts are kit-managed and are refreshed

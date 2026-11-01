@@ -192,3 +192,11 @@ kit-managed 6b1fa9c0ec142ecf22aaf11d5b746fa71736a8a02638d095bfce6b9851bbd08f .ag
 kit-managed 7a58231d3cf170c809f97b197354565c2c5ed58fc6d2386d014b36ba3940cdf3 .agents-v0/scripts/check-delivery-gate-local.sh
 kit-managed c4af99d34ab3012a799896f1dbbc825d69942ef5f455f75a6ee1c947430124b8 .agents-v0/scripts/check-delivery-gate-local.sh
 kit-managed e76222a1ef98c8eac6095fb1c1ff2730e21521bb1362c7692edd73bbb634084b .agents-v0/scripts/check-delivery-gate-local.sh
+#
+# Compiled bytecode committed in the kit (2026-10-12 to 10-17, gone at 338d6267), installed with .agents-v0/ci/
+# and removed by the same old `rm -rf` (Jiraiya review of fc5dd399). Hashes: every distinct blob in history.
+kit-managed 3e5e2b56dd6cde050bbc53e45748022bc664db1856cdce6e20f07aa6bd104bd7 .agents-v0/ci/__pycache__/endpoint_scan.cpython-313.pyc
+kit-managed 6dc5c4a138d16d2c731f26d02507af7100f8dc4838c987520b6d6ff0394215f8 .agents-v0/ci/__pycache__/endpoint_scan.cpython-313.pyc
+kit-managed ad9c7c61d2d267ebeb9dbec8e91810823fdc06f5d894ca7ae6a94e13e490d5a5 .agents-v0/ci/__pycache__/packlib.cpython-313.pyc
+kit-managed d8d899e3d24029069faa965ac36e14edc2c8373e5300847ded908a69a55fe25d .agents-v0/ci/__pycache__/packlib.cpython-313.pyc
+kit-managed 7f7424c90008933f70978603d3da50be76ea23ecc0cd132368d1d3c6746615e8 .agents-v0/ci/__pycache__/packlib.cpython-313.pyc
