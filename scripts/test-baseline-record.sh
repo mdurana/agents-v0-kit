@@ -14,6 +14,8 @@ REC=docs/agents-v0/discovery/baseline-audit.txt
 # A fake token built at run time, so no token-shaped text sits in the kit.
 TOK="ghp_$(printf 'Q%.0s' 1 2 3 4 5 6 7 8 9 10 11 12)$(printf 'r7%.0s' 1 2 3 4 5 6 7 8 9 10 11 12)"
 PIPTOK="pp$(printf 'Zk%.0s' 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17)"
+FLAGTOK="fv$(printf 'Wq%.0s' 1 2 3 4 5 6)"
+PROPTOK="pk$(printf 'Jx%.0s' 1 2 3 4 5 6)"
 
 # --- the two copies -----------------------------------------------------------
 if cmp -s "$KIT/scripts/audit-brownfield-baseline.sh" "$KIT/templates/.agents-v0/scripts/audit-brownfield-baseline.sh"; then
@@ -27,11 +29,11 @@ lacks "header no longer says to run the audit before build or maintain" "$KIT/te
 # --- fixture: a brownfield repo with a fake build --------------------------------
 r="$(t1_repo brown --commit)"
 t1_install "$r" || fail "install into the fixture (see $T1_TMP/install.log)"
-python3 - "$r/docs/agents-v0/project-profile.md" "$PIPTOK" <<'PY'
+python3 - "$r/docs/agents-v0/project-profile.md" "$PIPTOK" "$FLAGTOK" "$PROPTOK" <<'PY'
 import re, sys
-p, tok = sys.argv[1], sys.argv[2]
+p, tok, ftok, ptok = sys.argv[1:5]
 t = open(p, encoding="utf-8").read()
-t = re.sub(r"^\| Backend verify \|.*$", "| Backend verify | sh fake-build.sh --mirror https://ci:%s@mirror.example/simple |" % tok, t, count=1, flags=re.M)
+t = re.sub(r"^\| Backend verify \|.*$", "| Backend verify | sh fake-build.sh --mirror https://ci:%s@mirror.example/simple --token %s -PapiKey %s |" % (tok, ftok, ptok), t, count=1, flags=re.M)
 t = re.sub(r"^\| Timezone \|.*$", "| Timezone | Asia/Manila |", t, count=1, flags=re.M)
 open(p, "w", encoding="utf-8").write(t)
 PY
@@ -80,7 +82,7 @@ has "E18: the build output still reaches the screen" "$T1_TMP/out.txt" "BUILD-OU
 has "E18 pass: record says PASSED" "$r/$REC" "result: PASSED"
 has "E18 pass: record has exit 0" "$r/$REC" "exit: 0"
 has "E18 pass: record has the full commit" "$r/$REC" "commit: $head"
-has "E18 pass: record names the command run" "$r/$REC" "command: Backend verify: sh fake-build.sh --mirror https://***@mirror.example/simple"
+has "E18 pass: record names the command run" "$r/$REC" "command: Backend verify: sh fake-build.sh --mirror https://***@mirror.example/simple --token *** -PapiKey ***"
 if grep -Eq '^time: 20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+0800 \(Asia/Manila\)$' "$r/$REC"; then pass "E18 pass: record time carries the project zone offset"; else fail "E18 pass: record time carries the project zone offset"; fi
 lacks "E18 pass: no failing-test lines on a green run" "$r/$REC" "failing-test:"
 lacks "E18 pass: record holds no build output" "$r/$REC" "BUILD-OUTPUT-MARKER"
@@ -104,6 +106,19 @@ lacks "N25: the planted token is not in the record" "$r/$REC" "$TOK"
 lacks "N25: the pip token URL is not in the record" "$r/$REC" "$PIPTOK"
 has "N25: a token-shaped test name is withheld and counted" "$r/$REC" "failing-tests-withheld: 1"
 [ "$(grep -c '' "$r/$REC")" -le 40 ] && pass "N25: the record is a short summary" || fail "N25: the record is a short summary"
+
+lacks "N25: a credential after a --token flag is masked" "$r/$REC" "$FLAGTOK"
+lacks "N25: a credential after a -PapiKey flag is masked" "$r/$REC" "$PROPTOK"
+
+# --- a Timezone row that is not a real zone falls back to the system zone, labelled --------
+sed -i.bak 's#^| Timezone | Asia/Manila |#| Timezone | Asia/Manilla |#' "$r/docs/agents-v0/project-profile.md"
+echo pass > "$r/.fake-mode"
+expect_pass "a misspelled Timezone row does not stop the audit" "$r" sh "$AUDIT" --record
+has "a misspelled Timezone row is named in the record" "$r/$REC" "(system zone; the Timezone row 'Asia/Manilla' is not a known zone)"
+has "a misspelled Timezone row is warned about" "$T1_TMP/out.txt" "WARN: the Timezone row 'Asia/Manilla' is not a known zone"
+sysoff="$(date +%z)"
+grep -q "^time: .*$sysoff (system zone" "$r/$REC" && pass "the fallback time carries the system zone offset" || fail "the fallback time carries the system zone offset"
+cp "$r/docs/agents-v0/project-profile.md.bak" "$r/docs/agents-v0/project-profile.md"
 
 # --- E18: no build found ---------------------------------------------------------
 n="$(t1_repo nobuild --commit)"

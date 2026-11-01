@@ -326,16 +326,29 @@ tzname="$(awk -F'|' '
     if (v != "" && v !~ /^</ && v !~ / /) print v
     exit
   }' docs/agents-v0/project-profile.md 2>/dev/null || :)"
-if [ -n "$tzname" ]; then
+# A zone name that is not a real zone would make date fall back to UTC silently, so check it first.
+tz_known() {
+  case "$1" in *..*|/*|*[!A-Za-z0-9_+/-]*) return 1 ;; esac
+  [ -f "${TZDIR:-/usr/share/zoneinfo}/$1" ] && return 0
+  command -v python3 >/dev/null 2>&1 &&
+    PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys, zoneinfo; zoneinfo.ZoneInfo(sys.argv[1])' "$1" >/dev/null 2>&1
+}
+if [ -n "$tzname" ] && tz_known "$tzname"; then
   when="$(TZ="$tzname" date '+%Y-%m-%dT%H:%M:%S%z') ($tzname)"
+elif [ -n "$tzname" ]; then
+  printf "WARN: the Timezone row '%s' is not a known zone; the baseline record uses the system zone\n" "$tzname" >&2
+  when="$(date '+%Y-%m-%dT%H:%M:%S%z') (system zone; the Timezone row '$tzname' is not a known zone)"
 else
   when="$(date '+%Y-%m-%dT%H:%M:%S%z') (system zone)"
 fi
 
-# Mask credentials in a command line: user:password@ in URLs, secret-looking key=value pairs, known token prefixes.
+# Mask credentials in a command line: user:password@ in URLs, secret-looking key=value or key:value pairs,
+# the value after a secret-looking flag (--token X, -PapiKey X, -u X, --user X), and known token prefixes.
 mask() {
   sed -E \
     -e 's#://[^/@[:space:]]+@#://***@#g' \
+    -e 's#((^|[[:space:]])-{1,2}[A-Za-z0-9_.-]*([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss]([Ww][Oo][Rr][Dd])?|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll])[A-Za-z0-9_.-]*)[[:space:]]+[^-[:space:]][^[:space:]]*#\1 ***#g' \
+    -e 's#((^|[[:space:]])(-u|--user))[[:space:]]+[^-[:space:]][^[:space:]]*#\1 ***#g' \
     -e 's#(([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss]([Ww][Oo][Rr][Dd])?|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])[A-Za-z0-9_.-]*[=:])[^[:space:]]+#\1***#g' \
     -e 's#(ghp_|gho_|ghs_|github_pat_|glpat-|xox[abpr]-|AKIA)[A-Za-z0-9_-]+#\1***#g'
 }
