@@ -16,6 +16,9 @@
 #   LT-8  drive_run: a LEDGER turn -> HALT naming LEDGER-CHANGED, RUN_END=LEDGER, no further turn
 #   LT-9  a gate commit step in the turn (staged_secret_scan runs the ledger trailer step first, 2d60290b): creating the empty ledger is OK; a stale
 #         REOPEN-REFUSED grant= line for an unnamed grant line -> LEDGER (fail closed: a person looks at the grant)
+#   LT-10 the checker itself (Jiraiya must-fix on c0e4492f): GRANT-USED appended AND the workspace gate-checks.sh
+#         rewritten so ledger_turn_ok exits 0 -> drive_run stops (RUN_END=LEDGER, one turn); gate-checks.sh edited
+#         with no ledger change -> LEDGER via H10; the harness's own snapshot changed -> LEDGER
 # Usage: bash tests/test-ledger-turn.sh   (exit 0 when every case passes). Removes only its own mktemp folder;
 #   inside it, files it replaces are moved to $TEST_ROOT/trash.
 set -u
@@ -52,7 +55,12 @@ case "$msg" in
   edit1) sed '1s/.*/FAIL edited/' "$L" > "$L.new" && mv "$L.new" "$L" ;;
   cut) head -n 1 "$L" > "$L.new" && mv "$L.new" "$L" ;;
   delete) mv "$L" "$run/ledger-moved-away" ;;
-  scan) (cd "$ws" && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan) > "$run/scan-$k.txt" 2>&1 ;;
+  fake) mkdir -p "$(dirname "$L")"; printf 'GRANT-USED %064d count=0\n' 0 >> "$L"
+        printf '#!/bin/sh\necho "OK ledger_turn_ok: faked"; exit 0\n' > "$ws/.agents-v0/scripts/gate-checks.sh" ;;
+  gcedit) printf '# edited\n' >> "$ws/.agents-v0/scripts/gate-checks.sh" ;;
+  snapedit) printf '# edited\n' >> "$run/ledger-gc/turn-$k/gate-checks.sh" ;;
+  scan) (cd "$ws" && mkdir -p docs/agents-v0 && echo "lt $k" > docs/agents-v0/lt-scan.md && git add -- docs/agents-v0/lt-scan.md \
+          && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan; git restore --staged -- docs/agents-v0/lt-scan.md) > "$run/scan-$k.txt" 2>&1 ;;
 esac
 echo '{"type":"result","result":"done"}'
 STUB
@@ -66,7 +74,7 @@ islg(){ [ "$TURN_CLASS" = LEDGER ] && [ -s "$RUN/LEDGER-CHANGED" ]; }
 
 echo "-- LT-1 unchanged ledger"
 newrun; setledger; turn 1 noop
-[ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -qx "$MAIN	absent" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
+[ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -q "^$MAIN	absent	[0-9a-f]\{64\}$" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
   && ok "no ledger before or after -> mark absent, ledger_turn_ok OK, class $TURN_CLASS" || ko "absent/noop: class=$TURN_CLASS mark=$(cat "$RUN/ledger-mark-1" 2>&1) turn=$(cat "$RUN/ledger-turn-1.txt" 2>&1)"
 newrun; setledger "FAIL docs check 1" "FAIL docs check 2"; turn 1 noop
 [ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -q "	lines=2 sha256=" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
@@ -129,6 +137,20 @@ newrun; setledger; printf 'grant 2026-11-01T09:00:00+08:00 phase=p0-a reason="te
 islg && grep -q 'REOPEN-REFUSED grant=[0-9a-f]* stale' "$LEDGER" && grep -q 'appended 0 FAIL and 1 REOPEN-REFUSED' "$RUN/LEDGER-CHANGED" \
   && ok "the gate commit step names an unnamed grant line stale -> LEDGER" || ko "trailer/stale: class=$TURN_CLASS $(cat "$RUN/scan-1.txt" "$RUN/LEDGER-CHANGED" 2>&1)"
 away "$GRANT"
+
+echo "-- LT-10 the checker itself changed during the turn"
+GC="$MAIN/.agents-v0/scripts/gate-checks.sh"; cp "$GC" "$SB/gc.orig"
+fixgc(){ away "$GC"; cp "$SB/gc.orig" "$GC"; }
+away "$TEST_ROOT/HALT"; setledger "FAIL docs check 1"
+drive_run lt10 "$MAIN" "fake" onboard "onboard" 600 > /dev/null 2>&1
+[ "${RUN_END:-}" = LEDGER ] && [ -s "$RUN/LEDGER-CHANGED" ] && [ "$(wc -l < "$RUN/turns.tsv")" = 1 ] && grep -q 'GRANT-USED line appended' "$RUN/LEDGER-CHANGED" \
+  && ok "GRANT-USED + gate-checks.sh faked to exit 0 -> the snapshot catches it, RUN_END=LEDGER, one turn" || ko "fake: RUN_END=${RUN_END:-} $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+fixgc; away "$TEST_ROOT/HALT"
+newrun; setledger "FAIL docs check 1"; turn 1 gcedit
+islg && grep -q 'H10: the installed gate-checks.sh changed' "$RUN/LEDGER-CHANGED" && ok "gate-checks.sh edited, ledger unchanged -> LEDGER via H10" || ko "gcedit: class=$TURN_CLASS $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+fixgc
+newrun; setledger "FAIL docs check 1"; turn 1 snapedit
+islg && grep -q 'snapshot .* is missing or changed' "$RUN/LEDGER-CHANGED" && ok "the harness's snapshot changed -> LEDGER" || ko "snapedit: class=$TURN_CLASS $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
 
 echo "== test-ledger-turn: $PASS passed, $FAILN failed"
 [ "$FAILN" = 0 ]

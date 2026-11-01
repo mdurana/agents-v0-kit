@@ -735,24 +735,44 @@ turn-$k: gate commits out of order: $(tr '\n' ';' < "$RUN/gate-chain-order-$k.tx
 #   A gate commit in the turn (staged_secret_scan's ledger trailer step) may create the empty ledger (OK), or name an
 #   unnamed grant line stale with a REOPEN-REFUSED grant=<sha> line (2d60290b), which also stops the run.
 #   A kit without the N3A ledger (no gate-checks.sh with ledger_mark in WS or MAIN) is skipped (ledger-mark-<k>.na).
+#   Jiraiya must-fix on c0e4492f: the agent can edit the installed gate-checks.sh in the same turn it changes the
+#   ledger. So before the turn the harness copies that gate-checks.sh (and gate-rules beside it) to
+#   $RUN/ledger-gc/turn-<k>/, takes the mark with the copy, and keeps the dir, the mark and the copy's sha256 in
+#   shell variables (the files in $RUN are evidence only). After the turn ledger_turn_ok runs from that copy, never
+#   the workspace one; a missing copy or a changed hash stops the run. H10 (kit_integrity_check) also stops the run
+#   (ledger_stop, TURN_CLASS=LEDGER) when any installed .agents-v0/scripts/gate-checks.sh changed, appeared or vanished.
 #   H10 (kit_integrity_check) reports a gate-checks.sh changed during the turn.
 ledger_gc_dir(){ local d; for d in "$WS" "$MAIN"; do
     [ -n "$d" ] && [ -f "$d/.agents-v0/scripts/gate-checks.sh" ] && grep -q '^  ledger_mark)' "$d/.agents-v0/scripts/gate-checks.sh" 2>/dev/null \
       && { printf '%s\n' "$d"; return 0; }; done; return 1; }
 ledger_stop(){ printf 'turn-%s %s\n' "$1" "$2" >> "$RUN/LEDGER-CHANGED"; TURN_CLASS=LEDGER
-  post FINDING "N84 run=${RUN##*/} turn=$1: the gate ledger changed during the unattended turn, the run stops for a person (see ${RUN##*/}/LEDGER-CHANGED)"; }
-# ledger_turn_mark <k>: writes "<dir>\t<mark>" to $RUN/ledger-mark-<k>; returns 1 (run stops) when the mark fails.
-ledger_turn_mark(){ local k="$1" d out rc=0
+  post FINDING "N84 run=${RUN##*/} turn=$1: the gate ledger or its checker changed during the unattended turn, the run stops for a person (see ${RUN##*/}/LEDGER-CHANGED)"; }
+_LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA=""
+# ledger_turn_mark <k>: snapshots gate-checks.sh, takes the mark with the snapshot, writes "<dir>\t<mark>\t<sha256>"
+#   to $RUN/ledger-mark-<k>; returns 1 (run stops) when the snapshot or the mark fails.
+ledger_turn_mark(){ local k="$1" d out rc=0 snap="$RUN/ledger-gc/turn-$1"
+  _LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA=""
   d="$(ledger_gc_dir)" || { echo "no gate-checks.sh with ledger_mark in the workspace: no N3A ledger to compare" > "$RUN/ledger-mark-$k.na"; return 0; }
-  out="$(cd "$d" && sh .agents-v0/scripts/gate-checks.sh ledger_mark 2>&1)" || rc=$?
+  mkdir -p "$snap" && cp "$d/.agents-v0/scripts/gate-checks.sh" "$snap/gate-checks.sh" \
+    && { [ ! -f "$d/.agents-v0/scripts/gate-rules" ] || cp "$d/.agents-v0/scripts/gate-rules" "$snap/gate-rules"; } \
+    && _LG_SHA="$(sha256_cmd "$snap/gate-checks.sh" | cut -c1-64)" && [ -n "$_LG_SHA" ] \
+    || { ledger_stop "$k" "the gate-checks.sh snapshot before the turn failed ($d -> $snap)"; return 1; }
+  out="$(cd "$d" && sh "$snap/gate-checks.sh" ledger_mark 2>&1)" || rc=$?
   if [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -Eqx 'absent|lines=(0|[1-9][0-9]*) sha256=[0-9a-f]{64}'; then
-    printf '%s\t%s\n' "$d" "$out" > "$RUN/ledger-mark-$k"; return 0; fi
+    _LG_K="$k" _LG_DIR="$d" _LG_MARK="$out" _LG_GC="$snap/gate-checks.sh"
+    printf '%s\t%s\t%s\n' "$d" "$out" "$_LG_SHA" > "$RUN/ledger-mark-$k"; return 0; fi
   ledger_stop "$k" "ledger_mark before the turn failed (rc=$rc): $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }
-# ledger_turn_check <k>: after turn k, ledger_turn_ok against the mark; returns 1 (run stops) on anything but OK.
-ledger_turn_check(){ local k="$1" d mark out rc=0
-  [ -s "$RUN/ledger-mark-$k" ] || return 0
-  IFS="$(printf '\t')" read -r d mark < "$RUN/ledger-mark-$k"
-  out="$(cd "$d" && sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok "$mark" 0 0 2>&1)" || rc=$?
+# ledger_turn_check <k>: after turn k, ledger_turn_ok from the snapshot against the mark; returns 1 (run stops) on
+#   anything but OK, on a missing or changed snapshot, or when the mark was recorded but its variables are gone.
+ledger_turn_check(){ local k="$1" d mark out rc=0 now
+  if [ "$_LG_K" != "$k" ]; then
+    [ -e "$RUN/ledger-mark-$k" ] || return 0
+    ledger_stop "$k" "the ledger mark for this turn is not held by the harness (ledger-mark-$k exists, but no mark was taken in this shell)"; return 1; fi
+  d="$_LG_DIR" mark="$_LG_MARK"
+  now="$( [ -f "$_LG_GC" ] && sha256_cmd "$_LG_GC" | cut -c1-64)"
+  [ -n "$now" ] && [ "$now" = "$_LG_SHA" ] \
+    || { ledger_stop "$k" "the gate-checks.sh snapshot $_LG_GC is missing or changed during the turn (sha256 ${now:-absent}, was $_LG_SHA)"; return 1; }
+  out="$(cd "$d" && sh "$_LG_GC" ledger_turn_ok "$mark" 0 0 2>&1)" || rc=$?
   printf '%s\n' "$out" > "$RUN/ledger-turn-$k.txt"
   [ "$rc" != 0 ] || return 0
   ledger_stop "$k" "ledger_turn_ok rc=$rc: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }
@@ -783,7 +803,10 @@ kit_integrity_check(){ local k="$1" b="$RUN/kit-integrity-before-$k.tsv" a="$RUN
            END{for(k in b){split(k,p,"\t"); print "removed " p[2] " in " p[1]}}' "$b" "$a" | sort)"
   [ -n "$out" ] || return 0
   printf '%s\n' "$out" | sed "s/^/turn-$k /" >> "$RUN/kit-tamper.txt"
-  post FINDING "H10 run=${RUN##*/} turn=$k: the agent changed the installed kit or its policy file (see ${RUN##*/}/kit-tamper.txt)"; }
+  post FINDING "H10 run=${RUN##*/} turn=$k: the agent changed the installed kit or its policy file (see ${RUN##*/}/kit-tamper.txt)"
+  # N84 (Jiraiya must-fix on c0e4492f): the ledger checks rely on gate-checks.sh, so a change to it stops the run
+  local gc; gc="$(printf '%s\n' "$out" | grep -E '^(added|changed|removed) \.agents-v0/scripts/gate-checks\.sh in ' | tr '\n' ';')"
+  [ -z "$gc" ] || ledger_stop "$k" "H10: the installed gate-checks.sh changed during the turn ($gc)"; }
 # kitfix-20261031-harness-lock (Sonnet review 12:31, finding 2): the harness runs as the agent's OS user, so the agent
 #   could change the harness itself (scripts, fixtures/approvals.tsv) or the allowlist file agy-ws-exec.sh reads
 #   (status/pending-turn.json). For V3 the harness is a root-owned copy (/opt/harness-v3) and the preflight refuses a
