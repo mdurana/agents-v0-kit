@@ -342,6 +342,11 @@ for f in scripts/strip-test-overrides.sh scripts/check-installed-kit.sh scripts/
   [ -f "$f" ] || err "$f missing (kitfix-20261031-installed-no-overrides)"
 done
 sh scripts/test-installed-overrides.sh || err "scripts/test-installed-overrides.sh failed"
+# Onboard fix step 0: the tier 1 harness (scripts/lib/tier1-harness.sh, scripts/tier1.sh) and its self-test.
+for f in scripts/lib/tier1-harness.sh scripts/tier1.sh scripts/test-tier1-harness.sh; do
+  [ -f "$f" ] || err "$f missing (tier 1 harness)"
+done
+sh scripts/test-tier1-harness.sh || err "scripts/test-tier1-harness.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
