@@ -335,6 +335,26 @@ is_eq "DG-12 --gate fails closed (exit 2) when gate-rules lacks the list" "$rc" 
 out_has "DG-12 names gate-rules" "FAIL: cannot read onboard_gate_docs from gate-rules"
 q "$g" git checkout -q -- "$RL"
 
+# DG-12b (Iruka note 2): no glob in onboard_gate_docs. gate-rules refuses * ? [ in the list, and the docs check
+# never expands a list entry even if a file matches it.
+for gl_ in 'docs/agents-v0/*.md' 'docs/agents-v0/arch?tecture.md' 'docs/agents-v0/[a]rchitecture.md'; do
+  sed "s#^onboard_gate_docs=#onboard_gate_docs=$gl_ #" "$g/$RL" > "$T1_TMP/rules" && cp "$T1_TMP/rules" "$g/$RL"
+  (cd "$g" && sh "$GC" rules onboard_gate_docs) > "$T1_TMP/out.txt" 2>&1 && rc=0 || rc=$?
+  is_eq "DG-12b gate-rules refuses the glob entry $gl_ (exit 2)" "$rc" 2
+  out_has "DG-12b names the glob rule for $gl_" "glob characters (* ? [) are not allowed in onboard_gate_docs"
+  (cd "$g" && sh "$DOCS" --gate) > "$T1_TMP/out.txt" 2>&1 && rc=0 || rc=$?
+  is_eq "DG-12b --gate fails closed (exit 2) on the glob entry $gl_" "$rc" 2
+  q "$g" git checkout -q -- "$RL"
+done
+stub_="$T1_TMP/globstub"; mkdir -p "$stub_"
+cp "$g/$DOCS" "$stub_/check-onboarding-docs.sh"
+printf '%s\n' '#!/bin/sh' '# test stub: a gate list that slipped past the rules check' "printf '%s\\n' 'docs/agents-v0/glob*.md'" > "$stub_/gate-checks.sh"
+printf '# Glob hit\n\nA file a glob would match; it cites `src/app.py:99`, past the end.\n' > "$g/docs/agents-v0/globhit.md"
+expect_fail "DG-12b --gate does not expand a glob entry even when a file matches it" "$g" sh "$stub_/check-onboarding-docs.sh" --gate
+out_has "DG-12b names the literal entry" "FAIL: docs/agents-v0/glob*.md is missing or empty"
+lacks "DG-12b the matching file is not pulled in by expansion" "$T1_TMP/out.txt" "globhit.md"
+park "$g" docs/agents-v0/globhit.md
+
 # DG-13 refusal: --gate needs a git work tree (stamps are checked against the history)
 ng2="$T1_TMP/nogit-dg"; mkdir -p "$ng2"
 q "$g" cp -R .agents-v0 docs "$ng2/"

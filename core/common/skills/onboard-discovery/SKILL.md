@@ -31,5 +31,5 @@ Onboard phase playbook for the `codebase-documenter` agent (`/v0-onboard`, `work
 - [ ] `project-delivery-core.mdc`: mandated docs (README, architecture, network, sequences) as-is; stack deviations recorded.
 - [ ] `architecture-and-diagrams.mdc`: Mermaid conventions; database ownership shown as it is.
 - [ ] `security-baseline.mdc`: no secret value anywhere; literal secrets reported by key only.
-- [ ] Every statement cites code or says `UNVERIFIED`; `check-onboarding-docs.sh` passes.
+- [ ] Every statement cites code or says `UNVERIFIED`; `check-onboarding-docs.sh --gate` passes.
 - [ ] No weakening of security controls through an undocumented profile exception; no application file edited.

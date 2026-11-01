@@ -60,6 +60,9 @@ load_rules() {
       if (key in seen) { printf "gate-rules line %d repeats key %s\n", NR, key; bad = 1; exit }
       if (val ~ /^[[:space:]]*$/) { printf "gate-rules line %d has an empty value for %s\n", NR, key; bad = 1; exit }
       if (val ~ /["'\''`$\\]/) { printf "gate-rules line %d: quotes, $, backquote and backslash are not allowed (%s)\n", NR, key; bad = 1; exit }
+      if (key == "onboard_gate_docs" && val ~ /[*?[]/) {
+        printf "gate-rules line %d: glob characters (* ? [) are not allowed in onboard_gate_docs; list each path\n", NR; bad = 1; exit
+      }
       if ((key == "docs_check_cap" || key == "grant_max_age_seconds") && val !~ /^[1-9][0-9]*$/) {
         printf "gate-rules line %d: %s must be a positive whole number, got %s\n", NR, key, val; bad = 1; exit
       }

@@ -53,8 +53,12 @@ if [ "${1:-}" = "--gate" ]; then
   cd "$top" || { printf 'FAIL: cannot cd to %s\n' "$top" >&2; exit 2; }
   [ -f docs/agents-v0/onboarding/report.md ] || { printf 'FAIL: docs/agents-v0/onboarding/report.md is missing (copy docs/agents-v0/onboarding/_report.template.md)\n' >&2; exit 1; }
   set -- docs/agents-v0/onboarding docs/agents-v0/architecture.md docs/agents-v0/network.md docs/agents-v0/design/system/context-map.md docs/agents-v0/diagrams docs/agents-v0/adr/0000-inherited-decisions.md
+  # Split the list on blanks only: no pathname expansion (gate-checks.sh also refuses * ? [ in it).
+  case "$-" in *f*) had_f=1 ;; *) had_f=0 ;; esac
+  set -f
   # shellcheck disable=SC2086
   set -- "$@" $GATE_DOCS
+  [ "$had_f" = 1 ] || set +f
   present=""
   for path in "$@"; do
     case "$path" in
