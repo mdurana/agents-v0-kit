@@ -564,6 +564,70 @@ SECRET_ALLOWLIST_SHELL_CASES = [
 ]
 
 
+# onboard fix (Iruka scope, Sasuke): the workflow state files are never an agent's write, in every mode, in every
+#   shell spelling (Jiraiya's third look: redirects, tee, cp, mv). The kit's scripts and plain reads stay allowed.
+STATE_S = "docs/agents-v0/onboarding/state.json"
+STATE_WRITE_SHELL = [
+    f"echo {{}} > {STATE_S}", f"echo {{}} >> {STATE_S}", f"printf x 1>{STATE_S}", f"printf x 2>{STATE_S}",
+    f"cat /tmp/x >| {STATE_S}", f"cat /tmp/x >|{STATE_S}", f"cat /tmp/x &> {STATE_S}", f"cat /tmp/x &>> {STATE_S}",
+    f"exec 3<> {STATE_S}", f'echo {{}} > "{STATE_S}"', f"echo {{}} > '{STATE_S}'", f"echo {{}} > ./{STATE_S}",
+    f"echo {{}} > docs/agents-v0/../agents-v0/onboarding/state.json", f"echo {{}}>{STATE_S}",
+    f"echo {{}} | tee {STATE_S}", f"echo {{}} | tee -a {STATE_S}", f"echo {{}} | tee /dev/null {STATE_S}",
+    f"echo {{}} | /usr/bin/tee {STATE_S}", f"echo {{}} | sudo tee {STATE_S}",
+    f"cp /tmp/x {STATE_S}", f"cp -f /tmp/x ./{STATE_S}", f"/bin/cp /tmp/x {STATE_S}",
+    "cp /tmp/state.json docs/agents-v0/onboarding/", "cp /tmp/state.json docs/agents-v0/onboarding",
+    "cp /tmp/a /tmp/state.json docs/agents-v0/onboarding", "cp -t docs/agents-v0/onboarding /tmp/state.json",
+    "cp --target-directory=docs/agents-v0/onboarding /tmp/state.json",
+    "cp --target-directory docs/agents-v0/onboarding /tmp/state.json",
+    f"mv /tmp/x {STATE_S}", "mv /tmp/state.json docs/agents-v0/onboarding/", "mv -t docs/agents-v0/onboarding state.json",
+    f"mv -f /tmp/x {STATE_S}", f"install -m 644 /tmp/x {STATE_S}", "install -t docs/agents-v0/onboarding /tmp/state.json",
+    f"ln -sf /tmp/x {STATE_S}", f"rsync /tmp/x {STATE_S}", "rsync -a /tmp/state.json docs/agents-v0/onboarding/",
+    f"dd if=/tmp/x of={STATE_S}", f"sed -i s/a/b/ {STATE_S}", f"sed -i.bak s/a/b/ {STATE_S}",
+    f"perl -pi -e s/a/b/ {STATE_S}", f"truncate -s0 {STATE_S}", f"cat /tmp/x | sponge {STATE_S}",
+    f"rm {STATE_S}", f"rm -f {STATE_S}",
+    f"python3 -c \"open('{STATE_S}','w').write('{{}}')\"",
+    f"python3 - <<EOF\nopen('{STATE_S}','w').write('{{}}')\nEOF",
+    "cd docs/agents-v0/onboarding && echo {} > state.json", "cd docs/agents-v0/onboarding && cp /tmp/x state.json",
+    "cd docs/agents-v0/onboarding && tee state.json < /tmp/x", "cd docs/agents-v0/onboarding; mv /tmp/x state.json",
+    "cd docs/agents-v0 && mv /tmp/x onboarding/state.json", "cd docs && tee agents-v0/onboarding/state.json < /tmp/x",
+    "cd docs/agents-v0/onboarding && cat /tmp/x >| state.json",
+    f"git checkout HEAD~1 -- {STATE_S}", f"git checkout main {STATE_S}", f"git restore --source=HEAD~1 {STATE_S}",
+    f"git restore {STATE_S}", f"git rm {STATE_S}", f"git mv {STATE_S} /tmp/x",
+    f"sh -c 'echo {{}} > {STATE_S}'", f"bash -c \"cp /tmp/x {STATE_S}\"", f"env A=1 cp /tmp/x {STATE_S}",
+    f"echo $(cp /tmp/x {STATE_S})", f"true && cp /tmp/x {STATE_S}",
+    # the other workflow state files share the rule
+    "cp /tmp/x docs/agents-v0/requirements/orders.state.json", "echo {} >| docs/agents-v0/program.state.json",
+    "cp -t docs/agents-v0/maintain/inc-1 /tmp/state.json",
+]
+STATE_ALLOW_SHELL = [
+    "sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/onboarding.md",
+    "sh .agents-v0/scripts/gate-checks.sh rules", f"cat {STATE_S}", f"python3 -m json.tool {STATE_S}",
+    f"git diff -- {STATE_S}", f"git log -1 -- {STATE_S}", f"git restore --staged {STATE_S}",
+    f"grep activePhase {STATE_S}", "cp /tmp/a docs/agents-v0/onboarding/notes.md",
+    "echo x > docs/agents-v0/onboarding/notes.md", "cd docs/agents-v0/onboarding && echo x > notes.md",
+    "cp /tmp/other.json docs/agents-v0/onboarding/", "git checkout main", "git status",
+]
+STATE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(*)"}
+
+
+def state_write_cases(tmp: str) -> list:
+    proj = os.path.join(tmp, "stateproj")
+    os.makedirs(os.path.join(proj, "docs", "agents-v0", "onboarding"))
+    os.makedirs(os.path.join(proj, "docs", "agents-v0", "maintain", "inc-1"))
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True)
+    out = []
+    for c in STATE_WRITE_SHELL:
+        out.append(("shell", c, proj, {}, "block", "attended"))
+        out.append(("shell", c, proj, STATE_UNATTENDED_ENV, "block", "unattended"))
+    for c in STATE_ALLOW_SHELL:
+        out.append(("shell", c, proj, {}, "allow", "attended"))
+    for p in (STATE_S, "./" + STATE_S, os.path.join(proj, STATE_S), "docs/agents-v0/x/../onboarding/state.json"):
+        out.append(("path", p, proj, {}, "block", "edit tool"))
+        out.append(("path", p, proj, STATE_UNATTENDED_ENV, "block", "edit tool, unattended"))
+    out.append(("path", "docs/agents-v0/onboarding/notes.md", proj, {}, "allow", "edit tool"))
+    return out
+
+
 def lessons_cases(r: dict) -> list:
     """(kind, arg, cwd, hook_cwd, want) — MEM-13 story-branch lessons rule."""
     m, o, f = r["main"], r["orders"], r["fix"]
@@ -1139,6 +1203,12 @@ def main() -> int:
         check(path(p), want, f"N10/N46 guard file path {p}")
     for cmd, want in SECRET_ALLOWLIST_SHELL_CASES:
         check(shell(cmd), want, f"N10/N46 guard file shell `{cmd}`")
+    stcases = state_write_cases(tmp)
+    for kind, arg, cwd, env, want, label in stcases:
+        e = dict(env)
+        e["HOOK_CWD"] = cwd
+        got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
+        check(got, want, f"state.json guard ({label}) {kind} `{arg}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1185,7 +1255,7 @@ def main() -> int:
     shutil.rmtree(tmp, ignore_errors=True)
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

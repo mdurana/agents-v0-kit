@@ -316,6 +316,9 @@ python3 scripts/test-secret-scan.py || err "scripts/test-secret-scan.py failed"
 # N11C/N64: gh, glab and git push are denied through the agy hook entry point, in every mode.
 [ -f scripts/test-agy-remote-writes.sh ] || err "scripts/test-agy-remote-writes.sh missing"
 sh scripts/test-agy-remote-writes.sh || err "scripts/test-agy-remote-writes.sh failed"
+# Iruka scope: workflow state (onboarding/state.json and the rest) is never an agent's write, on Cursor and agy.
+[ -f scripts/test-state-json-guard.sh ] || err "scripts/test-state-json-guard.sh missing"
+sh scripts/test-state-json-guard.sh || err "scripts/test-state-json-guard.sh failed"
 # JO-1..JO-4 (Sai): gate-checks.sh and its rules file, driven through the onboard gate.
 [ -f scripts/test-gate-checks.sh ] || err "scripts/test-gate-checks.sh missing"
 sh scripts/test-gate-checks.sh || err "scripts/test-gate-checks.sh failed"

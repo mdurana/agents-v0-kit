@@ -517,6 +517,111 @@ def _segment_changes_container(seg: str, _is_kit_container) -> Optional[str]:
     return None
 
 
+# onboard fix (Iruka, Sasuke): the workflow state files (onboarding/state.json above all, and the feature,
+#   maintain and program state) change only through the kit's scripts (sync-feature-state.sh writes a temp file and
+#   renames it; gate-checks.sh only reads). The per-path patterns already stop an edit tool and a plain redirect,
+#   tee, cp, mv, sed -i or truncate that names the file. This adds the spellings that land on it without naming it
+#   whole: a destination folder (cp x docs/agents-v0/onboarding/), -t / --target-directory, dd of=, rsync, sponge,
+#   the >| and <> redirects, a relative path after cd, and git checkout / restore of an older copy. Every mode.
+#   Known gap: a hook that matches command text cannot see inside a script the agent wrote first and then runs
+#   (python3 x.py, sh x.sh); pre-push's state verification and the gate checks stay the backstop.
+STATE_PATH_PATTERNS = [
+    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$"),
+]
+STATE_WRITE_MSG = ("{} is workflow state: an agent never writes it, in any mode. Only the kit's scripts change it "
+                   "(sh .agents-v0/scripts/sync-feature-state.sh ...). Run that script, or report the problem.")
+_STATE_REDIRECT_RE = re.compile(r"(?:>\||<>|>>?|&>>?)\s*([^\s;|&<>]+)")
+_CLOBBER_RE = re.compile(r">\|")
+_STATE_LANDING = frozenset({"cp", "mv", "install", "ln", "link", "rsync", "scp"})
+
+
+def _is_state_path(p: str) -> bool:
+    raw = os.path.expanduser(p.replace("\\", "/").strip().strip("'\""))
+    if not raw:
+        return False
+    cands = [raw, posixpath.normpath(raw)]
+    if not raw.startswith("/"):
+        cands.append(posixpath.normpath(posixpath.join((_BASE_DIR or _base_dir()).replace("\\", "/"), raw)))
+    return any(pat.search(c) for c in cands for pat in STATE_PATH_PATTERNS)
+
+
+def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
+    out = [dest]
+    full = dest if dest.startswith("/") else os.path.join(_BASE_DIR or _base_dir(), dest)
+    if as_dir or dest.endswith("/") or os.path.isdir(os.path.expanduser(full)):
+        out += [posixpath.join(dest, posixpath.basename(s.rstrip("/"))) for s in srcs if s.rstrip("/")]
+    return out
+
+
+def _segment_writes_state(seg: str) -> Optional[str]:
+    seg = _strip_env_prefix(seg.strip())
+    if not seg:
+        return None
+    for m in _STATE_REDIRECT_RE.finditer(seg):
+        if _is_state_path(m.group(1)):
+            return m.group(1).strip("'\"")
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        parts = seg.split()
+    if not parts:
+        return None
+    bin0 = parts[0].split("/")[-1]
+    if bin0 in _STATE_LANDING:
+        tgt = None
+        ops: List[str] = []
+        skip = False
+        for i, a in enumerate(parts[1:], 1):
+            if skip:
+                skip = False
+                continue
+            if a in ("-t", "--target-directory") and i + 1 < len(parts):
+                tgt = parts[i + 1]
+                skip = True
+            elif a.startswith("--target-directory="):
+                tgt = a.split("=", 1)[1]
+            elif bin0 == "install" and a in ("-m", "--mode", "-o", "--owner", "-g", "--group") and i + 1 < len(parts):
+                skip = True
+            elif not a.startswith("-"):
+                ops.append(a)
+        if tgt is not None:
+            cands = _landing_paths(tgt, ops, True)
+        elif len(ops) >= 2:
+            cands = _landing_paths(ops[-1], ops[:-1], len(ops) > 2)
+        else:
+            cands = []
+        for c in cands:
+            if _is_state_path(c.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", c) else c):
+                return c
+    if bin0 in ("tee", "sponge", "truncate", "rm", "unlink", "shred", "touch") or (
+            bin0 in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", p) for p in parts[1:])):
+        for a in parts[1:]:
+            if not a.startswith("-") and _is_state_path(a):
+                return a
+    if bin0 == "dd":
+        for a in parts[1:]:
+            if a.startswith("of=") and _is_state_path(a[3:]):
+                return a[3:]
+    if bin0 == "git":
+        sub = _git_subcommand(parts)
+        if sub in ("checkout", "restore", "mv", "rm"):
+            sub_args = parts[parts.index(sub) + 1:]
+            staged_only = sub == "restore" and any(x in ("--staged", "-S") for x in sub_args) and not any(
+                x in ("--worktree", "-W") for x in sub_args)
+            if not staged_only:
+                for a in sub_args:
+                    if a != "--" and not a.startswith("-") and _is_state_path(a):
+                        return a
+    if bin0 in SCRIPT_INTERPRETERS and SCRIPT_WRITE_HINT.search(seg):
+        for lit in _script_literals(parts):
+            if _is_state_path(lit):
+                return lit
+    return None
+
+
 # kitfix-20261031-harness-lock (Sonnet review 12:31, finding 2; unattended mode, a speed bump): the agent runs as the
 #   same OS user as the harness runner, so it could edit the harness (scripts, fixtures/approvals.tsv) or the run
 #   root's control files (status/pending-turn.json holds the per-turn allowlist agy-ws-exec.sh applies; results/,
@@ -1606,6 +1711,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
             f"Protected kit/CI path cannot be modified via shell: {wpath}",
         )
 
+    spath = _segment_writes_state(seg)  # onboard fix (Iruka): workflow state, every spelling, every mode
+    if spath:
+        return "block", STATE_WRITE_MSG.format(spath)
+
     kpath = _segment_changes_kit_container(seg)
     if kpath:
         return "block", KIT_CONTAINER_MSG.format(kpath)
@@ -1902,6 +2011,9 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         return "block", GUARD_OVERRIDE_MSG
     if TEST_OVERRIDES_RE.search(cmd):
         return "block", TEST_OVERRIDES_MSG
+    # onboard fix (Iruka): `>|` (clobber) writes like `>`; split at its `|` it would hide the target, so it is
+    #   judged as `>` from here on (every protected path, and the state files after a cd).
+    cmd = _CLOBBER_RE.sub(">", cmd)
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
