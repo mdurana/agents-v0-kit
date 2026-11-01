@@ -1,0 +1,37 @@
+# gate-rules — the rule values that .agents-v0/scripts/gate-checks.sh reads (onboard fix, step 0).
+# One home for these values: the helper reads them, the command prose points here and never restates them
+# (design "Keeping the scripts small", jiraiya-onboard-fix-design-20261101.md rev 6).
+#
+# Format: one `key=value` per line. Lines starting with `#` and blank lines are ignored. A value is a
+# space-separated list or a single token; no quotes, no shell expansion. Every key below is required, a key
+# may appear only once, and an unknown key is an error: gate-checks.sh refuses (fails closed) on any of these.
+#
+# This file is kit-managed: install.sh seeds it and --update refreshes it, and check-installed-kit.sh hashes it
+# against the kit (gap 5). Do not edit it in a project; an agent edit must be refused by the hook (Sasuke's
+# hook patterns, gap 5 revision 4).
+
+# Gate documents the onboard docs check (`check-onboarding-docs.sh --gate`, JO-3/JO-4) requires, relative to
+# the repo root. Seeded with today's default set of check-onboarding-docs.sh (36b86cf :24); the JO-3/JO-4
+# fix owns the final list and changes it only here.
+onboard_gate_docs=docs/agents-v0/onboarding docs/agents-v0/architecture.md docs/agents-v0/network.md docs/agents-v0/design/system/context-map.md docs/agents-v0/diagrams docs/agents-v0/adr/0000-inherited-decisions.md
+
+# Next commands that need onboard approved and committed first (`prereq_approved`, JO-9; Sensei 20:45 added
+# triage and maintain). Brownfield repos only (gap 1).
+prereq_approved_phases=roadmap intake plan architecture deliver triage maintain
+
+# Paths the onboard gate commit stages (JO-8, flow step 8), relative to the repo root. README.md is staged only
+# if it exists or is tracked. The pack paths that activate-stack-pack.sh recorded are added at run time, not
+# listed here. Lock files are never staged; which files count as lock files is defined by the JO-8 fix, not
+# here (the design names no pattern).
+onboard_commit_paths=docs/agents-v0 README.md
+
+# Retry cap on the onboard docs check (gap 10; Sensei 5A at 22:30: cap stays at 3). The allowance is this cap,
+# plus this cap again for each grant used (Sensei 1A as reworded by 1A-gap B, Sasuke's form).
+docs_check_cap=3
+
+# Maximum age of a reopen grant, in seconds (N5A, Sensei 00:56). A grant must be newer than the last gate commit
+# of its phase AND at most this old; exactly this old passes ("at most").
+grant_max_age_seconds=86400
+
+# Brownfield content rule (gap 9): named once here when the gap 9 / N2A fix settles it. Not set in step 0, so
+# the entry check and the prereq_approved fallback cannot run yet and fail closed.
