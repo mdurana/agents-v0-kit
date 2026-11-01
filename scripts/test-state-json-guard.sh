@@ -163,6 +163,22 @@ judge cursor-shell ask "JO-8 the chain's commit step (git commit asks)" "$G && g
 judge cursor-shell allow "JO-8 read the onboard message" "cat $M"
 judge cursor-edit block "JO-8 edit tool on the onboard message" "$M"
 
+# Jiraiya 8670b7e4 review (Sasuke): commands inside ( ) and { } groups are judged like the same command bare, the
+#   protected paths match in any case (macOS file systems), and commit aliases / commit-tree are denied during
+#   onboarding. Through the Cursor entry; the full list is in scripts/test-hook-policy.py (jr3_cases).
+judge cursor-shell block "group: subshell push" "(git push origin main)"
+judge cursor-shell block "group: brace push" "{ git push; }"
+judge cursor-shell block "group: subshell restore over the state" "(git restore .)"
+judge cursor-shell block "group: subshell commit during onboarding" "(git commit -m x)"
+judge cursor-shell block "group: grouped commit after the check" "$G && (git commit -F $M)"
+judge cursor-shell block "group: subshell state write" "( printf x > $S ) 2>&1"
+judge cursor-shell allow "group: plain subshell" "(ls)"
+judge cursor-shell allow "group: plain brace group" "{ echo hi; }"
+judge cursor-shell block "case: upper-case .GIT scan record" "printf x > .GIT/agents-v0-onboard-commit-msg.scan"
+judge cursor-edit block "case: upper-case state path" "DOCS/AGENTS-V0/ONBOARDING/STATE.JSON"
+judge cursor-shell block "onboarding: commit alias" "git -c alias.ci=commit ci -m x"
+judge cursor-shell block "onboarding: commit-tree" "git commit-tree HEAD^{tree} -m x"
+
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2
 exit 1

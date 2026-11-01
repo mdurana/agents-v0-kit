@@ -1014,6 +1014,108 @@ def jo8_onboard_commit_cases(hp, tmp: str) -> list:
     return out
 
 
+# Jiraiya 8670b7e4 review cases (Sasuke): inserted into scripts/test-hook-policy.py
+JR3_BRACKETS = [
+    "({})", "( {} )", "{{ {}; }}", "{{ {};}}", "(({}))", "( ({}) )", "{{ ({}); }}", "true && ({})", "true&&({})",
+    "true; ({})", "false || ({})", "true | ({})", "true & ({})", "true\n({})", "true;{{ {}; }}",
+    "echo $( ({}) )", "echo `({})`", "sh -c '({})'", "bash -c '{{ {}; }}'", "({}) 2>&1", "{{ {}; }} > /tmp/jr3-log",
+    "diff <({}) /dev/null",
+]
+# (inner command, verdict, where): "shop" is the scratch repo of SHELL_CASES; "active" an onboarding project
+JR3_INNER = [
+    ("git push origin main", "block", "shop"), ("git push", "block", "shop"), ("gh pr create --fill", "block", "shop"),
+    ("git restore .", "block", "shop"), ("git commit -m x", "ask", "shop"),
+    ("printf x > docs/agents-v0/onboarding/state.json", "block", "active"),
+    ("git checkout HEAD~1 -- docs/agents-v0/onboarding/state.json", "block", "active"),
+    ("printf x > .git/agents-v0-onboard-commit-msg.scan", "block", "active"),
+    ("git commit -m x", "block", "active"),
+]
+JR3_ALLOW = [
+    "(ls)", "( ls )", "{ echo hi; }", "(cd src && make test)", "echo $((1+2))", "echo $(( 1 + 2 ))", "(( x++ ))",
+    "((x=1+2))", "(git status)", "{ git log --oneline -1; }", "( git diff )", "true && (git status)",
+    "find . \\( -name a -o -name b \\) -print", "find . -name x -exec ls {} \\;", "echo ${HOME}", "echo a{b,c}",
+    "(ls) 2>&1", "{ ls; } > /tmp/jr3-log", "echo '(git push)'", "echo \"{ git push; }\"", "echo `(ls)`",
+    "echo $( (ls) )",
+]
+JR3_COMMIT_BLOCK = [
+    "{G} && (git commit -m y)", "{G} && (git commit -F {M})", "{G} && ( git commit -F {M} )",
+    "{G} && {{ git commit -F {M}; }}", "({G} && git commit -F {M})", "{{ {G} && git commit -F {M}; }}",
+    "({G}) && git commit -F {M}", "sh -c '{G} && (git commit -F {M})'", "{G} && (git commit -F {M}) 2>&1",
+    "{G} && ((git commit -F {M}))",
+    "git -c alias.ci=commit ci -m x", "git -c alias.ci='!git commit' ci", "git -c alias.ci='!git commit -m x' ci",
+    "git -c Alias.CI=commit ci -m x", "{G} && git -c alias.ci=commit ci -F {M}",
+    "git -c alias.ct=commit-tree ct HEAD^{{tree}} -m x", "git commit-tree HEAD^{{tree}} -m x",
+    "{G} && git commit-tree HEAD^{{tree}} -F {M}", "(git commit-tree HEAD^{{tree}} -m x)",
+    "git --config-env=alias.ci=CI_ALIAS ci", "git --config-env alias.ci=CI_ALIAS ci",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci -m x",
+    "env GIT_CONFIG_PARAMETERS=\"'alias.ci=commit'\" git ci -m x",
+]
+JR3_COMMIT_ASK = ["{G} && git commit -F {M}", "{G} 2>&1 && git commit -F {M}"]
+_JR3_LEFT = {"git update-ref refs/heads/x HEAD": "ask", "git merge other": "ask", "git cherry-pick abc": "ask",
+             "git revert HEAD": "ask"}
+_JR3_DONE = {"git -c alias.ci=commit ci -m x": "allow", "git commit-tree HEAD^{tree} -m x": "allow"}  # as before
+JR3_CASE_PATHS = [
+    ".GIT/agents-v0-onboard-commit-msg.scan", ".Git/agents-v0-onboard-commit-msg.txt",
+    ".git/AGENTS-V0-ONBOARD-COMMIT-MSG.TXT", ".GIT/Agents-V0-Onboard-Commit-Msg.scan",
+    "DOCS/AGENTS-V0/ONBOARDING/STATE.JSON", "docs/agents-v0/onboarding/State.json",
+    "Docs/Agents-v0/program.state.json", "docs/agents-v0/MAINTAIN/x/STATE.json",
+    ".CURSOR/HOOKS.JSON", ".Cursor/hooks.json", ".AGENTS-V0/SCRIPTS/GATE-RULES", ".agents-v0/Secret-Allowlist.json",
+    ".GIT/hooks/pre-commit", ".Agents-v0/scripts/gate-checks.sh",
+]
+
+
+def jr3_cases(hp, tmp: str) -> list:
+    """Jiraiya's 8670b7e4 review: ( ) and { } groups, case variants of the protected paths, commit aliases and
+    commit-tree during onboarding. In-process; reuses the jo8-* projects jo8_onboard_commit_cases made."""
+    active = os.path.join(tmp, "jo8-active")
+    plain = os.path.join(tmp, "jo8-plain")
+    done = os.path.join(tmp, "jo8-committed")
+    alias_p = os.path.join(tmp, "jr3-alias")
+    os.makedirs(os.path.join(alias_p, "docs", "agents-v0", "onboarding"))
+    subprocess.run(["git", "init", "-q", "-b", "main", alias_p], check=True)
+    with open(os.path.join(alias_p, STATE_S), "w", encoding="utf-8") as fh:
+        json.dump({"activePhase": "onboard", "activeStatus": "in_progress", "approvedPhases": []}, fh)
+    for k, v in (("alias.ci", "commit"), ("alias.cm", "!git commit -m wip"), ("alias.st", "status")):
+        subprocess.run(["git", "-C", alias_p, "config", k, v], check=True)
+    out = []
+
+    def add(label, cmd, cwd, want, env=None):
+        e = dict({"HOOK_CWD": cwd} if cwd else {}, **(env or {}))
+        out.append((label, cmd, inproc_shell(hp, cmd, e, cwd), want))
+
+    for inner, want, where in JR3_INNER:
+        cwd = active if where == "active" else None
+        add(f"plain, {where}", inner, cwd, want)
+        for t in JR3_BRACKETS:
+            add(f"grouped, {where}", t.format(inner), cwd, want)
+    add("grouped, unattended", "(git push origin main)", None, "block", STATE_UNATTENDED_ENV)
+    add("grouped, unattended", "{ git commit -m x; }", active, "block", STATE_UNATTENDED_ENV)
+    add("background &", "true & git push", None, "block")
+    for c in JR3_ALLOW:
+        add("not a write", c, None, "allow")
+    add("arithmetic as the command (kept: a run-time command name)", "$((1+2))", None, "block")
+    for c in JR3_COMMIT_BLOCK:
+        add("onboard active", c.format(G=JO8_G, M=JO8_M), active, "block")
+    for c in JR3_COMMIT_ASK:
+        add("onboard active", c.format(G=JO8_G, M=JO8_M), active, "ask")
+    for c in ("git ci -m x", "git cm", f"{JO8_G} && git ci -F {JO8_M}"):
+        add("onboard active, alias in repo config", c, alias_p, "block")
+    add("onboard active, alias in repo config", "git st", alias_p, "allow")
+    add("onboard active, alias to status", "git -c alias.st=status st", active, "allow")
+    for c in ("git update-ref refs/heads/x HEAD", "git merge other", "git cherry-pick abc", "git revert HEAD"):
+        add("onboard active, left as is (handoff gap list)", c, active, _JR3_LEFT[c])
+    for c in ("git -c alias.ci=commit ci -m x", "git commit-tree HEAD^{tree} -m x"):
+        add("onboarding done", c, done, _JR3_DONE[c])
+    for p_ in JR3_CASE_PATHS:
+        add("case variant (macOS)", f"printf x > {p_}", active, "block")
+        out.append(("case variant (macOS), edit tool", p_, inproc_path(hp, p_, active), "block"))
+    for p_ in (".GIT/agents-v0-onboard-commit-msg.txt", ".git/AGENTS-V0-ONBOARD-COMMIT-MSG.SCAN"):
+        add("case variant, no docs/agents-v0", f"printf x > {p_}", plain, "allow")
+    add("case variant (macOS)", "cp /tmp/x .GIT/AGENTS-V0-ONBOARD-COMMIT-MSG.TXT", active, "block")
+    add("case variant (macOS)", "cd .GIT && printf x > Agents-V0-Onboard-Commit-Msg.txt", active, "block")
+    return out
+
+
 def state_write_cases(tmp: str) -> list:
     proj = os.path.join(tmp, "stateproj")
     os.makedirs(os.path.join(proj, "docs", "agents-v0", "onboarding"))
@@ -1626,6 +1728,9 @@ def main() -> int:
     jo8 = jo8_onboard_commit_cases(hp, tmp)
     for label, cmd, got, want in jo8:
         check(got, want, f"JO-8 onboard commit ({label}, in-process) `{cmd}`")
+    jr3 = jr3_cases(hp, tmp)
+    for label, cmd, got, want in jr3:
+        check(got, want, f"Jiraiya 8670b7e4 ({label}, in-process) `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1673,7 +1778,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(jr3) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

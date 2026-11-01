@@ -115,15 +115,44 @@ def _strip_env_prefix(cmd: str) -> str:
     return cmd
 
 
+def _group_word_at(cmd: str, i: int, buf: List[str], subst_depth: int) -> bool:
+    """True when cmd[i] (unquoted) opens or closes a ( ) subshell or a { } group, so the commands inside are judged
+    on their own (Jiraiya 8670b7e4 review: `(git push)` and `{ git push; }` used to read as the program `(git`).
+    `$(`, `<(`, `>(` (and every paren inside them) are substitutions, judged through its body; `{`/`}` count only as whole words,
+    so `${x}`, `{a,b}` and find's `{}` stay words. Arithmetic `(( ))` splits into its expression, which is harmless."""
+    c = cmd[i]
+    if c == "(":
+        return not subst_depth and not (i and cmd[i - 1] == "$")
+    if c == ")":
+        return not subst_depth
+    if subst_depth:
+        return False
+    at_word_start = not buf or buf[-1] in " \t"
+    nxt = cmd[i + 1:i + 2]
+    if c == "{":
+        return at_word_start and nxt in ("", " ", "\t", "\n")
+    if c == "}":
+        return at_word_start and (nxt == "" or nxt in " \t\n;)|&<>")
+    return False
+
+
 def split_segments(cmd: str) -> List[str]:
-    """Split compound shell commands; recurse into sh/bash -c bodies."""
+    """Split compound shell commands (&&, ||, ;, |, &, new line, ( ) and { } groups); recurse into sh/bash -c bodies."""
     cmd = cmd.strip()
     if not cmd:
         return []
     segments: List[str] = []
     buf: List[str] = []
-    in_single = in_double = False
+    in_single = in_double = in_bt = False
+    subst_depth = 0
     i = 0
+
+    def flush() -> None:
+        seg = "".join(buf).strip()
+        if seg:
+            segments.extend(_expand_wrapper(seg))
+        del buf[:]
+
     while i < len(cmd):
         c = cmd[i]
         if c == "'" and not in_double:
@@ -136,26 +165,44 @@ def split_segments(cmd: str) -> List[str]:
             buf.append(c)
             i += 1
             continue
+        if c == "`" and not in_single:
+            in_bt = not in_bt  # a `...` body is judged through _extract_substitutions, like $(...)
+            buf.append(c)
+            i += 1
+            continue
+        if not in_single and c == "\\" and cmd[i + 1:i + 2] in ("(", ")", "{", "}", "&"):
+            buf.append(cmd[i:i + 2])  # \( \) (find's grouping), \{ \} and \& are plain characters
+            i += 2
+            continue
+        if not in_single and cmd[i:i + 2] in ("$(", "<(", ">("):  # command / process substitution
+            subst_depth += 1
+            buf.append(cmd[i:i + 2])
+            i += 2
+            continue
+        if not in_single and subst_depth and c == "(":
+            subst_depth += 1
+        elif not in_single and subst_depth and c == ")":
+            subst_depth -= 1
+            buf.append(c)
+            i += 1
+            continue
         if not in_single and not in_double:
             if cmd[i : i + 2] in ("&&", "||"):
-                seg = "".join(buf).strip()
-                if seg:
-                    segments.extend(_expand_wrapper(seg))
-                buf = []
+                flush()
                 i += 2
                 continue
-            if c in ";|":
-                seg = "".join(buf).strip()
-                if seg:
-                    segments.extend(_expand_wrapper(seg))
-                buf = []
+            if c in ";|\n":
+                flush()
                 i += 1
                 continue
-            if c == "\n":
-                seg = "".join(buf).strip()
-                if seg:
-                    segments.extend(_expand_wrapper(seg))
-                buf = []
+            # a lone & runs what is before it in the background and goes on with what follows (`true & git push`);
+            # 2>&1, >&2, &>, &>> are redirects
+            if c == "&" and not ((buf and buf[-1] in "<>") or cmd[i + 1:i + 2] == ">"):
+                flush()
+                i += 1
+                continue
+            if c in "(){}" and not in_bt and _group_word_at(cmd, i, buf, subst_depth):
+                flush()
                 i += 1
                 continue
         buf.append(c)
@@ -169,7 +216,8 @@ def split_segments(cmd: str) -> List[str]:
 
 
 def _extract_substitutions(cmd: str) -> List[str]:
-    """Return bodies of $(...) and `...` command substitutions (outside single quotes)."""
+    """Return bodies of $(...) and `...` command substitutions and <(...) >(...) process substitutions (outside
+    single quotes)."""
     bodies: List[str] = []
     in_single = False
     i = 0
@@ -177,7 +225,7 @@ def _extract_substitutions(cmd: str) -> List[str]:
         c = cmd[i]
         if c == "'":
             in_single = not in_single
-        elif not in_single and cmd[i : i + 2] == "$(":
+        elif not in_single and cmd[i : i + 2] in ("$(", "<(", ">("):
             depth = 1
             j = i + 2
             while j < len(cmd) and depth:
@@ -526,11 +574,15 @@ def _segment_changes_container(seg: str, _is_kit_container) -> Optional[str]:
 #   the >| and <> redirects, a relative path after cd, and git checkout / restore of an older copy. Every mode.
 #   Known gap: a hook that matches command text cannot see inside a script the agent wrote first and then runs
 #   (python3 x.py, sh x.sh); pre-push's state verification and the gate checks stay the backstop.
+# Jiraiya 8670b7e4 review, item 1: these paths and PROTECTED_PATH_PATTERNS (and the onboard message files) match
+#   without regard to case: on macOS's default case-insensitive file system DOCS/AGENTS-V0/ONBOARDING/STATE.JSON,
+#   .CURSOR/HOOKS.JSON or .GIT/agents-v0-onboard-commit-msg.txt is the protected file itself. On a case-sensitive file
+#   system this also stops a write to a differently-cased file that is not the protected one (the conservative side).
 STATE_PATH_PATTERNS = [
-    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$"),
+    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$", re.I),
 ]
 STATE_WRITE_MSG = ("{} is workflow state: an agent never writes it, in any mode. Only the kit's scripts change it "
                    "(sh .agents-v0/scripts/sync-feature-state.sh ...). Run that script, or report the problem.")
@@ -555,7 +607,7 @@ def _is_state_path(p: str) -> bool:
 #   (the same condition as the tree-writer block) they are protected like the state files: every shell spelling the
 #   state guard knows (redirect, tee, cp/mv/rsync/install/ln target, sed -i, truncate, script open-write, a target
 #   built from $(git rev-parse --git-path ...)), and the edit tool. Reading them stays allowed.
-_ONB_MSG_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0-onboard-commit-msg\.[^/]*$")
+_ONB_MSG_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0-onboard-commit-msg\.[^/]*$", re.I)
 ONB_MSG_WRITE_MSG = ("{} is the onboard commit message or its scan record: only "
                      "sh .agents-v0/scripts/gate-checks.sh writes it (onboard_commit_msg, commit_msg_ok), in any mode. "
                      "Run the chain printed by sh .agents-v0/scripts/gate-checks.sh commit_chain, or report the problem.")
@@ -563,13 +615,13 @@ ONB_MSG_WRITE_MSG = ("{} is the onboard commit message or its scan record: only 
 
 def _is_onboard_msg_path(p: str) -> bool:
     raw = os.path.expanduser(p.replace("\\", "/").strip().strip("'\""))
-    if not raw or "agents-v0-onboard-commit-msg." not in raw:
+    if not raw or "agents-v0-onboard-commit-msg." not in raw.lower():
         return False
     full = raw if raw.startswith("/") else posixpath.join((_BASE_DIR or _base_dir()).replace("\\", "/"), raw)
     full = posixpath.normpath(full)
     if not _ONB_MSG_RE.search(full):
         return False
-    root = full[: full.rfind("/.git/")] or "/"
+    root = full[: full.lower().rfind("/.git/")] or "/"
     return os.path.isdir(os.path.join(root, "docs", "agents-v0"))
 
 
@@ -593,7 +645,7 @@ _STATE_TEMPLATES = ("docs/agents-v0/onboarding/state.json", "docs/agents-v0/prog
 _GLOB_CHARS = re.compile(r"[*?\[]")
 _SHELL_VARS: dict = {}  # name -> value for `name=value` segments earlier in the same command (None: not knowable)
 _STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)"
-                               r"|agents-v0-onboard-commit-msg")  # JO-8: a $(git rev-parse --git-path ...) target
+                               r"|agents-v0-onboard-commit-msg", re.I)  # JO-8: a $(git rev-parse --git-path ...) target
 _CMD_TEXT = [""]  # the whole command being judged (for "does it name a state folder")
 # onboard fix (Jiraiya round 2, item 1): a write target the shell only fills in at run time ($OUT, "$f", $(...)) that
 #   is not near a state folder. The guard cannot check it, so the command asks instead of passing. Set by
@@ -2177,7 +2229,7 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
 
     spath = _segment_writes_state(seg)  # onboard fix (Iruka): workflow state, every spelling, every mode
     if spath:
-        if "agents-v0-onboard-commit-msg" in spath or (_unknown_target(spath) and "agents-v0-onboard-commit-msg" in _CMD_TEXT[0]):
+        if "agents-v0-onboard-commit-msg" in spath.lower() or (_unknown_target(spath) and "agents-v0-onboard-commit-msg" in _CMD_TEXT[0].lower()):
             return "block", ONB_MSG_WRITE_MSG.format(spath)  # JO-8
         return "block", STATE_WRITE_MSG.format(spath)
 
@@ -2508,47 +2560,65 @@ _ONB_WRAPPERS = frozenset({"env", "command", "nohup", "time", "nice", "stdbuf", 
                            "timeout", "xargs", "eval", "sudo", "doas", "run0", "pkexec"})
 
 
-def _onb_ops_split(cmd: str) -> List[Tuple[str, str]]:
-    """Top-level (operator before, segment) pairs; the first operator is ""."""
-    out: List[Tuple[str, str]] = []
+def _onb_ops_split(cmd: str) -> List[Tuple[str, str, bool]]:
+    """Top-level (operator before, segment, inside a ( ) or { } group) triples; the first operator is "". A group
+    opening or closing ends the segment before it and starts the next with the operator "(" (never on the chain)."""
+    out: List[Tuple[str, str, bool]] = []
     buf: List[str] = []
     op = ""
     in_single = in_double = False
     depth = 0
+    grp = 0
     i = 0
+
+    def flush(sep: str, grouped: bool) -> None:
+        nonlocal op, buf
+        seg = "".join(buf).strip()
+        if seg:
+            out.append((op, seg, grouped))
+            op = sep
+        else:
+            op = op + sep if op else sep  # e.g. `a ;&& b` never parses; keep it off-chain
+        buf = []
+
     while i < len(cmd):
         c = cmd[i]
         if c == "'" and not in_double:
             in_single = not in_single
         elif c == '"' and not in_single:
             in_double = not in_double
-        elif not in_single and cmd[i:i + 2] == "$(":
-            depth += 1
-            buf.append("$(")
+        elif not in_single and c == "\\" and cmd[i + 1:i + 2] in ("(", ")", "{", "}", "&"):
+            buf.append(cmd[i:i + 2])
             i += 2
             continue
+        elif not in_single and cmd[i:i + 2] in ("$(", "<(", ">("):
+            depth += 1
+            buf.append(cmd[i:i + 2])
+            i += 2
+            continue
+        elif not in_single and depth and c == "(":
+            depth += 1
         elif not in_single and depth and c == ")":
             depth -= 1
         elif not in_single and not in_double and not depth:
+            if c in "(){}" and _group_word_at(cmd, i, buf, 0):
+                flush("(", grp > 0 or c in ")}")
+                grp = grp + 1 if c in "({" else max(grp - 1, 0)
+                i += 1
+                continue
             two = cmd[i:i + 2]
             sep = two if two in ("&&", "||") else (c if c in ";|&\n" else "")
             if sep == "&" and ((buf and buf[-1] in "<>") or cmd[i + 1:i + 2] == ">"):
                 sep = ""  # 2>&1, >&2, &> are redirects, not a background operator
             if sep:
-                seg = "".join(buf).strip()
-                if seg:
-                    out.append((op, seg))
-                    op = sep
-                else:
-                    op = op + sep if op else sep  # e.g. `a ;&& b` never parses; keep it off-chain
-                buf = []
+                flush(sep, grp > 0)
                 i += len(sep)
                 continue
         buf.append(c)
         i += 1
     seg = "".join(buf).strip()
     if seg:
-        out.append((op, seg))
+        out.append((op, seg, grp > 0))
     return out
 
 
@@ -2588,21 +2658,23 @@ def _onb_inner(seg: str) -> Optional[str]:
     return shlex.join(parts[i:]) if i < len(parts) else None
 
 
-def _onb_leaves(cmd: str, depth: int = 0) -> List[Tuple[str, str]]:
-    """(operator before, simple command) for every command the line runs, wrappers unwrapped (the first inner
-    command keeps the wrapper's operator); $(...) bodies are marked with the operator "$(" (never on the chain)."""
-    out: List[Tuple[str, str]] = []
-    for op, seg in _onb_ops_split(cmd):
+def _onb_leaves(cmd: str, depth: int = 0, grouped: bool = False) -> List[Tuple[str, str, bool]]:
+    """(operator before, simple command, inside a group) for every command the line runs, wrappers unwrapped (the
+    first inner command keeps the wrapper's operator); $(...) bodies are marked with the operator "$(" (never on the
+    chain)."""
+    out: List[Tuple[str, str, bool]] = []
+    for op, seg, grp in _onb_ops_split(cmd):
+        grp = grp or grouped
         inner = _onb_inner(seg) if depth < 8 else None
         if inner:
-            sub = _onb_leaves(inner, depth + 1)
+            sub = _onb_leaves(inner, depth + 1, grp)
             if sub:
-                sub[0] = (op, sub[0][1])
+                sub[0] = (op, sub[0][1], sub[0][2])
             out.extend(sub)
         else:
-            out.append((op, seg))
+            out.append((op, seg, grp))
         for body in _extract_substitutions(seg):
-            out.extend(("$(", s) for _o, s in _onb_leaves(body, depth + 1))
+            out.extend(("$(", s, g) for _o, s, g in _onb_leaves(body, depth + 1, grp))
     return out
 
 
@@ -2615,6 +2687,39 @@ def _onb_parts(seg: str) -> List[str]:
 
 def _onb_is_commit(parts: List[str]) -> bool:
     return bool(parts) and parts[0].lstrip("\\").split("/")[-1] == "git" and _git_subcommand(parts) == "commit"
+
+
+# Jiraiya 8670b7e4 review: an alias that stands for commit (`git -c alias.ci=commit ci`, `alias.ci='!git commit'`,
+#   --config-env=alias.ci=VAR, GIT_CONFIG_KEY_<n>=alias.ci / GIT_CONFIG_PARAMETERS, or alias.ci in the repo config)
+#   and git commit-tree make a commit without the gate chain; during onboarding they are denied outright.
+_ONB_ALIAS_COMMIT_RE = re.compile(r"^\s*(?:commit(?:-tree)?\b|!.*\bgit\b.*\bcommit(?:-tree)?\b)", re.I | re.S)
+_ONB_ENV_ALIAS_RE = re.compile(r"\bGIT_CONFIG_(?:KEY_\d+|PARAMETERS)\s*=\s*['\"]*[^\s]*?alias\.", re.I)
+
+
+def _onb_commit_alias(parts: List[str], cmd: str, base: str) -> Optional[str]:
+    """How this git call makes a commit other than through `git commit` (commit-tree or an alias), else None."""
+    if not parts or parts[0].lstrip("\\").split("/")[-1] != "git":
+        return None
+    sub = _git_subcommand(parts)
+    if sub == "commit-tree":
+        return "git commit-tree"
+    if not sub or sub == "commit":
+        return None
+    for j, p in enumerate(parts[1:parts.index(sub) if sub in parts else len(parts)], 1):
+        if p.startswith("--config-env") and "alias." in (p + " " + (parts[j + 1] if j + 1 < len(parts) else "")).lower():
+            return f"git {p} (an alias from the environment)"
+    if _ONB_ENV_ALIAS_RE.search(cmd):
+        return "a git alias set through GIT_CONFIG_* in the environment"
+    global _BASE_DIR
+    saved = _BASE_DIR
+    _BASE_DIR = base
+    try:
+        val = _git_alias_value(parts, sub)
+    finally:
+        _BASE_DIR = saved
+    if val and _ONB_ALIAS_COMMIT_RE.search(val):
+        return f"git {sub} (alias for `{val}`)"
+    return None
 
 
 def _onboard_state(root: str) -> Optional[str]:
@@ -2657,28 +2762,42 @@ def _onboard_state(root: str) -> Optional[str]:
 
 
 def _onboard_commit_block(cmd: str) -> Optional[str]:
-    if "commit" not in cmd:
+    if "git" not in cmd:
         return None
     leaves = _onb_leaves(cmd)
     base = _base_dir()
-    for k, (op, seg) in enumerate(leaves):
+    for k, (op, seg, grouped) in enumerate(leaves):
         cd_to = _cd_target(seg)
         if cd_to and op != "$(":
             base = os.path.normpath(os.path.join(base, os.path.expanduser(cd_to)))
             continue
         parts = _onb_parts(seg)
-        if not _onb_is_commit(parts):
+        commit = _onb_is_commit(parts)
+        if not commit and not (parts and parts[0].lstrip("\\").split("/")[-1] == "git"):
             continue
-        sub_idx = parts.index("commit")
+        sub = _git_subcommand(parts)
+        sub_idx = parts.index(sub) if sub in parts else len(parts)
         gbase = base
         for j in range(1, sub_idx):
             if parts[j - 1] == "-C":
                 gbase = os.path.normpath(os.path.join(gbase, os.path.expanduser(parts[j])))
+        if not commit:
+            if sub in _GIT_BUILTINS and sub != "commit-tree":
+                continue
+            why = _onboard_state(_repo_root(gbase) or "")
+            other = _onb_commit_alias(parts, cmd, gbase) if why else None
+            if other:
+                return ONB_COMMIT_MSG.format(why, other + " makes a commit without the gate chain; it is not "
+                                                  "allowed while onboarding is in progress.")
+            continue
         why = _onboard_state(_repo_root(gbase) or "")
         if not why:
             continue
+        if grouped:
+            return ONB_COMMIT_MSG.format(why, "This git commit runs inside a ( ) or { } group; the onboard commit is "
+                                              "run as the plain chain, not grouped.")
         prev = [t for t in _onb_parts(leaves[k - 1][1]) if not re.fullmatch(r"2>&1", t)] if k else []
-        if op != "&&" or k == 0 or leaves[k - 1][0] == "$(" or prev not in (
+        if op != "&&" or k == 0 or leaves[k - 1][0] == "$(" or leaves[k - 1][2] or prev not in (
                 ["sh", ".agents-v0/scripts/gate-checks.sh", "commit_msg_ok"],
                 ["sh", "./.agents-v0/scripts/gate-checks.sh", "commit_msg_ok"]):
             return ONB_COMMIT_MSG.format(why, "This git commit is not run right after `sh .agents-v0/scripts/"
@@ -2883,36 +3002,36 @@ def may_print_secrets(cmd: str) -> bool:
 
 
 PROTECTED_PATH_PATTERNS = [
-    re.compile(r"(^|/)\.cursor/hooks\.json$"),
-    re.compile(r"(^|/)\.cursor/cli\.json$"),
-    re.compile(r"(^|/)\.cursor/hooks/"),
-    re.compile(r"(^|/)\.cursor/rules/"),
-    re.compile(r"(^|/)\.cursor/agents/"),
-    re.compile(r"(^|/)\.cursor/(commands|skills)/"),
-    re.compile(r"(^|/)\.agents/hooks\.json$"),
-    re.compile(r"(^|/)\.agents/hooks/"),
-    re.compile(r"(^|/)\.agents/rules/"),
-    re.compile(r"(^|/)\.agents/agents/"),
-    re.compile(r"(^|/)\.agents/(commands|skills)/"),
-    re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.(sh|py|json)$"),
-    re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.(sh|py)$"),
-    re.compile(r"(^|/)\.agents-v0/packs/.+\.(json|sh|py)$"),
-    re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$"),
-    re.compile(r"(^|/)\.agents-v0/policy\.conf$"),  # kitfix-20261031-installed-no-overrides: trace mode
+    re.compile(r"(^|/)\.cursor/hooks\.json$", re.I),
+    re.compile(r"(^|/)\.cursor/cli\.json$", re.I),
+    re.compile(r"(^|/)\.cursor/hooks/", re.I),
+    re.compile(r"(^|/)\.cursor/rules/", re.I),
+    re.compile(r"(^|/)\.cursor/agents/", re.I),
+    re.compile(r"(^|/)\.cursor/(commands|skills)/", re.I),
+    re.compile(r"(^|/)\.agents/hooks\.json$", re.I),
+    re.compile(r"(^|/)\.agents/hooks/", re.I),
+    re.compile(r"(^|/)\.agents/rules/", re.I),
+    re.compile(r"(^|/)\.agents/agents/", re.I),
+    re.compile(r"(^|/)\.agents/(commands|skills)/", re.I),
+    re.compile(r"(^|/)\.agents-v0/ci/[^/]+\.(sh|py|json)$", re.I),
+    re.compile(r"(^|/)\.agents-v0/scripts/[^/]+\.(sh|py)$", re.I),
+    re.compile(r"(^|/)\.agents-v0/packs/.+\.(json|sh|py)$", re.I),
+    re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$", re.I),
+    re.compile(r"(^|/)\.agents-v0/policy\.conf$", re.I),  # kitfix-20261031-installed-no-overrides: trace mode
     # onboard fix SOC-11 (Sasuke): the gate rule values and the secret-scan allow-list are guard files. The
     #   allow-list is read from HEAD only, so an agent's edit would never count; it is still never an agent's edit.
-    re.compile(r"(^|/)\.agents-v0/scripts/gate-rules$"),
-    re.compile(r"(^|/)\.agents-v0/secret-allowlist\.json$"),
-    re.compile(r"(^|/)\.git/hooks/"),
-    re.compile(r"(^|/)\.gitlab-ci\.yml$"),
-    re.compile(r"(^|/)\.gitlab/"),
-    re.compile(r"(^|/)CODEOWNERS$"),
-    re.compile(r"(^|/)core/(common|[a-z]+)/hooks/"),
-    re.compile(r"(^|/)AGENTS\.md$"),
-    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$"),
-    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$"),
+    re.compile(r"(^|/)\.agents-v0/scripts/gate-rules$", re.I),
+    re.compile(r"(^|/)\.agents-v0/secret-allowlist\.json$", re.I),
+    re.compile(r"(^|/)\.git/hooks/", re.I),
+    re.compile(r"(^|/)\.gitlab-ci\.yml$", re.I),
+    re.compile(r"(^|/)\.gitlab/", re.I),
+    re.compile(r"(^|/)CODEOWNERS$", re.I),
+    re.compile(r"(^|/)core/(common|[a-z]+)/hooks/", re.I),
+    re.compile(r"(^|/)AGENTS\.md$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/requirements/[^/]+\.state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/maintain/[^/]+/state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/onboarding/state\.json$", re.I),
+    re.compile(r"(^|/)docs/agents-v0/program\.state\.json$", re.I),
 ]
 
 
