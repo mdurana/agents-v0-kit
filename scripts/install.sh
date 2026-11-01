@@ -312,11 +312,17 @@ PY
 
 install_templates() {
   t="$1"
+  # Retired kit files (Sensei 2026-11-02 00:38, option A): scripts/lib/retired-files.txt lists each one with its
+  # kit hashes. A bad or missing list stops here, before anything is written. Listed paths are never seeded.
+  . "$KIT/scripts/lib/retired-files.sh"
+  RETIRED_LIST="$KIT/scripts/lib/retired-files.txt"
+  rf_check_list "$RETIRED_LIST" || { printf 'error: %s is missing or malformed; nothing was changed.\n' "$RETIRED_LIST" >&2; exit 1; }
   [ -f "$t/README.md" ] || cp "$KIT/README.md" "$t/README.md"
   [ -f "$t/AGENTS.md" ] || cp "$KIT/AGENTS.md" "$t/AGENTS.md"
   [ -f "$t/.gitignore" ] || cp "$KIT/templates/.gitignore" "$t/.gitignore"
   if [ "$UPDATE" = 1 ]; then
-    rm -rf "$t/.agents-v0/ci" "$t/.agents-v0/hooks/pre-commit" "$t/.agents-v0/scripts/check-delivery-gate-local.sh"
+    # User CI files stay byte-identical; unedited retired kit files move to trash/; edited ones stay, with a warning.
+    rf_cleanup "$t" "$RETIRED_LIST" || exit 1
     cp "$KIT/AGENTS.md" "$t/AGENTS.md"
     # macOS AppleDouble files (._*) break Checkstyle and test globs; an existing .gitignore gains the rule.
     if [ -f "$t/.gitignore" ] && ! grep -Eq '^\._\*$' "$t/.gitignore"; then
@@ -416,6 +422,7 @@ docs/agents-v0/brownfield-onboarding.md
     rel="$1"
     dest="$t/$rel"
     overwrite=0
+    rf_listed "$rel" "$RETIRED_LIST" && return 0
     if [ "$UPDATE" = 1 ]; then
       for always in $always_on_update \
         .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \

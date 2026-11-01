@@ -7,7 +7,9 @@
 # .cursor/hooks/<file> when that adapter is installed). No installed script may still read an
 # AGENTS_V0_* variable (comments and the kit-fetch switch AGENTS_V0_FETCH_KIT of resolve-kit-root.sh
 # excepted). With --expect-trace-mode, check-traceability.sh --print-mode in the project must report
-# that mode. Prints one line per problem, then `HASH-OK files=<n> trace_mode=<m>` (exit 0) or
+# that mode. Retired kit files (scripts/lib/retired-files.txt): RETIRED-LEFT <path> for an unedited one still
+# in place (a failure), WARN RETIRED-EDITED <path> for an edited copy (not a failure). Prints one line per
+# problem, then `HASH-OK files=<n> trace_mode=<m>` (exit 0) or
 # `HASH-FAIL ...` (exit 1). Read-only: it changes nothing.
 set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,11 +19,15 @@ P="${1:-}"
 [ -n "$P" ] && [ -d "$P/.agents-v0/scripts" ] || { printf 'usage: %s [--expect-trace-mode warn|fail] <project checkout>\n' "$0" >&2; exit 2; }
 case "$want" in ""|warn|fail) ;; *) printf 'error: --expect-trace-mode must be warn or fail\n' >&2; exit 2 ;; esac
 bad=0; n=0
+# Retired kit files (N12A, Sensei 00:52): an unedited one still in place fails; an edited copy only warns.
+. "$KIT/scripts/lib/retired-files.sh"
+RETIRED_LIST="$KIT/scripts/lib/retired-files.txt"
 h() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
 for f in "$KIT"/templates/.agents-v0/scripts/*; do
   [ -f "$f" ] || continue
   b="${f##*/}"; i="$P/.agents-v0/scripts/$b"
   case "$b" in *.pyc|*.bak) continue ;; esac
+  rf_listed ".agents-v0/scripts/$b" "$RETIRED_LIST" 2>/dev/null && continue
   if [ ! -e "$i" ]; then
     # not part of the default install (check-delivery-gate-local.sh is removed on --update; run-local-container.sh
     # comes with --with-starters only)
@@ -46,6 +52,7 @@ for d in .agents/hooks .cursor/hooks; do
     elif [ "$(h < "$f")" != "$(h < "$P/$d/$b")" ]; then printf 'DIFF %s/%s\n' "$d" "$b"; bad=1; fi
   done
 done
+rf_status "$P" "$RETIRED_LIST" || bad=1
 # no installed script may read an AGENTS_V0_* variable (comments and AGENTS_V0_FETCH_KIT excepted)
 for i in "$P"/.agents-v0/scripts/*; do
   [ -f "$i" ] || continue

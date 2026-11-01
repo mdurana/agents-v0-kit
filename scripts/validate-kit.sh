@@ -364,6 +364,13 @@ cmp -s scripts/audit-brownfield-baseline.sh templates/.agents-v0/scripts/audit-b
   || err "scripts/audit-brownfield-baseline.sh and templates/.agents-v0/scripts/audit-brownfield-baseline.sh differ (JO-15a)"
 [ -f scripts/test-baseline-record.sh ] || err "scripts/test-baseline-record.sh missing (JO-15a)"
 sh scripts/test-baseline-record.sh || err "scripts/test-baseline-record.sh failed"
+# Onboard fix (Sensei 2026-11-02 00:38, option A): --update archives retired kit files to trash/, never removes.
+for f in scripts/lib/retired-files.sh scripts/lib/retired-files.txt scripts/test-update-retired-cleanup.sh; do
+  [ -f "$f" ] || err "$f missing (retired-files cleanup)"
+done
+! grep -v '^[[:space:]]*#' scripts/lib/retired-files.sh | grep -Eq '(^|[^A-Za-z0-9_-])(rm|unlink|rmdir)([[:space:]]|$)' \
+  || err "scripts/lib/retired-files.sh holds rm or unlink (N69: the cleanup moves files to trash/, it never removes)"
+sh scripts/test-update-retired-cleanup.sh || err "scripts/test-update-retired-cleanup.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
