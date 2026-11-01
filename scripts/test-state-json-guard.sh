@@ -196,6 +196,23 @@ judge cursor-shell allow "compound: plain if" "if true; then ls; fi"
 judge cursor-shell allow "compound: plain for" 'for f in *.md; do echo $f; done'
 judge cursor-shell allow "compound: ! grep" "! grep -q x file"
 
+# N3A (Sasuke; Sai's request with ec944f63, Kakashi's assignment): the gate ledger and the reopen grant are written only
+#   by gate-checks.sh (the grant only by the person). The full list is in scripts/test-hook-policy.py (n3a_cases).
+mkdir -p "$P/.git/agents-v0"
+printf 'FAIL onboard x\n' > "$P/.git/agents-v0/gate-ledger"
+L=.git/agents-v0/gate-ledger
+judge cursor-shell block "N3A: append to the gate ledger" "printf x >> $L"
+judge cursor-shell block "N3A: cut the gate ledger" "sed -i '\$d' $L"
+judge cursor-shell block "N3A: write the reopen grant" "printf x > .git/agents-v0/reopen-grant"
+judge cursor-shell block "N3A: move the agents-v0 folder" "mv .git/agents-v0 /tmp/x"
+judge cursor-shell block "N3A: case variant" "printf x > .GIT/AGENTS-V0/GATE-LEDGER"
+judge cursor-shell block "N3A: run-time target" 'printf x >> "$(git rev-parse --git-path agents-v0/gate-ledger)"'
+judge cursor-shell block "N3A: inside if" "if true; then : > $L; fi"
+judge agy-shell block "N3A: unattended rm" "rm $L" "$UA"
+judge cursor-edit block "N3A: edit tool on the ledger" "$L"
+judge cursor-shell allow "N3A: read the ledger" "cat $L"
+judge cursor-shell allow "N3A: copy the ledger out" "cp $L /tmp/ledger-copy"
+
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2
 exit 1

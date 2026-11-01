@@ -1190,6 +1190,118 @@ def jr4_cases(hp, tmp: str) -> list:
     return out
 
 
+# N3A ledger protection cases (Sasuke; Sai's request on ec944f63, Kakashi's assignment): the gate ledger and the reopen
+#   grant (.git/agents-v0/gate-ledger, .git/agents-v0/reopen-grant, and the .git/worktrees/<n>/agents-v0/ forms) are
+#   written only by gate-checks.sh (the grant only by the person), so while docs/agents-v0 exists an agent write, move,
+#   removal or archive of them, or of their agents-v0 folder, is denied like the onboard message (JO-8). Reads allowed.
+N3A_L = ".git/agents-v0/gate-ledger"
+N3A_R = ".git/agents-v0/reopen-grant"
+N3A_WRITES = [
+    "printf x > {P}", "echo x >> {P}", "cat /tmp/x >| {P}", "printf x &> {P}", ": > {P}", "printf x 1>>{P}",
+    "printf x | tee {P}", "printf x | tee -a {P}", "sed -i '$d' {P}", "sed -i.bak 1d {P}", "perl -pi -e s/a/b/ {P}",
+    "truncate -s0 {P}", "cp /tmp/x {P}", "cp -p {P}.orig {P}", "mv /tmp/x {P}", "install -m 644 /tmp/x {P}",
+    "ln -sf /tmp/x {P}", "ln {P} /tmp/hardlink", "ln -s {P} /tmp/l", "rsync /tmp/x {P}", "dd if=/tmp/x of={P}",
+    "rm {P}", "rm -f {P}", "unlink {P}", "shred -u {P}", "touch {P}", "sponge {P}", "mv {P} /tmp/x",
+    "mv {P} {P}.bak", "mv -f {P} .git/agents-v0/archive/", "head -n 3 {P} > /tmp/x && mv /tmp/x {P}",
+    "python3 -c \"open('{P}','w').write('x')\"", "python3 -c \"open('{P}','a').write('x')\"",
+    "sh -c 'printf x >> {P}'", "( printf x >> {P} )", "{{ printf x >> {P}; }}", "if true; then printf x >> {P}; fi",
+    "while true; do rm {P}; break; done", "true && cp /tmp/x {P}", "tar -czf /tmp/l.tgz --remove-files {P}",
+    "zip -m /tmp/l.zip {P}",
+]
+N3A_PATHS = [
+    ".GIT/agents-v0/gate-ledger", ".git/AGENTS-V0/GATE-LEDGER", ".Git/Agents-V0/Reopen-Grant", "./" + N3A_L,
+    ".git//agents-v0/gate-ledger", ".git/agents-v0/../agents-v0/reopen-grant", ".git/worktrees/wt1/agents-v0/gate-ledger",
+    ".git/worktrees/wt1/agents-v0/reopen-grant", ".GIT/worktrees/wt1/AGENTS-V0/gate-ledger",
+    ".git/agents-v0/gate-*", ".git/agents-v0/*", ".git/*/gate-ledger", ".git/agents-v0/reopen-gran?",
+    ".git/agents-v0/[g]ate-ledger",
+]
+N3A_RUNTIME = [
+    "L=.git/agents-v0/gate-ledger; printf x >> $L", "L=.git/agents-v0/gate-ledger && printf x >> \"$L\"",
+    "D=.git/agents-v0; printf x > $D/reopen-grant", "printf x >> \"$(git rev-parse --git-path agents-v0/gate-ledger)\"",
+    "printf x >> \"$(git rev-parse --git-common-dir)/agents-v0/gate-ledger\"",
+    "printf x > \"$(git rev-parse --git-path agents-v0/reopen-grant)\"", "cd .git/agents-v0 && printf x >> gate-ledger",
+    "cd .git && printf x > agents-v0/reopen-grant", "cd .GIT/AGENTS-V0 && : > GATE-LEDGER",
+    "for f in .git/agents-v0/gate-ledger; do printf x >> $f; done", "f=gate-ledger; cp /tmp/x .git/agents-v0/$f",
+    "cp /tmp/x \"$(git rev-parse --git-path agents-v0)/\"", "printf x | tee .git/agents-v0/{gate-ledger,x}",
+    "printf x | tee .git/agents-v0/{x,reopen-grant}",
+]
+N3A_FOLDER = [
+    "mv .git/agents-v0 /tmp/x", "mv .git/agents-v0 .git/agents-v0.old", "mv .GIT/Agents-V0 /tmp/x",
+    "mv .git/agents-v0/ /tmp/x", "mv .git/agents-v0/* /tmp/", "mv .git/worktrees/wt1/agents-v0 /tmp/x",
+    "rm -rf .git/agents-v0", "rm -r .git/agents-v0/", "rm -rf .GIT/AGENTS-V0", "cp -r /tmp/d/. .git/agents-v0/",
+    "rsync -a --delete /tmp/d/ .git/agents-v0/", "tar -czf /tmp/l.tgz --remove-files .git/agents-v0",
+    "tar -C .git -xf /tmp/l.tar", "tar -C .git/agents-v0 -xf /tmp/l.tar", "unzip -o /tmp/l.zip -d .git/agents-v0",
+    "zip -rm /tmp/l.zip .git/agents-v0", "mv .git /tmp/g", "( mv .git/agents-v0 /tmp/x )",
+    "if true; then rm -rf .git/agents-v0; fi", "mv \"$(git rev-parse --git-path agents-v0)\" /tmp/x",
+]
+N3A_ALLOW = [
+    "cat {L}", "cat {R}", "grep FAIL {L}", "wc -l {L}", "sha256sum {L}", "head -n 5 {L}", "tail -n 1 {L}",
+    "git log -1", "git log --format=%B -1", "cp {L} /tmp/ledger-copy", "cat {L} > /tmp/x", "tail -n1 {L} | tee /tmp/x",
+    "ls -la .git/agents-v0", "diff {L} /tmp/x", "git rev-parse --git-path agents-v0/gate-ledger",
+    "cp -r .git/agents-v0 /tmp/backup", "printf x > /tmp/gate-ledger", "printf x > notes/gate-ledger.md",
+    "sh .agents-v0/scripts/gate-checks.sh ledger_ok", "sh .agents-v0/scripts/gate-checks.sh ledger_mark",
+    "sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok", "sh .agents-v0/scripts/gate-checks.sh reopen_grant_ok",
+    "sh .agents-v0/scripts/gate-checks.sh staged_secret_scan", "sh .agents-v0/scripts/gate-checks.sh commit_chain",
+    "if sh .agents-v0/scripts/gate-checks.sh ledger_ok; then echo ok; fi", "grep -c . {L} {R}",
+]
+
+
+def n3a_cases(hp, tmp: str) -> list:
+    """N3A: the gate ledger and reopen grant. In-process; own projects with a real .git/agents-v0 folder."""
+    def project(name: str, kit: bool = True, state=None) -> str:
+        d = os.path.join(tmp, name)
+        os.makedirs(os.path.join(d, "src"))
+        os.makedirs(os.path.join(d, "notes"))
+        if kit:
+            os.makedirs(os.path.join(d, "docs", "agents-v0", "onboarding"))
+        subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
+        os.makedirs(os.path.join(d, ".git", "agents-v0", "archive"))
+        os.makedirs(os.path.join(d, ".git", "worktrees", "wt1", "agents-v0"))
+        for f in ("gate-ledger", "reopen-grant"):
+            for sub in ("", os.path.join("worktrees", "wt1")):
+                with open(os.path.join(d, ".git", sub, "agents-v0", f), "w", encoding="utf-8") as fh:
+                    fh.write("FAIL onboard x\n")
+        if state is not None:
+            with open(os.path.join(d, STATE_S), "w", encoding="utf-8") as fh:
+                json.dump(state, fh)
+        return d
+
+    active = project("n3a-active", state={"activePhase": "onboard", "activeStatus": "in_progress",
+                                          "approvedPhases": []})
+    done = project("n3a-done", state={"activePhase": "", "approvedPhases": ["onboard"]})
+    plain = project("n3a-plain", kit=False)
+    out = []
+
+    def add(label, cmd, cwd, want, env=None):
+        out.append((label, cmd, inproc_shell(hp, cmd, dict({"HOOK_CWD": cwd}, **(env or {})), cwd), want))
+
+    for t in N3A_WRITES:
+        for p_ in (N3A_L, N3A_R):
+            add("write", t.format(P=p_), active, "block")
+    for p_ in N3A_PATHS:
+        add("path spelling", f"printf x >> {p_}", active, "block")
+    add("path spelling, absolute", f"printf x >> {active}/{N3A_L}", plain, "block")
+    add("path spelling, absolute, case variant", f"rm {active}/.GIT/AGENTS-V0/REOPEN-GRANT", plain, "block")
+    for c in N3A_RUNTIME:
+        add("run-time target", c, active, "block")
+    for c in N3A_FOLDER:
+        add("agents-v0 folder", c, active, "block")
+    for c in (f"printf x >> {N3A_L}", f"rm {N3A_R}", "mv .git/agents-v0 /tmp/x", f"( sed -i 1d {N3A_L} )"):
+        add("unattended", c, active, "block", STATE_UNATTENDED_ENV)
+        add("onboarding approved (docs/agents-v0 exists)", c, done, "block")
+        add("no docs/agents-v0 (unchanged)", c, plain, "allow")
+    for c in N3A_ALLOW:
+        add("read or kit script", c.format(L=N3A_L, R=N3A_R), active, "allow")
+        if "gate-checks.sh" not in c:  # the kit scripts in unattended mode: as before (the allowlist decides)
+            add("read, unattended", c.format(L=N3A_L, R=N3A_R), active, "allow", STATE_UNATTENDED_ENV)
+    for p_ in (N3A_L, N3A_R, "./" + N3A_L, os.path.join(active, N3A_R), ".GIT/Agents-V0/Gate-Ledger",
+               ".git/worktrees/wt1/agents-v0/gate-ledger", ".git/agents-v0/x/../reopen-grant"):
+        out.append(("edit tool", p_, inproc_path(hp, p_, active), "block"))
+    out.append(("edit tool, no docs/agents-v0 (unchanged)", N3A_L, inproc_path(hp, N3A_L, plain), "allow"))
+    out.append(("edit tool, not the ledger", ".git/agents-v0/notes.txt", inproc_path(hp, ".git/agents-v0/notes.txt", active), "allow"))
+    return out
+
+
 def state_write_cases(tmp: str) -> list:
     proj = os.path.join(tmp, "stateproj")
     os.makedirs(os.path.join(proj, "docs", "agents-v0", "onboarding"))
@@ -1808,6 +1920,9 @@ def main() -> int:
     jr4 = jr4_cases(hp, tmp)
     for label, cmd, got, want in jr4:
         check(got, want, f"Jiraiya 36a0dce1 ({label}, in-process) `{cmd}`")
+    n3a = n3a_cases(hp, tmp)
+    for label, cmd, got, want in n3a:
+        check(got, want, f"N3A ledger ({label}, in-process) `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1855,7 +1970,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(jr3) + len(jr4) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(jr3) + len(jr4) + len(n3a) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

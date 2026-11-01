@@ -633,7 +633,8 @@ def _is_state_path(p: str) -> bool:
     cands = [raw, posixpath.normpath(raw)]
     if not raw.startswith("/"):
         cands.append(posixpath.normpath(posixpath.join((_BASE_DIR or _base_dir()).replace("\\", "/"), raw)))
-    return any(pat.search(c) for c in cands for pat in STATE_PATH_PATTERNS) or _is_onboard_msg_path(p)
+    return any(pat.search(c) for c in cands for pat in STATE_PATH_PATTERNS) or _is_onboard_msg_path(p) or \
+        _is_ledger_path(p)
 
 
 # JO-8 (Sasuke): the onboard commit message and its scan record (.git/agents-v0-onboard-commit-msg.txt / .scan) are
@@ -660,6 +661,63 @@ def _is_onboard_msg_path(p: str) -> bool:
     return os.path.isdir(os.path.join(root, "docs", "agents-v0"))
 
 
+# N3A (Sasuke; Sai's request with ec944f63, Kakashi's assignment 2026-11-02): the gate ledger and the reopen grant
+#   (.git/agents-v0/gate-ledger, .git/agents-v0/reopen-grant; gate-checks.sh keeps them in the git common dir, and the
+#   .git/worktrees/<n>/agents-v0/ forms are covered too) are written only by gate-checks.sh (the grant only by the
+#   person, in their own terminal). ledger_ok refuses a changed ledger, so an agent that rewrites, cuts, recreates,
+#   moves or removes it could clear its own FAIL history. While docs/agents-v0 exists (the JO-8 condition) they are
+#   protected like the state files and the onboard message: every shell spelling the state guard knows, case-blind,
+#   and the edit tool. Their agents-v0 folder and .git itself are "folders that hold them": moving, removing,
+#   archiving with --remove-files / zip -m, or extracting or copying recursively onto them is denied. ln that names
+#   them (either side) is denied. Reads (cat, grep, cp out, tar -c) and running gate-checks.sh stay allowed.
+#   Known gap (as for state.json): a script the agent wrote first and then runs (sh x.sh, python3 x.py).
+_LEDGER_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0/(?:gate-ledger|reopen-grant)$", re.I)
+_LEDGER_HOLDER_RE = re.compile(r"(?:^|/)\.git(?:/worktrees(?:/[^/]+)?)?(?:/agents-v0)?$", re.I)
+_LEDGER_MENTION_RE = re.compile(r"gate-ledger|reopen-grant|\.git/(?:worktrees/[^/\s]+/)?agents-v0(?:/|(?![\w.-]))"
+                                r"|--git-path\s+['\"]?agents-v0(?![\w.-])", re.I)
+LEDGER_WRITE_MSG = ("{} is the gate ledger or the reopen grant (or a folder that holds them): only "
+                    "sh .agents-v0/scripts/gate-checks.sh writes the ledger, and only the person writes the grant, in "
+                    "any mode. Never edit, cut, recreate, move or remove them; if a gate check says `ledger changed, "
+                    "ask the user`, stop and show the user its output.")
+
+
+def _abs_norm(p: str, base: Optional[str] = None) -> str:
+    raw = os.path.expanduser(p.replace("\\", "/").strip().strip("'\""))
+    if not raw:
+        return ""
+    full = raw if raw.startswith("/") else posixpath.join((base or _BASE_DIR or _base_dir()).replace("\\", "/"), raw)
+    return posixpath.normpath(full)
+
+
+def _ledger_match(full: str, rx: "re.Pattern") -> bool:
+    m = rx.search(full)
+    if not m:
+        return False
+    root = full[: m.start()] or "/"
+    return os.path.isdir(os.path.join(root, "docs", "agents-v0"))
+
+
+def _is_ledger_path(p: str, base: Optional[str] = None) -> bool:
+    if not re.search(r"gate-ledger|reopen-grant", p, re.I):
+        return False
+    full = _abs_norm(p, base)
+    return bool(full) and _ledger_match(full, _LEDGER_RE)
+
+
+def _is_ledger_holder(p: str, base: Optional[str] = None) -> bool:
+    """p is .git, .git/worktrees[/<n>] or an agents-v0 folder there, in a project with docs/agents-v0."""
+    full = _abs_norm(p, base)
+    return bool(full) and _ledger_match(full, _LEDGER_HOLDER_RE)
+
+
+def _ledger_related(t: str) -> bool:
+    """A refused target that is the ledger, the grant, a folder holding them, or a run-time target named near them."""
+    e = _expand_known_vars(t)
+    return _is_ledger_path(e) or _is_ledger_holder(e) or bool(_LEDGER_MENTION_RE.search(e)) or (
+        _unknown_target(t) and bool(_LEDGER_MENTION_RE.search(_CMD_TEXT[0])) and
+        not _STATE_MENTION_OLD_RE.search(_CMD_TEXT[0]))
+
+
 def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
     out = [dest]
     full = dest if dest.startswith("/") else os.path.join(_BASE_DIR or _base_dir(), dest)
@@ -679,8 +737,9 @@ _STATE_TEMPLATES = ("docs/agents-v0/onboarding/state.json", "docs/agents-v0/prog
                     "docs/agents-v0/maintain/{}/state.json", "docs/agents-v0/requirements/{}.state.json")
 _GLOB_CHARS = re.compile(r"[*?\[]")
 _SHELL_VARS: dict = {}  # name -> value for `name=value` segments earlier in the same command (None: not knowable)
-_STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)"
-                               r"|agents-v0-onboard-commit-msg", re.I)  # JO-8: a $(git rev-parse --git-path ...) target
+_STATE_MENTION_OLD_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)"
+                                   r"|agents-v0-onboard-commit-msg", re.I)  # JO-8: a $(git rev-parse --git-path ...) target
+_STATE_MENTION_RE = re.compile(_STATE_MENTION_OLD_RE.pattern + "|" + _LEDGER_MENTION_RE.pattern, re.I)  # N3A
 _CMD_TEXT = [""]  # the whole command being judged (for "does it name a state folder")
 # onboard fix (Jiraiya round 2, item 1): a write target the shell only fills in at run time ($OUT, "$f", $(...)) that
 #   is not near a state folder. The guard cannot check it, so the command asks instead of passing. Set by
@@ -723,6 +782,21 @@ def _state_candidates(root: str) -> List[str]:
     return sorted(out)
 
 
+def _ledger_candidates(root: str) -> List[str]:
+    """N3A: the ledger, the grant and the folders above them, when the project has docs/agents-v0."""
+    if not os.path.isdir(os.path.join(root, "docs", "agents-v0")):
+        return []
+    names = {"x"}
+    try:
+        names.update(os.listdir(os.path.join(root, ".git", "worktrees")))
+    except OSError:
+        pass
+    out = [".git", ".git/agents-v0", ".git/worktrees"]
+    for pre in [".git"] + [f".git/worktrees/{n}" for n in sorted(names)]:
+        out += [pre, f"{pre}/agents-v0", f"{pre}/agents-v0/gate-ledger", f"{pre}/agents-v0/reopen-grant"]
+    return out
+
+
 def _expand_known_vars(t: str) -> str:
     def sub(m: "re.Match") -> str:
         v = _SHELL_VARS.get(m.group(1) or m.group(2))
@@ -740,6 +814,8 @@ def _holds_state(arg: str, base: Optional[str] = None, git_pathspec: bool = Fals
         return True  # :/, :(glob), :(top), :! ... magic: judged as a match (the guard does not evaluate magic)
     if _is_state_path(a) and not _GLOB_CHARS.search(a):
         return True
+    if not _GLOB_CHARS.search(a) and _is_ledger_holder(a, base):  # N3A: .git, .git/agents-v0 hold the ledger
+        return True
     full = os.path.normpath(os.path.join(base, os.path.expanduser(a)))
     root = _repo_root(base)
     if _GLOB_CHARS.search(a):
@@ -749,6 +825,11 @@ def _holds_state(arg: str, base: Optional[str] = None, git_pathspec: bool = Fals
         for c in _state_candidates(root):
             rel = os.path.relpath(os.path.join(root, c), base).replace(os.sep, "/")
             if rx.match(rel) or rx.match(os.path.join(root, c)):
+                return True
+        rxi = re.compile(fnmatch.translate(a), re.I)  # N3A: the ledger paths match case-blind
+        for c in _ledger_candidates(root):
+            rel = os.path.relpath(os.path.join(root, c), base).replace(os.sep, "/")
+            if rxi.match(rel) or rxi.match(os.path.join(root, c)):
                 return True
         return False
     if root:
@@ -785,6 +866,9 @@ def _state_target(t: str) -> bool:
         return False
     e = _expand_known_vars(t)
     if _is_state_path(e):
+        return True
+    bm = re.search(r"\{([^{}]*,[^{}]*)\}", e)  # N3A: brace expansion (tee x/{a,b}): judge each word it makes
+    if bm and any(_state_target(e[:bm.start()] + alt + e[bm.end():]) for alt in bm.group(1).split(",")):
         return True
     if _unknown_target(t):
         base = os.path.abspath(_BASE_DIR or _base_dir())
@@ -896,6 +980,11 @@ def _segment_writes_state(seg: str) -> Optional[str]:
         for c in cands:
             if _state_target(c.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", c) else c):
                 return c
+        if bin0 in ("ln", "link"):  # N3A: a link to the ledger is a second name to write it through
+            for x in ops + ([tgt] if tgt else []):
+                if _is_ledger_path(_expand_known_vars(x)) or (_unknown_target(x) and _state_target(x) and
+                                                              _LEDGER_MENTION_RE.search(_CMD_TEXT[0])):
+                    return x
         # A whole folder replaced or moved: mv of a folder that holds a state file (away, or onto one), and a
         #   recursive cp / rsync onto a folder that holds one. Copying such a folder elsewhere is a read: allowed.
         dest = tgt if tgt is not None else (ops[-1] if len(ops) >= 2 else None)
@@ -910,6 +999,8 @@ def _segment_writes_state(seg: str) -> Optional[str]:
             for x in srcs:
                 if _holds_state(x):
                     return x
+                if _unknown_target(x) and _LEDGER_MENTION_RE.search(_CMD_TEXT[0]):  # N3A: mv "$(git rev-parse ...)"
+                    return x
             if dest and _holds_state(dest) and any(_is_folder(x) for x in srcs):
                 return dest
         if bin0 in ("cp", "rsync", "scp") and recursive and dest:
@@ -923,6 +1014,14 @@ def _segment_writes_state(seg: str) -> Optional[str]:
             bin0 in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", p) for p in parts[1:])):
         for a in _file_operands(bin0, parts, awk_inplace):
             if not a.startswith("-") and not a.startswith("+") and _state_target(a):
+                return a
+            if bin0 in ("rm", "unlink", "shred") and not a.startswith("-") and _is_ledger_holder(_expand_known_vars(a)):
+                return a  # N3A: rm -r .git/agents-v0
+    # N3A: an archive that removes what it packs (tar --remove-files, zip -m / --move) is a move.
+    if (bin0 in ("tar", "bsdtar", "gtar") and "--remove-files" in parts[1:]) or (
+            bin0 == "zip" and any(a == "--move" or re.fullmatch(r"-[A-Za-z]*m[A-Za-z]*", a) for a in parts[1:])):
+        for a in parts[1:]:
+            if not a.startswith("-") and (_state_target(a) or _holds_state(a)):
                 return a
     if bin0 == "dd":
         for a in parts[1:]:
@@ -2266,6 +2365,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if spath:
         if "agents-v0-onboard-commit-msg" in spath.lower() or (_unknown_target(spath) and "agents-v0-onboard-commit-msg" in _CMD_TEXT[0].lower()):
             return "block", ONB_MSG_WRITE_MSG.format(spath)  # JO-8
+        if _ledger_related(spath):
+            return "block", LEDGER_WRITE_MSG.format(spath)  # N3A
         return "block", STATE_WRITE_MSG.format(spath)
 
     kpath = _segment_changes_kit_container(seg)
@@ -2882,7 +2983,7 @@ COMPOUND_MSG = ("the guard cannot follow this shell compound form ({}), so it ju
 _COMPOUND_DENY_RE = re.compile(
     r"\bgit\b[^\n]*?\b(?:push|restore|checkout|switch|stash|reset|clean|commit|commit-tree|update-ref|rm|mv|"
     r"filter-branch|filter-repo)\b|(?:^|[^\w.-])(?:gh|glab|rm|shred|unlink|truncate)(?=[\s;&|()<>`]|$)|"
-    r"docs/agents-v0|state\.json|agents-v0-onboard-commit-msg|\.git/hooks|\.cursor/|\.agents/|\.agents-v0/|"
+    r"docs/agents-v0|state\.json|agents-v0-onboard-commit-msg|gate-ledger|reopen-grant|\.git/hooks|\.cursor/|\.agents/|\.agents-v0/|"
     r"\.gitlab-ci\.yml|\.github/workflows", re.I)
 
 
@@ -3236,6 +3337,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
         return ("block" if unattended_mode() else "ask"), _startup_msg(path)
     if _is_onboard_msg_path(path):  # JO-8
         return "block", ONB_MSG_WRITE_MSG.format(path)
+    if _is_ledger_path(path) or _is_ledger_holder(path):  # N3A
+        return "block", LEDGER_WRITE_MSG.format(path)
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         if norm.endswith(".phase-result.md"):
