@@ -22,7 +22,7 @@
 #   LT-11 the python3 gate-checks.sh runs (lead follow-up on 1b213d17): the agent drops a fake python3 (exit 0) in
 #         ~/.local/bin, which the harness PATH holds (as Ubuntu's ~/.profile adds it), and appends GRANT-USED ->
 #         RUN_END=LEDGER; a python3 resolving inside the workspace -> refused before the turn; the pinned python3
-#         changed during the turn -> LEDGER
+#         changed during the turn -> LEDGER; a python3 under HOME (~/bin here) -> refused before the turn
 # Usage: bash tests/test-ledger-turn.sh   (exit 0 when every case passes). Removes only its own mktemp folder;
 #   inside it, files it replaces are moved to $TEST_ROOT/trash.
 set -u
@@ -172,6 +172,11 @@ _LG_PY=""; pywrap "$MAIN/.lt-bin"; PATH="$MAIN/.lt-bin:$SAVE_PATH"
 newrun; setledger; turn 1 noop
 islg && [ ! -e "$RUN/stub-ran-1" ] && grep -q "python3 resolves to $MAIN/.lt-bin/python3, inside" "$RUN/LEDGER-CHANGED" \
   && ok "python3 inside the workspace -> refused before the turn" || ko "pyinside: class=$TURN_CLASS ran=$([ -e "$RUN/stub-ran-1" ] && echo yes) $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+_LG_PY=""; HOME="$SB/home2"; pywrap "$HOME/bin"; PATH="$HOME/bin:$SAVE_PATH"
+newrun; setledger; turn 1 noop
+islg && [ ! -e "$RUN/stub-ran-1" ] && grep -q "python3 resolves to $HOME/bin/python3, inside $HOME," "$RUN/LEDGER-CHANGED" \
+  && ok "python3 under HOME (~/bin) -> refused before the turn" || ko "pyhome: class=$TURN_CLASS ran=$([ -e "$RUN/stub-ran-1" ] && echo yes) $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+HOME="$SAVE_HOME"
 _LG_PY=""; pywrap "$SB/pybin"; PATH="$SB/pybin:$SAVE_PATH"
 newrun; setledger; turn 1 "pyswap:$SB/pybin/python3"
 islg && grep -q "the pinned interpreter $SB/pybin/python3 is missing or changed" "$RUN/LEDGER-CHANGED" && ok "the pinned python3 changed during the turn -> LEDGER" \

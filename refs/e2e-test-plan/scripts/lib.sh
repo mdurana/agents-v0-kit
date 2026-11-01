@@ -744,10 +744,11 @@ turn-$k: gate commits out of order: $(tr '\n' ';' < "$RUN/gate-chain-order-$k.tx
 #   Pinned python3 (lead follow-up on 1b213d17): gate-checks.sh runs `python3` from PATH, and the agent (same OS user)
 #   can drop one in ~/.local/bin or another PATH dir it writes. At the first mark of the harness process, python3 is
 #   resolved (command -v, then realpath/readlink -f, so a venv symlink pins the real file) and refused when it lies in
-#   WS, MAIN, TEST_ROOT or ~/.local/bin, or cannot be resolved; its path and sha256 stay in shell variables (and the
-#   mark file). Every ledger_mark and ledger_turn_ok then runs with /bin/sh, a fresh harness dir holding only a
-#   python3 symlink to the pinned file first on PATH, no PATH entry inside HOME, TEST_ROOT, WS or MAIN, and
-#   PYTHONNOUSERSITE=1 (no user-site .pth); the pinned file is re-hashed before each, and a change stops the run.
+#   WS, MAIN, TEST_ROOT or anywhere under HOME (as the PATH filter: ~/.local/bin, ~/bin, pyenv), or cannot be
+#   resolved; its path and sha256 stay in shell variables (and the mark file). Every ledger_mark and ledger_turn_ok
+#   then runs with /bin/sh, a fresh harness dir holding only a python3 symlink to the pinned file first on PATH, no
+#   PATH entry inside HOME, TEST_ROOT, WS or MAIN, and PYTHONNOUSERSITE=1 (no user-site .pth); the pinned file is
+#   re-hashed before each, and a change stops the run.
 #   H10 (kit_integrity_check) reports a gate-checks.sh changed during the turn.
 ledger_gc_dir(){ local d; for d in "$WS" "$MAIN"; do
     [ -n "$d" ] && [ -f "$d/.agents-v0/scripts/gate-checks.sh" ] && grep -q '^  ledger_mark)' "$d/.agents-v0/scripts/gate-checks.sh" 2>/dev/null \
@@ -756,7 +757,7 @@ ledger_stop(){ printf 'turn-%s %s\n' "$1" "$2" >> "$RUN/LEDGER-CHANGED"; TURN_CL
   post FINDING "N84 run=${RUN##*/} turn=$1: the gate ledger or its checker changed during the unattended turn, the run stops for a person (see ${RUN##*/}/LEDGER-CHANGED)"; }
 _LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA="" _LG_PY="" _LG_PYSHA=""
 _lg_real(){ realpath "$1" 2>/dev/null || readlink -f "$1" 2>/dev/null; }
-_lg_inside(){ local p="$1" d; for d in "$WS" "$MAIN" "$TEST_ROOT" "$HOME/.local/bin"; do
+_lg_inside(){ local p="$1" d; for d in "$WS" "$MAIN" "$TEST_ROOT" "$HOME"; do
     [ -n "$d" ] || continue; d="$(_lg_real "$d" || printf '%s' "$d")"; case "$p/" in "$d"/*) printf '%s\n' "$d"; return 0;; esac; done; return 1; }
 # _lg_path: the harness PATH without relative entries or entries inside HOME, TEST_ROOT, WS or MAIN
 _lg_path(){ local e out="" IFS=:; for e in $PATH; do case "$e" in /*) ;; *) continue;; esac
