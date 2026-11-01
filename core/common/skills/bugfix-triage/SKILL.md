@@ -17,7 +17,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 7. The reproducing test passes. Add the edge-path test. Each attempt appends a card; run `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` before the next one.
 8. Run the full verify command once. Bounded fix attempts (≤ 3 per failure, prompt-only); on exhaustion stop and report the blocker.
 9. Record the change tier and impacted surfaces in the note. Auth, sessions, routes, controllers, uploads, or deployment security configuration means the full Verify with the VAPT checklist.
-10. Do not commit or push without explicit user approval.
+10. Do not commit without explicit user approval. Do not push: the hook refuses it; the user pushes.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: smallest correct diff; no commits/force-push without approval.

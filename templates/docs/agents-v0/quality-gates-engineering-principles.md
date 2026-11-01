@@ -19,7 +19,7 @@ only from green.
 | SonarQube | Quality gate (coverage, complexity, duplication) | CI analysis step; `sonar.qualitygate` fail on breach |
 | Checkstyle | Style and structural rules (config starter: `core/java/starters/maven/checkstyle.xml`) | `verify` phase |
 | SpotBugs | Static bug analysis (correctness, injection) | `verify` phase |
-| OWASP Dependency-Check | CVE scanning of dependencies | CI scan; no new high/critical CVEs. Lockfiles committed. Secret detection on the merge request. SBOM for a service that ships (`security-baseline.mdc` §9) |
+| OWASP Dependency-Check | CVE scanning of dependencies | CI scan; no new high/critical CVEs. Lockfiles committed. Secret detection locally (the kit's staged scan on the onboard commit; the repo's own CI, if any). SBOM for a service that ships (`security-baseline.mdc` §9) |
 | OpenAPI contract diff | No breaking drift vs the approved contract | `verify` phase (starter: `core/java/starters/maven/contract-conformance.xml`) |
 | ArchUnit | Layer boundaries (domain ≠ web, DTO-only edge, constructor injection) | `test`/`verify` (starter: `core/java/starters/maven/archunit/LayerRulesTest.java`) |
 

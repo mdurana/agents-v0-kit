@@ -19,7 +19,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 4. Use Mermaid conventions from `architecture-and-diagrams.mdc` (camelCase IDs, quoted edge labels, ≤ ~50 nodes).
 5. Review the drafted changes for accuracy; apply with the smallest diff.
 5a. When `docs/agents-v0/onboarding/report.md` exists, run `sh .agents-v0/scripts/check-onboarding-docs.sh`. Code changes move lines, so a `path:line` citation that no longer resolves must be re-pointed to the code it described, or the statement marked `UNVERIFIED`. Update the module document's `commit:` only when you re-read the code it describes.
-6. Do not commit or push without explicit user approval.
+6. Do not commit without explicit user approval. Do not push: the hook refuses it; the user pushes.
 
 ## Rule-compliance checklist
 - [ ] `project-delivery-core.mdc`: mandated docs updated (README, architecture, network, sequences).

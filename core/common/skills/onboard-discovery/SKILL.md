@@ -9,7 +9,7 @@ Onboard phase playbook for the `codebase-documenter` agent (`/v0-onboard`, `work
 
 ## Steps
 1. **Set up.** Copy `docs/agents-v0/onboarding/_report.template.md` to `docs/agents-v0/onboarding/report.md` when it is absent. Record `commit:` (`git rev-parse HEAD`); every document describes that tree. If application files have uncommitted changes, tell the user and stop: the documents would describe a tree nobody can check out.
-2. **Baseline.** Run the baseline audit (`sh .agents-v0/scripts/audit-brownfield-baseline.sh`, or the repo's documented verify command). Record pass or fail. A red baseline is documented, not fixed.
+2. **Baseline.** Run the baseline audit (`sh .agents-v0/scripts/audit-brownfield-baseline.sh`, or the repo's documented verify command). Record pass or fail. Onboard records a red baseline and continues; build and maintain stop until it is fixed or accepted by name.
 3. **Mechanical inventories.** Run `sh .agents-v0/scripts/generate-repo-map.sh`, `sh .agents-v0/scripts/collect-dependency-graphs.sh`, and `sh .agents-v0/scripts/discover-codebase.sh`.
    - A non-zero exit from the graph script names the root that has no graph; record it as `UNVERIFIED` or fix the environment (wrapper, `npm ci`).
    - A `TRUNCATED:` line means a list was cut. Re-run with a higher `DISCOVER_MAX`, or record that the list is partial.

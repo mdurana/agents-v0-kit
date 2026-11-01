@@ -44,7 +44,7 @@ alwaysApply: true
 
 - **Do not commit** unless the user asked.
 - Avoid destructive git (`push --force`, hard reset) unless explicitly requested.
-- MR creation via **`glab`** only when the user requests it.
+- Never push or create an MR: the hook refuses `git push` and `gh`/`glab` writes in every mode; the user runs them.
 
 ## Prompt efficiency
 

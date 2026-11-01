@@ -51,7 +51,7 @@ To keep kit commits out of the project, pin the kit instead of copying it:
 ./scripts/install.sh --link --commit <sha> --url <kit-git-url> /path/to/your-new-repo
 ```
 
-`--path` points at a local kit checkout. The pin is `docs/agents-v0/kit-pin`. Set `CI_PACK_IMAGE` to the pack's `ciImage`.
+`--path` points at a local kit checkout. The pin is `docs/agents-v0/kit-pin`.
 **Major** cross-cutting changes use **`system-design`** in `/v0-design`.
 
 Manual equivalent:
@@ -65,9 +65,11 @@ cp /path/to/agents-v0/templates/docs/agents-v0/milestones/p0-platform-skeleton.m
 
 The manual path without bootstrap does not fill Layout. Set the **This repo** rows in `docs/agents-v0/project-profile.md`, or re-run bootstrap with `--profile`.
 
+**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.6 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
+
 On an Intel Mac, before the first verify command, run `sh .agents-v0/scripts/host-tools-macports.sh` to check tools named by the pack's `hostChecks` and PyYAML. Exit 2 means a tool is missing. Approve `sh .agents-v0/scripts/host-tools-macports.sh --install` ([gold-standards.md](gold-standards.md)).
 
-Wire CI with the seeded `.gitlab-ci.yml` when using GitLab. For air-gapped runners, set GitLab CI variable `CI_IMAGE_PREFIX` to your mirror prefix (document the same value in the profile's **CI image prefix** row). The build job uses Docker-in-Docker and caches `.m2/repository`; the frontend and e2e jobs cache `.npm/`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. Install PyYAML (`python3 -m pip install pyyaml`; on Intel macOS the host-tools script above covers it). Optional: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"` checks that `<feature>.state.json` has `verifyPassed: true` before pushing a feature branch. After Release, regulated teams may archive evidence with `sh .agents-v0/scripts/export-audit-pack.sh <feature>`. To remap Cursor models, edit `.cursor/model-config.json` (seeded on install), then run `sh .agents-v0/scripts/update-agents-model.sh`. Ensure `.gitignore` keeps `docs/agents-v0/build/` and `docs/agents-v0/verify/` committable.
+The kit ships no CI pipeline; the repo brings its own CI if it wants one. The kit's checks run locally at the gates. Install PyYAML (`python3 -m pip install pyyaml`; on Intel macOS the host-tools script above covers it). Optional: `cp .agents-v0/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push" && chmod +x "$(git rev-parse --git-path hooks)/pre-push"` checks that `<feature>.state.json` has `verifyPassed: true` before pushing a feature branch. After Release, regulated teams may archive evidence with `sh .agents-v0/scripts/export-audit-pack.sh <feature>`. To remap Cursor models, edit `.cursor/model-config.json` (seeded on install), then run `sh .agents-v0/scripts/update-agents-model.sh`. Ensure `.gitignore` keeps `docs/agents-v0/build/` and `docs/agents-v0/verify/` committable.
 
 ## 3. Wire quality before heavy coding
 

@@ -1,6 +1,6 @@
 # Agentic Delivery Workflow (agents-v0)
 
-Local-first, IDE-portable delivery kit (**Cursor**, **Claude Code**, **Antigravity**, **Windsurf**, **VS Code Copilot**). Always-on instructions live in `AGENTS.md` and `.cursor/rules/` after `scripts/install.sh`.
+Local-first, IDE-portable delivery kit (**Cursor**, **Claude Code**, **Windsurf**, **VS Code Copilot**; the **Antigravity** (agy) adapter is unproven and opt-in). Always-on instructions live in `AGENTS.md` and `.cursor/rules/` after `scripts/install.sh`.
 
 ## Mission
 
@@ -33,7 +33,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 - Reconnaissance → Plan → Execute → Verify → Report in every phase.
 - A phase is not complete until its gate passes; stop (`--status awaiting_approval`) and wait for explicit user approval before advancing. Never infer approval.
 - Record workflow state and approvals via `.agents-v0/scripts/sync-feature-state.sh` (`<feature>.state.json`, `maintain/<id>/state.json`, `onboarding/state.json`, `program.state.json`).
-- Commits, local merges, pushes, and merge-request creation each need explicit human authorization.
+- Commits and local merges each need explicit human authorization. Pushes and merge-request creation are the human's: the hook refuses `git push` and every `gh` or `glab` write in every mode.
 - Smallest correct diff; no drive-by refactors; no unsolicited files.
 - Read `docs/agents-v0/lessons.md` before a story phase; never edit it on a story branch (lesson candidates go in the phase-result).
 - Build & Verify gate: the profile Backend verify command (`.agents-v0/scripts/run-backend-verify.sh`, e.g. `./mvnw -B clean verify -Pci-security` or `dotnet test`) and Frontend verify command pass.

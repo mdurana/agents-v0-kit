@@ -24,7 +24,7 @@ cd app/backend && ./mvnw -B clean verify -Pci-security
 cd app/frontend && npm run build   # React example; SvelteKit when the repo already uses it
 ```
 
-Profile `service` runs the Backend verify row from the backend or BFF root. Profile `ui` runs the Frontend verify row. Profile `app` runs both. Fast loops use `Backend verify (fast, no OWASP)` and `Frontend verify (fast)`. Pack `java` fills those with `./mvnw -B clean verify -P!ci-security` and `npm test`. Bootstrap `--scaffold-app` fills the Java example; the red–green loop must not use a placeholder cell. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths. Set `CI_PACK_IMAGE` to that manifest's `ciImage`.
+Profile `service` runs the Backend verify row from the backend or BFF root. Profile `ui` runs the Frontend verify row. Profile `app` runs both. Fast loops use `Backend verify (fast, no OWASP)` and `Frontend verify (fast)`. Pack `java` fills those with `./mvnw -B clean verify -P!ci-security` and `npm test`. Bootstrap `--scaffold-app` fills the Java example; the red–green loop must not use a placeholder cell. A repo whose profile still names `backend/` or `frontend/` at the root uses those paths.
 
 ## Run
 

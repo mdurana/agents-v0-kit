@@ -27,7 +27,7 @@ Primary local completion for the `release-manager` agent (`workflow-orchestratio
 
 ## Do not
 - Commit to `feature/<feature>` or `maintain/<id>` after it was merged into the integration branch, or run `sync-feature-state.sh` (any option) or edit its state, phase-result, or evidence in the feature or maintain worktree after the merge. Release approval happens only on the integration branch; `sync-feature-state.sh --approve release` refuses on any other branch.
-- Call `glab` or push unless the user explicitly asks to push or run `/v0-release`.
+- Call `glab` or push: the hook refuses push and `glab` writes; the user pushes from their own terminal, or runs `/v0-release`.
 - Merge or approve a merge request.
 - Treat `/v0-release` as required for this local completion.
 - Edit `docs/agents-v0/lessons.md` on a feature or maintain branch, or append a lesson the user did not accept.

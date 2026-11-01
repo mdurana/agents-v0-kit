@@ -66,7 +66,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
 | `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
-| `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
+| `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake; roadmap, intake, plan, architecture, deliver, triage and maintain refuse until that approval is committed. The onboard commit runs a staged secret scan and a commit-message check, then asks you once; a finished onboard cannot be restarted (reopen is not available yet). |
 | `/v0-status`   | Name the feature when more than one is open. One open story can omit the name. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
 
 
@@ -309,8 +309,9 @@ Make the portal better.
 
 ## What the AI will not do without you
 
-- **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
-- **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
+- **Commit** code to Git without your OK — the shell hook **asks** in supervised mode (commit and tag); approve only when you intended that action (e.g. Release).  
+- **Push, or write to GitLab or GitHub** — the hook refuses `git push` and every `gh` or `glab` write in every mode, supervised included; `gh` is limited to read-only commands such as `gh pr view` or `gh run list`. You push and open the merge request from your own terminal.  
+- **Self-approve delivery gates** in markdown — a **human** approves each gate and reviews the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
 - **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop. The platform skeleton's one stop is Release. A story with no API, no messages between systems, no screens, and no public route has no Design stop. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  
 - **Overwrite another feature’s files** in the same checkout — it stops and names the files instead.  

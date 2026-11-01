@@ -19,7 +19,7 @@ Release phase playbook for the `release-manager` agent (`workflow-orchestration.
 6. Report: environments deployed, smoke results, flags, rollback status. Release is complete for a deployable project only after the last environment's smoke check passes.
 
 ## Rule-compliance checklist
-- [ ] `ai-agent-conduct.mdc`: no deploy, publish, or push without explicit user approval; no force-push or hard reset.
+- [ ] `ai-agent-conduct.mdc`: no deploy or publish without explicit user approval; no push (the hook refuses it); no force-push or hard reset.
 - [ ] `migration-safety`: expand/contract for schema changes; rollback notes recorded.
 - [ ] `security-baseline.mdc`: no secrets in deploy records.
 - [ ] Each environment has its own authorization, smoke result, and rollback command on record.

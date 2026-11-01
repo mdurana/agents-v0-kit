@@ -19,7 +19,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 9. Produce or refresh a CycloneDX or SPDX SBOM for the service.
 10. If the upgrade changes behavior or topology, sync docs (`doc-sync` skill).
 11. Record the change tier in the note. A version-only patch change is Trivial-eligible; a minor bump and anything else is `standard`.
-12. Do not commit or push without explicit user approval.
+12. Do not commit without explicit user approval. Do not push: the hook refuses it; the user pushes.
 
 ## Rule-compliance checklist
 - [ ] `security-baseline.mdc` §9: dependency scanning; lockfile committed; no new high/critical CVEs without a documented exception; SBOM produced for the service.

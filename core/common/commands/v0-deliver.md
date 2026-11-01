@@ -41,4 +41,4 @@ Run **one story** through **Intake → Design → Build → Verify → Local Rel
 Prefer launching the `orchestrator` subagent, which follows this file. In single-agent IDEs or sessions where subagents cannot spawn subagents, the main session executes each phase command and skill sequentially.
 
 ## Conduct
-Per `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report at each phase. No commits, merges, or pushes without explicit user approval. Follow `workflow-orchestration.mdc`.
+Per `ai-agent-conduct.mdc`: Reconnaissance → Plan → Execute → Verify → Report at each phase. No commits or merges without explicit user approval; no pushes (the hook refuses them; the user pushes). Follow `workflow-orchestration.mdc`.

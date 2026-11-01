@@ -20,7 +20,7 @@ alwaysApply: false
 2. Before merge: the profile Backend verify command (`sh .agents-v0/scripts/run-backend-verify.sh`; the `java` example is **`./mvnw -B clean verify -Pci-security`** from the backend root) or the full frontend verify command — see `docs/agents-v0/gold-standards.md` and the pack's `pack.json`. The fast loop does not replace this gate. The coverage table below applies to every pack.
 3. Coverage gaps: the report named in the pack `pack.json`. The `java` example is `./mvnw -B clean test jacoco:report` from the backend root → `target/site/jacoco/index.html`.
 4. No new high/critical CVEs without a documented exception. The report is the pack `cve.path` (Pack `java`: OWASP Dependency-Check).
-5. Lockfiles are committed. Secret detection runs on merge requests; a committed secret fails verification. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
+5. Lockfiles are committed. Secret detection runs locally (the kit's staged scan on the onboard commit; the repo's own CI, if any, on merge requests); a found secret stops the commit. A service that ships produces a CycloneDX or SPDX SBOM. Document the license policy when compliance requires it (`security-baseline.mdc` §9).
 
 ## Tooling
 

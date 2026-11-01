@@ -155,7 +155,7 @@ Remove fingerprinting headers (`X-Powered-By`, `Server` version leaks) where con
 - Dependency scanning in CI (OWASP Dependency-Check, Snyk, Dependabot) — see `quality-and-testing.mdc`
 - No new high or critical CVE without a documented exception
 - Lockfiles are committed
-- GitLab secret detection runs on the merge request. A committed secret fails the pipeline
+- The kit ships no CI: its secret scan runs locally on the staged onboard commit, and nothing scans the merge request unless the repo's own CI does. A found secret stops the commit
 - Every service that ships produces a CycloneDX or SPDX SBOM
 - Document the license policy when compliance requires it
 

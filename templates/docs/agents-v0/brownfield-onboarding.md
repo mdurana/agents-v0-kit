@@ -13,12 +13,16 @@ without blocking on a broken baseline or org coverage/CVE targets on day one.
 # ./scripts/install.sh --pack <id> --with-starters /path/to/existing-repo
 ```
 
+**Prerequisites:** `git`, a POSIX `sh`, and `python3` 3.6 or later: the gate checks (`gate-checks.sh`) and the secret scan (`secret_scan.py`) run on it, and the shell hooks need 3.8 or later. On a Mac, `python3` comes with the Xcode command line tools: run `xcode-select --install`.
+
 On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the first build or maintain verify. Missing host tools named by the pack's `hostChecks` are installed with MacPorts when a port exists (JDK 21, Node, npm, Python, Go). The .NET SDK comes from the pack image, not MacPorts. PyYAML uses that script (`python3 -m pip install pyyaml`, or a `pyXY-yaml` port when Python is from MacPorts) ([gold-standards.md](gold-standards.md)).
 
 Do **not** run `bootstrap-greenfield.sh --scaffold-app` on an existing codebase. That archive is for empty greenfield repos only; `/v0-onboard` records the tree as it is and does not move source onto `app/backend` / `app/frontend`.
 
 Then run `/v0-onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
-codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, or `/v0-plan`:
+codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, `/v0-plan`, `/v0-deliver`, `/v0-triage`, or `/v0-maintain`:
+
+**After onboarding.** `/v0-roadmap`, `/v0-intake`, `/v0-plan`, `/v0-architecture`, `/v0-deliver`, `/v0-triage` and `/v0-maintain` refuse to start until `onboard` is approved and that approval is committed. The onboard commit runs a staged secret scan and a commit-message check, then asks you once in supervised mode; it must run through the chain documented in `/v0-onboard`, not a hand-made `git commit`. A finished onboard (awaiting approval or approved) cannot be restarted without a reopen, and reopen is not available yet.
 
 | Output | Path |
 |--------|------|
@@ -32,14 +36,14 @@ codebase as it is today, with every statement cited to code or marked `UNVERIFIE
 | Proposed endpoint rows (.NET, Nest, Express, FastAPI, Django, Go), same regexes as `.agents-v0/scripts/endpoint_scan.py` | `docs/agents-v0/discovery/endpoint-stacks.md` |
 | As-is architecture, network, context map, inherited decisions, flows you name | `docs/agents-v0/architecture.md`, `docs/agents-v0/network.md`, `docs/agents-v0/design/system/context-map.md`, `docs/agents-v0/adr/0000-inherited-decisions.md`, `docs/agents-v0/diagrams/sequences/` |
 
-When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. No marker asks the person to name the pack id and to write its `pack.json`. Two markers stop so a person can choose. A `Pack` cell that already names an id stays, including an id that is not a kit example. A later roadmap or architecture does not replace that pack. Set `CI_PACK_IMAGE` to that pack's `ciImage`.
+When `Pack` is still empty, `/v0-onboard` runs `sh .agents-v0/scripts/activate-stack-pack.sh --detect`. No marker asks the person to name the pack id and to write its `pack.json`. Two markers stop so a person can choose. A `Pack` cell that already names an id stays, including an id that is not a kit example. A later roadmap or architecture does not replace that pack.
 
 Checks you can run yourself: `sh .agents-v0/scripts/discover-codebase.sh` (refresh the inventories) and `sh .agents-v0/scripts/check-onboarding-docs.sh` (every backticked citation resolves; no template line left; every document under `docs/agents-v0/onboarding/` has a `commit:` line). At the Onboard gate run it with `--gate`: it also requires the gate documents listed in `.agents-v0/scripts/gate-rules`, checks that every `commit:` stamp is a commit in the history of HEAD, and reports an unbackticked citation as a `WARN` line. Lists are capped (`DISCOVER_MAX`, default 500) and say so when they are cut. No secret value is ever written; configuration appears by key name.
 Record the directory layout in the profile **This repo** table (Profile `service`, `ui`, or `app`, or the discovered roots when the tree matches none of those). Do not move source onto a greenfield default.
 
 A copy install puts org rules in `.cursor/rules/org/` and refreshes them on `install.sh --update`. A `--link` install symlinks those rules to the pinned kit commit; a kit change reaches the project when the pin moves.
 
-The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. `install.sh --git-hooks` installs `pre-push`, which checks `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/maintain/<id>/state.json` for the branch slug. See [greenfield-onboarding.md](greenfield-onboarding.md).
+The kit ships no CI pipeline and no `CODEOWNERS`: the repo keeps its own CI if it has one, and the install leaves an existing `.gitlab-ci.yml` or `CODEOWNERS` untouched. The kit's checks run locally at the gates. `install.sh --git-hooks` installs `pre-push`, which checks `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/maintain/<id>/state.json` for the branch slug. See [greenfield-onboarding.md](greenfield-onboarding.md).
 
 ## 2. Audit the baseline (do this before `/v0-build` or `/v0-maintain`)
 
@@ -50,8 +54,8 @@ sh .agents-v0/scripts/audit-brownfield-baseline.sh
 ```
 
 The script runs the repo’s Backend verify command from `docs/agents-v0/project-profile.md` (or detects Maven, Gradle, npm, pytest, Go, or dotnet test when the profile cell is not yet set) and
-prints pass/fail. **Build and maintain agents stop if the baseline is red** — fix or
-document a stabilization plan before feature work.
+prints pass/fail. Onboard records a red baseline and continues. **Build and maintain agents stop if the baseline is red** until it is fixed or every failure is
+accepted by name (the scripted `baseline_ok` check is not wired into `/v0-build` and `/v0-maintain` yet; until it is, the agents stop by instruction).
 
 | Outcome | Action |
 |---------|--------|

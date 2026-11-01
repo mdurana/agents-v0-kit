@@ -28,4 +28,4 @@ The reporting toolchain is determined by the bound pack's `pack.json` (Pack `jav
 
 ## CVE policy
 
-No new high/critical CVEs without a documented exception. Lockfiles are committed. Secret detection runs on the merge request. A service that ships produces an SBOM (CycloneDX/SPDX). A license policy is documented when compliance requires it (`security-baseline.mdc` §9).
+No new high/critical CVEs without a documented exception. Lockfiles are committed. Secret detection runs locally (the kit's staged scan on the onboard commit); the merge request is scanned only by the repo's own CI, if it has one. A service that ships produces an SBOM (CycloneDX/SPDX). A license policy is documented when compliance requires it (`security-baseline.mdc` §9).
