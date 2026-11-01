@@ -140,8 +140,8 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 # Each grant line is named by exactly one ledger line (GRANT-USED or REOPEN-REFUSED grant=; pinned stale lines
 # of one gate commit may repeat a grant, void stale lines are ignored) and the named lines are the start of the
 # grant file, in ledger order; only the last line may still be unnamed, and only it is used.
-# where <text> has no control characters. The newest anchor is the largest recorded count over all onboard-v<n>
-# tags (the ledger is shared by every worktree, so is every tag).
+# where <text> has no control characters. The newest anchor is the highest onboard-v<n> tag, and no tag records
+# fewer lines than an older one (the ledger is shared by every worktree, so is every tag).
 ledger_py() {
   lp_l="$(ledger_path)" || exit 2
   lp_g="$(grant_path)" || exit 2
@@ -225,7 +225,7 @@ def anchors():
 def check_anchors(lines, anc):
     if lines is None:
         if anc:
-            t, n, _ = max(anc, key=lambda a: a[1])
+            t, n, _ = anc[-1]
             out(1, "the ledger %s is missing, but the gate commit %s recorded lines=%d; a missing ledger never reads as zero failures" % (ledger, t, n))
         return None, 0
     for t, n, h in anc:
@@ -235,7 +235,13 @@ def check_anchors(lines, anc):
             out(1, "the first %d lines of the ledger no longer match the sha256 that the gate commit %s recorded (an earlier line was edited)" % (n, t))
     if not anc:
         return None, 0
-    t, n, _ = max(anc, key=lambda a: a[1])
+    # the newest gate commit is the highest onboard-v<n> (anchors() sorts by number; the reopen time check and the
+    # next tag number use the same rule). Each gate commit pins the whole ledger and the ledger only grows, so a
+    # gate never records fewer lines than an older one.
+    for (t0, n0, _), (t1, n1, _) in zip(anc, anc[1:]):
+        if n1 < n0:
+            out(1, "the gate commit %s recorded lines=%d, fewer than the %d of the older gate commit %s (the ledger only grows)" % (t1, n1, n0, t0))
+    t, n, _ = anc[-1]
     return t, n
 
 def sha(x):
@@ -478,7 +484,7 @@ elif mode == "reopen" and len(args) == 2:
     if now - ts > max_age:
         refused("grant line %d is %ds old, older than gate-rules grant_max_age_seconds (%d)" % (last, int(now - ts), max_age), name=h)
     if anc:
-        gt = max(anc, key=lambda a: int(a[0][len("onboard-v"):]))[0]
+        gt = anc[-1][0]
         r = git("log", "-1", "--format=%ct", gt + "^{commit}")
         try:
             gts = int(r.stdout.decode().strip())

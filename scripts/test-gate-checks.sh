@@ -707,6 +707,16 @@ out_has "RV-2 names the pinned clash" "also names, and the stale one is pinned b
 cp "$rv_keep" "$RG_LED"
 expect_pass "RV-3 with the stray line gone the chain lands" "$rg" lg_gate "$rg" 4
 expect_pass "RV-3 ledger_ok passes after it" "$rg" sh "$GC" ledger_ok
+# RN (round 15, Yamato): the anchor is the newest gate commit (the highest onboard-v<n>, as the reopen time check
+# uses), also when two gate commits record the same line count; a newer gate recording fewer lines is refused.
+printf '\nRevision RN.\n' >> "$rg/docs/agents-v0/architecture.md"
+expect_pass "RN-1 a gate commit with no ledger change lands" "$rg" lg_gate "$rg" 5
+is_eq "RN-1 it records the same count as onboard-v4" "$(git -C "$rg" log -1 --format=%B onboard-v5 | sed -n 's/^Agents-V0-Ledger: lines=\([0-9]*\) .*/\1/p')" "$(git -C "$rg" log -1 --format=%B onboard-v4 | sed -n 's/^Agents-V0-Ledger: lines=\([0-9]*\) .*/\1/p')"
+expect_pass "RN-1 ledger_ok passes" "$rg" sh "$GC" ledger_ok
+out_has "RN-1 it names the newest gate commit" "the Agents-V0-Ledger trailer of onboard-v5 (lines="
+q "$rg" G . tag -a onboard-v6 -m "onboard approved" onboard-v2
+expect_fail "RN-2 a newer gate commit that records fewer lines is refused" "$rg" sh "$GC" ledger_ok
+out_has "RN-2 says why" "the gate commit onboard-v6 recorded lines="
 
 # N84: unattended turns. The harness marks the ledger before a turn and compares after it.
 expect_pass "N84 ledger_mark prints the mark" "$lg" sh "$GC" ledger_mark
