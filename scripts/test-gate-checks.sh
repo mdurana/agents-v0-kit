@@ -595,11 +595,11 @@ expect_pass "RG-4 the restored grant file passes" "$rg" sh "$GC" ledger_ok
 rg_l4="$(rg_line 0 onboard four)"; printf '%s\n' "$rg_l4" >> "$RG_GRANT"
 printf '\nRevision.\n' >> "$rg/docs/agents-v0/architecture.md"
 expect_pass "RG-5 the next gate commit chain runs with an unused grant line" "$rg" lg_gate "$rg" 2
-is_eq "RG-5 the gate commit named it stale" "$(rg_last)" "REOPEN-REFUSED grant=$(rg_h "$rg_l4") stale: in the grant file at gate commit onboard-v2, so never usable after it"
+is_eq "RG-5 the gate commit named it stale" "$(rg_last)" "REOPEN-REFUSED grant=$(rg_h "$rg_l4") stale: in the grant file when the scan for gate commit onboard-v2 wrote its trailer; void unless that gate commit lands with this line in its trailer"
 case "$(git -C "$rg" log -1 --format=%B onboard-v2)" in *"Agents-V0-Ledger: lines=$(wc -l < "$RG_LED" | tr -d ' ') sha256=$(lg_sha "$RG_LED")"*) pass "RG-5 the gate trailer anchors the stale line" ;;
   *) fail "RG-5 the gate trailer anchors the stale line" ;; esac
 expect_fail "RG-5 (1) the stale pre-gate grant is refused" "$rg" rg_run
-out_has "RG-5 names the stale grant" "the last grant line (grant line 4) was already refused or went stale at a gate commit"
+out_has "RG-5 names the stale grant" "the last grant line (grant line 4) was already refused or went stale at a landed gate commit"
 printf '%s\n' "$(rg_line -3600 onboard five)" >> "$RG_GRANT"
 expect_fail "RG-6 (1) a grant dated before the last gate commit is refused" "$rg" rg_run
 out_has "RG-6 names the gate" "is older than the last gate commit onboard-v2; a grant must be newer than the last gate"
@@ -657,6 +657,40 @@ expect_fail "RG-15 a grant line in git history is refused" "$rg" rg_run
 out_has "RG-15 names git history" "grant line 20 is in git history (commit"
 expect_fail "RG-16 another phase is not wired yet" "$rg" sh "$GC" reopen_grant_ok design
 out_has "RG-16 not wired" "NOT-WIRED reopen_grant_ok:"
+# RS (round 14, Iruka): a stale mark counts only when a landed gate commit's trailer pins it. A refused scan, or a
+# passing scan with no commit, never uses up a fresh grant; a real gate commit still makes an older grant stale.
+rs_scan() { sh "$GC" staged_secret_scan; }
+rs_g1="$(rg_line 0 onboard rs-one)"; printf '%s\n' "$rs_g1" >> "$RG_GRANT"
+expect_fail "RS-1 staged_secret_scan with nothing staged is refused" "$rg" rs_scan
+out_has "RS-1 says nothing staged" "REFUSED staged_secret_scan: nothing is staged"
+expect_pass "RS-1 (Iruka repro) the fresh grant is still usable after the refused scan" "$rg" rg_run
+is_eq "RS-1 it is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rs_g1") count=3"
+rs_g2="$(rg_line 0 onboard rs-two)"; printf '%s\n' "$rs_g2" >> "$RG_GRANT"
+printf '\nRevision RS.\n' >> "$rg/docs/agents-v0/architecture.md"; q "$rg" G . add -- docs/agents-v0
+expect_pass "RS-2 a passing scan (no commit follows)" "$rg" rs_scan
+expect_pass "RS-2 the grant is still usable after a passing scan with no commit" "$rg" rg_run
+is_eq "RS-2 it is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rs_g2") count=3"
+expect_fail "RS-2 commit_msg_ok refuses the old scan once the ledger grew (no stale mark pinned after its use)" "$rg" sh "$GC" commit_msg_ok
+out_has "RS-2 says rescan" "no longer matches the ledger"
+rs_g3="$(rg_line 0 onboard rs-three)"; printf '%s\n' "$rs_g3" >> "$RG_GRANT"
+printf 'aws_access_key_id = AKIA%s\n' "$(printf 'FAKE%.0s' 1 2 3 4)" > "$rg/docs/agents-v0/rs-fake-note.md"; q "$rg" G . add -- docs/agents-v0
+expect_fail "RS-3 a secret hit refuses the scan" "$rg" rs_scan
+out_has "RS-3 the scanner refused" "REFUSED staged_secret_scan: secret_scan.py exited 1"
+expect_pass "RS-3 the grant is still usable after the refused secret scan" "$rg" rg_run
+is_eq "RS-3 it is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rs_g3") count=3"
+q "$rg" G . restore --staged -- docs/agents-v0/rs-fake-note.md; mv "$rg/docs/agents-v0/rs-fake-note.md" "$T1_TMP/rg/"
+rs_g4="$(rg_line 0 onboard rs-four)"; printf '%s\n' "$rs_g4" >> "$RG_GRANT"
+expect_pass "RS-4 a passing scan leaves a void stale mark" "$rg" rs_scan
+expect_pass "RS-4 (regression) the real gate commit chain runs" "$rg" lg_gate "$rg" 3
+expect_fail "RS-4 (regression) the grant in the file at onboard-v3 is refused after it" "$rg" rg_run
+out_has "RS-4 names it stale" "the last grant line (grant line 24) was already refused or went stale at a landed gate commit"
+expect_pass "RS-4 ledger_ok passes (both stale marks pinned by onboard-v3)" "$rg" sh "$GC" ledger_ok
+printf '%s\n' "$(rg_line 300 onboard rs-skew-far)" >> "$RG_GRANT"
+expect_fail "RS-5 a grant 300s ahead (beyond the 120s skew) is refused" "$rg" rg_run
+out_has "RS-5 says future" "grant line 25 is dated in the future"
+rs_g6="$(rg_line 60 onboard rs-skew-near)"; printf '%s\n' "$rs_g6" >> "$RG_GRANT"
+expect_pass "RS-5 a grant 60s ahead (within the 120s skew) passes" "$rg" rg_run
+is_eq "RS-5 it is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rs_g6") count=3"
 
 # N84: unattended turns. The harness marks the ledger before a turn and compares after it.
 expect_pass "N84 ledger_mark prints the mark" "$lg" sh "$GC" ledger_mark

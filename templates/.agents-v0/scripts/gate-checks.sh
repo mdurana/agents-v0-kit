@@ -117,10 +117,13 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #                             a second reopen appends its grant, so an older GRANT-USED line still finds its own),
 #                             and the grant file (a regular file, never a symlink) still starts with the grant lines
 #                             the ledger named, in ledger order (no named line edited, removed or reordered)
-#   trailer                   check, name every grant line no ledger line names yet as stale (REOPEN-REFUSED
-#                             grant=<sha> stale: ...), then print the trailer for the next gate commit, so a grant
-#                             that was in the file at a gate commit can never be used after it (creates the empty
-#                             ledger when no gate commit exists yet and nothing has written it)
+#   trailer                   check, mark every grant line no ledger line names yet as stale (REOPEN-REFUSED
+#                             grant=<sha> stale: ...), then print the trailer for the next gate commit (creates the
+#                             empty ledger when no gate commit exists yet and nothing has written it). A stale line
+#                             counts only once it is pinned: it sits in the run of stale lines that ends a landed
+#                             onboard-v<n> gate commit's trailer count. Then a grant that was in the file at that
+#                             gate commit can never be used after it. A stale line that no landed gate commit pins
+#                             (the scan was refused, or no commit followed) is void and names nothing
 #   reopen <phase> <max age>  check, then judge the last grant line (reopen_grant_ok) and append GRANT-USED on
 #                             success or one REOPEN-REFUSED line on refusal
 #   commit <msg file>         check, and the message's own trailer still anchors the ledger (commit_msg_ok)
@@ -130,11 +133,13 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 #                             appended, exactly as many as the harness saw (N84)
 # Lines are newline-terminated; the line grammar (the kit writers must follow it):
 #   FAIL[ <text>]   GRANT-USED <sha256 of the grant line, without its newline> count=<n>   REOPEN-REFUSED <text>
-#   REOPEN-REFUSED grant=<sha256 of the grant line> <text>   (a refused or stale grant line: named, so used up)
+#   REOPEN-REFUSED grant=<sha256 of the grant line> <text>   (a refused grant line: named, so used up; with
+#   <text> "stale: ..." it names the grant only when pinned, see trailer above)
 # The grant file holds one grant line per approved reopen, appended, the newest last (the grant in force):
 #   grant <YYYY-MM-DDTHH:MM:SS+HH:MM> phase=<phase> reason="<text>" by=<name>
-# Each grant line is named by exactly one ledger line (GRANT-USED or REOPEN-REFUSED grant=) and the named lines
-# are the start of the grant file, in ledger order; only the last line may still be unnamed, and only it is used.
+# Each grant line is named by exactly one ledger line (GRANT-USED or REOPEN-REFUSED grant=; pinned stale lines
+# of one gate commit may repeat a grant, void stale lines are ignored) and the named lines are the start of the
+# grant file, in ledger order; only the last line may still be unnamed, and only it is used.
 # where <text> has no control characters. The newest anchor is the largest recorded count over all onboard-v<n>
 # tags (the ledger is shared by every worktree, so is every tag).
 ledger_py() {
@@ -152,6 +157,8 @@ REFGRANT_RE = re.compile(r"^REOPEN-REFUSED grant=([0-9a-f]{64}) [^\x00-\x1f\x7f]
 GLINE_RE = re.compile(r'^grant ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})([+-][0-9]{2}):?([0-9]{2}) '
                       r'phase=([a-z][a-z-]*) reason=("[^"\x00-\x1f\x7f]+"|[^"\s\x00-\x1f\x7f]+) '
                       r'by=("[^"\x00-\x1f\x7f]+"|[^"\s\x00-\x1f\x7f]+)$')
+STALE_TEXT = "stale: "
+FUTURE_SKEW = 120  # seconds a grant may be ahead of this clock (two machines' clocks; see reopen_grant_ok)
 MARK_RE = re.compile(r"^lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 EMPTY = hashlib.sha256(b"").hexdigest()
 
@@ -246,38 +253,70 @@ def read_grant():
     parts = data.split(b"\n")
     return (parts[:-1] if data.endswith(b"\n") else parts) if data else [], data
 
-def named_grants(lines):
-    # (ledger line number, grant sha, kind) for every GRANT-USED and REOPEN-REFUSED grant= line, in ledger order
-    found = []
+def is_stale(s):
+    m = REFGRANT_RE.match(s) if s is not None else None
+    return bool(m) and s[len("REOPEN-REFUSED grant=") + 65:].startswith(STALE_TEXT)
+
+def pinned_stale(lines, anc):
+    # the 0-based ledger indexes of pinned stale lines: for each landed gate commit (onboard-v<n> tag) with trailer
+    # count n, the run of stale lines that ends at line n (the gate's own scan writes them right before its trailer)
+    pins = set()
+    for _, n, _ in anc:
+        i = min(n, len(lines)) - 1
+        while i >= 0 and is_stale(text(lines[i])):
+            pins.add(i)
+            i -= 1
+    return pins
+
+def named_grants(lines, anc):
+    # (ledger line number, grant sha, kind) of the line that names each grant, in ledger order: a GRANT-USED or
+    # non-stale REOPEN-REFUSED grant= line, or a pinned stale line. Void (unpinned) stale lines are skipped. A grant
+    # named twice is refused, except by several pinned stale lines (repeated scans before one gate commit).
+    pins = pinned_stale(lines, anc)
+    found, first, dup = [], {}, None
     for i, x in enumerate(lines):
         s = text(x)
         m = GRANT_RE.match(s) if s is not None else None
-        if m:
-            found.append((i + 1, m.group(1), "GRANT-USED"))
+        kind = "GRANT-USED" if m else None
+        if not m:
+            m = REFGRANT_RE.match(s) if s is not None else None
+            if not m:
+                continue
+            kind = "REOPEN-REFUSED"
+            if is_stale(s):
+                if i not in pins:
+                    continue
+                kind = "stale"
+        h = m.group(1)
+        if h in first:
+            j, k0 = first[h]
+            if k0 == "stale" and kind == "stale":
+                continue
+            if dup is None:
+                if k0 == "GRANT-USED" and kind == "GRANT-USED":
+                    dup = "ledger line %d names a grant that another GRANT-USED line already used" % j
+                elif "stale" in (k0, kind):
+                    dup = ("ledger line %d names a grant that ledger line %d also names, and the stale one is pinned by a gate "
+                           "commit (a grant in the grant file at a gate commit is never usable after it)" % (i + 1, j))
+                else:
+                    dup = "ledger line %d names a grant that another ledger line already named (each grant line is named once)" % j
             continue
-        m = REFGRANT_RE.match(s) if s is not None else None
-        if m:
-            found.append((i + 1, m.group(1), "REOPEN-REFUSED"))
-    return found
+        first[h] = (i + 1, kind)
+        found.append((i + 1, h, "REOPEN-REFUSED" if kind == "stale" else kind))
+    return found, dup
 
-def check_grants(lines):
+def check_grants(lines, anc):
     # every named grant is a grant-file line, named once, and the named lines are the start of the grant file in
     # ledger order. Returns (grant lines, grant bytes, named).
-    named = named_grants(lines)
+    named, dup = named_grants(lines, anc)
     g, data = read_grant()
     if not named:
         return g, data, named
     if g is None:
         i, _, k = named[0]
         out(1, "ledger line %d is a %s line, but there is no grant file (%s)" % (i, k, grant))
-    seen = {}
-    for i, h, k in named:
-        seen.setdefault(h, []).append(k)
-    for i, h, k in named:
-        if len(seen[h]) > 1:
-            if all(x == "GRANT-USED" for x in seen[h]):
-                out(1, "ledger line %d names a grant that another GRANT-USED line already used" % i)
-            out(1, "ledger line %d names a grant that another ledger line already named (each grant line is named once)" % i)
+    if dup:
+        out(1, dup)
     hs = [sha(x) for x in g]
     where = {}
     for j, h in enumerate(hs):
@@ -331,7 +370,7 @@ def full_check():
     t, n = check_anchors(lines, anc)
     if lines is not None:
         check_appended(lines, n)
-    check_grants(lines if lines is not None else [])
+    check_grants(lines if lines is not None else [], anc)
     return anc, lines, t, n
 
 if mode == "check":
@@ -348,10 +387,11 @@ elif mode == "trailer":
         with open(ledger, "xb"):
             pass
         lines = []
-    g, data, named = check_grants(lines)
+    g, data, named = check_grants(lines, anc)
     if g:
         nxt = max([int(a[0][len("onboard-v"):]) for a in anc] + [0]) + 1
-        stale = ["REOPEN-REFUSED grant=%s stale: in the grant file at gate commit onboard-v%d, so never usable after it" % (sha(x), nxt)
+        stale = ["REOPEN-REFUSED grant=%s %sin the grant file when the scan for gate commit onboard-v%d wrote its trailer; "
+                 "void unless that gate commit lands with this line in its trailer" % (sha(x), STALE_TEXT, nxt)
                  for x in g[len(named):]]
         if stale:
             append_ledger(stale)
@@ -367,15 +407,17 @@ elif mode == "commit" and len(args) == 1:
     except OSError:
         out(1, "cannot read the commit message file")
     mn, mh = trailer_of(body, "the commit message")
-    if mn < n or mn > len(lines) or prefix_sha(lines, mn) != mh:
-        out(1, "the commit message's %s trailer (lines=%d) no longer matches the ledger (%d lines)" % (key, mn, len(lines)))
+    if mn != len(lines) or prefix_sha(lines, mn) != mh:
+        # the trailer pins the whole ledger: a line appended after the scan (a used grant, a FAIL) needs a rescan,
+        # so a stale line the scan wrote can never be pinned after its grant was used
+        out(1, "the commit message's %s trailer (lines=%d) no longer matches the ledger (%d lines); run the whole chain again (it rescans)" % (key, mn, len(lines)))
     out(0, "the commit message's %s trailer matches the ledger" % key)
 elif mode == "reopen" and len(args) == 2:
     import datetime, time
     phase, max_age = args[0], int(args[1])
     anc, lines, t, n = full_check()
     lines = lines if lines is not None else []
-    g, data, named = check_grants(lines)
+    g, data, named = check_grants(lines, anc)
     cmd = ("To grant a reopen, the person appends one new line in their own terminal (append with >>, never >; "
            "an overwrite is refused): printf '%%s\\n' \"grant $(date +%%Y-%%m-%%dT%%H:%%M:%%S%%z) phase=%s "
            "reason=\\\"<why>\\\" by=<your-name>\" >> '%s'" % (phase, grant))
@@ -392,7 +434,7 @@ elif mode == "reopen" and len(args) == 2:
         i, h, k = named[last - 1]
         if k == "GRANT-USED":
             refused("the last grant line (grant line %d) was already used (ledger line %d); each grant is used once" % (last, i))
-        refused("the last grant line (grant line %d) was already refused or went stale at a gate commit (ledger line %d)" % (last, i))
+        refused("the last grant line (grant line %d) was already refused or went stale at a landed gate commit (ledger line %d)" % (last, i))
     if not data.endswith(b"\n"):
         refused("the last grant line (grant line %d) has no newline, so it was not written whole by the printf command" % last,
                 how="The person first ends it with: printf '\\n' >> '%s'; then appends a new grant. %s" % (grant, cmd))
@@ -419,8 +461,8 @@ elif mode == "reopen" and len(args) == 2:
     if m.group(4) != phase:
         refused("grant line %d grants phase=%s, not %s" % (last, m.group(4), phase), name=h)
     ts, now = dt.timestamp(), time.time()
-    if ts > now:
-        refused("grant line %d is dated in the future (%s)" % (last, m.group(1)), name=h)
+    if ts > now + FUTURE_SKEW:
+        refused("grant line %d is dated in the future (%s, more than %ds ahead of this clock)" % (last, m.group(1), FUTURE_SKEW), name=h)
     if now - ts > max_age:
         refused("grant line %d is %ds old, older than gate-rules grant_max_age_seconds (%d)" % (last, int(now - ts), max_age), name=h)
     if anc:
@@ -768,10 +810,12 @@ staged_secret_scan() {
   ss_root="$(pwd)"
   ss_allowed="$(rule onboard_commit_paths)"
   command -v python3 >/dev/null 2>&1 || refuse staged_secret_scan "python3 is missing, so the staged-path check and the secret scan cannot run"
-  # N3A: the ledger check runs first, and its trailer goes into the message before the scan reads the message
-  # and the record takes its hash (so commit_msg_ok compares the message with the trailer in it).
-  ss_rc=0; ss_trailer="$(ledger_py trailer)" || ss_rc=$?
-  [ "$ss_rc" = 0 ] || refuse staged_secret_scan "ledger changed, ask the user (${ss_trailer:-the ledger check could not run}); no commit message was written and the commit is refused"
+  # N3A: the ledger check runs first. The trailer (and the stale marks of unnamed grant lines) is written only
+  # after the path and scanner checks pass, and goes into the message before the scan reads the message and the
+  # record takes its hash (so commit_msg_ok compares the message with the trailer in it). A stale mark that no
+  # landed gate commit pins (a refused scan, or no commit) is void, so it never uses up a grant.
+  ss_rc=0; ss_led="$(ledger_py check)" || ss_rc=$?
+  [ "$ss_rc" = 0 ] || refuse staged_secret_scan "ledger changed, ask the user (${ss_led:-the ledger check could not run}); no commit message was written and the commit is refused"
   ss_rc=0
   ss_bad="$(staged_path_check "$ss_allowed")" || ss_rc=$?
   case "$ss_rc" in
@@ -781,6 +825,8 @@ staged_secret_scan() {
     *) refuse staged_secret_scan "git could not read the index" ;;
   esac
   [ -f .agents-v0/scripts/secret_scan.py ] || refuse staged_secret_scan ".agents-v0/scripts/secret_scan.py is missing; reinstall the kit (install.sh --update)"
+  ss_rc=0; ss_trailer="$(ledger_py trailer)" || ss_rc=$?
+  [ "$ss_rc" = 0 ] || refuse staged_secret_scan "ledger changed, ask the user (${ss_trailer:-the ledger check could not run}); no commit message was written and the commit is refused"
   ss_msg="$(onb_msg_file)"
   printf 'onboarding: onboard approved\n\n%s\n' "$ss_trailer" > "$ss_msg" || refuse staged_secret_scan "cannot write the commit message file $ss_msg"
   ss_rc=0
@@ -817,7 +863,7 @@ commit_msg_ok() {
 }
 # 4A, N5A, 1A (1A-gap B): the last line of the grant file (a regular file) is the grant; it parses strictly (no CR,
 # no control characters), names <phase>, is not in the future, is newer than the last onboard gate commit and was
-# not in the grant file at it (the gate commit names every unnamed line stale), is at most grant_max_age_seconds
+# not in the grant file at it (the gate commit pins a stale mark of every unnamed line), is at most grant_max_age_seconds
 # old, is unused (no ledger line names it, not in git history) and every earlier grant line is named in order.
 # Success appends GRANT-USED <sha> count=<FAIL lines>; a refusal after the ledger check appends one REOPEN-REFUSED
 # line and prints the person's grant command (>>, never >). "The run is attended" is not visible here: the harness
