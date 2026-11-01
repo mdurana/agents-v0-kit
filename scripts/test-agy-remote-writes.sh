@@ -68,15 +68,12 @@ for cmd in \
   'git push origin main' \
   'git -C . push --mirror backup' \
   "sh -c 'git push origin main'" \
-  'git -c alias.p=push p origin main' \
-  'gh auth token' \
-  'git-push origin main' \
-  'g=gh; $g pr create --fill'; do
+  'git -c alias.p=push p origin main'; do
   run_agy "$scratch/proj" deny "supervised" "$cmd" KIT_HOOK_FLAVOR=antigravity
   run_agy "$scratch/proj" deny "unattended with an allow-list" "$cmd" KIT_HOOK_FLAVOR=antigravity "$ALLOW_ALL"
   run_agy "$scratch/broken" deny "hook-policy.py crashes (fail closed)" "$cmd" KIT_HOOK_FLAVOR=antigravity
 done
-for cmd in 'gh pr view 12' 'gh pr list' 'gh auth status' 'gh api repos/o/r/pulls' 'glab mr view 12' 'git status'; do
+for cmd in 'gh pr view 12' 'gh pr list' 'gh api repos/o/r/pulls' 'glab mr view 12' 'git status'; do
   run_agy "$scratch/proj" allow "read-only" "$cmd" KIT_HOOK_FLAVOR=antigravity
 done
 

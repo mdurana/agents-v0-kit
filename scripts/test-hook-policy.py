@@ -280,7 +280,7 @@ SHELL_CASES = [
     ("git stash list", "allow"),
     ("git stash push", "allow"),
     # Work-discarding and branch changes
-    ("git restore .", "ask"),
+    ("git restore .", "block"),  # onboard fix (Iruka note 2): `.` holds the workflow state files
     ("git restore src/Main.java", "ask"),
     ("git restore --source=HEAD~1 src/Main.java", "ask"),
     ("git restore --staged src/Main.java", "allow"),
@@ -633,14 +633,14 @@ def load_policy():
     return hp
 
 
-def inproc_shell(hp, cmd: str, env: dict = None) -> str:
+def inproc_shell(hp, cmd: str, env: dict = None, cwd: str = None) -> str:
     """The verdict main() would print for `hook-policy.py shell` with HOOK_CMD=cmd, without a new process."""
     saved = {k: os.environ.get(k) for k in _HOOK_ENV_KEYS}
     for k in _HOOK_ENV_KEYS:
         os.environ.pop(k, None)
     os.environ.update(env or {})
     old = os.getcwd()
-    os.chdir(CWD or old)
+    os.chdir(cwd or CWD or old)
     try:
         action, _msg = hp.classify_command(cmd)
         if action == "allow" and hp.may_print_secrets(cmd):
@@ -728,6 +728,96 @@ STATE_ALLOW_SHELL = [
     "echo x > docs/agents-v0/onboarding/notes.md", "cd docs/agents-v0/onboarding && echo x > notes.md",
     "cp /tmp/other.json docs/agents-v0/onboarding/", "git checkout main", "git status",
 ]
+# Iruka note 2: a git checkout / restore of a folder that holds a state file, of `.`, or of a glob that could match
+#   one replaces the state file as surely as naming it. Judged in-process (no process per case),
+#   in stateproj (repo root) unless the case says otherwise.
+STATE_FOLDER_WRITE_SHELL = [
+    "git checkout HEAD~1 -- docs/agents-v0/onboarding", "git checkout HEAD~1 -- docs/agents-v0/onboarding/",
+    "git checkout HEAD~1 -- docs/agents-v0", "git checkout HEAD~1 -- docs", "git checkout HEAD~1 -- .",
+    "git checkout -- .", "git checkout .", "git checkout HEAD~1 docs/agents-v0/onboarding", "git checkout main -- ./docs",
+    "git checkout HEAD~1 -- docs/agents-v0/maintain", "git checkout HEAD~1 -- docs/agents-v0/maintain/inc-1",
+    "git checkout HEAD~1 -- docs/agents-v0/requirements", "git checkout HEAD~1 -- docs/./agents-v0/x/../onboarding",
+    "git restore --source HEAD~1 docs/agents-v0/onboarding", "git restore --source=HEAD~1 -- docs/agents-v0",
+    "git restore -s HEAD~1 .", "git restore docs/agents-v0/onboarding", "git restore -W docs", "git restore :/",
+    "git restore --staged --worktree docs/agents-v0/onboarding", "git -C docs checkout HEAD~1 -- agents-v0",
+    "git checkout HEAD~1 -- 'docs/agents-v0/*'", "git checkout HEAD~1 -- \"docs/*/onboarding/*.json\"",
+    "git checkout HEAD~1 -- '*.json'", "git checkout HEAD~1 -- '*state.json'", "git restore --source=HEAD~1 '*.json'",
+    "git checkout HEAD~1 -- 'docs/agents-v0/maintain/inc-*/state.json'", "git checkout HEAD~1 -- docs/agents-v0/onboard?ng",
+    "git checkout HEAD~1 -- ':(glob)docs/**/state.json'", "git checkout HEAD~1 -- ':/docs'",
+    "cd docs && git checkout HEAD~1 -- agents-v0", "cd docs/agents-v0 && git checkout HEAD~1 -- onboarding",
+    "cd docs/agents-v0/onboarding && git checkout HEAD~1 -- .", "cd docs/agents-v0 && git restore -s HEAD~1 '*.json'",
+    "env GIT_PAGER=cat git checkout HEAD~1 -- docs/agents-v0", "sh -c 'git checkout HEAD~1 -- docs/agents-v0'",
+]
+STATE_FOLDER_ALLOW_SHELL = [
+    "git checkout main", "git checkout feature/x", "git checkout -", "git restore --staged src/Main.java",
+    "git restore --staged docs/agents-v0/onboarding", "git restore --staged .", "git status", "git diff -- docs",
+    "git log -1 -- docs/agents-v0/onboarding",
+]
+# Not about state: other folders keep their earlier verdict (ask), not a block.
+STATE_FOLDER_ASK_SHELL = [
+    "git checkout -- src", "git restore --source=HEAD~1 src", "git checkout HEAD~1 -- 'src/*.java'",
+    "git checkout HEAD~1 -- docs/agents-v0/design", "git checkout HEAD~1 -- 'docs/*.md'",
+]
+# Jiraiya C: the indirect spellings. A glob, a target the shell fills in ($f) near the state folders, pushd, a whole
+#   folder replaced or moved, and the writer tools that take their targets from the patch or archive. In-process.
+STATE_INDIRECT_WRITE_SHELL = [
+    "cd docs/agents-v0/onboarding && echo {} > st*.json", "echo {} > docs/agents-v0/onboarding/st*.json",
+    "echo {} > docs/agents-v0/onboarding/*.json", "cp /tmp/x docs/agents-v0/onboarding/s?ate.json",
+    "f=docs/agents-v0/onboarding/state.json; echo {} > $f", "f=docs/agents-v0/onboarding/state.json; echo {} > \"${f}\"",
+    "export f=docs/agents-v0/onboarding/state.json && cp /tmp/x $f",
+    "f=$(ls docs/agents-v0/onboarding/*.json); echo {} > \"$f\"", "cd docs/agents-v0/onboarding && echo {} > $f",
+    "echo {} > docs/agents-v0/onboarding/$n", "d=docs/agents-v0/onboarding; cd $d && echo {} > state.json",
+    "pushd docs/agents-v0/onboarding && echo {} > state.json", "pushd docs/agents-v0 && cp /tmp/x onboarding/state.json",
+    "mv s/onboarding docs/agents-v0/", "mv /tmp/onboarding docs/agents-v0/onboarding", "cp -r s/onboarding docs/agents-v0/",
+    "cp -R /tmp/agents-v0 docs/", "cp -a s/. docs/agents-v0/onboarding/", "cp --recursive /tmp/s/. docs/agents-v0/",
+    "rsync -a s/ docs/agents-v0/", "rsync -r --delete /tmp/s/ docs/agents-v0/onboarding/",
+    "mv docs/agents-v0/onboarding /tmp/away", "mv docs/agents-v0 /tmp/away", "mv docs old-docs",
+    "git apply x.diff", "git apply --index x.diff", "git apply --directory=docs/agents-v0 x.diff",
+    "cd docs/agents-v0/onboarding && git apply ../x.diff", "patch -p1 < x.diff", "patch -p1 -i x.diff",
+    "patch -d docs/agents-v0/onboarding -p0 < x.diff", "patch docs/agents-v0/onboarding/state.json x.diff",
+    "patch -o docs/agents-v0/onboarding/state.json a x.diff", "tar -xf x.tar", "tar xzf x.tgz -C docs/agents-v0",
+    "tar --extract -f x.tar --directory=docs/agents-v0/onboarding", "unzip -o x.zip", "unzip -o x.zip -d docs/agents-v0/onboarding",
+    "awk -i inplace '{print}' docs/agents-v0/onboarding/state.json", "gawk -i inplace 1 docs/agents-v0/program.state.json",
+    "ed docs/agents-v0/onboarding/state.json", "ed -s docs/agents-v0/onboarding/state.json <<< $'1d\\nw'",
+    "vim -es -c 'wq' docs/agents-v0/onboarding/state.json", "ex -sc 'wq' docs/agents-v0/onboarding/state.json",
+    "sh -c 'tar -xf x.tar -C docs/agents-v0'", "env A=1 git apply x.diff",
+]
+STATE_INDIRECT_ALLOW_SHELL = [
+    "echo hi > $OUT", "f=out.txt; echo hi > $f", "echo x > src/*.txt", "cp -r docs/agents-v0/onboarding /tmp/backup",
+    "rsync -a docs/agents-v0/ /tmp/backup/", "cp notes.md docs/agents-v0/onboarding/", "mv a.txt src/",
+    "pushd src && echo x > a.txt", "git apply --check x.diff", "git apply --stat x.diff", "cd src && git apply ../x.diff",
+    "patch --dry-run -p1 < x.diff", "patch src/Main.java fix.diff", "cd src && patch -p1 < ../x.diff",
+    "tar -tf x.tar", "tar -czf /tmp/x.tgz docs", "tar -xf x.tar -C /tmp/out", "cd src && tar -xf ../x.tar",
+    "unzip -l x.zip", "unzip -o x.zip -d /tmp/out", "awk '{print}' docs/agents-v0/onboarding/state.json",
+    "awk -i inplace 1 src/a.txt", "vim -es -c 'wq' src/Main.java",
+    "sh .agents-v0/scripts/sync-feature-state.sh --active-phase onboard docs/agents-v0/onboarding/onboarding.md",
+    "sh .agents-v0/scripts/gate-checks.sh rules", "git diff", "git add src/Main.java", "git log -1",
+]
+# Jiraiya C: left at ask, as before. Fine supervised; unattended has no one to answer the ask (see the handoff).
+STATE_INDIRECT_ASK_SHELL = ["git stash pop", "git merge feature/x"]
+
+
+def state_folder_inproc_cases(hp, tmp: str) -> list:
+    """(label, cmd, got, want): Iruka note 2 and Jiraiya C, judged in-process in a scratch project."""
+    proj = os.path.join(tmp, "stateproj-c")
+    for d in ("docs/agents-v0/onboarding", "docs/agents-v0/maintain/inc-1", "docs/agents-v0/requirements",
+              "docs/agents-v0/design", "src", "s/onboarding"):
+        os.makedirs(os.path.join(proj, d))
+    with open(os.path.join(proj, STATE_S), "w", encoding="utf-8") as fh:
+        fh.write("{}\n")
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True)
+    hook = {"HOOK_CWD": proj}
+    out = []
+    for c in STATE_FOLDER_WRITE_SHELL + STATE_INDIRECT_WRITE_SHELL:
+        out.append(("attended", c, inproc_shell(hp, c, hook, proj), "block"))
+        out.append(("unattended", c, inproc_shell(hp, c, dict(hook, **STATE_UNATTENDED_ENV), proj), "block"))
+    for c in STATE_FOLDER_ALLOW_SHELL + STATE_INDIRECT_ALLOW_SHELL:
+        out.append(("attended", c, inproc_shell(hp, c, hook, proj), "allow"))
+    for c in STATE_FOLDER_ASK_SHELL + STATE_INDIRECT_ASK_SHELL:
+        out.append(("attended", c, inproc_shell(hp, c, hook, proj), "ask"))
+    return out
+
+
 STATE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(*)"}
 
 
@@ -1337,6 +1427,9 @@ def main() -> int:
         e["HOOK_CWD"] = cwd
         got = _run("shell", dict(e, HOOK_CMD=arg), cwd) if kind == "shell" else _run("path", dict(e, HOOK_PATH=arg), cwd)
         check(got, want, f"state.json guard ({label}) {kind} `{arg}`")
+    fcases_c = state_folder_inproc_cases(hp, tmp)
+    for label, cmd, got, want in fcases_c:
+        check(got, want, f"Iruka 2 / Jiraiya C state folder ({label}, in-process) `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1384,7 +1477,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

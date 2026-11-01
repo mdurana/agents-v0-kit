@@ -101,6 +101,28 @@ mv /tmp/state.json docs/agents-v0/onboarding/
 cd docs/agents-v0/onboarding && echo {} > state.json
 python3 -c "open('$S','w').write('{}')"
 EOC
+# Cursor only (agy is out of the onboard fix per Sensei): a few spellings through the Cursor entry point, so the
+#   in-process lists in test-hook-policy.py are known to be what the hook does. Jiraiya C and Iruka note 2 (a folder
+#   checkout, a run-time target, pushd, a writer tool), then Jiraiya A and B (gh token, git-push, a $var command name).
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  judge cursor-shell block "shell write (Jiraiya C / Iruka 2)" "$c"
+done <<EOC
+git checkout HEAD~1 -- docs/agents-v0/onboarding
+f=$S; echo {} > \$f
+pushd docs/agents-v0/onboarding && echo {} > state.json
+git apply x.diff
+EOC
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  judge cursor-shell block "remote write or token (Jiraiya A / B)" "$c"
+done <<EOC
+gh auth token
+git-push origin main
+g=gh; \$g pr create --fill
+EOC
+judge cursor-shell allow "gh read (Jiraiya B)" "gh auth status"
+judge cursor-shell allow "plain branch checkout" "git checkout main"
 # The kit's own scripts and plain reads stay allowed.
 while IFS= read -r c; do
   [ -n "$c" ] || continue

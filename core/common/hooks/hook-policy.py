@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import fnmatch
 import posixpath
 import re
 import shlex
@@ -556,12 +557,140 @@ def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
     return out
 
 
+# onboard fix (Jiraiya C, Iruka note 2): the spellings that land on a state file without naming it. A folder that
+#   holds one (docs, docs/agents-v0, its onboarding/maintain/requirements folders, the repository root, `.`), a glob or
+#   git pathspec magic that can match one, a target the shell fills in at run time ($f) near the state folders, a
+#   whole-folder copy or move onto them, and the writer tools that take their targets from elsewhere (git apply,
+#   patch, tar -x, unzip, awk -i inplace, ed, vim -es). Every mode.
+_STATE_DIR_RE = re.compile(r"^docs(?:/agents-v0(?:/(?:onboarding|requirements|maintain(?:/[^/]+)?))?)?$")
+_STATE_DIR_TAIL_RE = re.compile(r"(?:^|/)docs/agents-v0(?:/(?:onboarding|requirements|maintain(?:/[^/]+)?))?$")
+_STATE_TEMPLATES = ("docs/agents-v0/onboarding/state.json", "docs/agents-v0/program.state.json",
+                    "docs/agents-v0/maintain/{}/state.json", "docs/agents-v0/requirements/{}.state.json")
+_GLOB_CHARS = re.compile(r"[*?\[]")
+_SHELL_VARS: dict = {}  # name -> value for `name=value` segments earlier in the same command (None: not knowable)
+_STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)")
+_CMD_TEXT = [""]  # the whole command being judged (for "does it name a state folder")
+_STATE_FOLDER_NAMES = {"docs", "agents-v0", "onboarding", "maintain", "requirements"}
+
+
+def _repo_root(start: str) -> Optional[str]:
+    d = os.path.abspath(os.path.expanduser(start))
+    while True:
+        if os.path.exists(os.path.join(d, ".git")):
+            return d
+        up = os.path.dirname(d)
+        if up == d:
+            return None
+        d = up
+
+
+def _state_candidates(root: str) -> List[str]:
+    """Repository-relative state files (with sample and on-disk names) and every folder above them."""
+    names = {"inc-1", "x"}
+    for sub in ("maintain", "requirements"):
+        try:
+            for n in os.listdir(os.path.join(root, "docs", "agents-v0", sub)):
+                names.add(n[:-len(".state.json")] if n.endswith(".state.json") else n)
+        except OSError:
+            pass
+    out = set()
+    for t in _STATE_TEMPLATES:
+        for n in (names if "{}" in t else {""}):
+            f = t.format(n)
+            out.add(f)
+            d = posixpath.dirname(f)
+            while d:
+                out.add(d)
+                d = posixpath.dirname(d)
+    return sorted(out)
+
+
+def _expand_known_vars(t: str) -> str:
+    def sub(m: "re.Match") -> str:
+        v = _SHELL_VARS.get(m.group(1) or m.group(2))
+        return v if isinstance(v, str) else m.group(0)
+    return re.sub(r"\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)", sub, t)
+
+
+def _holds_state(arg: str, base: Optional[str] = None, git_pathspec: bool = False) -> bool:
+    """True when arg names a state file, a folder holding one, or a glob / pathspec that can match one."""
+    a = _expand_known_vars(arg.replace("\\", "/").strip().strip("'\""))
+    if not a:
+        return False
+    base = os.path.abspath(os.path.expanduser(base or _BASE_DIR or _base_dir()))
+    if git_pathspec and a.startswith(":"):
+        return True  # :/, :(glob), :(top), :! ... magic: judged as a match (the guard does not evaluate magic)
+    if _is_state_path(a) and not _GLOB_CHARS.search(a):
+        return True
+    full = os.path.normpath(os.path.join(base, os.path.expanduser(a)))
+    root = _repo_root(base)
+    if _GLOB_CHARS.search(a):
+        if not root:
+            return False
+        rx = re.compile(fnmatch.translate(a))  # `*` crosses `/`, as in a git pathspec
+        for c in _state_candidates(root):
+            rel = os.path.relpath(os.path.join(root, c), base).replace(os.sep, "/")
+            if rx.match(rel) or rx.match(os.path.join(root, c)):
+                return True
+        return False
+    if root:
+        kit_docs = os.path.isdir(os.path.join(root, "docs", "agents-v0"))
+        if full == root or (root + os.sep).startswith(full.rstrip(os.sep) + os.sep):
+            return kit_docs  # the repository root (or above): its checkout or restore holds every state file
+        rel = os.path.relpath(full, root).replace(os.sep, "/")
+        if not rel.startswith("../"):
+            if rel == "docs":
+                return kit_docs
+            return bool(_STATE_DIR_RE.match(rel))
+    return bool(_STATE_DIR_TAIL_RE.search(full.replace(os.sep, "/")))
+
+
+def _inside_state_dir(base: str) -> bool:
+    """The folder is a state folder or below one (docs/agents-v0/onboarding/x)."""
+    root = _repo_root(base)
+    if not root:
+        return bool(re.search(r"(?:^|/)docs/agents-v0(?:/(?:onboarding|requirements|maintain))(?:/|$)",
+                              base.replace(os.sep, "/")))
+    rel = os.path.relpath(os.path.abspath(base), root).replace(os.sep, "/")
+    return bool(re.match(r"docs/agents-v0/(?:onboarding|requirements|maintain)(?:/|$)", rel))
+
+
+def _unknown_target(t: str) -> bool:
+    return bool(re.search(r"[$`]", _expand_known_vars(t)))
+
+
+def _state_target(t: str) -> bool:
+    """A write target that is, or may be, a state file: a state path, a glob that can match one, or a target the
+    shell fills in at run time ($f, $(...)) written from inside a state folder or into a folder that holds one."""
+    t = t.strip().strip("'\"")
+    if not t:
+        return False
+    e = _expand_known_vars(t)
+    if _is_state_path(e):
+        return True
+    if _unknown_target(t):
+        base = os.path.abspath(_BASE_DIR or _base_dir())
+        lit = re.split(r"[$`]", e, maxsplit=1)[0]
+        lit_dir = (lit if lit.endswith("/") else posixpath.dirname(lit)).rstrip("/")
+        if _inside_state_dir(base) or _STATE_MENTION_RE.search(_CMD_TEXT[0]):
+            return True  # near a state folder: inside one, or the command names one
+        return bool(lit_dir) and lit_dir != "." and _holds_state(lit_dir, base)
+    if _GLOB_CHARS.search(e):
+        return _holds_state(e)
+    return False
+
+
+def _writer_target_dir(base: str) -> bool:
+    """A folder an extract or patch writes into holds a state file or is inside a state folder."""
+    return _holds_state(base, base) or _inside_state_dir(base)
+
+
 def _segment_writes_state(seg: str) -> Optional[str]:
     seg = _strip_env_prefix(seg.strip())
     if not seg:
         return None
     for m in _STATE_REDIRECT_RE.finditer(seg):
-        if _is_state_path(m.group(1)):
+        if _state_target(m.group(1)):
             return m.group(1).strip("'\"")
     try:
         parts = shlex.split(seg, posix=True)
@@ -594,27 +723,116 @@ def _segment_writes_state(seg: str) -> Optional[str]:
         else:
             cands = []
         for c in cands:
-            if _is_state_path(c.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", c) else c):
+            if _state_target(c.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", c) else c):
                 return c
-    if bin0 in ("tee", "sponge", "truncate", "rm", "unlink", "shred", "touch") or (
+        # A whole folder replaced or moved: mv of a folder that holds a state file (away, or onto one), and a
+        #   recursive cp / rsync onto a folder that holds one. Copying such a folder elsewhere is a read: allowed.
+        dest = tgt if tgt is not None else (ops[-1] if len(ops) >= 2 else None)
+        srcs = ops if tgt is not None else ops[:-1]
+        recursive = any(re.fullmatch(r"-[A-Za-z]*[rRa][A-Za-z]*", a) or a in ("--recursive", "--archive", "--delete")
+                        for a in parts[1:])
+        def _is_folder(x: str) -> bool:
+            xx = x.rstrip("/")
+            return x.endswith("/") or x.endswith("/.") or posixpath.basename(xx) in _STATE_FOLDER_NAMES or \
+                os.path.isdir(os.path.join(_BASE_DIR or _base_dir(), os.path.expanduser(xx)))
+        if bin0 == "mv":
+            for x in srcs:
+                if _holds_state(x):
+                    return x
+            if dest and _holds_state(dest) and any(_is_folder(x) for x in srcs):
+                return dest
+        if bin0 in ("cp", "rsync", "scp") and recursive and dest:
+            d = dest.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", dest) else dest
+            if _holds_state(d):
+                return d
+    awk_inplace = bin0 in ("awk", "gawk") and any(
+        a in ("inplace", "--include=inplace", "-iinplace") or a.endswith("inplace") for a in parts[1:])
+    if bin0 in ("tee", "sponge", "truncate", "rm", "unlink", "shred", "touch", "ed", "red", "ex", "vim", "vi",
+                "nvim") or awk_inplace or (
             bin0 in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", p) for p in parts[1:])):
         for a in parts[1:]:
-            if not a.startswith("-") and _is_state_path(a):
+            if not a.startswith("-") and not a.startswith("+") and _state_target(a):
                 return a
     if bin0 == "dd":
         for a in parts[1:]:
-            if a.startswith("of=") and _is_state_path(a[3:]):
+            if a.startswith("of=") and _state_target(a[3:]):
                 return a[3:]
+    base = os.path.abspath(_BASE_DIR or _base_dir())
+    if bin0 in ("tar", "bsdtar", "gtar"):
+        extract = any(a in ("--extract", "--get") or re.fullmatch(r"-[A-Za-z]*x[A-Za-z]*", a) for a in parts[1:]) or (
+            len(parts) > 1 and not parts[1].startswith("-") and re.fullmatch(r"[A-Za-z]*x[A-Za-z]*", parts[1]))
+        if extract:
+            dest = base
+            for i, a in enumerate(parts[1:], 1):
+                if a in ("-C", "--directory") and i + 1 < len(parts):
+                    dest = os.path.join(base, os.path.expanduser(parts[i + 1]))
+                elif a.startswith("--directory="):
+                    dest = os.path.join(base, os.path.expanduser(a.split("=", 1)[1]))
+            if _writer_target_dir(os.path.normpath(dest)):
+                return f"{os.path.relpath(dest, base) if dest != base else '.'} (tar -x writes whatever the archive names there)"
+    if bin0 == "unzip" and not any(a in ("-l", "-t", "-v", "-Z", "-p", "-z") for a in parts[1:]):
+        dest = base
+        for i, a in enumerate(parts[1:], 1):
+            if a == "-d" and i + 1 < len(parts):
+                dest = os.path.join(base, os.path.expanduser(parts[i + 1]))
+        if _writer_target_dir(os.path.normpath(dest)):
+            return f"{os.path.relpath(dest, base) if dest != base else '.'} (unzip writes whatever the archive names there)"
+    if bin0 == "patch" and not any(a in ("--dry-run", "-C", "--check") for a in parts[1:]):
+        dest = base
+        target = None
+        skip = False
+        for i, a in enumerate(parts[1:], 1):
+            if skip:
+                skip = False
+                continue
+            if a in ("-d", "--directory") and i + 1 < len(parts):
+                dest = os.path.join(base, os.path.expanduser(parts[i + 1]))
+                skip = True
+            elif a in ("-o", "--output") and i + 1 < len(parts):
+                target = parts[i + 1]
+                skip = True
+            elif a in ("-i", "--input", "-p", "-r", "-B", "-z", "-D", "-F", "-V", "-Y") and i + 1 < len(parts):
+                skip = True
+            elif a in ("<", "<<", "<<<", ">", ">>", "2>", "&>") or re.match(r"[0-9]*[<>]", a):
+                skip = a in ("<", "<<", "<<<", ">", ">>", "2>", "&>")
+            elif not a.startswith("-") and target is None:
+                target = a
+        if target is not None:
+            if _state_target(target) or _holds_state(target):
+                return target
+        elif _writer_target_dir(os.path.normpath(dest)):
+            return f"{os.path.relpath(dest, base) if dest != base else '.'} (patch writes whatever the patch names there)"
     if bin0 == "git":
         sub = _git_subcommand(parts)
+        gbase = base
+        for j, p in enumerate(parts[1:parts.index(sub) if sub in parts else len(parts)], 1):
+            if p == "-C" and j + 1 < len(parts):
+                gbase = os.path.normpath(os.path.join(gbase, os.path.expanduser(parts[j + 1])))
+        sub_args = parts[parts.index(sub) + 1:] if sub in parts else []
         if sub in ("checkout", "restore", "mv", "rm"):
-            sub_args = parts[parts.index(sub) + 1:]
             staged_only = sub == "restore" and any(x in ("--staged", "-S") for x in sub_args) and not any(
                 x in ("--worktree", "-W") for x in sub_args)
             if not staged_only:
+                skip = False
                 for a in sub_args:
-                    if a != "--" and not a.startswith("-") and _is_state_path(a):
+                    if skip:
+                        skip = False
+                        continue
+                    if a in ("-s", "--source", "-b", "-B", "--orphan", "--conflict", "--pathspec-from-file"):
+                        skip = True
+                        continue
+                    if a == "--" or a.startswith("-"):
+                        continue
+                    if _is_state_path(a) or _holds_state(a, gbase, git_pathspec=True):
                         return a
+        if sub == "apply" and not (any(a in ("--check", "--stat", "--numstat", "--summary") for a in sub_args)
+                                   and "--apply" not in sub_args):
+            dest = gbase
+            for a in sub_args:
+                if a.startswith("--directory="):
+                    dest = os.path.join(_repo_root(gbase) or gbase, a.split("=", 1)[1])
+            if _writer_target_dir(os.path.normpath(dest)):
+                return f"{os.path.relpath(dest, base) if dest != base else '.'} (git apply writes whatever the patch names there)"
     if bin0 in SCRIPT_INTERPRETERS and SCRIPT_WRITE_HINT.search(seg):
         for lit in _script_literals(parts):
             if _is_state_path(lit):
@@ -2151,13 +2369,15 @@ def _heredoc_writes_ask_path(cmd: str) -> Optional[Tuple[str, str]]:
 
 
 def _cd_target(seg: str) -> Optional[str]:
-    m = re.fullmatch(r"\s*cd\s+(?:--\s+)?(['\"]?)([^'\"\s;&|]+)\1\s*", seg)
+    m = re.fullmatch(r"\s*(?:cd|pushd)\s+(?:--\s+)?(['\"]?)([^'\"\s;&|]+)\1\s*", seg)
     return m.group(2) if m else None
 
 
 def classify_command(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
+    _SHELL_VARS.clear()
+    _CMD_TEXT[0] = cmd
     del _ESCALATIONS[:]
     if GUARD_OVERRIDE_RE.search(cmd):
         return "block", GUARD_OVERRIDE_MSG
@@ -2204,8 +2424,13 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     for seg in segments:
         cd_to = _cd_target(seg)
         if cd_to:
-            _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(cd_to)))
+            _BASE_DIR = os.path.normpath(os.path.join(_base_dir(), os.path.expanduser(_expand_known_vars(cd_to))))
             continue
+        for am in re.finditer(r"(?:^|\s)(?:export\s+|local\s+|readonly\s+)?([A-Za-z_]\w*)=('[^']*'|\"[^\"]*\"|\S*)",
+                              seg if re.fullmatch(r"\s*(?:(?:export|local|readonly)\s+)?[A-Za-z_]\w*=('[^']*'|\"[^\"]*\"|\S*)"
+                                                  r"(?:\s+[A-Za-z_]\w*=('[^']*'|\"[^\"]*\"|\S*))*\s*", seg) else ""):
+            val = am.group(2).strip("'\"")
+            _SHELL_VARS[am.group(1)] = None if re.search(r"[$`]", val) else val
         if unattended:
             why, inner = _segment_ws_exec(seg)
             if why:
