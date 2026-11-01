@@ -674,7 +674,8 @@ def _is_onboard_msg_path(p: str) -> bool:
 _LEDGER_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0/(?:gate-ledger|reopen-grant)$", re.I)
 _LEDGER_HOLDER_RE = re.compile(r"(?:^|/)\.git(?:/worktrees(?:/[^/]+)?)?(?:/agents-v0)?$", re.I)
 _LEDGER_MENTION_RE = re.compile(r"gate-ledger|reopen-grant|\.git/(?:worktrees/[^/\s]+/)?agents-v0(?:/|(?![\w.-]))"
-                                r"|--git-path\s+['\"]?agents-v0(?![\w.-])", re.I)
+                                r"|--git-path\s+['\"]?agents-v0(?![\w.-])"
+                                r"|--git-common-dir|--git-dir|--absolute-git-dir", re.I)  # follow-up: the git dir
 LEDGER_WRITE_MSG = ("{} is the gate ledger or the reopen grant (or a folder that holds them): only "
                     "sh .agents-v0/scripts/gate-checks.sh writes the ledger, and only the person writes the grant, in "
                     "any mode. Never edit, cut, recreate, move or remove them; if a gate check says `ledger changed, "
@@ -710,10 +711,37 @@ def _is_ledger_holder(p: str, base: Optional[str] = None) -> bool:
     return bool(full) and _ledger_match(full, _LEDGER_HOLDER_RE)
 
 
+_LEDGER_FOLDER_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0$", re.I)
+_GIT_DIR_RE = re.compile(r"(?:^|/)\.git(?:/worktrees/[^/]+)?$", re.I)
+
+
+def _ledger_folder_target(d: str, srcs: List[str]) -> bool:
+    """N3A: d (a landing spot) is the agents-v0 folder that holds the ledger, or a git dir that a source named
+    agents-v0 lands in; also a glob that matches one. Only in a project with docs/agents-v0."""
+    e = _expand_known_vars(d)
+    if _GLOB_CHARS.search(e):
+        root = _repo_root(_BASE_DIR or _base_dir())
+        if not root:
+            return False
+        rx = re.compile(fnmatch.translate(e.rstrip("/")), re.I)
+        base = _BASE_DIR or _base_dir()
+        return any(rx.match(os.path.relpath(os.path.join(root, c), base).replace(os.sep, "/"))
+                   for c in _ledger_candidates(root) if c.lower().endswith("agents-v0"))
+    full = _abs_norm(e)
+    if not full:
+        return False
+    if _ledger_match(full, _LEDGER_FOLDER_RE):
+        return True
+    if _ledger_match(full, _GIT_DIR_RE):
+        return any(posixpath.basename(_expand_known_vars(x).rstrip("/")).lower() == "agents-v0" for x in srcs)
+    return False
+
+
 def _ledger_related(t: str) -> bool:
     """A refused target that is the ledger, the grant, a folder holding them, or a run-time target named near them."""
     e = _expand_known_vars(t)
-    return _is_ledger_path(e) or _is_ledger_holder(e) or bool(_LEDGER_MENTION_RE.search(e)) or (
+    return _is_ledger_path(e) or _is_ledger_holder(e) or _ledger_folder_target(t, []) or \
+        bool(_LEDGER_MENTION_RE.search(e)) or (
         _unknown_target(t) and bool(_LEDGER_MENTION_RE.search(_CMD_TEXT[0])) and
         not _STATE_MENTION_OLD_RE.search(_CMD_TEXT[0]))
 
@@ -984,6 +1012,22 @@ def _segment_writes_state(seg: str) -> Optional[str]:
             for x in ops + ([tgt] if tgt else []):
                 if _is_ledger_path(_expand_known_vars(x)) or (_unknown_target(x) and _state_target(x) and
                                                               _LEDGER_MENTION_RE.search(_CMD_TEXT[0])):
+                    return x
+        # N3A follow-up (Jiraiya): the agents-v0 folder that holds the ledger is never replaced, renamed or linked as a
+        #   whole, whether or not it exists yet: mv / ln / cp / install / rsync whose landing spot is that folder
+        #   (.git/agents-v0, .git/worktrees/<n>/agents-v0, or .git/ given a source named agents-v0), ln naming it on
+        #   either side, and a run-time landing spot in a command that names the git dir.
+        swap_dest = tgt if tgt is not None else (ops[-1] if len(ops) >= 2 else None)
+        swap_srcs = ops if tgt is not None else ops[:-1]
+        if swap_dest is not None:
+            d = swap_dest.split(":", 1)[1] if bin0 in ("scp", "rsync") and re.match(r"^[^/]+:", swap_dest) else swap_dest
+            if _ledger_folder_target(d, swap_srcs):
+                return d
+            if _unknown_target(d) and _LEDGER_MENTION_RE.search(_CMD_TEXT[0]):
+                return d
+        if bin0 in ("ln", "link"):
+            for x in swap_srcs:
+                if _ledger_folder_target(x, []) or _is_ledger_holder(_expand_known_vars(x)):
                     return x
         # A whole folder replaced or moved: mv of a folder that holds a state file (away, or onto one), and a
         #   recursive cp / rsync onto a folder that holds one. Copying such a folder elsewhere is a read: allowed.

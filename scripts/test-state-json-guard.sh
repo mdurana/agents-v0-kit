@@ -212,6 +212,10 @@ judge agy-shell block "N3A: unattended rm" "rm $L" "$UA"
 judge cursor-edit block "N3A: edit tool on the ledger" "$L"
 judge cursor-shell allow "N3A: read the ledger" "cat $L"
 judge cursor-shell allow "N3A: copy the ledger out" "cp $L /tmp/ledger-copy"
+judge cursor-shell block "N3A: folder swap, mv onto it" "mv /tmp/d .git/agents-v0"
+judge cursor-shell block "N3A: folder swap, ln -s onto it" "ln -sfn /tmp/d .git/agents-v0"
+judge cursor-shell block "N3A: folder swap, cp -r onto it" "cp -r /tmp/d .git/agents-v0"
+judge cursor-shell block "N3A: folder swap, worktrees form" "mv /tmp/d .git/worktrees/wt1/agents-v0"
 
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2

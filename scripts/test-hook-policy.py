@@ -1234,6 +1234,33 @@ N3A_FOLDER = [
     "zip -rm /tmp/l.zip .git/agents-v0", "mv .git /tmp/g", "( mv .git/agents-v0 /tmp/x )",
     "if true; then rm -rf .git/agents-v0; fi", "mv \"$(git rev-parse --git-path agents-v0)\" /tmp/x",
 ]
+# N3A follow-up (Jiraiya): the agents-v0 folder replaced, renamed or linked as a whole (a folder swap). Each runs in a
+#   project whose .git/agents-v0 exists and in one where it does not exist yet.
+N3A_SWAP = [
+    "mv /tmp/d .git/agents-v0", "mv -T /tmp/d .git/agents-v0", "mv /tmp/d/ .git/agents-v0", "mv -f /tmp/d .git/agents-v0",
+    "mv -t .git /tmp/agents-v0", "mv --target-directory=.git /tmp/agents-v0", "mv /tmp/agents-v0 .git/",
+    "mv /tmp/agents-v0 .git", "mv /tmp/d .GIT/AGENTS-V0", "mv /tmp/d .git/worktrees/wt1/agents-v0",
+    "mv /tmp/d .git/worktrees/wt9/agents-v0", "mv .git/agents-v0 .git/old && mv /tmp/d .git/agents-v0",
+    "mv /tmp/d ./.git/agents-v0", "mv /tmp/d .git/x/../agents-v0", "d=.git/agents-v0; mv /tmp/d \"$d\"",
+    "mv /tmp/d \"$(git rev-parse --git-common-dir)/agents-v0\"", "mv /tmp/d \"$(git rev-parse --git-dir)/agents-v0\"",
+    "mv /tmp/d \"$(git rev-parse --git-path agents-v0)\"", "mv /tmp/d .git/agents-v?",
+    "cp -r /tmp/d .git/agents-v0", "cp -rT /tmp/d .git/agents-v0", "cp -a /tmp/d/. .git/agents-v0/",
+    "cp -R /tmp/d .GIT/Agents-V0", "cp -r /tmp/d .git/worktrees/wt1/agents-v0", "cp /tmp/f .git/agents-v0",
+    "cp -r /tmp/agents-v0 .git/", "cp -r /tmp/d \"$(git rev-parse --git-common-dir)/agents-v0\"",
+    "install -D /tmp/f .git/agents-v0", "rsync -a /tmp/d/ .git/agents-v0/", "rsync -a /tmp/d/ .git/agents-v0",
+    "rsync -a --delete /tmp/d/ .git/worktrees/wt1/agents-v0/", "rsync -r /tmp/agents-v0 .git/",
+    "ln -s /tmp/d .git/agents-v0", "ln -sfn /tmp/d .git/agents-v0", "ln -sf /tmp/d .git/agents-v0",
+    "ln -s /tmp/d .git/worktrees/wt1/agents-v0", "ln -s /tmp/d .GIT/AGENTS-V0", "ln -s .git/agents-v0 /tmp/l",
+    "ln -s \"$PWD/.git/agents-v0\" /tmp/l", "ln -s /tmp/agents-v0 .git/", "ln -t .git -s /tmp/agents-v0",
+    "ln -s /tmp/d \"$(git rev-parse --git-common-dir)/agents-v0\"", "( mv /tmp/d .git/agents-v0 )",
+    "{ ln -s /tmp/d .git/agents-v0; }", "if true; then mv /tmp/d .git/agents-v0; fi",
+    "while false; do cp -r /tmp/d .git/agents-v0; done", "mv .git/agents-v0 /tmp/old; ln -s /tmp/d .git/agents-v0",
+]
+N3A_SWAP_ALLOW = [
+    "mkdir -p .git/agents-v0", "cp -r .git/agents-v0 /tmp/backup", "mv /tmp/d /tmp/agents-v0", "ln -s /tmp/d /tmp/l",
+    "cp -r /tmp/d src/agents-v0", "mv /tmp/d notes/agents-v0", "rsync -a .git/agents-v0/ /tmp/backup/",
+    "ls -la .git/agents-v0", "cp /tmp/f .git/info/exclude",
+]
 N3A_ALLOW = [
     "cat {L}", "cat {R}", "grep FAIL {L}", "wc -l {L}", "sha256sum {L}", "head -n 5 {L}", "tail -n 1 {L}",
     "git log -1", "git log --format=%B -1", "cp {L} /tmp/ledger-copy", "cat {L} > /tmp/x", "tail -n1 {L} | tee /tmp/x",
@@ -1248,13 +1275,19 @@ N3A_ALLOW = [
 
 def n3a_cases(hp, tmp: str) -> list:
     """N3A: the gate ledger and reopen grant. In-process; own projects with a real .git/agents-v0 folder."""
-    def project(name: str, kit: bool = True, state=None) -> str:
+    def project(name: str, kit: bool = True, state=None, ledger: bool = True) -> str:
         d = os.path.join(tmp, name)
         os.makedirs(os.path.join(d, "src"))
         os.makedirs(os.path.join(d, "notes"))
         if kit:
             os.makedirs(os.path.join(d, "docs", "agents-v0", "onboarding"))
         subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
+        if not ledger:
+            os.makedirs(os.path.join(d, ".git", "worktrees", "wt1"))
+            if state is not None:
+                with open(os.path.join(d, STATE_S), "w", encoding="utf-8") as fh:
+                    json.dump(state, fh)
+            return d
         os.makedirs(os.path.join(d, ".git", "agents-v0", "archive"))
         os.makedirs(os.path.join(d, ".git", "worktrees", "wt1", "agents-v0"))
         for f in ("gate-ledger", "reopen-grant"):
@@ -1270,6 +1303,8 @@ def n3a_cases(hp, tmp: str) -> list:
                                           "approvedPhases": []})
     done = project("n3a-done", state={"activePhase": "", "approvedPhases": ["onboard"]})
     plain = project("n3a-plain", kit=False)
+    fresh = project("n3a-fresh", state={"activePhase": "onboard", "activeStatus": "in_progress", "approvedPhases": []},
+                    ledger=False)  # docs/agents-v0, but no .git/agents-v0 folder yet
     out = []
 
     def add(label, cmd, cwd, want, env=None):
@@ -1286,6 +1321,15 @@ def n3a_cases(hp, tmp: str) -> list:
         add("run-time target", c, active, "block")
     for c in N3A_FOLDER:
         add("agents-v0 folder", c, active, "block")
+    for c in N3A_SWAP:
+        add("agents-v0 folder swap", c, active, "block")
+        add("agents-v0 folder swap, folder not there yet", c, fresh, "block")
+    for c in ("mv /tmp/d .git/agents-v0", "ln -s /tmp/d .git/agents-v0", "cp -r /tmp/d .git/agents-v0"):
+        add("agents-v0 folder swap, unattended", c, active, "block", STATE_UNATTENDED_ENV)
+        add("agents-v0 folder swap, onboarding approved", c, done, "block")
+        add("agents-v0 folder swap, no docs/agents-v0 (unchanged)", c, plain, "allow")
+    for c in N3A_SWAP_ALLOW:
+        add("agents-v0 folder, not a swap", c, active, "allow")
     for c in (f"printf x >> {N3A_L}", f"rm {N3A_R}", "mv .git/agents-v0 /tmp/x", f"( sed -i 1d {N3A_L} )"):
         add("unattended", c, active, "block", STATE_UNATTENDED_ENV)
         add("onboarding approved (docs/agents-v0 exists)", c, done, "block")
