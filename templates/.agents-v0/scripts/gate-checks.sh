@@ -6,6 +6,7 @@
 #   sh .agents-v0/scripts/gate-checks.sh list               print every check and whether it is wired
 #   sh .agents-v0/scripts/gate-checks.sh commit_chain       print the onboard gate commit chain (JO-8); runs nothing
 #   sh .agents-v0/scripts/gate-checks.sh ledger_mark        print the gate ledger's mark (N84: lines=<n> sha256=<h>, or absent)
+#   sh .agents-v0/scripts/gate-checks.sh greenfield_trailer create the empty ledger, print the greenfield root trailer
 #
 # Design: kit-eval/kitfix-plan-20261031/proposals/jiraiya-onboard-fix-design-20261101.md (revision 6),
 # "Keeping the scripts small" and gap 5. Each check is one function with one job and one refusal message, and
@@ -16,6 +17,8 @@
 #   OK <check>: <rule>                     exit 0, the check passed
 #   REFUSED <check>: <reason>              exit 1, the check refused
 #   NOT-WIRED <check>: <rule> ...          exit 3, the check exists but its logic is not built yet
+#   NONE <check>: <reason>                 exit 4, greenfield_record_ok only: there is no valid record to judge
+#                                          (no record, or two root commits); the content rule decides
 #   error: ...  (stderr)                   exit 2, usage error or unreadable/invalid gate-rules
 # A caller treats every exit code but 0 as a stop (fail closed). Step 0 wired the plumbing (dispatch,
 # gate-rules loading and validation, the ledger and grant paths); a check stays NOT-WIRED until its fix turn
@@ -34,11 +37,11 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok ledger_ok ledger_turn_ok"
+WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok ledger_ok ledger_turn_ok greenfield_record_ok"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok ledger_turn_ok"
 
 usage() {
-  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain | ledger_mark\n' >&2
+  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain | ledger_mark | greenfield_trailer\n' >&2
   printf '       sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok <mark> <fails seen> <refusals seen>\n' >&2
   printf 'checks: %s\n' "$CHECKS" >&2
   exit 2
@@ -101,6 +104,7 @@ grant_path() { gcd="$(git_common_dir)" || exit 2; printf '%s/%s\n' "$gcd" "$GRAN
 # --- checks ---------------------------------------------------------------------------------------------
 ok() { printf 'OK %s: %s\n' "$1" "$2"; exit 0; }
 refuse() { printf 'REFUSED %s: %s\n' "$1" "$2"; exit 1; }
+none() { printf 'NONE %s: %s\n' "$1" "$2"; exit 4; }
 # not_wired <check> <rule> <who wires it>: fail closed until the fix turn builds the logic.
 not_wired() { printf 'NOT-WIRED %s: %s. Not yet wired (step 0 skeleton; built by %s). Stop: treat as refused.\n' "$1" "$2" "$3"; exit 3; }
 
@@ -161,6 +165,7 @@ STALE_TEXT = "stale: "
 FUTURE_SKEW = 120  # seconds a grant may be ahead of this clock (two machines' clocks; see reopen_grant_ok)
 MARK_RE = re.compile(r"^lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 EMPTY = hashlib.sha256(b"").hexdigest()
+RECORD = ".agents-v0/greenfield-record.json"  # GF_RECORD below
 
 SIM = None  # trailer mode: the prefix of a refusal found while checking the ledger as the gate commit would pin it
 
@@ -202,12 +207,37 @@ def trailer_of(body, where):
         out(1, "%s has a malformed %s trailer" % (where, key))
     return int(m.group(1)), m.group(2)
 
+def root_anchor():
+    # 5A, N2A: a greenfield repo's only root commit holds the record and anchors the empty ledger (lines=0, the
+    # empty hash); bootstrap-greenfield.sh writes that trailer (greenfield_trailer). With two or more roots (E31)
+    # the record is not valid and the root anchors nothing.
+    if git("rev-parse", "-q", "--verify", "HEAD^{commit}").returncode != 0:
+        return []
+    r = git("rev-list", "--max-parents=0", "HEAD")
+    if r.returncode != 0:
+        out(1, "git could not list the root commits")
+    roots = r.stdout.decode().split()
+    if len(roots) != 1 or git("cat-file", "-e", roots[0] + ":" + RECORD).returncode != 0:
+        return []
+    b = git("cat-file", "commit", roots[0])
+    if b.returncode != 0:
+        out(1, "git could not read the root commit %s" % roots[0][:12])
+    body = b.stdout.decode("utf-8", "surrogateescape")
+    where = "the greenfield root commit %s" % roots[0][:12]
+    n, h = trailer_of(body.split("\n\n", 1)[1] if "\n\n" in body else "", where)
+    if n != 0 or h != EMPTY:
+        out(1, "%s must record lines=0 sha256=%s (the empty ledger), not lines=%d" % (where, EMPTY, n))
+    return [(where, 0, EMPTY)]
+
+def tag_no(anc):
+    return [int(a[0][len("onboard-v"):]) for a in anc if a[0].startswith("onboard-v")]
+
 def anchors():
     r = git("tag", "-l", "onboard-v*")
     if r.returncode != 0:
         out(1, "git could not list the onboard-v<n> tags")
     tags = [t for t in r.stdout.decode("utf-8", "replace").split("\n") if re.match(r"^onboard-v[0-9]+$", t)]
-    found = []
+    found = root_anchor()
     for t in sorted(tags, key=lambda x: int(x[len("onboard-v"):])):
         c = git("rev-parse", "-q", "--verify", t + "^{commit}")
         if c.returncode != 0:
@@ -397,12 +427,12 @@ elif mode == "trailer":
         lines = []
     g, data, named = check_grants(lines, anc)
     if g:
-        nxt = max([int(a[0][len("onboard-v"):]) for a in anc] + [0]) + 1
+        nxt = max(tag_no(anc) + [0]) + 1
         stale = ["REOPEN-REFUSED grant=%s %sin the grant file when the scan for gate commit onboard-v%d wrote its trailer; "
                  "void unless that gate commit lands with this line in its trailer" % (sha(x), STALE_TEXT, nxt)
                  for x in g[len(named):]]
     else:
-        stale, nxt = [], max([int(a[0][len("onboard-v"):]) for a in anc] + [0]) + 1
+        stale, nxt = [], max(tag_no(anc) + [0]) + 1
     # check the ledger as the gate commit would leave it, before writing anything: the new stale lines added and a
     # gate commit pinning every line. A void stale line already at the end of the ledger joins the pinned run, so
     # one that names no grant line (or a grant another line names) would make every later check refuse.
@@ -483,7 +513,7 @@ elif mode == "reopen" and len(args) == 2:
         refused("grant line %d is dated in the future (%s, more than %ds ahead of this clock)" % (last, m.group(1), FUTURE_SKEW), name=h)
     if now - ts > max_age:
         refused("grant line %d is %ds old, older than gate-rules grant_max_age_seconds (%d)" % (last, int(now - ts), max_age), name=h)
-    if anc:
+    if tag_no(anc):
         gt = anc[-1][0]
         r = git("log", "-1", "--format=%ct", gt + "^{commit}")
         try:
@@ -663,7 +693,8 @@ gate_committed() {
 # record (discovery/baseline-audit.txt, JO-15a). With none of them the repo is treated as not brownfield and the
 # check passes.
 # TODO(gap 9 / N2A, 5A): the content-rule fallback (a brownfield repo where onboard was skipped and no record was
-#   written) and the greenfield record (greenfield_record_ok) are not built; until then a repo with no record passes.
+#   written) is not built, and prereq_approved does not call greenfield_record_ok yet (built in round 15); until
+#   then a repo with no record passes.
 PA_AUDIT="docs/agents-v0/discovery/baseline-audit.txt"
 prereq_approved() {
   need_phase prereq_approved "${1:-}"
@@ -899,9 +930,114 @@ reopen_grant_ok() {
     *) die "reopen_grant_ok: ${rg_out:-the grant check could not run}" ;;
   esac
 }
-# 5A, N2A: .agents-v0/greenfield-record.json is valid only in the repo's single root commit.
+# 5A, N2A (design rev 6 "Greenfield record"; E31): .agents-v0/greenfield-record.json is valid only when the
+# repo's only root commit added it, nothing changed it since (HEAD, the index and the work tree hold the same
+# bytes, mode 100644) and it reads exactly {"kind": "greenfield", "bootstrapAt": "<YYYY-MM-DDTHH:MM:SS+HH:MM>",
+# "kitSha": "<7-40 hex>[-dirty]" or "unknown"} (no hash field: the commit that holds it is the proof).
+#   OK       exit 0  a valid record: greenfield, onboard stops and suggests /v0-intake
+#   NONE     exit 4  no record anywhere, or two or more root commits (E31): the content rule decides
+#   REFUSED  exit 1  any other record: "record changed, ask the user"
+# The ledger check runs first (ledger_guard), so the root commit's trailer must be lines=0 and the empty hash.
+GF_RECORD=".agents-v0/greenfield-record.json"
 greenfield_record_ok() {
-  not_wired greenfield_record_ok "the greenfield record must sit in the repo's only root commit" "the greenfield record fix (5A, N2A, N9A)"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || none greenfield_record_ok "not a git work tree, so there is no greenfield record"
+  to_root
+  ledger_guard greenfield_record_ok
+  gf_rc=0; gf_out="$(python3 - "$GF_RECORD" <<'PYGF'
+import datetime, json, os, re, subprocess, sys
+rec = sys.argv[1]
+def git(*a):
+    return subprocess.run(["git"] + list(a), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def done(code, msg):
+    print(msg)
+    sys.exit(code)
+def changed(why):
+    done(1, "record changed, ask the user (%s %s)" % (rec, why))
+born = git("rev-parse", "-q", "--verify", "HEAD^{commit}").returncode == 0
+wt = os.path.lexists(rec)
+adds = []
+if born:
+    r = git("log", "--no-renames", "--diff-filter=A", "--format=%H", "HEAD", "--", rec)
+    if r.returncode != 0:
+        done(1, "git could not read the history of %s" % rec)
+    adds = r.stdout.decode().split()
+if not adds:
+    if wt or (born and git("cat-file", "-e", "HEAD:" + rec).returncode == 0):
+        changed("is not in any commit of HEAD's history: a copy that no root commit added")
+    if git("ls-files", "--error-unmatch", "--", rec).returncode == 0:
+        changed("is staged but not committed")
+    done(4, "no greenfield record (%s): the content rule decides" % rec)
+r = git("rev-list", "--max-parents=0", "HEAD")
+roots = r.stdout.decode().split()
+if r.returncode != 0 or not roots:
+    done(1, "git could not list the root commits")
+if len(roots) != 1:
+    done(4, "HEAD has %d root commits (unrelated history was merged, E31), so the greenfield record is not valid: the content rule decides" % len(roots))
+root = roots[0]
+if adds[-1] != root:
+    changed("was added by commit %s, not by the root commit %s" % (adds[-1][:12], root[:12]))
+if len(adds) != 1:
+    changed("was removed and added again after the root commit %s" % root[:12])
+def entry(rev):
+    r = git("ls-tree", rev, "--", rec)
+    f = r.stdout.decode().split()
+    return (f[0], f[2]) if r.returncode == 0 and len(f) >= 3 else None
+want = entry(root)
+if want is None or want[0] != "100644":
+    changed("is not a regular file (mode 100644) in the root commit %s" % root[:12])
+if entry("HEAD") != want:
+    changed("is missing at HEAD or differs from the root commit %s" % root[:12])
+r = git("ls-files", "-s", "--", rec)
+f = r.stdout.decode().split()
+if r.returncode != 0 or len(f) < 2 or (f[0], f[1]) != want or len(r.stdout.decode().strip().split("\n")) != 1:
+    changed("in the index differs from the root commit %s" % root[:12])
+if not wt or os.path.islink(rec) or not os.path.isfile(rec):
+    changed("is missing in the work tree or is not a regular file")
+r = subprocess.run(["git", "hash-object", "--no-filters", "--", rec], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+if r.returncode != 0 or r.stdout.decode().strip() != want[1]:
+    changed("in the work tree differs from the root commit %s" % root[:12])
+try:
+    d = json.loads(git("cat-file", "blob", want[1]).stdout.decode("utf-8"))
+except (UnicodeDecodeError, ValueError):
+    changed("is not valid JSON")
+if not isinstance(d, dict) or sorted(d) != ["bootstrapAt", "kind", "kitSha"]:
+    changed("must hold exactly the keys kind, bootstrapAt and kitSha")
+if d["kind"] != "greenfield":
+    changed("kind is not \"greenfield\"")
+ok_at = isinstance(d["bootstrapAt"], str) and re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$", d["bootstrapAt"])
+if ok_at:
+    try:
+        datetime.datetime.fromisoformat(d["bootstrapAt"])
+    except ValueError:
+        ok_at = None
+if not ok_at:
+    changed("bootstrapAt is not a time like 2026-11-02T08:00:00+08:00")
+if not (isinstance(d["kitSha"], str) and re.match(r"^(unknown|[0-9a-f]{7,40}(-dirty)?)$", d["kitSha"])):
+    changed("kitSha is not a kit commit (7-40 hex, optional -dirty) or unknown")
+done(0, "greenfield: %s was added by the only root commit %s and is unchanged (bootstrapAt %s, kit %s); onboard stops, writes nothing and suggests /v0-intake" % (rec, root[:12], d["bootstrapAt"], d["kitSha"]))
+PYGF
+)" || gf_rc=$?
+  case "$gf_rc" in
+    0) ok greenfield_record_ok "$gf_out" ;;
+    4) none greenfield_record_ok "$gf_out" ;;
+    1) refuse greenfield_record_ok "$gf_out" ;;
+    *) die "greenfield_record_ok: ${gf_out:-the record check could not run}" ;;
+  esac
+}
+# greenfield_trailer (for bootstrap-greenfield.sh, N9A): before the greenfield root commit, create the empty ledger
+# and print the trailer that commit's message must end with: Agents-V0-Ledger: lines=0 sha256=<empty hash>. Refuses
+# (exit 1) unless HEAD is unborn, no onboard-v<n> tag exists and the ledger is absent or empty.
+greenfield_trailer() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse greenfield_trailer "not a git work tree"
+  git rev-parse -q --verify 'HEAD^{commit}' >/dev/null 2>&1 && refuse greenfield_trailer "HEAD already has a commit; the greenfield record belongs in the root commit only"
+  [ -z "$(git tag -l 'onboard-v*')" ] || refuse greenfield_trailer "an onboard-v<n> tag exists; this is not a new repo"
+  gt_l="$(ledger_path)" || exit 2
+  if [ -e "$gt_l" ] || [ -L "$gt_l" ]; then
+    { [ -f "$gt_l" ] && [ ! -L "$gt_l" ] && [ ! -s "$gt_l" ]; } || refuse greenfield_trailer "the ledger $gt_l is not an empty regular file; a new repo starts with an empty ledger"
+  else
+    mkdir -p "$(dirname "$gt_l")" && : > "$gt_l" || refuse greenfield_trailer "could not create the empty ledger $gt_l"
+  fi
+  printf '%s: lines=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n' "$LEDGER_TRAILER"
 }
 # 2A, N4B: the baseline record is green, or every failing test is in baseline-accepted.json read from HEAD.
 # Built in the helper by onboard; build and maintain wire it in their own fix turns (N4B).
@@ -950,6 +1086,9 @@ case "$cmd" in
     lm_rc=0; lm_out="$(ledger_py mark)" || lm_rc=$?
     [ "$lm_rc" = 0 ] || die "ledger_mark: ${lm_out:-the ledger could not be read}"
     printf '%s\n' "$lm_out" ;;
+  greenfield_trailer)
+    [ "$#" = 0 ] || usage
+    greenfield_trailer ;;
   ledger_turn_ok)
     [ "$#" = 3 ] || usage
     ledger_turn_ok "$1" "$2" "$3" ;;

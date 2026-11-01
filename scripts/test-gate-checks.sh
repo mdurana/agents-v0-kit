@@ -757,6 +757,72 @@ expect_fail "N83 a gate commit with a malformed trailer is refused" "$lg" sh "$G
 out_has "N83 names the malformed trailer" "has a malformed Agents-V0-Ledger trailer)"
 
 # list reports the wired checks
+# GF-n (5A, N2A, E31; round 15): greenfield_record_ok and the greenfield root trailer. gf_root <name> <trailer|->
+# <record json>: a new repo whose root commit holds the installed kit and the record ("-": no trailer), with the
+# empty ledger greenfield_trailer creates.
+GFR=".agents-v0/greenfield-record.json"
+GFJ='{"kind": "greenfield", "bootstrapAt": "2026-11-02T08:00:00+08:00", "kitSha": "0123456789ab"}'
+gf_root() {
+  r_="$(t1_repo "$1")"; t1_install "$r_" || { fail "install.sh into $1"; return 1; }
+  q "$r_" sh "$GC" greenfield_trailer; printf '%s\n' "$3" > "$r_/$GFR"; G "$r_" add -A >/dev/null
+  if [ "$2" = - ]; then G "$r_" commit -qm "bootstrap"; else G "$r_" commit -qm "bootstrap
+
+$2"; fi
+}
+# expect_rc <desc> <rc> <dir> <command...>
+expect_rc() { d_="$1"; w_rc="$2"; w_="$3"; shift 3; g_rc=0; (cd "$w_" && "$@") > "$T1_TMP/out.txt" 2>&1 || g_rc=$?
+  if [ "$g_rc" = "$w_rc" ]; then pass "$d_"; else fail "$d_ (exit $g_rc, want $w_rc)"; fi; }
+gq="$(t1_repo gf-ok)"; t1_install "$gq" || fail "install.sh into gf-ok"
+expect_pass "GF-1 greenfield_trailer runs before the root commit" "$gq" sh "$GC" greenfield_trailer
+gf_tr="$(cat "$T1_TMP/out.txt")"
+is_eq "GF-1 it prints the empty-ledger trailer" "$gf_tr" "Agents-V0-Ledger: lines=0 sha256=$(printf '' | sha256sum | cut -d' ' -f1)"
+is_eq "GF-1 it creates the empty ledger" "$(wc -c < "$gq/.git/agents-v0/gate-ledger" | tr -d ' ')" "0"
+printf '%s\n' "$GFJ" > "$gq/$GFR"; G "$gq" add -A >/dev/null; G "$gq" commit -qm "bootstrap
+
+$gf_tr"
+expect_pass "GF-2 a valid record in the only root commit passes" "$gq" sh "$GC" greenfield_record_ok
+out_has "GF-2 says greenfield" "OK greenfield_record_ok: greenfield: $GFR was added by the only root commit"
+expect_pass "GF-2 ledger_ok anchors on the root trailer" "$gq" sh "$GC" ledger_ok
+out_has "GF-2 names the root commit" "trailer of the greenfield root commit"
+expect_fail "GF-3 greenfield_trailer refuses once HEAD has a commit" "$gq" sh "$GC" greenfield_trailer
+out_has "GF-3 says why" "HEAD already has a commit"
+printf ' \n' >> "$gq/$GFR"
+expect_rc "GF-4 an edited work-tree copy is refused" 1 "$gq" sh "$GC" greenfield_record_ok
+out_has "GF-4 asks the user" "REFUSED greenfield_record_ok: record changed, ask the user ($GFR in the work tree differs"
+G "$gq" checkout -q -- "$GFR"
+G "$gq" checkout -q -b gf-moved; G "$gq" mv "$GFR" .agents-v0/moved.json; G "$gq" commit -qm moved
+expect_rc "GF-5 a record missing at HEAD is refused" 1 "$gq" sh "$GC" greenfield_record_ok
+out_has "GF-5 says missing" "is missing at HEAD or differs from the root commit"
+G "$gq" checkout -q main
+mv "$gq/.git/agents-v0/gate-ledger" "$T1_TMP/gf-ledger.keep"
+expect_fail "GF-6 a missing ledger under the root trailer is refused" "$gq" sh "$GC" ledger_ok
+out_has "GF-6 never reads as empty" "the ledger $gq/.git/agents-v0/gate-ledger is missing, but the gate commit the greenfield root commit"
+mv "$T1_TMP/gf-ledger.keep" "$gq/.git/agents-v0/gate-ledger"
+gb="$(t1_repo gf-brown --commit)"; t1_install "$gb" || fail "install.sh into gf-brown"
+G "$gb" add -A >/dev/null; G "$gb" commit -qm installed
+expect_rc "GF-7 no record: NONE, the content rule decides" 4 "$gb" sh "$GC" greenfield_record_ok
+out_has "GF-7 says why" "NONE greenfield_record_ok: no greenfield record"
+G "$gq" checkout -q -b gf-merged; G "$gq" fetch -q "$gb" main; G "$gq" merge -q --no-edit -X ours --allow-unrelated-histories FETCH_HEAD
+expect_rc "GF-8 two root commits (E31): NONE" 4 "$gq" sh "$GC" greenfield_record_ok
+out_has "GF-8 names the roots" "HEAD has 2 root commits"
+G "$gq" checkout -q main
+printf '%s\n' "$GFJ" > "$gb/$GFR"
+expect_rc "GF-9 an untracked copy is refused" 1 "$gb" sh "$GC" greenfield_record_ok
+out_has "GF-9 says not committed by a root" "a copy that no root commit added"
+G "$gb" add "$GFR"; G "$gb" commit -qm "record later"
+expect_rc "GF-9 a record added after the root commit is refused" 1 "$gb" sh "$GC" greenfield_record_ok
+out_has "GF-9 names the commit" "not by the root commit"
+gf_root gf-extra "$gf_tr" '{"kind": "greenfield", "bootstrapAt": "2026-11-02T08:00:00+08:00", "kitSha": "0123456789ab", "rootSha": "0123456789ab"}'
+expect_rc "GF-10 a record with another field is refused" 1 "$T1_TMP/gf-extra" sh "$GC" greenfield_record_ok
+out_has "GF-10 names the keys" "must hold exactly the keys kind, bootstrapAt and kitSha"
+gf_root gf-notr - "$GFJ"
+expect_fail "GF-11 a root commit with the record and no trailer is refused" "$T1_TMP/gf-notr" sh "$GC" ledger_ok
+out_has "GF-11 names the root" "the greenfield root commit"
+out_has "GF-11 no trailer" "has no Agents-V0-Ledger trailer"
+gf_root gf-one "Agents-V0-Ledger: lines=1 sha256=$(printf 'FAIL\n' | sha256sum | cut -d' ' -f1)" "$GFJ"
+printf 'FAIL\n' > "$T1_TMP/gf-one/.git/agents-v0/gate-ledger"
+expect_fail "GF-11 a root trailer other than lines=0 is refused" "$T1_TMP/gf-one" sh "$GC" greenfield_record_ok
+out_has "GF-11 says lines=0" "must record lines=0 sha256="
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"
@@ -766,6 +832,7 @@ out_has "list: no_restart_without_reopen is wired" "no_restart_without_reopen wi
 out_has "list: commit_msg_ok is wired" "commit_msg_ok wired"
 out_has "list: ledger_ok is wired (N3A)" "ledger_ok wired"
 out_has "list: ledger_turn_ok is wired (N84)" "ledger_turn_ok wired"
+out_has "list: greenfield_record_ok is wired (5A)" "greenfield_record_ok wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.
