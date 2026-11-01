@@ -1,6 +1,6 @@
 # Agentic Delivery Workflow (agents-v0)
 
-Local-first, IDE-portable delivery kit (**Cursor**, **Claude Code**, **Windsurf**, **VS Code Copilot**; the **Antigravity** (agy) adapter is unproven and opt-in). Always-on instructions live in `AGENTS.md` and `.cursor/rules/` after `scripts/install.sh`.
+Local-first, IDE-portable delivery kit (**Cursor**, **Claude Code**, **Windsurf**, **VS Code Copilot**; the **Antigravity** (agy) adapter is unproven and opt-in: `scripts/install.sh --with-antigravity`). Always-on instructions live in `AGENTS.md` and `.cursor/rules/` after `scripts/install.sh`.
 
 ## Mission
 
