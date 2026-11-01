@@ -32,7 +32,7 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence"
+WIRED="approval_evidence gate_committed"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
@@ -104,6 +104,7 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 # at these paths; the agent writes the phase result).
 ONB_DIR="docs/agents-v0/onboarding"
 ONB_STATE="$ONB_DIR/state.json"
+ONB_REPORT="$ONB_DIR/report.md"
 ONB_RESULT="$ONB_DIR/phase-result.md"
 
 # to_root: run from the repo root when inside a git work tree (sync and the docs check use root-relative paths).
@@ -147,10 +148,54 @@ approval_evidence() {
   sh "$HERE/check-onboarding-docs.sh" >/dev/null 2>&1 || refuse approval_evidence "the onboarding docs check failed (check-onboarding-docs.sh); run it, fix the docs, and ask again"
   ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed"
 }
-# JO-1: wraps check-gate-commit.sh unchanged; the gate commit of <phase> holds only allowed paths.
+# JO-1 (design rev 6 lines 69, 84, 96, 168): the approved <phase> has its gate commit. For onboard: onboard is in
+# approvedPhases, check-gate-commit.sh (unchanged) passes on the onboarding report (the approval is in HEAD and
+# the tree is clean), and the newest onboard-v<n> tag is on this branch and holds the current approval.
+# Consumers: prereq_approved (JO-9) and the JO-8 commit chain; nothing in sync calls this check yet.
+# TODO(JO-8): the commit's paths are a subset of gate-rules onboard_commit_paths plus the recorded pack paths, and
+#   the range re-scan (design line 27) belong to the JO-8 commit chain and its secret scanner; not checked here.
+# Not here (N3A, blocked on Sasuke's hook work): the Agents-V0-Ledger trailer on the gate commit is ledger_ok's job.
 gate_committed() {
   need_phase gate_committed "${1:-}"
-  not_wired gate_committed "phase $1 must have its gate commit (wraps check-gate-commit.sh)" "JO-1"
+  [ "$1" = onboard ] || not_wired gate_committed "phase $1 must have its gate commit (only onboard is wired)" "the fix turn for $1"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse gate_committed "not a git work tree, so the onboard gate cannot be committed"
+  to_root
+  [ -f "$ONB_STATE" ] || refuse gate_committed "onboard is not approved in $ONB_STATE, so it has no gate commit"
+  gc_approved="$(state_field "$ONB_STATE" approvedPhases)" || refuse gate_committed "$ONB_STATE is not valid JSON; stop and ask the user"
+  case " $gc_approved " in *" onboard "*) ;; *) refuse gate_committed "onboard is not approved in $ONB_STATE, so it has no gate commit" ;; esac
+  [ -f "$ONB_REPORT" ] || refuse gate_committed "$ONB_REPORT is missing, so the onboard gate cannot be checked"
+  [ -f "$HERE/check-gate-commit.sh" ] || refuse gate_committed "$HERE/check-gate-commit.sh is missing; reinstall the kit (install.sh --update)"
+  if ! gc_out="$(sh "$HERE/check-gate-commit.sh" "$ONB_REPORT" 2>&1)"; then
+    printf '%s\n' "$gc_out" | sed 's/^/  /' >&2
+    refuse gate_committed "the onboard gate is not committed (check-gate-commit.sh); commit it, then tag it onboard-v<n>"
+  fi
+  case "$gc_out" in *"skipped (kit test override)"*)
+    refuse gate_committed "check-gate-commit.sh skipped its check (AGENTS_V0_SKIP_COMMIT_CHECK); a skipped check is not a gate commit" ;;
+  esac
+  gc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  [ -n "$gc_n" ] || refuse gate_committed "no onboard-v<n> tag on the onboard gate commit; tag it: git tag -a onboard-v1 -m \"onboard approved\""
+  gc_tag="onboard-v$gc_n"
+  git merge-base --is-ancestor "$gc_tag^{commit}" HEAD 2>/dev/null || refuse gate_committed "$gc_tag is not on this branch (not an ancestor of HEAD)"
+  if ! python3 - "$gc_tag" "$ONB_STATE" <<'PYGT'
+import json, subprocess, sys
+tag, path = sys.argv[1], sys.argv[2]
+def approval(rev):
+    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True, check=False)
+    try:
+        d = json.loads(out.stdout) if out.returncode == 0 else None
+    except ValueError:
+        d = None
+    if not isinstance(d, dict) or "onboard" not in (d.get("approvedPhases") or []):
+        return None
+    return ((d.get("lastApprovedPhase") or "").lower(), sorted(d.get("approvedPhases") or []),
+            (d.get("phaseTimes") or {}).get("onboard"), (d.get("phaseDates") or {}).get("onboard"))
+at_tag, at_head = approval(tag), approval("HEAD")
+sys.exit(0 if at_tag is not None and at_tag == at_head else 1)
+PYGT
+  then
+    refuse gate_committed "$gc_tag does not hold the current onboard approval; tag the new gate commit onboard-v$((gc_n + 1))"
+  fi
+  ok gate_committed "onboard is approved, committed (check-gate-commit.sh) and tagged $gc_tag (path subset and range re-scan: JO-8, not checked yet)"
 }
 # JO-9: <next-phase> in prereq_approved_phases needs onboard approved and committed (brownfield only).
 prereq_approved() {

@@ -125,8 +125,57 @@ printf '| onboard | %s | user | Re-opened | 2026-11-02 |\n' "$REP" >> "$n/$REP"
 expect_pass "N1 plain sync with a typed Re-opened row runs" "$n" sh "$SFS" "$REP"
 is_eq "N1 typed Re-opened row does not count as a reopen" "$(state_val "$n" reopenCount)" "0"
 
-# list reports the wired checks
+# ===== JO-1 gate_committed ====================================================================================
+c="$(onb_repo gc)"
+
+# GC-1 refusal: onboard not approved
+expect_fail "GC-1 gate_committed refuses when onboard is not approved" "$c" sh "$GC" gate_committed onboard
+out_has "GC-1 names the missing approval" "REFUSED gate_committed: onboard is not approved in $ST, so it has no gate commit"
+
+# GC-2 refusal (N4 at helper level): approved but not committed
+to_awaiting "$c"
+q "$c" sh "$SFS" "$REP" --approve onboard
+is_eq "GC-2 setup: onboard approved" "$(state_val "$c" lastApprovedPhase)" "onboard"
+expect_fail "GC-2 / N4 gate_committed refuses an approved but uncommitted onboard" "$c" sh "$GC" gate_committed onboard
+out_has "GC-2 says the gate is not committed" "REFUSED gate_committed: the onboard gate is not committed (check-gate-commit.sh)"
+out_has "GC-2 passes on check-gate-commit.sh's reason" "is not committed"
+
+# GC-3 refusal: committed, but no onboard-v<n> tag
+q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved"
+expect_fail "GC-3 gate_committed refuses without an onboard-v<n> tag" "$c" sh "$GC" gate_committed onboard
+out_has "GC-3 names the missing tag" "REFUSED gate_committed: no onboard-v<n> tag on the onboard gate commit"
+
+# GC-4 pass: committed and tagged
+q "$c" G . tag -a onboard-v1 -m "onboard approved"
+expect_pass "GC-4 gate_committed passes when committed and tagged" "$c" sh "$GC" gate_committed onboard
+out_has "GC-4 prints the rule" "OK gate_committed: onboard is approved, committed (check-gate-commit.sh) and tagged onboard-v1"
+
+# GC-5 refusal: a later uncommitted change (dirty tree) after the gate commit
+printf 'scratch\n' > "$c/scratch.txt"
+expect_fail "GC-5 gate_committed refuses with uncommitted changes" "$c" sh "$GC" gate_committed onboard
+out_has "GC-5 says the gate is not committed" "REFUSED gate_committed: the onboard gate is not committed (check-gate-commit.sh)"
+q "$c" mv scratch.txt "$T1_TMP/scratch.txt"
+
+# GC-6 refusal: reopened and approved again; the newest tag still holds the old approval
+sleep 1
+q "$c" sh "$SFS" "$REP" --reopen onboard
+q "$c" sh "$SFS" "$REP" --active-phase onboard --status awaiting_approval
+q "$c" sh "$SFS" "$REP" --approve onboard
+q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved (revision)"
+expect_fail "GC-6 gate_committed refuses when the newest tag holds an older approval" "$c" sh "$GC" gate_committed onboard
+out_has "GC-6 names the stale tag" "REFUSED gate_committed: onboard-v1 does not hold the current onboard approval; tag the new gate commit onboard-v2"
+q "$c" G . tag -a onboard-v2 -m "onboard approved"
+expect_pass "GC-6 passes once the revision is tagged onboard-v2" "$c" sh "$GC" gate_committed onboard
+
+# GC-7 refusal: not a git work tree
+ng="$T1_TMP/nogit"; mkdir -p "$ng/docs/agents-v0/onboarding"
+q "$c" cp -R .agents-v0 "$ng/.agents-v0"; q "$c" cp "$REP" "$ST" "$ng/docs/agents-v0/onboarding/"
+expect_fail "GC-7 gate_committed refuses outside a git work tree" "$ng" sh "$GC" gate_committed onboard
+out_has "GC-7 names the missing repo" "REFUSED gate_committed: not a git work tree, so the onboard gate cannot be committed"
+
+# list reports the two wired checks
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
+out_has "list: gate_committed is wired" "gate_committed wired"
 
 t1_done test-gate-checks.sh
