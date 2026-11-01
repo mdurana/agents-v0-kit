@@ -28,7 +28,8 @@
 #   - a `commit:` stamp in a checked document is not a commit of this repo or not in the history of HEAD.
 # In --gate every _*.md file (_template.md, _*.template.md) is a template: never scanned, never a gate document.
 # Helper briefs (onboard fix JO-7) are never scanned: not docs/agents-v0/onboarding/briefs/ (nor its archive/),
-# not any *.helper-brief.md. --gate fails while a brief waits in briefs/ or straight under onboarding/, and
+# not any *.helper-brief.md. --gate fails while any *.helper-brief.md under onboarding/ is outside briefs/archive/
+# (in briefs/, a subfolder of it, straight under onboarding/ or elsewhere there), and
 # names docs/agents-v0/onboarding/briefs/archive/, where a used brief goes.
 # Citations also accept more extensions and extensionless build files (Dockerfile, Makefile, ...); a
 # citation-like `path.ext:N` that is not backticked is not checked and is reported as a WARN line (no failure).
@@ -132,7 +133,7 @@ def is_template(name):
 
 
 # JO-7: helper briefs are not documents. The briefs folder (and its archive) is never scanned, and no
-# *.helper-brief.md file is; --gate instead fails on a brief still waiting in briefs/ (below).
+# *.helper-brief.md file is; --gate instead fails on a brief still waiting under onboarding/ (below).
 BRIEFS = "docs/agents-v0/onboarding/briefs"
 BRIEF_ARCHIVE = BRIEFS + "/archive"
 
@@ -261,12 +262,13 @@ def is_md_doc(name):
 
 
 if GATE:
-    # JO-7: a helper brief still waiting (in briefs/, or straight under onboarding/) means a helper result
-    # was not folded in; the gate fails and names the folder a used brief moves to.
+    # JO-7: a helper brief anywhere under onboarding/ but outside briefs/archive/ (in briefs/, a subfolder of
+    # it, straight under onboarding/ or anywhere else there) means a helper result was not folded in; the
+    # gate fails and names the folder a used brief moves to.
     waiting = []
-    for folder in ("docs/agents-v0/onboarding", BRIEFS):
-        if os.path.isdir(folder):
-            waiting += sorted(os.path.join(folder, n) for n in os.listdir(folder) if n.endswith(".helper-brief.md"))
+    for dirpath, dirs, names in os.walk("docs/agents-v0/onboarding"):
+        dirs[:] = sorted(d for d in dirs if os.path.join(dirpath, d) != BRIEF_ARCHIVE)
+        waiting += sorted(os.path.join(dirpath, n) for n in names + dirs if n.endswith(".helper-brief.md"))
     for brief in waiting:
         failures.append(f"{brief}: a helper brief is still waiting; fold in its helper result and move it to {BRIEF_ARCHIVE}/")
     # JO-3: every gate document of gate-rules onboard_gate_docs is present.

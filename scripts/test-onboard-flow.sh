@@ -12,7 +12,8 @@
 #         changed must fail the parse.
 #   FL-n  the flow, steps 1 to 7 of the command, in order, on the fixture (the step 2 commands are taken
 #         from the parsed prose).
-#   BR-n  helper briefs in docs/agents-v0/onboarding/briefs/ and the archive folder (JO-7).
+#   BR-n  helper briefs in docs/agents-v0/onboarding/briefs/ (and its subfolders) and the archive folder
+#         (JO-7; BR-10..13 are Iruka's 03:23 follow-up findings).
 #   TP-n  the minimal install seeds the templates the skill points to (JO-6, E21).
 # Open (not built yet, so not tested here): the step 8 commit chain and the planted fake secret (JO-8; FL-8
 # stands in with a narrowed commit), the next-phase prerequisite (JO-9), the script-level resume refusal
@@ -244,6 +245,42 @@ expect_pass "BR-9 a legacy brief in onboarding/ is still read by sync" "$r" sh "
 expect_fail "BR-9 --gate fails on a legacy brief left in onboarding/" "$r" sh "$DOCS" --gate
 out_has "BR-9 the --gate failure names the legacy brief" "docs/agents-v0/onboarding/old.helper-brief.md"
 mv "$r/docs/agents-v0/onboarding/old.helper-brief.md" "$r/$AR/old.helper-brief.md"
+# JO-7 follow-up (Iruka 03:23): a real ask: line is required; one folder key for both onboarding locations;
+# briefs in subfolders of briefs/ are read; --gate fails on any brief under onboarding/ outside the archive
+printf 'helper: explore-researcher\noutputs: docs/agents-v0/onboarding/modules/app.md\n' > "$r/$BR/noask.helper-brief.md"
+got="$(rc "$r" sh "$SFS" "$REP")"
+is_eq "BR-10 N37 a brief with helper: and outputs: but no ask: fails closed (exit 2)" "$got" 2
+out_has "BR-10 N37 the brief with no ask: is named" "$BR/noask.helper-brief.md"
+mv "$r/$BR/noask.helper-brief.md" "$T1_TMP/parked/noask.helper-brief.md"
+printf 'helper: explore-researcher\nask: moved ask\n' > "$r/docs/agents-v0/onboarding/mv.helper-brief.md"
+expect_pass "BR-11 a legacy brief in onboarding/ is synced" "$r" sh "$SFS" "$REP"
+mv "$r/docs/agents-v0/onboarding/mv.helper-brief.md" "$r/$BR/mv.helper-brief.md"
+got="$(rc "$r" sh "$SFS" "$REP")"
+is_eq "BR-11 N14 the same brief moved from onboarding/ to briefs/ still exits 2" "$got" 2
+out_has "BR-11 N14 the moved brief is named" "$BR/mv.helper-brief.md"
+mv "$r/$BR/mv.helper-brief.md" "$r/$AR/mv.helper-brief.md"
+mkdir -p "$r/$BR/sub"
+printf 'helper: explore-researcher\nask: nested ask\n' > "$r/$BR/sub/n.helper-brief.md"
+expect_pass "BR-12 the first sync with a brief in briefs/sub/ passes" "$r" sh "$SFS" "$REP"
+got="$(rc "$r" sh "$SFS" "$REP")"
+is_eq "BR-12 N14 a second sync with the brief still in briefs/sub/ exits 2" "$got" 2
+out_has "BR-12 N14 the nested brief is named by sync" "$BR/sub/n.helper-brief.md"
+expect_fail "BR-12 --gate fails while a brief waits in briefs/sub/" "$r" sh "$DOCS" --gate
+out_has "BR-12 the --gate failure names the nested brief" "$BR/sub/n.helper-brief.md"
+printf 'outputs: x.md\n' > "$r/$BR/sub/bad.helper-brief.md"
+got="$(rc "$r" sh "$SFS" "$REP")"
+is_eq "BR-12 N37 a malformed brief in briefs/sub/ fails closed (exit 2)" "$got" 2
+out_has "BR-12 N37 the malformed nested brief is named" "$BR/sub/bad.helper-brief.md"
+mkdir -p "$r/$AR/sub"
+mv "$r/$BR/sub/n.helper-brief.md" "$r/$AR/sub/n.helper-brief.md"
+mv "$r/$BR/sub/bad.helper-brief.md" "$r/$AR/sub/bad.helper-brief.md"
+expect_pass "BR-12 N36 briefs in briefs/archive/sub/ (one malformed) do not trip sync" "$r" sh "$SFS" "$REP"
+mkdir -p "$r/docs/agents-v0/onboarding/modules"
+printf 'helper: explore-researcher\nask: stray ask\n' > "$r/docs/agents-v0/onboarding/modules/stray.helper-brief.md"
+expect_fail "BR-13 --gate fails on a brief elsewhere under onboarding/ (modules/)" "$r" sh "$DOCS" --gate
+out_has "BR-13 the --gate failure names the stray brief" "docs/agents-v0/onboarding/modules/stray.helper-brief.md"
+out_has "BR-13 the --gate failure names the archive folder" "$AR/"
+mv "$r/docs/agents-v0/onboarding/modules/stray.helper-brief.md" "$r/$AR/stray.helper-brief.md"
 
 # Step 5: the gate documents (the codebase-documenter's work, written by the fixture)
 expect_fail "FL-5 --gate fails before the gate documents exist" "$r" sh "$DOCS" --gate
