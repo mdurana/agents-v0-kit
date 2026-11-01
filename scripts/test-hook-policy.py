@@ -274,7 +274,7 @@ SHELL_CASES = [
     ("git merge feature/x", "ask"),
     ("git cherry-pick abcdef", "ask"),
     ("git revert HEAD", "ask"),
-    ("git stash pop", "ask"),
+    ("git stash pop", "block"),  # Jiraiya round 3: rewrites the working tree like git stash apply (docs/agents-v0 here)
     ("git stash drop", "ask"),
     ("git stash clear", "ask"),
     ("git stash list", "allow"),
@@ -794,7 +794,7 @@ STATE_INDIRECT_ALLOW_SHELL = [
     "sh .agents-v0/scripts/gate-checks.sh rules", "git diff", "git add src/Main.java", "git log -1",
 ]
 # Jiraiya C: left at ask, as before. Fine supervised; unattended has no one to answer the ask (see the handoff).
-STATE_INDIRECT_ASK_SHELL = ["git stash pop", "git merge feature/x"]
+STATE_INDIRECT_ASK_SHELL = ["git merge feature/x"]  # git stash pop: blocked since Jiraiya round 3
 # Jiraiya round 2, item 1: a write target the shell fills in at run time, away from the state folders, asks (it was
 #   allowed). Near a state folder it stays a block (STATE_INDIRECT_WRITE_SHELL). A `$` inside a sed, perl or awk
 #   program is not a target.
@@ -825,8 +825,34 @@ STATE_TREE_ALLOW_SHELL = [
     "git fetch", "git fetch origin main", "git pull", "git pull --rebase", "git status", "git diff",
     "git checkout main", "git checkout feature/x",
 ]
-STATE_TREE_ASK_SHELL = ["git cherry-pick abc1234", "git rebase main", "git stash pop", "git merge feature/x",
+STATE_TREE_ASK_SHELL = ["git cherry-pick abc1234", "git rebase main", "git merge feature/x",
                         "git commit -m x"]
+
+# Jiraiya round 3: a forced branch change (checkout -f/--force, switch -f/--force/--discard-changes) throws away
+#   unsaved edits to state.json like `git restore .`, and git stash pop writes the stash like git stash apply; both
+#   are denied while docs/agents-v0 exists, through the same wrappers as the round 2 rules.
+STATE_FORCE_WRITE_SHELL = [
+    "git checkout -f main", "git checkout --force main", "git switch -f main", "git switch --force main",
+    "git switch --discard-changes main", "git checkout -f", "git checkout -fb x", "git checkout -f -b x",
+    "git checkout -qf main", "git switch -f -c x", "git checkout --force -B x main",
+    "git -C src checkout -f main", "git -C src switch --discard-changes main", "sh -c 'git checkout -f main'",
+    "bash -c 'git switch --force main'", "env A=1 git switch -f main", "cd src && git checkout --force main",
+    "git -c core.quotepath=off checkout -f main",
+    "git stash pop", "git stash pop stash@{1}", "git stash pop --index", "git stash pop -q",
+    "git -C src stash pop", "sh -c 'git stash pop'", "bash -c 'git stash pop stash@{1}'", "env A=1 git stash pop",
+    "cd src && git stash pop",
+]
+# Plain branch changes and the other stash commands keep their verdicts (the branch-creating ones stay ask).
+STATE_FORCE_ALLOW_SHELL = [
+    "git checkout main", "git switch main", "git checkout -", "git switch -", "git switch --detach HEAD~1",
+    "git -C src checkout main", "git stash", "git stash list", "git stash push", "git stash push -m wip",
+    "git stash show", "git stash show -p stash@{1}",
+]
+STATE_FORCE_ASK_SHELL = ["git checkout -f -- src", "git switch -c new", "git checkout -b new", "git checkout -bf main", "git switch -C new",
+                         "git stash drop", "git stash clear"]
+# Outside a kit project (no docs/agents-v0) nothing changes: forced checkout allowed, stash pop ask.
+STATE_FORCE_NOKIT = [("git checkout -f main", "allow"), ("git switch --discard-changes main", "allow"),
+                     ("git stash pop", "ask")]
 
 
 def state_folder_inproc_cases(hp, tmp: str) -> list:
@@ -840,13 +866,18 @@ def state_folder_inproc_cases(hp, tmp: str) -> list:
     subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True)
     hook = {"HOOK_CWD": proj}
     out = []
-    for c in STATE_FOLDER_WRITE_SHELL + STATE_INDIRECT_WRITE_SHELL + STATE_TREE_WRITE_SHELL:
+    for c in STATE_FOLDER_WRITE_SHELL + STATE_INDIRECT_WRITE_SHELL + STATE_TREE_WRITE_SHELL + STATE_FORCE_WRITE_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "block"))
         out.append(("unattended", c, inproc_shell(hp, c, dict(hook, **STATE_UNATTENDED_ENV), proj), "block"))
-    for c in STATE_FOLDER_ALLOW_SHELL + STATE_INDIRECT_ALLOW_SHELL + STATE_RUNTIME_ALLOW_SHELL + STATE_TREE_ALLOW_SHELL:
+    for c in STATE_FOLDER_ALLOW_SHELL + STATE_INDIRECT_ALLOW_SHELL + STATE_RUNTIME_ALLOW_SHELL + STATE_TREE_ALLOW_SHELL + STATE_FORCE_ALLOW_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "allow"))
-    for c in STATE_FOLDER_ASK_SHELL + STATE_INDIRECT_ASK_SHELL + STATE_RUNTIME_ASK_SHELL + STATE_TREE_ASK_SHELL:
+    for c in STATE_FOLDER_ASK_SHELL + STATE_INDIRECT_ASK_SHELL + STATE_RUNTIME_ASK_SHELL + STATE_TREE_ASK_SHELL + STATE_FORCE_ASK_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "ask"))
+    plain = os.path.join(tmp, "plainproj-c")
+    os.makedirs(os.path.join(plain, "src"))
+    subprocess.run(["git", "init", "-q", "-b", "main", plain], check=True)
+    for c, want in STATE_FORCE_NOKIT:
+        out.append(("no docs/agents-v0", c, inproc_shell(hp, c, {"HOOK_CWD": plain}, plain), want))
     return out
 
 

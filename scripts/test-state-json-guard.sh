@@ -106,7 +106,7 @@ EOC
 # Cursor only (agy is out of the onboard fix per Sensei): a few spellings through the Cursor entry point, so the
 #   in-process lists in test-hook-policy.py are known to be what the hook does. Jiraiya C and Iruka note 2 (a folder
 #   checkout, a run-time target, pushd, a writer tool, git stash apply and git am; a run-time target away from
-#   the state folders asks), then Jiraiya A and B (gh token, git-push, a $var command name).
+#   the state folders asks; round 3: a forced checkout/switch and git stash pop), then Jiraiya A and B (gh token, git-push, a $var command name).
 while IFS= read -r c; do
   [ -n "$c" ] || continue
   judge cursor-shell block "shell write (Jiraiya C / Iruka 2)" "$c"
@@ -117,6 +117,9 @@ pushd docs/agents-v0/onboarding && echo {} > state.json
 git apply x.diff
 git stash apply
 git am x.patch
+git checkout -f main
+git switch --discard-changes main
+git stash pop
 EOC
 judge cursor-shell ask "run-time write target (Jiraiya round 2)" 'echo {} > "$OUT"'
 while IFS= read -r c; do
@@ -129,6 +132,7 @@ g=gh; \$g pr create --fill
 EOC
 judge cursor-shell allow "gh read (Jiraiya B)" "gh auth status"
 judge cursor-shell allow "plain branch checkout" "git checkout main"
+judge cursor-shell allow "plain branch switch (Jiraiya round 3)" "git switch main"
 # The kit's own scripts and plain reads stay allowed.
 while IFS= read -r c; do
   [ -n "$c" ] || continue

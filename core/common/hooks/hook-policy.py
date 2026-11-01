@@ -721,6 +721,24 @@ def _file_operands(bin0: str, parts: List[str], awk_inplace: bool) -> List[str]:
     return out
 
 
+def _git_forced_switch(sub: str, sub_args: List[str]) -> bool:
+    """git checkout -f/--force or git switch -f/--force/--discard-changes without `--` (Jiraiya round 3). A short
+    cluster counts only when the f comes before a letter that takes a value: -fb x is forced, -bf creates branch f."""
+    if "--" in sub_args:
+        return False
+    takes_value = "bBU" if sub == "checkout" else "cCU"
+    for a in sub_args:
+        if a in ("--force", "--discard-changes"):
+            return True
+        if a.startswith("-") and not a.startswith("--") and len(a) > 1:
+            for ch in a[1:]:
+                if ch == "f":
+                    return True
+                if ch in takes_value:
+                    break
+    return False
+
+
 def _writer_target_dir(base: str) -> bool:
     """A folder an extract or patch writes into holds a state file or is inside a state folder."""
     return _holds_state(base, base) or _inside_state_dir(base)
@@ -883,8 +901,12 @@ def _segment_writes_state(seg: str) -> Optional[str]:
             tree_writer = "git am (writes whatever the patches name)"
         if sub == "stash":
             op = next((a for a in sub_args if not a.startswith("-")), "")
-            if op in ("apply", "branch"):
+            if op in ("apply", "branch", "pop"):  # pop: Jiraiya round 3, like apply
                 tree_writer = f"git stash {op} (writes whatever the stash holds)"
+        # Jiraiya round 3: a forced branch change throws away unsaved edits everywhere, state.json included, like
+        #   `git restore .`. With `--` it only names paths, which the folder checkout rule above judges.
+        if sub in ("checkout", "switch") and _git_forced_switch(sub, sub_args):
+            tree_writer = f"git {sub} --force (discards uncommitted changes in every file)"
         if sub == "read-tree" and any(a == "-u" or re.fullmatch(r"-[A-Za-z]*u[A-Za-z]*", a) for a in sub_args):
             tree_writer = "git read-tree -u (writes the whole tree it reads)"
         if sub == "checkout-index":
@@ -2337,8 +2359,9 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
                 return "ask", branch_msg
         if sub == "worktree" and "add" in parts[1:]:
             return "ask", branch_msg
-        if sub == "checkout" and any(x in parts for x in ("-b", "-B")):
-            return "ask", branch_msg
+        if sub == "checkout" and (any(x in parts for x in ("-b", "-B")) or any(
+                re.fullmatch(r"-[a-zA-Z]*[bB][a-zA-Z]*", a) for a in (parts[parts.index(sub) + 1:] if sub in parts else []))):
+            return "ask", branch_msg  # Jiraiya round 3: also a cluster such as -bf (creates branch f) or -qb x
         if sub == "switch" and any(x in parts for x in ("-c", "-C", "--create")):
             return "ask", branch_msg
         if sub in ("rebase", "merge", "cherry-pick", "revert"):
