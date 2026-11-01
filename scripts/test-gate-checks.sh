@@ -6,7 +6,8 @@
 # Test ids: jiraiya-onboard-test-cases-20261101.md (N1, N2, N3, N4, E7, E22, H1/H2 partial) plus AE-n / GC-n
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
-# Iruka probe 8).
+# Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
+# ledger_turn_ok).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -29,6 +30,14 @@ print("" if v is None else (" ".join(v) if isinstance(v, list) else v))' "$1/$ST
 # q <dir> <command...>: a setup step; its output goes to $T1_TMP/setup.txt and a failure never stops the suite
 # (a later assertion catches it)
 q() { d_="$1"; shift; (cd "$d_" && "$@") > "$T1_TMP/setup.txt" 2>&1 || :; }
+# lt_trailer <repo>: the N3A trailer for the repo's gate ledger (made empty when missing); a stand-in for the
+# commit chain's staged_secret_scan, which writes the same trailer into the gate commit message
+lt_trailer() {
+  lt_d="$(cd "$1" && cd "$(git rev-parse --git-common-dir)" && pwd)/agents-v0"
+  mkdir -p "$lt_d"; [ -f "$lt_d/gate-ledger" ] || : > "$lt_d/gate-ledger"
+  printf 'Agents-V0-Ledger: lines=%s sha256=%s\n' "$(wc -l < "$lt_d/gate-ledger" | tr -d ' ')" \
+    "$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$lt_d/gate-ledger")"
+}
 # is_eq <desc> <got> <want>
 is_eq() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (got '$2', want '$3')"; fi; }
 
@@ -179,7 +188,7 @@ out_has "GC-2 says the gate is not committed" "REFUSED gate_committed: the onboa
 out_has "GC-2 passes on check-gate-commit.sh's reason" "is not committed"
 
 # GC-3 refusal: committed, but no onboard-v<n> tag
-q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved"
+q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved" -m "$(lt_trailer "$c")"
 expect_fail "GC-3 gate_committed refuses without an onboard-v<n> tag" "$c" sh "$GC" gate_committed onboard
 out_has "GC-3 names the missing tag" "REFUSED gate_committed: no onboard-v<n> tag on the onboard gate commit"
 
@@ -206,7 +215,7 @@ d["approvedPhases"]=[x for x in d.get("approvedPhases") or [] if x!="onboard"]
 d["activePhase"]="onboard"; d["activeStatus"]="awaiting_approval"
 json.dump(d, open(p,"w"), indent=2)' "$ST"
 q "$c" sh "$SFS" "$REP" --approve onboard
-q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved (revision)"
+q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved (revision)" -m "$(lt_trailer "$c")"
 expect_fail "GC-6 gate_committed refuses when the newest tag holds an older approval" "$c" sh "$GC" gate_committed onboard
 out_has "GC-6 names the stale tag" "REFUSED gate_committed: onboard-v1 does not hold the current onboard approval; tag the new gate commit onboard-v2"
 q "$c" G . tag -a onboard-v2 -m "onboard approved"
@@ -332,6 +341,7 @@ expect_fail "NR-7 N30 a corrupt state is refused" "$nr" sh "$GC" no_restart_with
 out_has "NR-7 N30 asks the user" "REFUSED no_restart_without_reopen: $ST is not valid JSON; state missing or corrupt, stop and ask the user (this is not a new run)"
 expect_fail "NR-7 N30 sync on a corrupt state is refused" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
 mv "$nr/$ST" "$T1_TMP/nr/corrupt-state.json"; mv "$nr/$PR" "$T1_TMP/nr/phase-result.md"
+q "$nr" G . commit -q --allow-empty -m "onboarding: onboard approved" -m "$(lt_trailer "$nr")"
 q "$nr" G . tag -a onboard-v1 -m "onboard approved"
 expect_fail "NR-8 N30 an onboard-v<n> tag alone is a trace" "$nr" sh "$GC" no_restart_without_reopen
 out_has "NR-8 N30 names the tag" "is missing but an earlier onboard run left tags onboard-v1; state missing or corrupt"
@@ -379,7 +389,157 @@ expect_fail "SS-7 a lock file with a space in its name is refused" "$ss" sh "$GC
 out_has "SS-7 names it, quoted" 'or lock files: "docs/agents-v0/my deps.lock". Nothing was unstaged'
 q "$ss" G . reset -q
 
-# list reports the two wired checks
+# ===== N3A ledger integrity (design rev 6 "Ledger integrity (N3A)"; test cases N80-N84) ===========================
+# The gate commit records the ledger (lines and sha256) in its Agents-V0-Ledger trailer; ledger_ok and every gate
+# check refuse "ledger changed, ask the user" when the ledger is cut, missing or edited, or an appended line is
+# not a well-formed kit line. No kit script writes FAIL or GRANT-USED lines yet (gap 10, reopen_grant_ok), so the
+# tests append them as stand-ins for those writers.
+lg="$(onb_repo lg)"
+LG_LED="$(cd "$lg" && cd "$(git rev-parse --git-common-dir)" && pwd)/agents-v0/gate-ledger"
+LG_GRANT="${LG_LED%/gate-ledger}/reopen-grant"
+LG_EMPTY="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+lg_sha() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
+lg_env() { env GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com "$@"; }
+# lg_gate <repo> <n>: the kit's commit chain for the onboard docs (staged_secret_scan, commit_msg_ok, commit, tag)
+lg_gate() { (cd "$1" && G . add --all -- docs/agents-v0 && sh "$GC" staged_secret_scan && sh "$GC" commit_msg_ok \
+  && lg_env git commit -q -F "$(git rev-parse --git-path agents-v0-onboard-commit-msg.txt)" && G . tag -a "onboard-v$2" -m "onboard approved"); }
+lg_keep() { cp "$LG_LED" "$T1_TMP/lg-ledger.keep"; }
+lg_back() { cp "$T1_TMP/lg-ledger.keep" "$LG_LED"; }
+to_awaiting "$lg"; q "$lg" sh "$SFS" "$REP" --approve onboard
+expect_pass "LT-0 ledger_ok passes before any gate commit, with no ledger" "$lg" sh "$GC" ledger_ok
+out_has "LT-0 says why" "OK ledger_ok: no gate commit yet and no ledger"
+expect_pass "LT-1 the gate commit chain runs (trailer written before the scan record)" "$lg" lg_gate "$lg" 1
+lg_msg1="$(git -C "$lg" log -1 --format=%B onboard-v1)"
+case "$lg_msg1" in *"Agents-V0-Ledger: lines=0 sha256=$LG_EMPTY"*) pass "LT-1 the first gate commit carries lines=0 and the empty-ledger sha256" ;;
+  *) fail "LT-1 the first gate commit carries lines=0 and the empty-ledger sha256 (got: $lg_msg1)" ;; esac
+is_eq "LT-1 the subject is unchanged" "$(git -C "$lg" log -1 --format=%s onboard-v1)" "onboarding: onboard approved"
+if [ -f "$LG_LED" ] && [ ! -s "$LG_LED" ]; then pass "LT-1 the chain created the empty ledger"; else fail "LT-1 the chain created the empty ledger"; fi
+expect_pass "LT-1 ledger_ok passes after the gate commit" "$lg" sh "$GC" ledger_ok
+out_has "LT-1 names the anchor" "OK ledger_ok: the ledger matches the Agents-V0-Ledger trailer of onboard-v1 (lines=0)"
+expect_pass "LT-1 gate_committed passes with the trailer" "$lg" sh "$GC" gate_committed onboard
+# two docs-check failures appended (stand-in for the FAIL writer), then the next gate commit anchors them
+printf 'FAIL docs check\nFAIL docs check\n' >> "$LG_LED"
+expect_pass "LT-2 appended FAIL lines after the anchor pass" "$lg" sh "$GC" ledger_ok
+printf '\nRevision.\n' >> "$lg/docs/agents-v0/architecture.md"
+expect_pass "LT-2 the next gate commit chain runs" "$lg" lg_gate "$lg" 2
+case "$(git -C "$lg" log -1 --format=%B onboard-v2)" in *"Agents-V0-Ledger: lines=2 sha256=$(lg_sha "$LG_LED")"*) pass "LT-2 the second gate commit anchors the two FAIL lines" ;;
+  *) fail "LT-2 the second gate commit anchors the two FAIL lines" ;; esac
+lg_keep; lg_head="$(git -C "$lg" rev-parse HEAD)"
+
+# N81: the ledger is cut (fewer lines than the trailer recorded)
+printf 'FAIL docs check\n' > "$LG_LED"
+expect_fail "N81 ledger_ok refuses a ledger shorter than the recorded count" "$lg" sh "$GC" ledger_ok
+out_has "N81 says ledger changed, ask the user" "REFUSED ledger_ok: ledger changed, ask the user (the ledger has 1 lines, fewer than the 2 that the gate commit onboard-v2 recorded)"
+expect_fail "N81 prereq_approved refuses on the cut ledger" "$lg" sh "$GC" prereq_approved intake
+out_has "N81 prereq_approved names the ledger" "REFUSED prereq_approved: ledger changed, ask the user"
+expect_fail "N81 gate_committed refuses on the cut ledger" "$lg" sh "$GC" gate_committed onboard
+out_has "N81 gate_committed names the ledger" "REFUSED gate_committed: ledger changed, ask the user"
+printf '\nRevision 3.\n' >> "$lg/docs/agents-v0/architecture.md"
+expect_fail "N81 the next gate commit chain refuses on the cut ledger" "$lg" lg_gate "$lg" 3
+out_has "N81 staged_secret_scan names the ledger" "REFUSED staged_secret_scan: ledger changed, ask the user"
+is_eq "N81 no gate commit was made" "$(git -C "$lg" rev-parse HEAD)" "$lg_head"
+is_eq "N81 the cut ledger is left as found (nothing repaired)" "$(wc -l < "$LG_LED" | tr -d ' ')" "1"
+lg_back
+
+# N82: the ledger is deleted (moved away); never read as zero failures
+mkdir -p "$T1_TMP/lg"; mv "$LG_LED" "$T1_TMP/lg/gate-ledger.moved"
+expect_fail "N82 ledger_ok refuses a missing ledger once a gate commit exists" "$lg" sh "$GC" ledger_ok
+out_has "N82 says ledger changed, ask the user" "REFUSED ledger_ok: ledger changed, ask the user (the ledger $LG_LED is missing, but the gate commit onboard-v2 recorded lines=2; a missing ledger never reads as zero failures)"
+expect_fail "N82 approval_evidence refuses on the missing ledger" "$lg" sh "$GC" approval_evidence onboard
+out_has "N82 approval_evidence names the ledger" "REFUSED approval_evidence: ledger changed, ask the user"
+expect_fail "N82 the next gate commit chain refuses on the missing ledger" "$lg" lg_gate "$lg" 3
+if [ -e "$LG_LED" ]; then fail "N82 the chain does not recreate the ledger"; else pass "N82 the chain does not recreate the ledger"; fi
+is_eq "N82 no gate commit was made" "$(git -C "$lg" rev-parse HEAD)" "$lg_head"
+lg_back
+
+# N83: an earlier line is edited (same length), or a FAIL line becomes blank
+printf 'FAIL docs check\nFAIL edited\n' > "$LG_LED"
+expect_fail "N83 ledger_ok refuses an edited earlier line" "$lg" sh "$GC" ledger_ok
+out_has "N83 says ledger changed, ask the user" "REFUSED ledger_ok: ledger changed, ask the user (the first 2 lines of the ledger no longer match the sha256 that the gate commit onboard-v2 recorded (an earlier line was edited))"
+printf 'FAIL docs check\n\n' > "$LG_LED"
+expect_fail "N83 ledger_ok refuses a FAIL line turned blank" "$lg" sh "$GC" ledger_ok
+out_has "N83 the blank line refusal" "REFUSED ledger_ok: ledger changed, ask the user (the first 2 lines"
+expect_fail "N83 no_restart_without_reopen refuses on the edited ledger" "$lg" sh "$GC" no_restart_without_reopen
+out_has "N83 no_restart_without_reopen names the ledger" "REFUSED no_restart_without_reopen: ledger changed, ask the user"
+lg_back
+# N83 (commit step): the ledger is edited after a clean scan; commit_msg_ok refuses, no commit
+expect_pass "N83 setup: a clean scan" "$lg" sh -c "git add --all -- docs/agents-v0 && sh $GC staged_secret_scan"
+printf 'FAIL docs check\nFAIL edited\n' > "$LG_LED"
+expect_fail "N83 commit_msg_ok refuses once the ledger changed after the scan" "$lg" sh "$GC" commit_msg_ok
+out_has "N83 commit_msg_ok names the ledger" "REFUSED commit_msg_ok: ledger changed, ask the user"
+lg_back
+expect_pass "N83 restored ledger: commit_msg_ok passes again" "$lg" sh "$GC" commit_msg_ok
+
+# N80: appended lines since the anchor. A GRANT-USED line must name the grant file's line, once, with count= the
+# FAIL lines before it; any other line fails closed.
+lg_gl="grant 2026-11-02T06:00:00+08:00 phase=onboard reason=FAKE-retry by=FAKE-person"
+lg_gh="$(printf '%s' "$lg_gl" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')"
+printf 'GRANT-USED %s count=2\n' "$lg_gh" >> "$LG_LED"
+expect_fail "N80 a GRANT-USED line with no grant file is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 names the missing grant" "REFUSED ledger_ok: ledger changed, ask the user (ledger line 3 is a GRANT-USED line, but there is no grant file ($LG_GRANT))"
+printf '%s\n' "$lg_gl" > "$LG_GRANT"
+expect_pass "N80 a GRANT-USED line naming the grant, once, with count=2 passes" "$lg" sh "$GC" ledger_ok
+lg_back; printf 'GRANT-USED %s count=2\n' "0000000000000000000000000000000000000000000000000000000000000000" >> "$LG_LED"
+expect_fail "N80 a GRANT-USED line naming another grant is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 names the wrong grant" "ledger line 3 is a GRANT-USED line that names no grant in $LG_GRANT"
+lg_back; printf 'GRANT-USED %s count=0\n' "$lg_gh" >> "$LG_LED"
+expect_fail "N80 a GRANT-USED line with the wrong count is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 names the count" "ledger line 3 says count=0, but the FAIL lines before it give 2"
+lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_gh" >> "$LG_LED"
+expect_fail "N80 a grant used twice is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 names the reuse" "ledger line 3 names a grant that another GRANT-USED line already used"
+for lg_bad in "hello" "FAIL " "GRANT-USED abc count=1" "REOPEN-REFUSED" "fail docs check"; do
+  lg_back; printf '%s\n' "$lg_bad" >> "$LG_LED"
+  expect_fail "N80 a malformed appended line fails closed: '$lg_bad'" "$lg" sh "$GC" ledger_ok
+  out_has "N80 names the malformed line ('$lg_bad')" "ledger line 3 is not a well-formed FAIL, GRANT-USED or REOPEN-REFUSED line"
+done
+lg_back; printf 'FAIL docs check' >> "$LG_LED"
+expect_fail "N80 a last line with no newline fails closed" "$lg" sh "$GC" ledger_ok
+out_has "N80 names the missing newline" "has no newline (every kit write ends in one)"
+lg_back; printf 'REOPEN-REFUSED no valid grant\nFAIL docs check\n' >> "$LG_LED"
+expect_pass "N80 appended REOPEN-REFUSED and FAIL lines pass" "$lg" sh "$GC" ledger_ok
+lg_back
+mv "$LG_GRANT" "$T1_TMP/lg/reopen-grant.moved"
+
+# N84: unattended turns. The harness marks the ledger before a turn and compares after it.
+expect_pass "N84 ledger_mark prints the mark" "$lg" sh "$GC" ledger_mark
+lg_mark="$(cat "$T1_TMP/out.txt")"
+is_eq "N84 the mark is lines and sha256" "$lg_mark" "lines=2 sha256=$(lg_sha "$LG_LED")"
+printf 'FAIL docs check\nREOPEN-REFUSED no valid grant\n' >> "$LG_LED"
+expect_pass "N84 one FAIL and one REOPEN-REFUSED the harness saw pass" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 1 1
+expect_fail "N84 lines the harness did not see stop the run" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 0 1
+out_has "N84 names the count" "REFUSED ledger_turn_ok: ledger changed during the unattended turn, stop the run and ask the user (the turn appended 1 FAIL and 1 REOPEN-REFUSED line(s), but the harness saw 0 docs-check failure(s) and 1 refused --reopen run(s))"
+lg_back; printf 'GRANT-USED %s count=2\n' "$lg_gh" >> "$LG_LED"
+expect_fail "N84 a GRANT-USED line in an unattended turn stops the run" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 0 0
+out_has "N84 names the grant use" "is a GRANT-USED line appended during an unattended turn (grants are never used unattended)"
+printf 'FAIL docs check\n' > "$LG_LED"
+expect_fail "N84 a cut during the turn stops the run" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 0 0
+out_has "N84 names the cut" "the ledger was cut during the turn (1 lines, it had 2)"
+printf 'FAIL docs check\nFAIL edited\n' > "$LG_LED"
+expect_fail "N84 an edit during the turn stops the run" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 0 0
+out_has "N84 names the edit" "the first 2 lines of the ledger changed during the turn"
+mv "$LG_LED" "$T1_TMP/lg/gate-ledger.moved2"
+expect_fail "N84 a deleted ledger stops the run" "$lg" sh "$GC" ledger_turn_ok "$lg_mark" 0 0
+out_has "N84 names the delete" "the ledger was deleted during the turn (it had 2 lines)"
+expect_pass "N84 an absent ledger marks absent" "$lg" sh "$GC" ledger_mark
+out_has "N84 absent mark" "absent"
+expect_pass "N84 absent before and after with no runs passes" "$lg" sh "$GC" ledger_turn_ok absent 0 0
+(cd "$lg" && sh "$GC" ledger_turn_ok "lines=x" 0 0) > "$T1_TMP/out.txt" 2>&1 && rc=0 || rc=$?
+is_eq "N84 a bad mark is a usage error (exit 2)" "$rc" 2
+lg_back
+
+# N3A trailer shape on the gate commits: a tag on a commit with no trailer, or a malformed one, refuses
+q "$lg" G . commit -q --allow-empty -m "onboarding: onboard approved (no trailer)"
+q "$lg" G . tag -a onboard-v3 -m "onboard approved"
+expect_fail "N83 a gate commit with no trailer is refused" "$lg" sh "$GC" ledger_ok
+out_has "N83 names the missing trailer" "REFUSED ledger_ok: ledger changed, ask the user (the gate commit onboard-v3 ("
+out_has "N83 no trailer" "has no Agents-V0-Ledger trailer)"
+q "$lg" G . commit -q --allow-empty -m "onboarding: onboard approved" -m "Agents-V0-Ledger: lines=two sha256=$LG_EMPTY"
+q "$lg" G . tag -f -a onboard-v3 -m "onboard approved"
+expect_fail "N83 a gate commit with a malformed trailer is refused" "$lg" sh "$GC" ledger_ok
+out_has "N83 names the malformed trailer" "has a malformed Agents-V0-Ledger trailer)"
+
+# list reports the wired checks
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"
@@ -387,6 +547,8 @@ out_has "list: prereq_approved is wired" "prereq_approved wired"
 out_has "list: staged_secret_scan is wired" "staged_secret_scan wired"
 out_has "list: no_restart_without_reopen is wired" "no_restart_without_reopen wired"
 out_has "list: commit_msg_ok is wired" "commit_msg_ok wired"
+out_has "list: ledger_ok is wired (N3A)" "ledger_ok wired"
+out_has "list: ledger_turn_ok is wired (N84)" "ledger_turn_ok wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.

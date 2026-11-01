@@ -425,6 +425,11 @@ out_has "FL-8 CM the commit step's re-check passes on the normal path" "OK commi
 out_has "FL-8 N7 other dirty files are listed, not swept in" "other uncommitted files, not in this commit: src/app.py src/stray.txt"
 is_eq "FL-8 one new commit on top of the old HEAD (no amend)" "$(git -C "$r" rev-parse HEAD^)" "$fl8_head"
 is_eq "FL-8 the commit message" "$(git -C "$r" log -1 --format=%s)" "onboarding: onboard approved"
+case "$(git -C "$r" log -1 --format=%B)" in *"Agents-V0-Ledger: lines=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"*)
+  pass "FL-8 N3A the gate commit carries the ledger trailer (empty ledger: lines=0)" ;;
+  *) fail "FL-8 N3A the gate commit carries the ledger trailer (empty ledger: lines=0)" ;; esac
+expect_pass "FL-8 N3A ledger_ok passes after the gate commit" "$r" sh "$GC" ledger_ok
+has "FL-8 N3A v0-onboard step 6 says stop on a changed ledger" "$r/.cursor/commands/v0-onboard.md" "If any gate check says \`ledger changed, ask the user\`, stop"
 is_eq "FL-8 the tag is on the gate commit" "$(git -C "$r" rev-parse 'onboard-v1^{commit}')" "$(git -C "$r" rev-parse HEAD)"
 outside="$(git -C "$r" show --name-only --format= HEAD | grep -v '^docs/agents-v0/' || :)"
 is_eq "FL-8 the gate commit holds only docs/agents-v0 files" "$outside" ""

@@ -5,6 +5,7 @@
 #   sh .agents-v0/scripts/gate-checks.sh paths              print the git common dir, ledger and grant paths
 #   sh .agents-v0/scripts/gate-checks.sh list               print every check and whether it is wired
 #   sh .agents-v0/scripts/gate-checks.sh commit_chain       print the onboard gate commit chain (JO-8); runs nothing
+#   sh .agents-v0/scripts/gate-checks.sh ledger_mark        print the gate ledger's mark (N84: lines=<n> sha256=<h>, or absent)
 #
 # Design: kit-eval/kitfix-plan-20261031/proposals/jiraiya-onboard-fix-design-20261101.md (revision 6),
 # "Keeping the scripts small" and gap 5. Each check is one function with one job and one refusal message, and
@@ -33,11 +34,12 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok"
-CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
+WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok ledger_ok ledger_turn_ok"
+CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok ledger_turn_ok"
 
 usage() {
-  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain\n' >&2
+  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain | ledger_mark\n' >&2
+  printf '       sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok <mark> <fails seen> <refusals seen>\n' >&2
   printf 'checks: %s\n' "$CHECKS" >&2
   exit 2
 }
@@ -104,6 +106,231 @@ not_wired() { printf 'NOT-WIRED %s: %s. Not yet wired (step 0 skeleton; built by
 
 need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in *[!a-z-]*) die "$1: bad phase name: $2" ;; esac; }
 
+# --- N3A ledger integrity -------------------------------------------------------------------------------
+# ledger_py <mode> [args]: read the gate ledger against the Agents-V0-Ledger trailers (design rev 6, "Ledger
+# integrity (N3A)"). Exit 0 prints a summary (or, for trailer/mark, the value); exit 1 prints the refusal reason;
+# exit 2 a usage error. Modes:
+#   check                     every onboard-v<n> gate commit has one well-formed trailer, the ledger exists once
+#                             any gate commit does, is at least as long as each recorded count, its first n lines
+#                             hash to each recorded sha256, and every line after the newest anchor is well formed
+#                             (each GRANT-USED names the grant file's line, once, with the FAIL count before it)
+#   trailer                   check, then print the trailer for the next gate commit (creates the empty ledger
+#                             when no gate commit exists yet and nothing has written it)
+#   commit <msg file>         check, and the message's own trailer still anchors the ledger (commit_msg_ok)
+#   mark                      print "lines=<n> sha256=<hash>" or "absent" (the harness, before an unattended turn)
+#   turn <mark> <fails> <refusals>
+#                             since <mark>: nothing cut, edited or deleted; only FAIL and REOPEN-REFUSED lines
+#                             appended, exactly as many as the harness saw (N84)
+# Lines are newline-terminated; the line grammar (the kit writers must follow it):
+#   FAIL[ <text>]   GRANT-USED <sha256 of the grant line, without its newline> count=<n>   REOPEN-REFUSED <text>
+# where <text> has no control characters. The newest anchor is the largest recorded count over all onboard-v<n>
+# tags (the ledger is shared by every worktree, so is every tag).
+ledger_py() {
+  lp_l="$(ledger_path)" || exit 2
+  lp_g="$(grant_path)" || exit 2
+  python3 - "$lp_l" "$lp_g" "$LEDGER_TRAILER" "$@" <<'PYLG'
+import hashlib, os, re, subprocess, sys
+ledger, grant, key, mode, args = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]
+TRAILER_RE = re.compile(r"^" + re.escape(key) + r": lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
+KEY_RE = re.compile(r"^\s*" + re.escape(key) + r"\s*:", re.I)
+FAIL_RE = re.compile(r"^FAIL(?: [^\x00-\x1f\x7f]+)?$")
+GRANT_RE = re.compile(r"^GRANT-USED ([0-9a-f]{64}) count=(0|[1-9][0-9]*)$")
+REFUSED_RE = re.compile(r"^REOPEN-REFUSED [^\x00-\x1f\x7f]+$")
+MARK_RE = re.compile(r"^lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
+EMPTY = hashlib.sha256(b"").hexdigest()
+
+def out(code, msg):
+    print(msg)
+    sys.exit(code)
+
+def git(*a):
+    return subprocess.run(["git"] + list(a), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def prefix_sha(lines, n):
+    return hashlib.sha256(b"".join(x + b"\n" for x in lines[:n])).hexdigest()
+
+def text(x):
+    try:
+        return x.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+def read_ledger():
+    if not os.path.lexists(ledger):
+        return None
+    if os.path.islink(ledger) or not os.path.isfile(ledger):
+        out(1, "the ledger %s is not a regular file" % ledger)
+    with open(ledger, "rb") as f:
+        data = f.read()
+    if data and not data.endswith(b"\n"):
+        out(1, "the last line of the ledger %s has no newline (every kit write ends in one)" % ledger)
+    return data.split(b"\n")[:-1] if data else []
+
+def trailer_of(body, where):
+    hits = [x for x in body.split("\n") if KEY_RE.match(x)]
+    if not hits:
+        out(1, "%s has no %s trailer" % (where, key))
+    if len(hits) > 1:
+        out(1, "%s has more than one %s trailer" % (where, key))
+    m = TRAILER_RE.match(hits[0])
+    if not m:
+        out(1, "%s has a malformed %s trailer" % (where, key))
+    return int(m.group(1)), m.group(2)
+
+def anchors():
+    r = git("tag", "-l", "onboard-v*")
+    if r.returncode != 0:
+        out(1, "git could not list the onboard-v<n> tags")
+    tags = [t for t in r.stdout.decode("utf-8", "replace").split("\n") if re.match(r"^onboard-v[0-9]+$", t)]
+    found = []
+    for t in sorted(tags, key=lambda x: int(x[len("onboard-v"):])):
+        c = git("rev-parse", "-q", "--verify", t + "^{commit}")
+        if c.returncode != 0:
+            out(1, "the tag %s does not name a commit" % t)
+        sha = c.stdout.decode().strip()
+        b = git("cat-file", "commit", sha)
+        if b.returncode != 0:
+            out(1, "git could not read the gate commit %s" % t)
+        body = b.stdout.decode("utf-8", "surrogateescape")
+        msg = body.split("\n\n", 1)[1] if "\n\n" in body else ""
+        n, h = trailer_of(msg, "the gate commit %s (%s)" % (t, sha[:12]))
+        found.append((t, n, h))
+    return found
+
+def check_anchors(lines, anc):
+    if lines is None:
+        if anc:
+            t, n, _ = max(anc, key=lambda a: a[1])
+            out(1, "the ledger %s is missing, but the gate commit %s recorded lines=%d; a missing ledger never reads as zero failures" % (ledger, t, n))
+        return None, 0
+    for t, n, h in anc:
+        if len(lines) < n:
+            out(1, "the ledger has %d lines, fewer than the %d that the gate commit %s recorded" % (len(lines), n, t))
+        if prefix_sha(lines, n) != h:
+            out(1, "the first %d lines of the ledger no longer match the sha256 that the gate commit %s recorded (an earlier line was edited)" % (n, t))
+    if not anc:
+        return None, 0
+    t, n, _ = max(anc, key=lambda a: a[1])
+    return t, n
+
+def grant_hash():
+    if not os.path.isfile(grant):
+        return None
+    with open(grant, "rb") as f:
+        return hashlib.sha256(f.read().split(b"\n", 1)[0]).hexdigest()
+
+def check_appended(lines, start):
+    fails, used, gh = 0, {}, False
+    for x in lines:
+        s = text(x)
+        m = GRANT_RE.match(s) if s is not None else None
+        if m:
+            used[m.group(1)] = used.get(m.group(1), 0) + 1
+    for i, x in enumerate(lines):
+        s = text(x)
+        if i >= start:
+            bad = "ledger line %d is not a well-formed FAIL, GRANT-USED or REOPEN-REFUSED line" % (i + 1)
+            if s is None:
+                out(1, bad)
+            m = GRANT_RE.match(s)
+            if m:
+                if gh is False:
+                    gh = grant_hash()
+                if gh is None:
+                    out(1, "ledger line %d is a GRANT-USED line, but there is no grant file (%s)" % (i + 1, grant))
+                if m.group(1) != gh:
+                    out(1, "ledger line %d is a GRANT-USED line that names no grant in %s" % (i + 1, grant))
+                if used[m.group(1)] > 1:
+                    out(1, "ledger line %d names a grant that another GRANT-USED line already used" % (i + 1))
+                if int(m.group(2)) != fails:
+                    out(1, "ledger line %d says count=%s, but the FAIL lines before it give %d" % (i + 1, m.group(2), fails))
+            elif not FAIL_RE.match(s) and not REFUSED_RE.match(s):
+                out(1, bad)
+        if s is not None and FAIL_RE.match(s):
+            fails += 1
+
+def full_check():
+    anc = anchors()
+    lines = read_ledger()
+    t, n = check_anchors(lines, anc)
+    if lines is not None:
+        check_appended(lines, n)
+    return anc, lines, t, n
+
+if mode == "check":
+    anc, lines, t, n = full_check()
+    if lines is None:
+        out(0, "no gate commit yet and no ledger")
+    if t is None:
+        out(0, "no gate commit yet; the ledger's %d line(s) are well formed" % len(lines))
+    out(0, "the ledger matches the %s trailer of %s (lines=%d) and its %d later line(s) are well formed" % (key, t, n, len(lines) - n))
+elif mode == "trailer":
+    anc, lines, t, n = full_check()
+    if lines is None:
+        os.makedirs(os.path.dirname(ledger), exist_ok=True)
+        with open(ledger, "xb"):
+            pass
+        lines = []
+    out(0, "%s: lines=%d sha256=%s" % (key, len(lines), prefix_sha(lines, len(lines))))
+elif mode == "commit" and len(args) == 1:
+    anc, lines, t, n = full_check()
+    if lines is None:
+        out(1, "the ledger %s is missing, but the commit message carries a %s trailer" % (ledger, key))
+    try:
+        with open(args[0], "rb") as f:
+            body = f.read().decode("utf-8", "surrogateescape")
+    except OSError:
+        out(1, "cannot read the commit message file")
+    mn, mh = trailer_of(body, "the commit message")
+    if mn < n or mn > len(lines) or prefix_sha(lines, mn) != mh:
+        out(1, "the commit message's %s trailer (lines=%d) no longer matches the ledger (%d lines)" % (key, mn, len(lines)))
+    out(0, "the commit message's %s trailer matches the ledger" % key)
+elif mode == "mark" and not args:
+    lines = read_ledger()
+    out(0, "absent" if lines is None else "lines=%d sha256=%s" % (len(lines), prefix_sha(lines, len(lines))))
+elif mode == "turn" and len(args) == 3:
+    mark, want_f, want_r = args
+    m = MARK_RE.match(mark)
+    if mark != "absent" and not m:
+        out(2, "the mark must be the output of ledger_mark (lines=<n> sha256=<hash>, or absent), got: %s" % mark[:80])
+    if not re.match(r"^(0|[1-9][0-9]*)$", want_f) or not re.match(r"^(0|[1-9][0-9]*)$", want_r):
+        out(2, "the FAIL and REOPEN-REFUSED counts the harness saw must be whole numbers")
+    n, h = (0, EMPTY) if mark == "absent" else (int(m.group(1)), m.group(2))
+    lines = read_ledger()
+    if lines is None:
+        if mark != "absent":
+            out(1, "the ledger was deleted during the turn (it had %d lines)" % n)
+        lines = []
+    if len(lines) < n:
+        out(1, "the ledger was cut during the turn (%d lines, it had %d)" % (len(lines), n))
+    if prefix_sha(lines, n) != h:
+        out(1, "the first %d lines of the ledger changed during the turn" % n)
+    f = r = 0
+    for i in range(n, len(lines)):
+        s = text(lines[i])
+        if s is not None and FAIL_RE.match(s):
+            f += 1
+        elif s is not None and REFUSED_RE.match(s):
+            r += 1
+        elif s is not None and GRANT_RE.match(s):
+            out(1, "ledger line %d is a GRANT-USED line appended during an unattended turn (grants are never used unattended)" % (i + 1))
+        else:
+            out(1, "ledger line %d, appended during the turn, is not a well-formed FAIL or REOPEN-REFUSED line" % (i + 1))
+    if f != int(want_f) or r != int(want_r):
+        out(1, "the turn appended %d FAIL and %d REOPEN-REFUSED line(s), but the harness saw %s docs-check failure(s) and %s refused --reopen run(s)" % (f, r, want_f, want_r))
+    out(0, "the turn only appended %d FAIL and %d REOPEN-REFUSED line(s), as the harness saw" % (f, r))
+else:
+    out(2, "ledger_py: bad mode or arguments: %s" % " ".join([mode] + args))
+PYLG
+}
+# ledger_guard <check>: N3A, run before <check>'s own rule. Refuses as <check> with "ledger changed, ask the user"
+# when ledger_py check refuses. Outside a git repository there is no ledger, and the check's own rule decides.
+ledger_guard() {
+  git rev-parse --git-common-dir >/dev/null 2>&1 || return 0
+  lg_rc=0; lg_out="$(ledger_py check)" || lg_rc=$?
+  [ "$lg_rc" = 0 ] || refuse "$1" "ledger changed, ask the user (${lg_out:-the ledger check could not run})"
+}
+
 # Onboarding paths, relative to the repo root (sync-feature-state.sh writes the state and reads the phase result
 # at these paths; the agent writes the phase result).
 ONB_DIR="docs/agents-v0/onboarding"
@@ -140,6 +367,7 @@ approval_evidence() {
   need_phase approval_evidence "${1:-}"
   [ "$1" = onboard ] || not_wired approval_evidence "phase $1 needs recorded approval evidence before its gate (only onboard is wired)" "the fix turn for $1"
   to_root
+  ledger_guard approval_evidence
   [ -f "$ONB_STATE" ] || refuse approval_evidence "there is no onboarding state ($ONB_STATE); onboard has not run"
   ae_phase="$(state_field "$ONB_STATE" activePhase)" || refuse approval_evidence "$ONB_STATE is not valid JSON; stop and ask the user"
   ae_status="$(state_field "$ONB_STATE" activeStatus)" || refuse approval_evidence "$ONB_STATE is not valid JSON; stop and ask the user"
@@ -186,12 +414,14 @@ PYGT
 # Consumers: prereq_approved (JO-9) and the JO-8 commit chain; nothing in sync calls this check yet.
 # TODO(JO-8): the commit's paths are a subset of gate-rules onboard_commit_paths plus the recorded pack paths, and
 #   the range re-scan (design line 27) belong to the JO-8 commit chain and its secret scanner; not checked here.
-# Not here (N3A, blocked on Sasuke's hook work): the Agents-V0-Ledger trailer on the gate commit is ledger_ok's job.
+# N3A: the ledger check (ledger_guard, the rule of ledger_ok) runs first: every onboard-v<n> gate commit must carry
+# a well-formed Agents-V0-Ledger trailer that still anchors the ledger.
 gate_committed() {
   need_phase gate_committed "${1:-}"
   [ "$1" = onboard ] || not_wired gate_committed "phase $1 must have its gate commit (only onboard is wired)" "the fix turn for $1"
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse gate_committed "not a git work tree, so the onboard gate cannot be committed"
   to_root
+  ledger_guard gate_committed
   [ -f "$ONB_STATE" ] || refuse gate_committed "onboard is not approved in $ONB_STATE, so it has no gate commit"
   gc_approved="$(state_field "$ONB_STATE" approvedPhases)" || refuse gate_committed "$ONB_STATE is not valid JSON; stop and ask the user"
   case " $gc_approved " in *" onboard "*) ;; *) refuse gate_committed "onboard is not approved in $ONB_STATE, so it has no gate commit" ;; esac
@@ -228,6 +458,7 @@ prereq_approved() {
   if [ ! -e "$ONB_STATE" ] && [ ! -e "$ONB_REPORT" ] && [ ! -e "$PA_AUDIT" ]; then
     ok prereq_approved "no brownfield record ($ONB_STATE, $ONB_REPORT, $PA_AUDIT), so $1 needs no onboard approval (brownfield only)"
   fi
+  ledger_guard prereq_approved
   [ -f "$ONB_STATE" ] || refuse prereq_approved "$pa_need; onboard has not run ($ONB_STATE is missing). Run /v0-onboard first"
   pa_approved="$(state_field "$ONB_STATE" approvedPhases)" || refuse prereq_approved "$pa_need; $ONB_STATE is not valid JSON; stop and ask the user"
   case " $pa_approved " in
@@ -257,6 +488,7 @@ prereq_approved() {
 # lost state (reading of SKO-3; the report-only case is an open gap).
 no_restart_without_reopen() {
   to_root
+  ledger_guard no_restart_without_reopen
   nr_rule="no state change on an onboard report awaiting review or approved without a granted --reopen onboard"
   if [ ! -f "$ONB_STATE" ]; then
     nr_trace=""
@@ -377,6 +609,10 @@ staged_secret_scan() {
   ss_root="$(pwd)"
   ss_allowed="$(rule onboard_commit_paths)"
   command -v python3 >/dev/null 2>&1 || refuse staged_secret_scan "python3 is missing, so the staged-path check and the secret scan cannot run"
+  # N3A: the ledger check runs first, and its trailer goes into the message before the scan reads the message
+  # and the record takes its hash (so commit_msg_ok compares the message with the trailer in it).
+  ss_rc=0; ss_trailer="$(ledger_py trailer)" || ss_rc=$?
+  [ "$ss_rc" = 0 ] || refuse staged_secret_scan "ledger changed, ask the user (${ss_trailer:-the ledger check could not run}); no commit message was written and the commit is refused"
   ss_rc=0
   ss_bad="$(staged_path_check "$ss_allowed")" || ss_rc=$?
   case "$ss_rc" in
@@ -387,7 +623,7 @@ staged_secret_scan() {
   esac
   [ -f .agents-v0/scripts/secret_scan.py ] || refuse staged_secret_scan ".agents-v0/scripts/secret_scan.py is missing; reinstall the kit (install.sh --update)"
   ss_msg="$(onb_msg_file)"
-  printf 'onboarding: onboard approved\n' > "$ss_msg" || refuse staged_secret_scan "cannot write the commit message file $ss_msg"
+  printf 'onboarding: onboard approved\n\n%s\n' "$ss_trailer" > "$ss_msg" || refuse staged_secret_scan "cannot write the commit message file $ss_msg"
   ss_rc=0
   python3 .agents-v0/scripts/secret_scan.py --staged --root "$ss_root" --message-file "$ss_msg" || ss_rc=$?
   [ "$ss_rc" = 0 ] || refuse staged_secret_scan "secret_scan.py exited $ss_rc (1: a hit, 2: it could not scan); the commit is refused"
@@ -400,7 +636,8 @@ staged_secret_scan() {
 # commit_msg_ok: the commit step of the chain, right before `git commit -F` (Jiraiya; Sasuke's gap). Passes only
 # when the scan record staged_secret_scan wrote matches now: the same message file bytes (sha256), the same
 # index tree (git write-tree) and the same HEAD. A message or index changed after the scan, a missing record or a
-# record from an earlier commit is refused; nothing is printed from the message.
+# record from an earlier commit is refused; nothing is printed from the message. N3A: then the ledger check, and
+# the message's Agents-V0-Ledger trailer must still anchor the ledger (a ledger cut or edited after the scan).
 commit_msg_ok() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse commit_msg_ok "not a git work tree"
   to_root
@@ -415,12 +652,15 @@ commit_msg_ok() {
   cm_w_rest="${cm_want#* }"; cm_n_rest="${cm_now#* }"
   [ "${cm_w_rest%% *}" = "${cm_n_rest%% *}" ] || refuse commit_msg_ok "the index changed after staged_secret_scan; run the whole chain again (it rescans)"
   [ "$cm_want" = "$cm_now" ] || refuse commit_msg_ok "HEAD moved after staged_secret_scan (the record is from an earlier commit); run the whole chain again"
+  cm_rc=0; cm_led="$(ledger_py commit "$(onb_msg_file)")" || cm_rc=$?
+  [ "$cm_rc" = 0 ] || refuse commit_msg_ok "ledger changed, ask the user (${cm_led:-the ledger check could not run}); the commit is refused"
   ok commit_msg_ok "the commit message and the index are the ones staged_secret_scan passed"
 }
 # 4A, N5A, 1A (1A-gap B): the grant parses, names <phase>, is newer than the last gate of <phase>, is at most
 # grant_max_age_seconds old, is unused (no GRANT-USED line, not in git history) and the run is attended.
 reopen_grant_ok() {
   need_phase reopen_grant_ok "${1:-}"
+  ledger_guard reopen_grant_ok
   age="$(rule grant_max_age_seconds)"
   not_wired reopen_grant_ok "the grant for $1 must be newer than the last $1 gate and at most ${age}s old, unused and attended" "the reopen grant and ledger fix (4A, N5A, 1A; needs JO-10 and Sasuke's hook patterns)"
 }
@@ -434,9 +674,28 @@ baseline_ok() {
   need_phase baseline_ok "${1:-}"
   not_wired baseline_ok "phase $1 needs a green baseline record or every failure accepted in HEAD's baseline-accepted.json" "the red baseline fix (2A, N4B; needs the JO-15a record)"
 }
-# N3A: the ledger still starts with the lines the last gate commit's $LEDGER_TRAILER trailer anchored.
+# N3A (design rev 6 "Ledger integrity (N3A)"; N80-N83): the ledger still starts with the lines every gate commit's
+# $LEDGER_TRAILER trailer anchored, and the lines after the newest anchor are well formed (ledger_py check).
+# The same rule runs first in approval_evidence, gate_committed, prereq_approved, no_restart_without_reopen,
+# staged_secret_scan, commit_msg_ok and reopen_grant_ok (ledger_guard). Not wired yet: the docs-check count
+# (check-onboarding-docs.sh does not count or write FAIL lines yet, gap 10).
 ledger_ok() {
-  not_wired ledger_ok "the gate ledger must match the $LEDGER_TRAILER trailer of the last gate commit" "the ledger integrity fix (N3A; needs the JO-8 commit chain)"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse ledger_ok "not a git work tree, so there is no gate ledger"
+  lo_rc=0; lo_out="$(ledger_py check)" || lo_rc=$?
+  [ "$lo_rc" = 0 ] || refuse ledger_ok "ledger changed, ask the user (${lo_out:-the ledger check could not run})"
+  ok ledger_ok "$lo_out"
+}
+# N84 (unattended runs): the harness prints ledger_mark before each turn and runs ledger_turn_ok after it with the
+# FAIL (docs check) and REOPEN-REFUSED (refused --reopen) runs it saw. Anything else (a GRANT-USED line, an edit, a
+# cut, a deleted ledger, a count that differs) refuses: stop the run.
+ledger_turn_ok() {
+  git rev-parse --git-common-dir >/dev/null 2>&1 || refuse ledger_turn_ok "not a git repository, so there is no gate ledger"
+  lt_rc=0; lt_out="$(ledger_py turn "$1" "$2" "$3")" || lt_rc=$?
+  case "$lt_rc" in
+    0) ok ledger_turn_ok "$lt_out" ;;
+    1) refuse ledger_turn_ok "ledger changed during the unattended turn, stop the run and ask the user ($lt_out)" ;;
+    *) die "ledger_turn_ok: ${lt_out:-the ledger check could not run}" ;;
+  esac
 }
 
 # --- dispatch -------------------------------------------------------------------------------------------
@@ -451,6 +710,14 @@ case "$cmd" in
     [ "$#" = 0 ] || usage
     load_rules > /dev/null
     commit_chain ;;
+  ledger_mark)
+    [ "$#" = 0 ] || usage
+    lm_rc=0; lm_out="$(ledger_py mark)" || lm_rc=$?
+    [ "$lm_rc" = 0 ] || die "ledger_mark: ${lm_out:-the ledger could not be read}"
+    printf '%s\n' "$lm_out" ;;
+  ledger_turn_ok)
+    [ "$#" = 3 ] || usage
+    ledger_turn_ok "$1" "$2" "$3" ;;
   paths)
     [ "$#" = 0 ] || usage
     gcd="$(git_common_dir)"; lp="$(ledger_path)"; gp="$(grant_path)"
