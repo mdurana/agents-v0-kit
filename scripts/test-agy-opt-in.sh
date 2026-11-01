@@ -4,7 +4,9 @@
 # rules, agents, commands, skills, hooks, the hook-python pin); install.sh --with-antigravity installs them exactly
 # as before; --update without the flag leaves an existing .agents/ untouched (never deleted, moved or refreshed);
 # --update --with-antigravity refreshes it. check-installed-kit.sh is HASH-OK in both modes and checks .agents/hooks
-# whenever it is there. Tier 1: offline, temp folders only.
+# whenever it is there. A changed model in .cursor/model-config.json does not reach .agents/ on a no-flag --update
+# (update-agents-model.sh --no-antigravity), and install.sh refuses an unknown option such as --with-antigravty.
+# Tier 1: offline, temp folders only.
 set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$KIT/scripts/lib/tier1-harness.sh"
@@ -101,5 +103,42 @@ L="$(t1_repo link --commit)"
 if sh "$KIT/scripts/install.sh" --link --commit HEAD --path "$KIT" --with-antigravity "$L" > "$T1_TMP/link.log" 2>&1; then fail "--link --with-antigravity is refused"
 else has "--link --with-antigravity is refused" "$T1_TMP/link.log" "--with-antigravity"; fi
 no_agy "--link --with-antigravity" "$L"
+
+# --- 7. a changed model in .cursor/model-config.json: --update without the flag still leaves .agents/ untouched -----
+# Jiraiya (97e29d5c review): update-agents-model.sh rewrote the model: line of .agents/agents/*.md on a no-flag
+# --update, under the "left as is" note. Every .agents/ file is hashed (sha256, sorted) before and after.
+M="$(t1_repo agymodel --commit)"
+t1_install "$M" --with-antigravity && pass "model case: --with-antigravity install runs" || fail "model case: --with-antigravity install runs"
+python3 - "$M/.cursor/model-config.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+cfg = json.load(open(p, encoding="utf-8"))
+cfg["build"] = "t1-build-model[fast=true]"
+open(p, "w", encoding="utf-8").write(json.dumps(cfg, indent=2) + "\n")
+PY
+G "$M" add -A && G "$M" commit -qm "agy install, build model changed"
+agy_hash() { ( cd "$1" && find .agents -type f -print | LC_ALL=C sort | while IFS= read -r f_; do printf '%s %s\n' "$(t1_sha < "$f_")" "$f_"; done ) > "$2"; }
+agy_hash "$M" "$T1_TMP/agyM0"
+upd --quick "$M" && pass "model case: --update --quick (no flag) runs" || fail "model case: --update --quick (no flag) runs (see $T1_TMP/upd.log)"
+agy_hash "$M" "$T1_TMP/agyM1"
+if [ -s "$T1_TMP/agyM0" ] && cmp -s "$T1_TMP/agyM0" "$T1_TMP/agyM1"; then pass "model case, --update (no flag): every .agents/ file hashes the same"
+else fail "model case, --update (no flag): every .agents/ file hashes the same ($(diff "$T1_TMP/agyM0" "$T1_TMP/agyM1" | grep '^>' | head -3 | tr '\n' ' '))"; fi
+[ -z "$(git -C "$M" status --porcelain -- .agents)" ] && pass "model case, --update (no flag): git sees no change under .agents/" || fail "model case, --update (no flag): git sees no change under .agents/"
+grep -qx 'model: t1-build-model\[fast=true\]' "$M/.cursor/agents/backend-engineer.md" && pass "model case, --update (no flag): .cursor/agents still gets the new model" || fail "model case, --update (no flag): .cursor/agents still gets the new model"
+upd --quick --with-antigravity "$M" && pass "model case: --update --quick --with-antigravity runs" || fail "model case: --update --quick --with-antigravity runs (see $T1_TMP/upd.log)"
+grep -qx 'model: t1-build-model\[fast=true\]' "$M/.agents/agents/backend-engineer.md" && pass "model case, --with-antigravity: .agents/agents model: line updated" || fail "model case, --with-antigravity: .agents/agents model: line updated"
+if diff -r "$M/.cursor/agents" "$M/.agents/agents" >/dev/null; then pass "model case, --with-antigravity: .agents/agents equals .cursor/agents"; else fail "model case, --with-antigravity: .agents/agents equals .cursor/agents"; fi
+
+# --- 8. install.sh refuses an unknown option (a typo is not taken as the target and dropped) ------------------------
+U="$(t1_repo typo --commit)"
+if sh "$KIT/scripts/install.sh" --with-antigravty "$U" > "$T1_TMP/typo.log" 2>&1; then fail "unknown option --with-antigravty: install.sh exits non-zero"
+else pass "unknown option --with-antigravty: install.sh exits non-zero"; fi
+has "unknown option: the error names it" "$T1_TMP/typo.log" "unknown option: --with-antigravty"
+[ ! -e "$U/.cursor" ] && [ ! -e "$U/.agents" ] && [ ! -e "$U/.agents-v0" ] && [ -z "$(git -C "$U" status --porcelain)" ] && pass "unknown option: the target is untouched" || fail "unknown option: the target is untouched"
+if sh "$KIT/scripts/install.sh" --update --quick --bogus "$A" > "$T1_TMP/typo2.log" 2>&1; then fail "unknown option with --update: refused"
+else has "unknown option with --update: refused, option named" "$T1_TMP/typo2.log" "unknown option: --bogus"; fi
+t1_install "$U" --with-antigravity && [ -f "$U/.agents/hooks.json" ] && pass "the correctly spelled --with-antigravity still installs" || fail "the correctly spelled --with-antigravity still installs"
+V="$(t1_repo dashdash --commit)"
+t1_install "$V" -- && [ -f "$V/.cursor/hooks.json" ] && pass "-- ends the options (target after it)" || fail "-- ends the options (target after it)"
 
 t1_done test-agy-opt-in

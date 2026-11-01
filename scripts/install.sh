@@ -600,6 +600,18 @@ while [ $# -gt 0 ]; do
     -h|--help)
       usage
       ;;
+    --)
+      # End of options: the one argument left is the target, even if it starts with "-".
+      shift
+      [ $# -eq 1 ] || usage
+      TARGET="$1"
+      shift
+      ;;
+    -*)
+      # A mistyped flag (e.g. --with-antigravty) must not be taken as the target and silently dropped.
+      printf 'error: unknown option: %s\n' "$1" >&2
+      usage
+      ;;
     *)
       TARGET="$1"
       shift
@@ -728,7 +740,12 @@ elif [ -e "$TARGET_ABS/.agents" ]; then
   printf 'NOTE: .agents/ (Antigravity adapter, opt-in) left as is; refresh it with install.sh --update --with-antigravity\n'
 fi
 ignore_hook_python "$TARGET_ABS"
-sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
+# Without --with-antigravity the model sync must not touch .agents/ either (Jiraiya, 97e29d5c review).
+if [ "$WITH_ANTIGRAVITY" = 1 ]; then
+  sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
+else
+  sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh" --no-antigravity
+fi
 
 for hook in "$TARGET_ABS"/.agents-v0/hooks/*; do
   if [ -f "$hook" ] && [ ! -L "$hook" ]; then chmod +x "$hook"; fi

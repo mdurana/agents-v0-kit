@@ -3,13 +3,27 @@
 # docs/agents-v0/model-routing-matrix.md from .cursor/model-config.json.
 #
 # Usage (from the target repo root, or via this path):
-#   sh .agents-v0/scripts/update-agents-model.sh
+#   sh .agents-v0/scripts/update-agents-model.sh [--no-antigravity]
+#
+# .agents/agents/<name>.md (the opt-in Antigravity adapter) gets the same model: line when that file exists.
+# Standalone default: it is synced too, so a project that opted in keeps both adapters on one model map after
+# editing .cursor/model-config.json. --no-antigravity skips the .agents/ tree entirely (no file under .agents/
+# is read or written); install.sh passes it whenever --with-antigravity is not given, so an --update without
+# the flag leaves an existing .agents/ exactly as it is.
 #
 # Agent-to-role mapping is the Kit agent mapping table. Skill rows name a Role column.
 # KIT_MODEL_<ROLE> overrides the JSON value. Hyphens in the role become underscores
 # (ux-designer -> KIT_MODEL_UX_DESIGNER).
 
 set -eu
+
+SYNC_AGY=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-antigravity) SYNC_AGY=0; shift ;;
+    *) printf 'error: unknown argument: %s\nusage: sh .agents-v0/scripts/update-agents-model.sh [--no-antigravity]\n' "$1" >&2; exit 1 ;;
+  esac
+done
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -27,10 +41,10 @@ if [ ! -d "$agents" ]; then
   exit 1
 fi
 
-python3 - "$cfg" "$matrix" "$agents" <<'PY'
+python3 - "$cfg" "$matrix" "$agents" "$SYNC_AGY" <<'PY'
 import json, os, re, sys
 
-cfg_path, matrix_path, agents_dir = sys.argv[1:4]
+cfg_path, matrix_path, agents_dir, sync_agy = sys.argv[1:5]
 cfg = {}
 if os.path.isfile(cfg_path):
     with open(cfg_path, encoding="utf-8") as handle:
@@ -126,7 +140,7 @@ for name, role in roles:
         sys.exit(f"error: missing agent file {path}")
     target_paths = [path]
     agy_path = os.path.join(".agents/agents", name + ".md")
-    if os.path.isfile(agy_path) and not os.path.samefile(path, agy_path):
+    if sync_agy == "1" and os.path.isfile(agy_path) and not os.path.samefile(path, agy_path):
         target_paths.append(agy_path)
     for idx_t, tpath in enumerate(target_paths):
         with open(tpath, encoding="utf-8") as handle:
