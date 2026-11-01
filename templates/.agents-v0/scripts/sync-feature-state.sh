@@ -166,6 +166,25 @@ case "$art" in
         printf 'FAIL: --approve onboard refused: no approval evidence. Do not approve; finish onboard and set it awaiting_approval first.\n' >&2
         exit 1
       fi
+    else
+      # JO-10 (SKO-2): every other onboard path (in_progress, blocked, --clear-active, a plain sync, --reopen)
+      # goes through the helper; --reopen onboard passes only with a grant that reopen_grant_ok accepts.
+      nr_script="$(dirname "$0")/gate-checks.sh"
+      if [ ! -f "$nr_script" ]; then
+        printf 'FAIL: an onboard state change needs %s (no_restart_without_reopen); reinstall the kit (install.sh --update). Nothing was recorded.\n' "$nr_script" >&2
+        exit 1
+      fi
+      if [ "$(printf '%s' "$reopen_phase" | tr '[:upper:]' '[:lower:]')" = onboard ]; then
+        if ! nr_out="$(sh "$nr_script" reopen_grant_ok onboard 2>&1)"; then
+          printf '%s\n' "$nr_out" >&2
+          printf 'FAIL: --reopen onboard refused: no valid reopen grant (gate-checks.sh reopen_grant_ok). The retry count is kept. Nothing was recorded; stop and ask the user.\n' >&2
+          exit 1
+        fi
+      elif ! nr_out="$(sh "$nr_script" no_restart_without_reopen 2>&1)"; then
+        printf '%s\n' "$nr_out" >&2
+        printf 'FAIL: onboard state change refused (gate-checks.sh no_restart_without_reopen). Nothing was recorded.\n' >&2
+        exit 1
+      fi
     fi
     ;;
 esac

@@ -33,7 +33,7 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved staged_secret_scan"
+WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
@@ -248,9 +248,31 @@ prereq_approved() {
   pa_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
   ok prereq_approved "$1: onboard is approved and committed (state.json committed, tagged onboard-v$pa_n)"
 }
-# JO-10: no state change on an onboard report awaiting review or approved, unless --reopen with a valid grant.
+# JO-10 (design rev 6 flow step 2; Sakura SKO-1/2/3; N8 N28 N29 N30 E9): no state change on an onboard report
+# that is awaiting review or approved. sync-feature-state.sh calls this on every onboard path but --approve
+# (set in_progress, set blocked, --clear-active, a plain sync) and skips it only after reopen_grant_ok passes
+# (4A, N5A, 1A; not built, so every --reopen onboard is refused for now). A missing or corrupt state is a
+# refusal, never a new run, once an earlier run left a trace: phase-result.md (step 6) or an onboard-v<n> tag.
+# report.md alone is not a trace: step 1 writes it before the first sync, so it cannot tell a new run from a
+# lost state (reading of SKO-3; the report-only case is an open gap).
 no_restart_without_reopen() {
-  not_wired no_restart_without_reopen "no state change on a report awaiting review or approved without a granted --reopen" "JO-10 (Sensei 4A, 1A)"
+  to_root
+  nr_rule="no state change on an onboard report awaiting review or approved without a granted --reopen onboard"
+  if [ ! -f "$ONB_STATE" ]; then
+    nr_trace=""
+    [ ! -f "$ONB_RESULT" ] || nr_trace="$ONB_RESULT"
+    nr_tags="$(git tag -l 'onboard-v*' 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+    [ -z "$nr_tags" ] || nr_trace="${nr_trace:+$nr_trace }tags $nr_tags"
+    [ -z "$nr_trace" ] || refuse no_restart_without_reopen "$ONB_STATE is missing but an earlier onboard run left $nr_trace; state missing or corrupt, stop and ask the user (this is not a new run)"
+    ok no_restart_without_reopen "$nr_rule (no onboarding state and no earlier run: a new run)"
+  fi
+  nr_status="$(state_field "$ONB_STATE" activeStatus)" || refuse no_restart_without_reopen "$ONB_STATE is not valid JSON; state missing or corrupt, stop and ask the user (this is not a new run)"
+  nr_approved="$(state_field "$ONB_STATE" approvedPhases)" || refuse no_restart_without_reopen "$ONB_STATE is not valid JSON; state missing or corrupt, stop and ask the user (this is not a new run)"
+  case " $nr_approved " in
+    *" onboard "*) refuse no_restart_without_reopen "onboard is approved in $ONB_STATE; a state change needs --reopen onboard with a grant that passes reopen_grant_ok. Stop and ask the user" ;;
+  esac
+  [ "$nr_status" != awaiting_approval ] || refuse no_restart_without_reopen "onboard is awaiting_approval in $ONB_STATE; wait for the user's approval (--approve onboard), or a --reopen onboard with a grant that passes reopen_grant_ok. Stop and ask the user"
+  ok no_restart_without_reopen "$nr_rule (onboard is ${nr_status:-not started})"
 }
 # JO-8 (design rev 6 flow step 8, N7A; Sasuke SOC-2/3/9/13): the one commit chain of the onboard gate.
 # onb_paths prints the onboard paths of gate-rules onboard_commit_paths that exist or are tracked (README.md is

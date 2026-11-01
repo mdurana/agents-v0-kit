@@ -18,8 +18,11 @@
 #   TP-n  the minimal install seeds the templates the skill points to (JO-6, E21).
 #   FL-8  the step 8 commit chain (JO-8): commit_chain, the staged-path check (N15), the planted FAKE secret
 #         (N6), the clean commit plus tag, other dirty work listed and left out (N7).
-# Open (not built yet, so not tested here): the gate_committed range re-scan (N40), the script-level resume refusal
-# (JO-10), N27 (baseline output never committed; needs JO-8), the unattended run, and the tier 2 replay.
+#   FL-10 the resume refusal (JO-10): resume while in_progress (E9), restart / blocked / clear-active / plain
+#         sync / --reopen while awaiting_approval (N8 N28 N29 N19), restart after the approval, and a moved or
+#         corrupt state after the gate commit (N30).
+# Open (not built yet, so not tested here): the gate_committed range re-scan (N40), the granted --reopen
+# (reopen_grant_ok), N27 (baseline output never committed; needs JO-8), the unattended run, and the tier 2 replay.
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -192,6 +195,7 @@ is_eq "TP-7 E21 --update leaves the edited adr template unchanged" "$(cat "$u/do
 cp "$r/docs/agents-v0/onboarding/_report.template.md" "$r/$REP"
 expect_pass "FL-1 sync --status in_progress" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
 is_eq "FL-1 state is in_progress" "$(state_val "$r" activeStatus)" "in_progress"
+expect_pass "FL-10 E9 resume while in_progress is allowed without --reopen" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
 # Step 2: the discovery commands exactly as the prose gives them
 sed -n '2,6p' "$ONB" > "$T1_TMP/step2.txt"
 while IFS= read -r c; do
@@ -327,9 +331,21 @@ sed -e "s#^commit: .*#commit: $base#" -e 's#^<!-- TEMPLATE:.*-->$#Filled in by t
     "$d/onboarding/_phase-result.template.md" > "$d/onboarding/phase-result.md"
 expect_pass "FL-6 sync --status awaiting_approval" "$r" sh "$SFS" --active-phase onboard --status awaiting_approval "$REP"
 is_eq "FL-6 state is awaiting_approval" "$(state_val "$r" activeStatus)" "awaiting_approval"
+# JO-10: while awaiting_approval, every state change but --approve onboard is refused and nothing is recorded
+fl10_ck="$(cksum < "$r/$ST")"
+expect_fail "FL-10 N8 restart (in_progress) while awaiting_approval is refused" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "FL-10 N8 the refusal comes from the helper" "REFUSED no_restart_without_reopen: onboard is awaiting_approval"
+expect_fail "FL-10 N29 set blocked while awaiting_approval is refused" "$r" sh "$SFS" --active-phase onboard --status blocked --reason "stuck" "$REP"
+expect_fail "FL-10 N28 --clear-active while awaiting_approval is refused" "$r" sh "$SFS" --clear-active "$REP"
+expect_fail "FL-10 SKO-2 a plain sync while awaiting_approval is refused" "$r" sh "$SFS" "$REP"
+expect_fail "FL-10 N19 --reopen onboard without a grant is refused" "$r" sh "$SFS" --reopen onboard "$REP"
+out_has "FL-10 N19 sync names the grant" "FAIL: --reopen onboard refused: no valid reopen grant (gate-checks.sh reopen_grant_ok)"
+is_eq "FL-10 the refusals recorded nothing" "$(cksum < "$r/$ST")" "$fl10_ck"
 # Step 7: approval
 expect_pass "FL-7 sync --approve onboard" "$r" sh "$SFS" --approve onboard "$REP"
 case " $(state_val "$r" approvedPhases) " in *" onboard "*) pass "FL-7 onboard is in approvedPhases" ;; *) fail "FL-7 onboard is in approvedPhases" ;; esac
+expect_fail "FL-10 restart (in_progress) after the approval is refused" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "FL-10 names the approval" "REFUSED no_restart_without_reopen: onboard is approved in $ST"
 # Step 9 before the gate commit (JO-9): the next phase refuses while onboard is approved but not committed
 mkdir -p "$T1_TMP/fl9" && printf '# orders\n' > "$T1_TMP/fl9/orders.md"
 fl9_req="docs/agents-v0/requirements/orders.md"
@@ -389,5 +405,15 @@ expect_pass "FL-8 gate_committed onboard passes after the gate commit" "$r" sh "
 expect_pass "FL-9 prereq_approved intake passes after the onboard gate commit" "$r" sh "$GC" prereq_approved intake
 mkdir -p "$r/docs/agents-v0/requirements" && cp "$T1_TMP/fl9/orders.md" "$r/$fl9_req"
 expect_pass "FL-9 sync --active-phase intake in_progress starts after the onboard gate commit" "$r" sh "$SFS" --active-phase intake --status in_progress "$fl9_req"
+# JO-10 N30 (SKO-3): after the gate commit, a moved or corrupt state is a refusal, never a new run
+mkdir -p "$T1_TMP/fl10" && mv "$r/$ST" "$T1_TMP/fl10/state.json"
+expect_fail "FL-10 N30 sync with the state moved away does not start a new run" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "FL-10 N30 asks the user" "is missing but an earlier onboard run left docs/agents-v0/onboarding/phase-result.md tags onboard-v1; state missing or corrupt, stop and ask the user"
+if [ -f "$r/$ST" ]; then fail "FL-10 N30 no new state was written"; else pass "FL-10 N30 no new state was written"; fi
+printf '{ not json\n' > "$r/$ST"
+expect_fail "FL-10 N30 sync on a corrupt state is refused" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "FL-10 N30 corrupt: asks the user" "REFUSED no_restart_without_reopen: $ST is not valid JSON; state missing or corrupt"
+mv "$r/$ST" "$T1_TMP/fl10/corrupt-state.json"; mv "$T1_TMP/fl10/state.json" "$r/$ST"
+is_eq "FL-10 N30 the committed state is back unchanged" "$(git -C "$r" status --porcelain -- "$ST")" ""
 
 t1_done test-onboard-flow

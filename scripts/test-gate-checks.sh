@@ -4,7 +4,8 @@
 # Offline, no agent. Every case runs on an installed copy (install.sh into a temp git repo, Yamato's tier 1
 # harness). Each helper check has a pass case and a refusal case with its exact message.
 # Test ids: jiraiya-onboard-test-cases-20261101.md (N1, N2, N3, N4, E7, E22, H1/H2 partial) plus AE-n / GC-n
-# helper cases and DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4).
+# helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
+# NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -194,8 +195,15 @@ q "$c" mv scratch.txt "$T1_TMP/scratch.txt"
 
 # GC-6 refusal: reopened and approved again; the newest tag still holds the old approval
 sleep 1
-q "$c" sh "$SFS" "$REP" --reopen onboard
-q "$c" sh "$SFS" "$REP" --active-phase onboard --status awaiting_approval
+# an agent-run --reopen onboard is refused (JO-10, N19: reopen_grant_ok is not built, so no grant passes)
+expect_fail "GC-6 N19 sync --reopen onboard is refused without a valid grant" "$c" sh "$SFS" "$REP" --reopen onboard
+out_has "GC-6 N19 names the missing grant" "FAIL: --reopen onboard refused: no valid reopen grant (gate-checks.sh reopen_grant_ok)"
+# stand-in for a person's granted reopen (the grant is not built): the state file is set back by hand
+q "$c" python3 -c 'import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d["approvedPhases"]=[x for x in d.get("approvedPhases") or [] if x!="onboard"]
+d["activePhase"]="onboard"; d["activeStatus"]="awaiting_approval"
+json.dump(d, open(p,"w"), indent=2)' "$ST"
 q "$c" sh "$SFS" "$REP" --approve onboard
 q "$c" G . add -A; q "$c" G . commit -qm "onboarding: onboard approved (revision)"
 expect_fail "GC-6 gate_committed refuses when the newest tag holds an older approval" "$c" sh "$GC" gate_committed onboard
@@ -275,12 +283,71 @@ expect_fail "PA-9 sync refuses intake when gate-checks.sh is missing and a brown
 out_has "PA-9 names the missing helper" "to check the onboard prerequisite (docs/agents-v0/onboarding/state.json exists); reinstall the kit"
 q "$p7" mv "$T1_TMP/pa9-gate-checks.sh" .agents-v0/scripts/gate-checks.sh
 
+# ===== JO-10 no_restart_without_reopen ===========================================================================
+# Design rev 6 flow step 2 (Sakura SKO-1/2/3); test cases N8, N19, N28, N29, N30, E9.
+nr="$(onb_repo nr)"
+# cks <repo>: the onboarding state's checksum ("none" when missing), to prove a refusal recorded nothing
+cks() { if [ -f "$1/$ST" ]; then cksum < "$1/$ST"; else echo none; fi; }
+expect_pass "NR-1 no state and no earlier run: a new run" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-1 says why" "(no onboarding state and no earlier run: a new run)"
+expect_pass "NR-2 sync --status in_progress starts onboard" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+expect_pass "NR-2 E9 resume while in_progress is allowed without --reopen" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+expect_pass "NR-2 the helper passes while in_progress" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-2 names the status" "OK no_restart_without_reopen: no state change on an onboard report awaiting review or approved without a granted --reopen onboard (onboard is in_progress)"
+pr_result "$nr"
+expect_pass "NR-3 sync --status awaiting_approval" "$nr" sh "$SFS" --active-phase onboard --status awaiting_approval "$REP"
+expect_fail "NR-3 the helper refuses while awaiting_approval" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-3 names the status" "REFUSED no_restart_without_reopen: onboard is awaiting_approval in $ST; wait for the user's approval (--approve onboard)"
+nr_ck="$(cks "$nr")"
+expect_fail "NR-3 N8 restart (in_progress) while awaiting_approval is refused" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "NR-3 N8 the refusal comes from the helper" "REFUSED no_restart_without_reopen: onboard is awaiting_approval"
+out_has "NR-3 N8 sync says nothing was recorded" "FAIL: onboard state change refused (gate-checks.sh no_restart_without_reopen). Nothing was recorded."
+expect_fail "NR-3 N28 --clear-active while awaiting_approval is refused" "$nr" sh "$SFS" --clear-active "$REP"
+out_has "NR-3 N28 the refusal comes from the helper" "REFUSED no_restart_without_reopen: onboard is awaiting_approval"
+expect_fail "NR-3 N29 set blocked while awaiting_approval is refused" "$nr" sh "$SFS" --active-phase onboard --status blocked --reason "stuck" "$REP"
+out_has "NR-3 N29 the refusal comes from the helper" "REFUSED no_restart_without_reopen: onboard is awaiting_approval"
+expect_fail "NR-3 SKO-2 a plain sync while awaiting_approval is refused" "$nr" sh "$SFS" "$REP"
+out_has "NR-3 SKO-2 the refusal comes from the helper" "REFUSED no_restart_without_reopen: onboard is awaiting_approval"
+expect_fail "NR-4 N19 --reopen onboard without a grant is refused" "$nr" sh "$SFS" --reopen onboard "$REP"
+out_has "NR-4 N19 the refusal comes from reopen_grant_ok" "reopen_grant_ok"
+out_has "NR-4 N19 sync names the grant" "FAIL: --reopen onboard refused: no valid reopen grant (gate-checks.sh reopen_grant_ok). The retry count is kept."
+is_eq "NR-3/NR-4 the refusals recorded nothing" "$(cks "$nr")" "$nr_ck"
+is_eq "NR-3/NR-4 still awaiting_approval" "$(state_val "$nr" activeStatus)" "awaiting_approval"
+expect_pass "NR-5 --approve onboard is still allowed while awaiting_approval" "$nr" sh "$SFS" --approve onboard "$REP"
+expect_fail "NR-5 the helper refuses once onboard is approved" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-5 names the approval" "REFUSED no_restart_without_reopen: onboard is approved in $ST; a state change needs --reopen onboard with a grant that passes reopen_grant_ok"
+nr_ck="$(cks "$nr")"
+expect_fail "NR-5 restart (in_progress) after the approval is refused" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+expect_fail "NR-5 --clear-active after the approval is refused" "$nr" sh "$SFS" --clear-active "$REP"
+is_eq "NR-5 the refusals recorded nothing" "$(cks "$nr")" "$nr_ck"
+# N30 / SKO-3: a moved or corrupt state with an earlier run's trace is a refusal, never a new run
+mkdir -p "$T1_TMP/nr" && mv "$nr/$ST" "$T1_TMP/nr/state.json"
+expect_fail "NR-6 N30 a moved state with phase-result.md on disk is refused" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-6 N30 asks the user" "REFUSED no_restart_without_reopen: $ST is missing but an earlier onboard run left $PR; state missing or corrupt, stop and ask the user (this is not a new run)"
+expect_fail "NR-6 N30 sync does not start a new run" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+is_eq "NR-6 N30 no new state was written" "$(cks "$nr")" "none"
+printf '{ not json\n' > "$nr/$ST"
+expect_fail "NR-7 N30 a corrupt state is refused" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-7 N30 asks the user" "REFUSED no_restart_without_reopen: $ST is not valid JSON; state missing or corrupt, stop and ask the user (this is not a new run)"
+expect_fail "NR-7 N30 sync on a corrupt state is refused" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+mv "$nr/$ST" "$T1_TMP/nr/corrupt-state.json"; mv "$nr/$PR" "$T1_TMP/nr/phase-result.md"
+q "$nr" G . tag -a onboard-v1 -m "onboard approved"
+expect_fail "NR-8 N30 an onboard-v<n> tag alone is a trace" "$nr" sh "$GC" no_restart_without_reopen
+out_has "NR-8 N30 names the tag" "is missing but an earlier onboard run left tags onboard-v1; state missing or corrupt"
+mv "$T1_TMP/nr/state.json" "$nr/$ST"; mv "$T1_TMP/nr/phase-result.md" "$nr/$PR"
+# NR-9: the helper is missing (fail closed on every onboard path)
+mv "$nr/$GC" "$T1_TMP/nr/gate-checks.sh"
+expect_fail "NR-9 sync refuses an onboard state change when gate-checks.sh is missing" "$nr" sh "$SFS" --active-phase onboard --status in_progress "$REP"
+out_has "NR-9 names the missing helper" "FAIL: an onboard state change needs .agents-v0/scripts/gate-checks.sh (no_restart_without_reopen); reinstall the kit"
+mv "$T1_TMP/nr/gate-checks.sh" "$nr/$GC"
+
 # list reports the two wired checks
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"
 out_has "list: prereq_approved is wired" "prereq_approved wired"
 out_has "list: staged_secret_scan is wired" "staged_secret_scan wired"
+out_has "list: no_restart_without_reopen is wired" "no_restart_without_reopen wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.
