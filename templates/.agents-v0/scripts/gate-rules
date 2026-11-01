@@ -11,9 +11,11 @@
 # hook patterns, gap 5 revision 4).
 
 # Gate documents the onboard docs check (`check-onboarding-docs.sh --gate`, JO-3/JO-4) requires, relative to
-# the repo root. Seeded with today's default set of check-onboarding-docs.sh (36b86cf :24); the JO-3/JO-4
-# fix owns the final list and changes it only here.
-onboard_gate_docs=docs/agents-v0/onboarding docs/agents-v0/architecture.md docs/agents-v0/network.md docs/agents-v0/design/system/context-map.md docs/agents-v0/diagrams docs/agents-v0/adr/0000-inherited-decisions.md
+# the repo root (review JO-3 fix, jiraiya-review-of-onboard-flow-20261101.md:155). A file entry must be a
+# non-empty file; an entry ending in `/` must be a directory holding at least one .md document (a _*.md
+# template does not count). The docs check reads this list; the command prose never restates it. phase-result.md is
+# not listed: approval_evidence requires it, and the check scans it (commit stamp, TEMPLATE markers) once written.
+onboard_gate_docs=docs/agents-v0/onboarding/report.md docs/agents-v0/architecture.md docs/agents-v0/network.md docs/agents-v0/design/system/context-map.md docs/agents-v0/adr/0000-inherited-decisions.md docs/agents-v0/onboarding/modules/ docs/agents-v0/diagrams/sequences/ docs/agents-v0/discovery/endpoints.txt
 
 # Next commands that need onboard approved and committed first (`prereq_approved`, JO-9; Sensei 20:45 added
 # triage and maintain). Brownfield repos only (gap 1).

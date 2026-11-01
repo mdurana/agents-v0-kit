@@ -130,10 +130,8 @@ PYSF
 
 # JO-2 (design rev 6 lines 25, 95, 167): --approve <phase> needs recorded evidence, never report text. For
 # onboard: the state says onboard is awaiting_approval, phase-result.md exists, and the onboarding docs check
-# passes. The helper runs the docs check itself (read-only) and judges no doc content.
-# TODO(JO-3/JO-4): run `check-onboarding-docs.sh --gate` on the gate-rules onboard_gate_docs list once JO-3/JO-4
-# build that mode; until then this proves only that today's default docs check passes, not that the gate
-# docs are complete (design line 167). JO-2 stays open until then.
+# passes in gate mode (`check-onboarding-docs.sh --gate`, JO-3/JO-4), which reads the gate-rules
+# onboard_gate_docs list itself. The helper runs the docs check (read-only) and judges no doc content.
 approval_evidence() {
   need_phase approval_evidence "${1:-}"
   [ "$1" = onboard ] || not_wired approval_evidence "phase $1 needs recorded approval evidence before its gate (only onboard is wired)" "the fix turn for $1"
@@ -145,8 +143,11 @@ approval_evidence() {
   [ "$ae_status" = awaiting_approval ] || refuse approval_evidence "onboard status is ${ae_status:-none}, not awaiting_approval"
   [ -s "$ONB_RESULT" ] || refuse approval_evidence "$ONB_RESULT is missing or empty"
   [ -f "$HERE/check-onboarding-docs.sh" ] || refuse approval_evidence "$HERE/check-onboarding-docs.sh is missing; reinstall the kit (install.sh --update)"
-  sh "$HERE/check-onboarding-docs.sh" >/dev/null 2>&1 || refuse approval_evidence "the onboarding docs check failed (check-onboarding-docs.sh); run it, fix the docs, and ask again"
-  ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed"
+  if ! ae_docs="$(sh "$HERE/check-onboarding-docs.sh" --gate 2>&1)"; then
+    printf '%s\n' "$ae_docs" | grep -E '^(FAIL|error|usage)' | sed 's/^/  /' >&2
+    refuse approval_evidence "the onboarding docs check failed (check-onboarding-docs.sh --gate); run it, fix the docs, and ask again"
+  fi
+  ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed (--gate)"
 }
 # JO-1 (design rev 6 lines 69, 84, 96, 168): the approved <phase> has its gate commit. For onboard: onboard is in
 # approvedPhases, check-gate-commit.sh (unchanged) passes on the onboarding report (the approval is in HEAD and

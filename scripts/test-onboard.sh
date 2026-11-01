@@ -300,9 +300,13 @@ has "state: baseCommit pinned from report commit header" "$r/docs/agents-v0/onbo
 expect_fail "state: approval straight from in_progress is refused (JO-2)" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
 expect_pass "state: onboarding awaiting approval" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status awaiting_approval
 printf 'phase: onboard\nstatus: awaiting_approval\ncommit: abcdef1234567\n' > "$r/docs/agents-v0/onboarding/phase-result.md"
-expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
-has "state: last approved phase is onboard" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
-has "state: baseCommit preserved across approval sync" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
+# Onboard fix JO-3/JO-4: the approval runs `check-onboarding-docs.sh --gate` (gate documents, real commit stamps,
+# a git work tree). This fixture is not a git repo and has no gate documents, so the approval is refused here;
+# the approval pass path and its state (activePhase cleared, lastApprovedPhase, baseCommit, artifacts) are
+# tested in test-gate-checks.sh (AE-5, AE-7) on an installed git repo.
+expect_fail "state: approval is refused while the gate docs check fails (JO-3)" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
+lacks "state: nothing approved after the refused approval" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
+has "state: baseCommit pinned while awaiting approval" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
 has "state: artifacts map records primary report path" "$r/docs/agents-v0/onboarding/state.json" '"primary": "docs/agents-v0/onboarding/report.md"'
 expect_fail "state: an intake phase is not valid for onboarding" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase intake --status in_progress
 
