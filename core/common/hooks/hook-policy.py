@@ -546,7 +546,31 @@ def _is_state_path(p: str) -> bool:
     cands = [raw, posixpath.normpath(raw)]
     if not raw.startswith("/"):
         cands.append(posixpath.normpath(posixpath.join((_BASE_DIR or _base_dir()).replace("\\", "/"), raw)))
-    return any(pat.search(c) for c in cands for pat in STATE_PATH_PATTERNS)
+    return any(pat.search(c) for c in cands for pat in STATE_PATH_PATTERNS) or _is_onboard_msg_path(p)
+
+
+# JO-8 (Sasuke): the onboard commit message and its scan record (.git/agents-v0-onboard-commit-msg.txt / .scan) are
+#   written only by gate-checks.sh (onboard_commit_msg, commit_msg_ok). commit_msg_ok checks the message against the
+#   scan record, so an agent that rewrites either one could commit an unscanned message. While docs/agents-v0 exists
+#   (the same condition as the tree-writer block) they are protected like the state files: every shell spelling the
+#   state guard knows (redirect, tee, cp/mv/rsync/install/ln target, sed -i, truncate, script open-write, a target
+#   built from $(git rev-parse --git-path ...)), and the edit tool. Reading them stays allowed.
+_ONB_MSG_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0-onboard-commit-msg\.[^/]*$")
+ONB_MSG_WRITE_MSG = ("{} is the onboard commit message or its scan record: only "
+                     "sh .agents-v0/scripts/gate-checks.sh writes it (onboard_commit_msg, commit_msg_ok), in any mode. "
+                     "Run the chain printed by sh .agents-v0/scripts/gate-checks.sh commit_chain, or report the problem.")
+
+
+def _is_onboard_msg_path(p: str) -> bool:
+    raw = os.path.expanduser(p.replace("\\", "/").strip().strip("'\""))
+    if not raw or "agents-v0-onboard-commit-msg." not in raw:
+        return False
+    full = raw if raw.startswith("/") else posixpath.join((_BASE_DIR or _base_dir()).replace("\\", "/"), raw)
+    full = posixpath.normpath(full)
+    if not _ONB_MSG_RE.search(full):
+        return False
+    root = full[: full.rfind("/.git/")] or "/"
+    return os.path.isdir(os.path.join(root, "docs", "agents-v0"))
 
 
 def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
@@ -568,7 +592,8 @@ _STATE_TEMPLATES = ("docs/agents-v0/onboarding/state.json", "docs/agents-v0/prog
                     "docs/agents-v0/maintain/{}/state.json", "docs/agents-v0/requirements/{}.state.json")
 _GLOB_CHARS = re.compile(r"[*?\[]")
 _SHELL_VARS: dict = {}  # name -> value for `name=value` segments earlier in the same command (None: not knowable)
-_STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)")
+_STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)"
+                               r"|agents-v0-onboard-commit-msg")  # JO-8: a $(git rev-parse --git-path ...) target
 _CMD_TEXT = [""]  # the whole command being judged (for "does it name a state folder")
 # onboard fix (Jiraiya round 2, item 1): a write target the shell only fills in at run time ($OUT, "$f", $(...)) that
 #   is not near a state folder. The guard cannot check it, so the command asks instead of passing. Set by
@@ -2152,6 +2177,8 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
 
     spath = _segment_writes_state(seg)  # onboard fix (Iruka): workflow state, every spelling, every mode
     if spath:
+        if "agents-v0-onboard-commit-msg" in spath or (_unknown_target(spath) and "agents-v0-onboard-commit-msg" in _CMD_TEXT[0]):
+            return "block", ONB_MSG_WRITE_MSG.format(spath)  # JO-8
         return "block", STATE_WRITE_MSG.format(spath)
 
     kpath = _segment_changes_kit_container(seg)
@@ -2462,6 +2489,216 @@ def _cd_target(seg: str) -> Optional[str]:
     return m.group(2) if m else None
 
 
+# JO-8 (Sasuke): while onboarding is in progress the only commit is the onboard gate commit, run exactly as
+#   `sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F <onboard message file>` (gate-checks.sh
+#   commit_chain prints the whole chain). commit_msg_ok checks the message against the secret-scan record; a commit
+#   that does not follow it with `&&` (`;`, `||`, `|`, `&`, a new line, another command between, $(...)) or that
+#   takes anything else (-m, another -F file, -a, --amend, -C/-c, --fixup, pathspecs, git -C/-c ...) is denied.
+#   The allowed chain still gets the usual "git commit requires explicit user approval" ask.
+#   Why here and not only in check-gate-commit: that check runs when the next phase starts (sync-feature-state), after
+#   the unscanned commit is already in local history; the hook stops it before it runs, in every mode.
+#   Known gap: a commit run from inside a script the agent wrote (python3 x.py, make) is not seen.
+ONB_COMMIT_MSG = ("onboarding is in progress ({}): the only commit allowed is the onboard gate commit, run as "
+                  "`sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F "
+                  ".git/agents-v0-onboard-commit-msg.txt` (nothing else in the git commit; see "
+                  "`sh .agents-v0/scripts/gate-checks.sh commit_chain`). {}")
+_ONB_MSG_TXT_RE = re.compile(r"^(?:\.git|/\S*/\.git)(?:/worktrees/[^/]+)?/agents-v0-onboard-commit-msg\.txt$")
+_ONB_MSG_GITPATH_RE = re.compile(r"^\$\(\s*git\s+rev-parse\s+--git-path\s+agents-v0-onboard-commit-msg\.txt\s*\)$")
+_ONB_WRAPPERS = frozenset({"env", "command", "nohup", "time", "nice", "stdbuf", "exec", "builtin", "setsid", "ionice",
+                           "timeout", "xargs", "eval", "sudo", "doas", "run0", "pkexec"})
+
+
+def _onb_ops_split(cmd: str) -> List[Tuple[str, str]]:
+    """Top-level (operator before, segment) pairs; the first operator is ""."""
+    out: List[Tuple[str, str]] = []
+    buf: List[str] = []
+    op = ""
+    in_single = in_double = False
+    depth = 0
+    i = 0
+    while i < len(cmd):
+        c = cmd[i]
+        if c == "'" and not in_double:
+            in_single = not in_single
+        elif c == '"' and not in_single:
+            in_double = not in_double
+        elif not in_single and cmd[i:i + 2] == "$(":
+            depth += 1
+            buf.append("$(")
+            i += 2
+            continue
+        elif not in_single and depth and c == ")":
+            depth -= 1
+        elif not in_single and not in_double and not depth:
+            two = cmd[i:i + 2]
+            sep = two if two in ("&&", "||") else (c if c in ";|&\n" else "")
+            if sep == "&" and ((buf and buf[-1] in "<>") or cmd[i + 1:i + 2] == ">"):
+                sep = ""  # 2>&1, >&2, &> are redirects, not a background operator
+            if sep:
+                seg = "".join(buf).strip()
+                if seg:
+                    out.append((op, seg))
+                    op = sep
+                else:
+                    op = op + sep if op else sep  # e.g. `a ;&& b` never parses; keep it off-chain
+                buf = []
+                i += len(sep)
+                continue
+        buf.append(c)
+        i += 1
+    seg = "".join(buf).strip()
+    if seg:
+        out.append((op, seg))
+    return out
+
+
+def _onb_inner(seg: str) -> Optional[str]:
+    """The command a wrapper runs (sh/bash -c body, env/command/nohup/... remainder), else None."""
+    seg = _strip_env_prefix(seg)
+    try:
+        parts = shlex.split(seg, posix=True)
+    except ValueError:
+        return None
+    if not parts:
+        return None
+    bin0 = parts[0].lstrip("\\").split("/")[-1]
+    if bin0 in ("sh", "bash", "zsh", "dash", "ksh"):
+        i = 1
+        while i < len(parts) and parts[i].startswith("-"):
+            f = parts[i]
+            if f in ("-c", "-lc") or (len(f) > 2 and "c" in f[1:] and not f.startswith("--")):
+                return parts[i + 1] if i + 1 < len(parts) else None
+            i += 2 if f in ("-o", "+o") else 1
+        return None
+    if bin0 not in _ONB_WRAPPERS or len(parts) < 2:
+        return None
+    i = 1
+    if bin0 == "eval":
+        return " ".join(parts[1:])
+    with_arg = {"env": ("-u", "--unset", "-C", "--chdir", "-S", "--split-string"),
+                "sudo": ("-u", "-g", "-C", "-D", "-R", "-T"), "nice": ("-n",), "timeout": ("-k", "-s"),
+                "xargs": tuple(_XARGS_OPTS_WITH_ARG | {"-I", "--replace"})}.get(bin0, ())
+    while i < len(parts) and (parts[i].startswith("-") or (bin0 == "env" and "=" in parts[i])):
+        if parts[i] in with_arg and i + 1 < len(parts):
+            i += 2
+        else:
+            i += 1
+    if bin0 == "timeout":
+        i += 1  # the duration
+    return shlex.join(parts[i:]) if i < len(parts) else None
+
+
+def _onb_leaves(cmd: str, depth: int = 0) -> List[Tuple[str, str]]:
+    """(operator before, simple command) for every command the line runs, wrappers unwrapped (the first inner
+    command keeps the wrapper's operator); $(...) bodies are marked with the operator "$(" (never on the chain)."""
+    out: List[Tuple[str, str]] = []
+    for op, seg in _onb_ops_split(cmd):
+        inner = _onb_inner(seg) if depth < 8 else None
+        if inner:
+            sub = _onb_leaves(inner, depth + 1)
+            if sub:
+                sub[0] = (op, sub[0][1])
+            out.extend(sub)
+        else:
+            out.append((op, seg))
+        for body in _extract_substitutions(seg):
+            out.extend(("$(", s) for _o, s in _onb_leaves(body, depth + 1))
+    return out
+
+
+def _onb_parts(seg: str) -> List[str]:
+    try:
+        return shlex.split(_strip_env_prefix(seg.strip()), posix=True)
+    except ValueError:
+        return _strip_env_prefix(seg.strip()).split()
+
+
+def _onb_is_commit(parts: List[str]) -> bool:
+    return bool(parts) and parts[0].lstrip("\\").split("/")[-1] == "git" and _git_subcommand(parts) == "commit"
+
+
+def _onboard_state(root: str) -> Optional[str]:
+    """Why onboarding counts as in progress in this repository, or None. In progress: the onboarding record folder
+    exists and either the state names onboard as the active phase, or onboard is approved but that approval is not
+    committed yet (state.json untracked or changed against HEAD: the window commit_chain is for), or the folder exists
+    with no readable state and no onboard-v tag (fail closed)."""
+    if not root or not os.path.isdir(os.path.join(root, "docs", "agents-v0", "onboarding")):
+        return None
+    sfile = os.path.join(root, "docs", "agents-v0", "onboarding", "state.json")
+
+    def git_out(*args: str) -> Optional[str]:
+        try:
+            r = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return r.stdout if r.returncode == 0 else None
+
+    try:
+        with open(sfile, encoding="utf-8") as fh:
+            st = json.load(fh)
+        if not isinstance(st, dict):
+            raise ValueError("not an object")
+    except (OSError, ValueError) as exc:
+        tags = git_out("tag", "-l", "onboard-v*")
+        if tags is not None and tags.strip():
+            return None
+        what = "missing" if isinstance(exc, FileNotFoundError) else "unreadable"
+        return f"docs/agents-v0/onboarding exists, its state.json is {what} and there is no onboard-v tag; failing closed"
+    if st.get("activePhase") == "onboard":
+        return f"activePhase onboard, status {st.get('activeStatus') or 'unset'}"
+    approved = st.get("approvedPhases")
+    if isinstance(approved, list) and "onboard" in approved:
+        out = git_out("status", "--porcelain", "--", "docs/agents-v0/onboarding/state.json")
+        if out is None:
+            return "onboard approved, and git cannot tell whether the approval is committed; failing closed"
+        if out.strip():
+            return "onboard approved, approval not committed yet"
+    return None
+
+
+def _onboard_commit_block(cmd: str) -> Optional[str]:
+    if "commit" not in cmd:
+        return None
+    leaves = _onb_leaves(cmd)
+    base = _base_dir()
+    for k, (op, seg) in enumerate(leaves):
+        cd_to = _cd_target(seg)
+        if cd_to and op != "$(":
+            base = os.path.normpath(os.path.join(base, os.path.expanduser(cd_to)))
+            continue
+        parts = _onb_parts(seg)
+        if not _onb_is_commit(parts):
+            continue
+        sub_idx = parts.index("commit")
+        gbase = base
+        for j in range(1, sub_idx):
+            if parts[j - 1] == "-C":
+                gbase = os.path.normpath(os.path.join(gbase, os.path.expanduser(parts[j])))
+        why = _onboard_state(_repo_root(gbase) or "")
+        if not why:
+            continue
+        prev = [t for t in _onb_parts(leaves[k - 1][1]) if not re.fullmatch(r"2>&1", t)] if k else []
+        if op != "&&" or k == 0 or leaves[k - 1][0] == "$(" or prev not in (
+                ["sh", ".agents-v0/scripts/gate-checks.sh", "commit_msg_ok"],
+                ["sh", "./.agents-v0/scripts/gate-checks.sh", "commit_msg_ok"]):
+            return ONB_COMMIT_MSG.format(why, "This git commit is not run right after `sh .agents-v0/scripts/"
+                                              "gate-checks.sh commit_msg_ok &&`.")
+        args = parts[sub_idx + 1:]
+        if sub_idx != 1:
+            return ONB_COMMIT_MSG.format(why, "git options before commit (" + " ".join(parts[1:sub_idx]) + ") are not "
+                                              "part of the onboard commit.")
+        msg_file = None
+        if len(args) == 2 and args[0] in ("-F", "--file"):
+            msg_file = args[1]
+        elif len(args) == 1 and (args[0].startswith("--file=") or (args[0].startswith("-F") and len(args[0]) > 2)):
+            msg_file = args[0][7:] if args[0].startswith("--file=") else args[0][2:]
+        if msg_file is None or not (_ONB_MSG_TXT_RE.match(posixpath.normpath(msg_file))
+                                    or _ONB_MSG_GITPATH_RE.match(msg_file.strip())):
+            return ONB_COMMIT_MSG.format(why, "The onboard commit takes only -F .git/agents-v0-onboard-commit-msg.txt; "
+                                              "got: git commit " + " ".join(args))
+    return None
+
+
 def classify_command(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
@@ -2496,6 +2733,9 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     for esc in _ESCALATIONS:
         if esc in ESCALATORS_ALL_MODES or unattended:
             return "block", ESCALATION_MSG.format(esc)
+    ob = _onboard_commit_block(cmd)  # JO-8
+    if ob:
+        return "block", ob
     stdin_exec = unattended and any(_segment_reads_stdin_program(sg) for sg in segments)
     hook_root = _project_root(_base_dir()) if unattended else ""
     if unattended:
@@ -2751,6 +2991,8 @@ def classify_path(path: str) -> Tuple[Action, str]:
         )
     if _is_py_startup_path(path):  # kitfix-20261031-n1, -jn4
         return ("block" if unattended_mode() else "ask"), _startup_msg(path)
+    if _is_onboard_msg_path(path):  # JO-8
+        return "block", ONB_MSG_WRITE_MSG.format(path)
     norm = path.replace("\\", "/")
     if re.search(r"(^|/)docs/agents-v0/requirements/.+\.md$", norm):
         if norm.endswith(".phase-result.md"):

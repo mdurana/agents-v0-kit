@@ -149,6 +149,20 @@ grep -q 'os.replace(tmp_path, out)' "$KIT/templates/.agents-v0/scripts/sync-feat
   || err "sync-feature-state.sh no longer writes state via tempfile + os.replace; re-check the state guard"
 n=$((n + 1))
 
+# JO-8 (Sasuke): with onboarding in progress (activePhase onboard) the only commit is the onboard chain step
+#   `gate-checks.sh commit_msg_ok && git commit -F <onboard message>` (still an ask), and the onboard message and scan
+#   record are never an agent's write. Through the Cursor entry; the full list is in scripts/test-hook-policy.py.
+printf '{"activePhase":"onboard","activeStatus":"awaiting_approval","approvedPhases":[]}\n' > "$P/$S"
+G='sh .agents-v0/scripts/gate-checks.sh commit_msg_ok'
+M=.git/agents-v0-onboard-commit-msg.txt
+judge cursor-shell block "JO-8 commit outside the chain" "git commit -m x"
+judge cursor-shell block "JO-8 commit after ; not &&" "$G ; git commit -F $M"
+judge cursor-shell block "JO-8 commit with another message file" "$G && git commit -F other.txt"
+judge cursor-shell block "JO-8 write to the scan record" "printf x > .git/agents-v0-onboard-commit-msg.scan"
+judge cursor-shell ask "JO-8 the chain's commit step (git commit asks)" "$G && git commit -F $M"
+judge cursor-shell allow "JO-8 read the onboard message" "cat $M"
+judge cursor-edit block "JO-8 edit tool on the onboard message" "$M"
+
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2
 exit 1

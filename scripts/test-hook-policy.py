@@ -886,6 +886,134 @@ def state_folder_inproc_cases(hp, tmp: str) -> list:
 STATE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(*)"}
 
 
+# JO-8 (Sasuke): while onboarding is in progress the only commit is `sh .agents-v0/scripts/gate-checks.sh
+#   commit_msg_ok && git commit -F <onboard message file>` (still an ask); the onboard message and scan record are never
+#   an agent's write while docs/agents-v0 exists. G = the check, M / SC = the message file and the scan record.
+JO8_G = "sh .agents-v0/scripts/gate-checks.sh commit_msg_ok"
+JO8_M = ".git/agents-v0-onboard-commit-msg.txt"
+JO8_SC = ".git/agents-v0-onboard-commit-msg.scan"
+JO8_CHAIN = (f"git add --all -- docs/agents-v0/onboarding AGENTS.md ':(exclude,glob)**/*.lock' && "
+             f"sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && {JO8_G} && git commit -F {JO8_M} && "
+             f"git tag -a onboard-v1 -m \"onboard approved\"")
+JO8_COMMIT_BLOCK = [
+    "git commit -F other.txt", "git commit -m x", f"git commit -F {JO8_M}", "git commit", "git commit -a -m x",
+    f"{JO8_G} ; git commit -F {JO8_M}", f"{JO8_G} || git commit -F {JO8_M}", f"{JO8_G} | git commit -F {JO8_M}",
+    f"{JO8_G} & git commit -F {JO8_M}", f"{JO8_G}\ngit commit -F {JO8_M}", f"{JO8_G} && true && git commit -F {JO8_M}",
+    f"sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && git commit -F {JO8_M}",
+    f"sh .agents-v0/scripts/gate-checks.sh commit_msg_ok x && git commit -F {JO8_M}",
+    f"{JO8_G} && git commit -m x", f"{JO8_G} && git commit -F other.txt", f"{JO8_G} && git commit -a -F {JO8_M}",
+    f"{JO8_G} && git commit --all -F {JO8_M}", f"{JO8_G} && git commit --amend -F {JO8_M}",
+    f"{JO8_G} && git commit -F {JO8_M} -- src", f"{JO8_G} && git commit -F {JO8_M} -e",
+    f"{JO8_G} && git commit -F {JO8_M} --allow-empty-message", f"{JO8_G} && git commit -C HEAD",
+    f"{JO8_G} && git commit --fixup HEAD", f"{JO8_G} && git commit -F {JO8_M} -F other.txt",
+    f"{JO8_G} && git -C . commit -F {JO8_M}", f"{JO8_G} && git -c commit.gpgsign=false commit -F {JO8_M}",
+    "git -C . commit -m x", "git -c user.name=x commit -m x", "env A=1 git commit -m x", "A=1 git commit -m x",
+    "sh -c 'git commit -m x'", "bash -c \"git commit -F other.txt\"", "cd src && git commit -m x",
+    "echo $(git commit -m x)", f"{JO8_G} && echo $(git commit -F {JO8_M})", "command git commit -m x",
+    f"sh -c '{JO8_G} ; git commit -F {JO8_M}'", "true && git commit -m x",
+]
+JO8_COMMIT_ASK = [
+    f"{JO8_G} && git commit -F {JO8_M}", JO8_CHAIN, f"{JO8_G} && git commit --file={JO8_M}",
+    f"{JO8_G} && git commit -F \"$(git rev-parse --git-path agents-v0-onboard-commit-msg.txt)\"",
+    f"sh -c '{JO8_G} && git commit -F {JO8_M}'", f"cd src && cd .. && {JO8_G} && git commit -F {JO8_M}",
+    f"{JO8_G} 2>&1 && git commit -F {JO8_M}",
+]
+JO8_MSG_WRITE_BLOCK = [
+    f"printf x > {JO8_SC}", f"cp other {JO8_M}", f"sha256sum {JO8_M} > {JO8_SC}", f"echo x >> {JO8_M}",
+    f"printf x | tee {JO8_M}", f"mv /tmp/x {JO8_SC}", f"sed -i s/a/b/ {JO8_M}", f"truncate -s0 {JO8_SC}",
+    f"install -m 644 /tmp/x {JO8_M}", f"ln -sf /tmp/x {JO8_SC}", f"rsync /tmp/x {JO8_M}", f"cat /tmp/x >| {JO8_M}",
+    f"python3 -c \"open('{JO8_M}','w').write('x')\"",
+    "printf x > \"$(git rev-parse --git-path agents-v0-onboard-commit-msg.scan)\"",
+    "printf x > \"$(git rev-parse --git-dir)/agents-v0-onboard-commit-msg.txt\"",
+    "cd .git && printf x > agents-v0-onboard-commit-msg.txt", f"sh -c 'printf x > {JO8_SC}'",
+    "cp /tmp/agents-v0-onboard-commit-msg.scan .git/", "mv /tmp/agents-v0-onboard-commit-msg.txt .git/",
+]
+JO8_MSG_ALLOW = [
+    f"cat {JO8_M}", f"sha256sum {JO8_M} {JO8_SC}", JO8_G, "sh .agents-v0/scripts/gate-checks.sh commit_chain",
+    "sh .agents-v0/scripts/gate-checks.sh staged_secret_scan", "git log -1", f"cat {JO8_M} > /tmp/copy.txt",
+]
+
+
+def inproc_path(hp, p: str, cwd: str) -> str:
+    saved = os.environ.get("HOOK_CWD")
+    os.environ["HOOK_CWD"] = cwd
+    try:
+        return hp.classify_path(p)[0]
+    finally:
+        if saved is None:
+            os.environ.pop("HOOK_CWD", None)
+        else:
+            os.environ["HOOK_CWD"] = saved
+
+
+def jo8_onboard_commit_cases(hp, tmp: str) -> list:
+    """(label, cmd, got, want), judged in-process in scratch projects with each onboarding state."""
+    gi = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+
+    def project(name: str, state, commit_state: bool = False, tag: bool = False, kit: bool = True,
+                onboarding: bool = True) -> str:
+        d = os.path.join(tmp, name)
+        os.makedirs(os.path.join(d, "src"))
+        if kit:
+            os.makedirs(os.path.join(d, "docs", "agents-v0", "onboarding" if onboarding else "design"))
+        subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
+        if state is not None:
+            with open(os.path.join(d, STATE_S), "w", encoding="utf-8") as fh:
+                fh.write(state if isinstance(state, str) else json.dumps(state))
+        if commit_state or tag:
+            subprocess.run(gi + ["-C", d, "add", "-A"], check=True)
+            subprocess.run(gi + ["-C", d, "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        if tag:
+            subprocess.run(gi + ["-C", d, "tag", "-a", "onboard-v1", "-m", "onboard approved"], check=True)
+        return d
+
+    active = project("jo8-active", {"activePhase": "onboard", "activeStatus": "awaiting_approval", "approvedPhases": []})
+    approved = project("jo8-approved", {"activePhase": "", "activeStatus": "", "approvedPhases": ["onboard"]})
+    done = project("jo8-committed", {"activePhase": "", "approvedPhases": ["onboard"]}, commit_state=True)
+    broken = project("jo8-broken", "{not json")
+    broken_tag = project("jo8-broken-tag", "{not json", tag=True)
+    nostate = project("jo8-nostate", None)
+    green = project("jo8-greenfield", None, onboarding=False)
+    plain = project("jo8-plain", None, kit=False)
+    out = []
+
+    def add(label, cmd, cwd, want, env=None):
+        out.append((label, cmd, inproc_shell(hp, cmd, dict({"HOOK_CWD": cwd}, **(env or {})), cwd), want))
+
+    for c in JO8_COMMIT_BLOCK:
+        add("onboard active", c, active, "block")
+    for c in ("git commit -m x", f"{JO8_G} ; git commit -F {JO8_M}", "sh -c 'git commit -F other.txt'"):
+        add("onboard active, unattended", c, active, "block", STATE_UNATTENDED_ENV)
+        add("onboard approved, not committed", c, approved, "block")
+    for c in JO8_COMMIT_ASK:
+        add("onboard active", c, active, "ask")
+    add("onboard approved, not committed", JO8_CHAIN, approved, "ask")
+    add("git -C into an onboarding project", f"git -C {active} commit -m x", plain, "block")
+    add("cd into an onboarding project", f"cd {active} && git commit -m x", plain, "block")
+    add("state unreadable, no onboard-v tag (fail closed)", "git commit -m x", broken, "block")
+    add("onboarding folder without state, no onboard-v tag (fail closed)", "git commit -m x", nostate, "block")
+    for label, d in (("onboard approved and committed", done), ("state unreadable, onboard-v tag", broken_tag),
+                     ("greenfield kit project (no onboarding folder)", green), ("no docs/agents-v0", plain)):
+        for c in ("git commit -m x", "git commit -F .git/agents-v0-gate-msg.txt", f"git commit -F {JO8_M}"):
+            add(label, c, d, "ask")
+    add("onboard approved and committed", "sh .agents-v0/scripts/gate-checks.sh commit_msg_ok ; git commit -F "
+        ".git/agents-v0-gate-msg.txt", done, "ask")
+    for c in JO8_MSG_WRITE_BLOCK:
+        add("onboard active", c, active, "block")
+    for c in (f"printf x > {JO8_SC}", f"cp other {JO8_M}", f"sha256sum {JO8_M} > {JO8_SC}"):
+        add("onboard active, unattended", c, active, "block", STATE_UNATTENDED_ENV)
+        add("onboard approved and committed (docs/agents-v0 exists)", c, done, "block")
+        add("greenfield kit project", c, green, "block")
+        add("no docs/agents-v0", c, plain, "allow")
+    add("absolute path", f"printf x > {active}/{JO8_M}", plain, "block")
+    for c in JO8_MSG_ALLOW:
+        add("onboard active", c, active, "allow")
+    for p_ in (JO8_M, JO8_SC, "./" + JO8_M, os.path.join(active, JO8_SC)):
+        out.append(("edit tool", p_, inproc_path(hp, p_, active), "block"))
+    out.append(("edit tool, no docs/agents-v0", JO8_M, inproc_path(hp, JO8_M, plain), "allow"))
+    return out
+
+
 def state_write_cases(tmp: str) -> list:
     proj = os.path.join(tmp, "stateproj")
     os.makedirs(os.path.join(proj, "docs", "agents-v0", "onboarding"))
@@ -1495,6 +1623,9 @@ def main() -> int:
     fcases_c = state_folder_inproc_cases(hp, tmp)
     for label, cmd, got, want in fcases_c:
         check(got, want, f"Iruka 2 / Jiraiya C state folder ({label}, in-process) `{cmd}`")
+    jo8 = jo8_onboard_commit_cases(hp, tmp)
+    for label, cmd, got, want in jo8:
+        check(got, want, f"JO-8 onboard commit ({label}, in-process) `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1542,7 +1673,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
