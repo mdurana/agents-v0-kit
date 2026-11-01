@@ -147,10 +147,13 @@ def split_segments(cmd: str) -> List[str]:
     subst_depth = 0
     i = 0
 
+    after_word_paren = [False]  # the segment after `word(` (`--format=%(if)`): its first word is no keyword
+
     def flush() -> None:
         seg = "".join(buf).strip()
         if seg:
-            segments.extend(_expand_wrapper(seg))
+            segments.extend(_expand_wrapper(seg, keywords=not after_word_paren[0]))
+            after_word_paren[0] = False
         del buf[:]
 
     while i < len(cmd):
@@ -202,14 +205,17 @@ def split_segments(cmd: str) -> List[str]:
                 i += 1
                 continue
             if c in "(){}" and not in_bt and _group_word_at(cmd, i, buf, subst_depth):
+                mid_word = (c == "(" and bool(buf) and buf[-1] not in " \t"
+                            and not re.match(r"\s*\)", cmd[i + 1:]))  # `name()` is a function definition
                 flush()
+                after_word_paren[0] = mid_word
                 i += 1
                 continue
         buf.append(c)
         i += 1
     tail = "".join(buf).strip()
     if tail:
-        segments.extend(_expand_wrapper(tail))
+        segments.extend(_expand_wrapper(tail, keywords=not after_word_paren[0]))
     for body in _extract_substitutions(cmd):
         segments.extend(split_segments(body))
     return [s for s in segments if s.strip()]
@@ -263,8 +269,37 @@ _XARGS_OPTS_WITH_ARG = frozenset({"-n", "-P", "-L", "-l", "-d", "-E", "-e", "-s"
                                   "--max-lines", "--delimiter", "--eof", "--max-chars", "--arg-file"})
 
 
-def _expand_wrapper(seg: str) -> List[str]:
+# Jiraiya 36a0dce1 review: a segment whose first word is a shell reserved word (`if true`, `then git push`,
+#   `do git push`, `! git push`, `coproc git push`) was judged as the program `if`/`then`/`do`/`!`/`coproc`, so the
+#   command after it met no rule (`if true; then git push; fi` was allowed). The reserved word is stripped and the rest
+#   judged like any command (also an `if`/`while`/`until` condition); a closing word (fi, done, esac) is judged as
+#   `true` with its redirects (`done > state.json` still writes); a header (`for x in ...`, `select x in ...`,
+#   `case w in pat`, `function name`, `in ...`) runs no command: its $( ) and backticks are judged as substitutions.
+#   `( )`, `{ }` and case-arm `pat)` are split by split_segments. Every keyword seen is recorded in _SH_KEYWORDS so
+#   classify_command can fail closed on a compound form it cannot balance (see _compound_unparsed).
+_SH_STRIP_KW_RE = re.compile(r"(if|then|elif|else|while|until|do|!|coproc)(?=\s|$)\s*")
+_SH_CLOSE_KW_RE = re.compile(r"(fi|done|esac)(?=[\s<>&|;]|$)")
+_SH_HEADER_KW_RE = re.compile(r"(for|select|case|function|in)(?=\s|$)")
+_SH_KEYWORDS: List[str] = []
+
+
+def _expand_wrapper(seg: str, keywords: bool = True) -> List[str]:
     seg = _strip_env_prefix(seg)
+    if keywords:
+        m = _SH_STRIP_KW_RE.match(seg)
+        if m:
+            _SH_KEYWORDS.append(m.group(1))
+            rest = seg[m.end():]
+            return split_segments(rest) if rest.strip() else []
+        m = _SH_CLOSE_KW_RE.match(seg)
+        if m:
+            _SH_KEYWORDS.append(m.group(1))
+            rest = seg[m.end():].strip()
+            return ["true " + rest] if rest else []
+        m = _SH_HEADER_KW_RE.match(seg)
+        if m:
+            _SH_KEYWORDS.append(m.group(1))
+            return []
     try:
         parts = shlex.split(seg, posix=True)
     except ValueError:
@@ -2658,23 +2693,36 @@ def _onb_inner(seg: str) -> Optional[str]:
     return shlex.join(parts[i:]) if i < len(parts) else None
 
 
-def _onb_leaves(cmd: str, depth: int = 0, grouped: bool = False) -> List[Tuple[str, str, bool]]:
+def _onb_leaves(cmd: str, depth: int = 0, grouped: bool = False,
+               seen: Optional[List[str]] = None) -> List[Tuple[str, str, bool]]:
     """(operator before, simple command, inside a group) for every command the line runs, wrappers unwrapped (the
     first inner command keeps the wrapper's operator); $(...) bodies are marked with the operator "$(" (never on the
-    chain)."""
+    chain). Shell reserved words (if/then/do/!/coproc ...) are stripped, the command after one counts as grouped, and
+    every reserved word met is added to `seen` (Jiraiya 36a0dce1 review)."""
     out: List[Tuple[str, str, bool]] = []
     for op, seg, grp in _onb_ops_split(cmd):
         grp = grp or grouped
+        kw = None if depth >= 8 else (_SH_STRIP_KW_RE.match(seg) or _SH_CLOSE_KW_RE.match(seg)
+                                      or _SH_HEADER_KW_RE.match(seg))
+        if kw:
+            if seen is not None:
+                seen.append(kw.group(1))
+            if kw.re is _SH_STRIP_KW_RE and seg[kw.end():].strip():
+                out.extend(_onb_leaves(seg[kw.end():], depth + 1, True, seen))
+            else:
+                for body in _extract_substitutions(seg):  # a for/case/select word list runs only its $( )
+                    out.extend(("$(", s, True) for _o, s, _g in _onb_leaves(body, depth + 1, True, seen))
+            continue
         inner = _onb_inner(seg) if depth < 8 else None
         if inner:
-            sub = _onb_leaves(inner, depth + 1, grp)
+            sub = _onb_leaves(inner, depth + 1, grp, seen)
             if sub:
                 sub[0] = (op, sub[0][1], sub[0][2])
             out.extend(sub)
         else:
             out.append((op, seg, grp))
         for body in _extract_substitutions(seg):
-            out.extend(("$(", s, g) for _o, s, g in _onb_leaves(body, depth + 1, grp))
+            out.extend(("$(", s, g) for _o, s, g in _onb_leaves(body, depth + 1, grp, seen))
     return out
 
 
@@ -2764,6 +2812,8 @@ def _onboard_state(root: str) -> Optional[str]:
 def _onboard_commit_block(cmd: str) -> Optional[str]:
     if "git" not in cmd:
         return None
+    seen: List[str] = []
+    _onb_leaves(_strip_heredoc_bodies(cmd), seen=seen)  # reserved words outside here-document bodies
     leaves = _onb_leaves(cmd)
     base = _base_dir()
     for k, (op, seg, grouped) in enumerate(leaves):
@@ -2793,6 +2843,10 @@ def _onboard_commit_block(cmd: str) -> Optional[str]:
         why = _onboard_state(_repo_root(gbase) or "")
         if not why:
             continue
+        if seen:
+            return ONB_COMMIT_MSG.format(why, "This command uses a shell compound form (" + " ".join(sorted(set(seen)))
+                                              + "); while onboarding a git commit is run only as the plain chain, "
+                                              "never inside if/for/while/until/case/select, !, coproc or a function.")
         if grouped:
             return ONB_COMMIT_MSG.format(why, "This git commit runs inside a ( ) or { } group; the onboard commit is "
                                               "run as the plain chain, not grouped.")
@@ -2818,7 +2872,77 @@ def _onboard_commit_block(cmd: str) -> Optional[str]:
     return None
 
 
+# Jiraiya 36a0dce1 review: when the reserved words of a compound form do not pair up (if/fi, then, case/esac,
+#   for|while|until|select / do / done), or a here-document sits inside one, the segment split above may not match
+#   what bash runs, so the verdict fails closed: block when the text names anything a rule denies (git push and other
+#   history/worktree changers, gh, glab, rm, the state and onboard files, guard paths), otherwise at least ask.
+#   Never allow.
+COMPOUND_MSG = ("the guard cannot follow this shell compound form ({}), so it judges the whole text: {}. Write it as "
+                "plain commands joined by && or ;, one step at a time.")
+_COMPOUND_DENY_RE = re.compile(
+    r"\bgit\b[^\n]*?\b(?:push|restore|checkout|switch|stash|reset|clean|commit|commit-tree|update-ref|rm|mv|"
+    r"filter-branch|filter-repo)\b|(?:^|[^\w.-])(?:gh|glab|rm|shred|unlink|truncate)(?=[\s;&|()<>`]|$)|"
+    r"docs/agents-v0|state\.json|agents-v0-onboard-commit-msg|\.git/hooks|\.cursor/|\.agents/|\.agents-v0/|"
+    r"\.gitlab-ci\.yml|\.github/workflows", re.I)
+
+
+_HEREDOC_OPEN_RE = re.compile(r"<<(?!<)(-?)\s*(['\"]?)([A-Za-z_][\w.-]*)\2")
+
+
+def _strip_heredoc_bodies(cmd: str) -> str:
+    """cmd without the bodies of its here-documents (their lines are text, not reserved words)."""
+    lines = cmd.split("\n")
+    out: List[str] = []
+    pending: List[Tuple[str, bool]] = []
+    for line in lines:
+        if pending:
+            delim, dash = pending[0]
+            if (line.lstrip("\t") if dash else line) == delim:
+                pending.pop(0)
+            continue
+        out.append(line)
+        pending = [(m.group(3), m.group(1) == "-") for m in _HEREDOC_OPEN_RE.finditer(line)]
+    return "\n".join(out)
+
+
+def _sh_keywords(cmd: str) -> List[str]:
+    """The shell reserved words split_segments meets in cmd outside here-document bodies."""
+    del _SH_KEYWORDS[:]
+    split_segments(_CLOBBER_RE.sub(">", _strip_heredoc_bodies(cmd)))
+    return list(_SH_KEYWORDS)
+
+
+def _compound_unparsed(kws: List[str], cmd: str) -> Optional[str]:
+    """Why the compound form in cmd is not trusted to be split right, else None."""
+    n = {k: kws.count(k) for k in set(kws)}
+    g = n.get
+    loops = g("for", 0) + g("while", 0) + g("until", 0) + g("select", 0)
+    if g("if", 0) != g("fi", 0) or g("then", 0) != g("if", 0) + g("elif", 0):
+        return "if/then/fi do not pair up"
+    if g("case", 0) != g("esac", 0):
+        return "case/esac do not pair up"
+    if loops != g("done", 0) or g("do", 0) != g("done", 0):
+        return "for/while/until/select, do and done do not pair up"
+    if (g("else", 0) or g("elif", 0)) and not g("if", 0):
+        return "else/elif outside an if"
+    if re.search(r"<<(?!<)", cmd):
+        return "a here-document inside a compound form"
+    return None
+
+
 def classify_command(cmd: str) -> Tuple[Action, str]:
+    kws = _sh_keywords(cmd)
+    action, msg = _classify_command_core(cmd)
+    why = _compound_unparsed(kws, cmd) if kws else None
+    if why and action != "block":
+        tok = _COMPOUND_DENY_RE.search(cmd)
+        if tok:
+            return "block", COMPOUND_MSG.format(why, f"it names `{tok.group(0).strip()}`")
+        return "ask", COMPOUND_MSG.format(why, "nothing it names is denied, so it needs your approval")
+    return action, msg
+
+
+def _classify_command_core(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
     _SHELL_VARS.clear()

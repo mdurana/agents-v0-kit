@@ -179,6 +179,23 @@ judge cursor-edit block "case: upper-case state path" "DOCS/AGENTS-V0/ONBOARDING
 judge cursor-shell block "onboarding: commit alias" "git -c alias.ci=commit ci -m x"
 judge cursor-shell block "onboarding: commit-tree" "git commit-tree HEAD^{tree} -m x"
 
+# Jiraiya 36a0dce1 review (Sasuke): commands inside if/for/while/until/case/select, !, coproc and function bodies are
+#   judged like the same command bare; a compound form whose reserved words do not pair up fails closed. The full
+#   list is in scripts/test-hook-policy.py (jr4_cases).
+judge cursor-shell block "compound: push in if" "if true; then git push; fi"
+judge cursor-shell block "compound: push in for" "for i in 1; do git push; done"
+judge cursor-shell block "compound: push in while" "while true; do git push; break; done"
+judge cursor-shell block "compound: ! push" "! git push"
+judge cursor-shell block "compound: coproc push" "coproc git push"
+judge cursor-shell block "compound: gh in until" "until false; do gh pr create --fill; done"
+judge cursor-shell block "compound: state write in a case arm" "case x in x) printf x > $S;; esac"
+judge cursor-shell block "compound: onboard commit chain in if" "if true; then $G && git commit -F $M; fi"
+judge cursor-shell block "compound: unbalanced, names git push" "if true; then echo git push"
+judge cursor-shell ask "compound: unbalanced, nothing denied" "if true; then ls"
+judge cursor-shell allow "compound: plain if" "if true; then ls; fi"
+judge cursor-shell allow "compound: plain for" 'for f in *.md; do echo $f; done'
+judge cursor-shell allow "compound: ! grep" "! grep -q x file"
+
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2
 exit 1

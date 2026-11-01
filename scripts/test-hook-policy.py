@@ -1116,6 +1116,80 @@ def jr3_cases(hp, tmp: str) -> list:
     return out
 
 
+# Jiraiya 36a0dce1 review cases (Sasuke): shell compound forms. Each template runs the inner command once.
+JR4_FORMS = [
+    "if true; then {}; fi", "if {}; then :; fi", "if false; then :; elif true; then {}; fi",
+    "if false; then :; else {}; fi", "if false; then :; elif {}; then :; fi", "if ! {}; then :; fi",
+    "for i in 1; do {}; done", "for i in 1 2\ndo\n  {}\ndone", "for ((i=0;i<1;i++)); do {}; done",
+    "while true; do {}; break; done", "while {}; do break; done", "until false; do {}; break; done",
+    "until {}; do :; done", "select x in a; do {}; break; done",
+    "! {}", "coproc {}", "coproc P {{ {}; }}", "coproc P ( {} )",
+    "f() {{ {}; }}; f", "f(){{ {};}}; f", "function f {{ {}; }}; f", "function f() {{ {}; }}; f",
+    "case x in x) {};; esac", "case x in (x) {};; esac", "case x in a) :;; *) {};; esac",
+    "case x in\n  x)\n    {}\n    ;;\nesac",
+    "[[ -n x ]] && {}", "if [[ -n x ]]; then {}; fi",
+    "if true; then ({}); fi", "for i in 1; do {{ {}; }}; done", "while true; do if true; then {}; fi; break; done",
+    "if true\nthen\n  {}\nfi", "while true\ndo\n  {}\n  break\ndone",
+    "for i in $({}); do :; done", "case `{}` in x) :;; esac", "sh -c 'if true; then {}; fi'",
+    "true && if true; then {}; fi", "time -p {}",
+]
+JR4_INNER = [
+    ("git push origin main", "block", "shop"), ("gh pr create --fill", "block", "shop"),
+    ("git restore .", "block", "shop"), ("git commit -m x", "ask", "shop"),
+    ("printf x > docs/agents-v0/onboarding/state.json", "block", "active"), ("git commit -m x", "block", "active"),
+]
+JR4_ALLOW = [
+    "if true; then ls; fi", "for f in *.md; do echo $f; done", "while read l; do echo $l; done < x",
+    "case $x in a) echo a;; esac", "! grep -q x file", "cat done.txt", "cat fi.md", "echo if then",
+    "git log --format=%(if)", "git log --format='%(if)'", "ls done.txt fi.md esac.txt", "echo done; echo fi",
+    "for ((i=0;i<3;i++)); do echo $i; done", "if [[ -f x ]]; then echo y; fi",
+    "for i in a b; do if [ $i = a ]; then echo $i; fi; done", "cat > /tmp/jr4-notes.md <<EOF\nfor docs see x\nif any\nEOF",
+    "while IFS= read -r l; do printf '%s\\n' \"$l\"; done < x", "until false; do break; done", "f() { ls; }; f",
+    "time -p ls", "! test -f x", "if true; then git status; fi", "for f in a b; do git log -1 -- $f; done",
+    "case x in a|b) ls;; *) pwd;; esac",
+]
+# not parsed with confidence: block when the text names a denied thing, else ask (never allow)
+JR4_UNPARSED = [
+    ("if true; then ls", "ask"), ("while true; do ls; done; done", "ask"), ("case x in x) ls;;", "ask"),
+    ("else ls", "ask"), ("if true; then cat <<EOF\nx\nEOF\nfi", "ask"),
+    ("if true; then echo git push", "block"), ("for x in 1; do echo gh; fi", "block"),
+    ("if true; then cat <<EOF\nhello\nEOF\necho docs/agents-v0/onboarding/state.json; fi", "block"),
+]
+JR4_COMMIT_BLOCK = [
+    "for i in 1; do {G} && git commit -F {M}; done", "if true; then {G} && git commit -F {M}; fi",
+    "if {G}; then git commit -F {M}; fi", "while {G}; do git commit -F {M}; break; done", "! {G} && git commit -F {M}",
+    "f() {{ {G} && git commit -F {M}; }}; f", "case x in x) {G} && git commit -F {M};; esac",
+    "if true; then ls; fi; {G} && git commit -F {M}", "until ! {G}; do git commit -F {M}; break; done",
+    "coproc {G} && git commit -F {M}",
+]
+
+
+def jr4_cases(hp, tmp: str) -> list:
+    """Jiraiya's 36a0dce1 review: commands inside if/for/while/until/case/select, !, coproc and function bodies, and the
+    fail-closed verdict on compound forms the hook cannot pair up. In-process; reuses the jo8-* projects."""
+    active = os.path.join(tmp, "jo8-active")
+    out = []
+
+    def add(label, cmd, cwd, want, env=None):
+        e = dict({"HOOK_CWD": cwd} if cwd else {}, **(env or {}))
+        out.append((label, cmd, inproc_shell(hp, cmd, e, cwd), want))
+
+    for inner, want, where in JR4_INNER:
+        cwd = active if where == "active" else None
+        for t in JR4_FORMS:
+            add(f"compound, {where}", t.format(inner), cwd, want)
+    add("compound, unattended", "if true; then git push; fi", None, "block", STATE_UNATTENDED_ENV)
+    add("compound, unattended", "for i in 1; do git commit -m x; done", active, "block", STATE_UNATTENDED_ENV)
+    for c in JR4_ALLOW:
+        add("compound, not a write", c, None, "allow")
+    for c, want in JR4_UNPARSED:
+        add("compound not parsed (fail closed)", c, None, want)
+    for c in JR4_COMMIT_BLOCK:
+        add("onboard active, commit in a compound form", c.format(G=JO8_G, M=JO8_M), active, "block")
+    add("onboard active, plain chain (unchanged)", f"{JO8_G} && git commit -F {JO8_M}", active, "ask")
+    return out
+
+
 def state_write_cases(tmp: str) -> list:
     proj = os.path.join(tmp, "stateproj")
     os.makedirs(os.path.join(proj, "docs", "agents-v0", "onboarding"))
@@ -1731,6 +1805,9 @@ def main() -> int:
     jr3 = jr3_cases(hp, tmp)
     for label, cmd, got, want in jr3:
         check(got, want, f"Jiraiya 8670b7e4 ({label}, in-process) `{cmd}`")
+    jr4 = jr4_cases(hp, tmp)
+    for label, cmd, got, want in jr4:
+        check(got, want, f"Jiraiya 36a0dce1 ({label}, in-process) `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1778,7 +1855,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(jr3) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(fcases_c) + len(jo8) + len(jr3) + len(jr4) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)
