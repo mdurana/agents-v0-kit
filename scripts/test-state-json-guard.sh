@@ -50,7 +50,7 @@ printf '{}\n' > "$P/docs/agents-v0/onboarding/state.json"
 git init -q -b main "$P"
 S=docs/agents-v0/onboarding/state.json
 
-# judge <tool> <want block|allow> <label> <arg> [VAR=value ...]
+# judge <tool> <want block|allow|ask> <label> <arg> [VAR=value ...]
 judge() {
   tool="$1"; want="$2"; label="$3"; arg="$4"; shift 4
   n=$((n + 1))
@@ -70,6 +70,8 @@ judge() {
     block) [ "$rc" = 2 ] || err "$tool $label: expected a refusal (rc=2), got rc=$rc: $arg ($out)" ;;
     allow) { [ "$rc" = 0 ] && ! printf '%s' "$out" | grep -Eq 'BLOCK:|"(deny|ask)"'; } \
              || err "$tool $label: expected allow (rc=0), got rc=$rc: $arg ($out)" ;;
+    ask) { [ "$rc" = 0 ] && printf '%s' "$out" | grep -q '"ask"'; } \
+             || err "$tool $label: expected ask (rc=0), got rc=$rc: $arg ($out)" ;;
   esac
 }
 
@@ -103,7 +105,8 @@ python3 -c "open('$S','w').write('{}')"
 EOC
 # Cursor only (agy is out of the onboard fix per Sensei): a few spellings through the Cursor entry point, so the
 #   in-process lists in test-hook-policy.py are known to be what the hook does. Jiraiya C and Iruka note 2 (a folder
-#   checkout, a run-time target, pushd, a writer tool), then Jiraiya A and B (gh token, git-push, a $var command name).
+#   checkout, a run-time target, pushd, a writer tool, git stash apply and git am; a run-time target away from
+#   the state folders asks), then Jiraiya A and B (gh token, git-push, a $var command name).
 while IFS= read -r c; do
   [ -n "$c" ] || continue
   judge cursor-shell block "shell write (Jiraiya C / Iruka 2)" "$c"
@@ -112,7 +115,10 @@ git checkout HEAD~1 -- docs/agents-v0/onboarding
 f=$S; echo {} > \$f
 pushd docs/agents-v0/onboarding && echo {} > state.json
 git apply x.diff
+git stash apply
+git am x.patch
 EOC
+judge cursor-shell ask "run-time write target (Jiraiya round 2)" 'echo {} > "$OUT"'
 while IFS= read -r c; do
   [ -n "$c" ] || continue
   judge cursor-shell block "remote write or token (Jiraiya A / B)" "$c"

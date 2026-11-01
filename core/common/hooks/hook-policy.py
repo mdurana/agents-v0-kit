@@ -570,6 +570,12 @@ _GLOB_CHARS = re.compile(r"[*?\[]")
 _SHELL_VARS: dict = {}  # name -> value for `name=value` segments earlier in the same command (None: not knowable)
 _STATE_MENTION_RE = re.compile(r"docs/agents-v0|state\.json|(?:^|[\s/'\"])onboarding(?:/|\b)")
 _CMD_TEXT = [""]  # the whole command being judged (for "does it name a state folder")
+# onboard fix (Jiraiya round 2, item 1): a write target the shell only fills in at run time ($OUT, "$f", $(...)) that
+#   is not near a state folder. The guard cannot check it, so the command asks instead of passing. Set by
+#   _state_target, read per segment by classify_command.
+_UNKNOWN_WRITE: List[Optional[str]] = [None]
+UNKNOWN_TARGET_MSG = ("the write target {} is only known when the command runs, so the guard cannot check it against "
+                      "workflow state or protected paths; requires approval. Write to a literal path instead.")
 _STATE_FOLDER_NAMES = {"docs", "agents-v0", "onboarding", "maintain", "requirements"}
 
 
@@ -674,10 +680,45 @@ def _state_target(t: str) -> bool:
         lit_dir = (lit if lit.endswith("/") else posixpath.dirname(lit)).rstrip("/")
         if _inside_state_dir(base) or _STATE_MENTION_RE.search(_CMD_TEXT[0]):
             return True  # near a state folder: inside one, or the command names one
-        return bool(lit_dir) and lit_dir != "." and _holds_state(lit_dir, base)
+        if bool(lit_dir) and lit_dir != "." and _holds_state(lit_dir, base):
+            return True
+        if _UNKNOWN_WRITE[0] is None:
+            _UNKNOWN_WRITE[0] = t  # not provably state, not provably safe: the caller asks
+        return False
     if _GLOB_CHARS.search(e):
         return _holds_state(e)
     return False
+
+
+def _file_operands(bin0: str, parts: List[str], awk_inplace: bool) -> List[str]:
+    """The arguments that can be files: for sed, perl and awk the program text (-e X, or the first operand) is left
+    out, so a `$` in a script is not taken for a run-time write target (Jiraiya round 2)."""
+    if bin0 not in ("sed", "perl") and not awk_inplace:
+        return parts[1:]
+    out: List[str] = []
+    have_prog = False
+    skip = False
+    for a in parts[1:]:
+        if skip:
+            skip = False
+            continue
+        if bin0 in ("sed", "perl") and re.fullmatch(r"-[A-Za-z]*[eEf]", a) or a in ("--expression", "--file"):
+            have_prog, skip = True, True
+            continue
+        if a.startswith("--expression=") or a.startswith("--file="):
+            have_prog = True
+            continue
+        if awk_inplace and a in ("-f", "-v", "-i", "--file", "--assign", "--include"):
+            have_prog = have_prog or a in ("-f", "--file")
+            skip = True
+            continue
+        if a.startswith("-"):
+            continue
+        if not have_prog and bin0 != "perl":
+            have_prog = True  # sed / awk: the first operand is the program
+            continue
+        out.append(a)
+    return out
 
 
 def _writer_target_dir(base: str) -> bool:
@@ -750,7 +791,7 @@ def _segment_writes_state(seg: str) -> Optional[str]:
     if bin0 in ("tee", "sponge", "truncate", "rm", "unlink", "shred", "touch", "ed", "red", "ex", "vim", "vi",
                 "nvim") or awk_inplace or (
             bin0 in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", p) for p in parts[1:])):
-        for a in parts[1:]:
+        for a in _file_operands(bin0, parts, awk_inplace):
             if not a.startswith("-") and not a.startswith("+") and _state_target(a):
                 return a
     if bin0 == "dd":
@@ -833,6 +874,31 @@ def _segment_writes_state(seg: str) -> Optional[str]:
                     dest = os.path.join(_repo_root(gbase) or gbase, a.split("=", 1)[1])
             if _writer_target_dir(os.path.normpath(dest)):
                 return f"{os.path.relpath(dest, base) if dest != base else '.'} (git apply writes whatever the patch names there)"
+        # Jiraiya round 2, item 2: git commands that rewrite the working tree from a patch, a stash or a tree, like a
+        #   folder checkout of the repository root: denied when the protected state folders exist.
+        groot = _repo_root(gbase)
+        kit_tree = bool(groot) and os.path.isdir(os.path.join(groot, "docs", "agents-v0"))
+        tree_writer = None
+        if sub == "am" and not any(a in ("--abort", "--quit") or a.startswith("--show-current-patch") for a in sub_args):
+            tree_writer = "git am (writes whatever the patches name)"
+        if sub == "stash":
+            op = next((a for a in sub_args if not a.startswith("-")), "")
+            if op in ("apply", "branch"):
+                tree_writer = f"git stash {op} (writes whatever the stash holds)"
+        if sub == "read-tree" and any(a == "-u" or re.fullmatch(r"-[A-Za-z]*u[A-Za-z]*", a) for a in sub_args):
+            tree_writer = "git read-tree -u (writes the whole tree it reads)"
+        if sub == "checkout-index":
+            prefix = next((a.split("=", 1)[1] for a in sub_args if a.startswith("--prefix=")), None)
+            named = [a for a in sub_args if not a.startswith("-")]
+            for a in named:
+                if _is_state_path(a) or _holds_state(a, gbase, git_pathspec=True):
+                    return a
+            all_files = any(a in ("-a", "--all") or re.fullmatch(r"-[A-Za-z]*a[A-Za-z]*", a) for a in sub_args)
+            if all_files and (prefix is None or _writer_target_dir(
+                    os.path.normpath(os.path.join(gbase, os.path.dirname(prefix) or prefix)))):
+                tree_writer = "git checkout-index -a (writes every tracked file)"
+        if tree_writer and kit_tree:
+            return f"{os.path.relpath(groot, base) if groot != base else '.'} ({tree_writer})"
     if bin0 in SCRIPT_INTERPRETERS and SCRIPT_WRITE_HINT.search(seg):
         for lit in _script_literals(parts):
             if _is_state_path(lit):
@@ -2452,9 +2518,12 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
             why = _segment_git_kit_source(seg, hook_root)
             if why:
                 return "block", GIT_SOURCE_MSG.format(why)
+        _UNKNOWN_WRITE[0] = None
         action, message = classify_segment(seg)
         if action == "block":
             return "block", message
+        if _UNKNOWN_WRITE[0] is not None and action == "allow":
+            action, message = "ask", UNKNOWN_TARGET_MSG.format(_UNKNOWN_WRITE[0])
         if action == "ask" and worst != "block":
             worst = "ask"
             msg = message or msg

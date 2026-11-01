@@ -783,7 +783,7 @@ STATE_INDIRECT_WRITE_SHELL = [
     "sh -c 'tar -xf x.tar -C docs/agents-v0'", "env A=1 git apply x.diff",
 ]
 STATE_INDIRECT_ALLOW_SHELL = [
-    "echo hi > $OUT", "f=out.txt; echo hi > $f", "echo x > src/*.txt", "cp -r docs/agents-v0/onboarding /tmp/backup",
+    "f=out.txt; echo hi > $f", "echo x > src/*.txt", "cp -r docs/agents-v0/onboarding /tmp/backup",
     "rsync -a docs/agents-v0/ /tmp/backup/", "cp notes.md docs/agents-v0/onboarding/", "mv a.txt src/",
     "pushd src && echo x > a.txt", "git apply --check x.diff", "git apply --stat x.diff", "cd src && git apply ../x.diff",
     "patch --dry-run -p1 < x.diff", "patch src/Main.java fix.diff", "cd src && patch -p1 < ../x.diff",
@@ -795,6 +795,38 @@ STATE_INDIRECT_ALLOW_SHELL = [
 ]
 # Jiraiya C: left at ask, as before. Fine supervised; unattended has no one to answer the ask (see the handoff).
 STATE_INDIRECT_ASK_SHELL = ["git stash pop", "git merge feature/x"]
+# Jiraiya round 2, item 1: a write target the shell fills in at run time, away from the state folders, asks (it was
+#   allowed). Near a state folder it stays a block (STATE_INDIRECT_WRITE_SHELL). A `$` inside a sed, perl or awk
+#   program is not a target.
+STATE_RUNTIME_ASK_SHELL = [
+    "echo hi > $OUT", "echo {} > \"$OUT\"", "f=$(cat x); echo {} > $f", "echo {} > \"$(cat x)\"",
+    "cd src && echo x > \"$OUT\"", "echo x >> \"${LOG}\"", "echo x > \"$TMPDIR/a\"", "ls > \"$(mktemp)\"",
+    "tee \"$LOG\" < /tmp/x", "cp /tmp/x \"$DEST\"", "mv a.txt $DEST", "dd if=/tmp/x of=$OUT",
+    "sed -i s/a/b/ \"$F\"", "pushd src && echo x > $OUT",
+]
+STATE_RUNTIME_ALLOW_SHELL = [
+    "f=out.txt; echo hi > \"$f\"", "echo x 2>&1 > /dev/null", "sed -i \"s/$a/b/\" src/a.txt",
+    "perl -pi -e 's/$x/y/' src/a.txt", "awk -i inplace '{print $1}' src/a.txt", "echo $HOME > src/home.txt",
+]
+# Jiraiya round 2, item 2: git commands that write the working tree from a patch, a stash or a tree, denied like a
+#   folder checkout of the repository root while the state folders exist.
+STATE_TREE_WRITE_SHELL = [
+    "git am x.patch", "git am -3 x.patch", "git am < x.mbox", "git am --continue", "git am --skip",
+    "git stash apply", "git stash apply stash@{1}", "git stash apply --index", "git stash branch tmp",
+    "git read-tree -u -m HEAD~1", "git read-tree --reset -u HEAD~1", "git read-tree -mu HEAD~1",
+    "git checkout-index -f -a", "git checkout-index -a", "git checkout-index --all --force", "git checkout-index -fa",
+    "git checkout-index -f -- docs/agents-v0/onboarding/state.json", "git checkout-index -f docs/agents-v0/onboarding",
+    "cd src && git am ../x.patch", "git -C src stash apply", "sh -c 'git stash apply'", "env A=1 git read-tree -u -m HEAD~1",
+]
+# Normal git use stays as it was: these are allowed, and the history combiners below stay ask.
+STATE_TREE_ALLOW_SHELL = [
+    "git am --show-current-patch", "git stash", "git stash list", "git stash show -p", "git read-tree HEAD~1",
+    "git read-tree -m HEAD~1", "git checkout-index -a --prefix=/tmp/export/", "git checkout-index -f -- src/Main.java",
+    "git fetch", "git fetch origin main", "git pull", "git pull --rebase", "git status", "git diff",
+    "git checkout main", "git checkout feature/x",
+]
+STATE_TREE_ASK_SHELL = ["git cherry-pick abc1234", "git rebase main", "git stash pop", "git merge feature/x",
+                        "git commit -m x"]
 
 
 def state_folder_inproc_cases(hp, tmp: str) -> list:
@@ -808,12 +840,12 @@ def state_folder_inproc_cases(hp, tmp: str) -> list:
     subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True)
     hook = {"HOOK_CWD": proj}
     out = []
-    for c in STATE_FOLDER_WRITE_SHELL + STATE_INDIRECT_WRITE_SHELL:
+    for c in STATE_FOLDER_WRITE_SHELL + STATE_INDIRECT_WRITE_SHELL + STATE_TREE_WRITE_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "block"))
         out.append(("unattended", c, inproc_shell(hp, c, dict(hook, **STATE_UNATTENDED_ENV), proj), "block"))
-    for c in STATE_FOLDER_ALLOW_SHELL + STATE_INDIRECT_ALLOW_SHELL:
+    for c in STATE_FOLDER_ALLOW_SHELL + STATE_INDIRECT_ALLOW_SHELL + STATE_RUNTIME_ALLOW_SHELL + STATE_TREE_ALLOW_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "allow"))
-    for c in STATE_FOLDER_ASK_SHELL + STATE_INDIRECT_ASK_SHELL:
+    for c in STATE_FOLDER_ASK_SHELL + STATE_INDIRECT_ASK_SHELL + STATE_RUNTIME_ASK_SHELL + STATE_TREE_ASK_SHELL:
         out.append(("attended", c, inproc_shell(hp, c, hook, proj), "ask"))
     return out
 
