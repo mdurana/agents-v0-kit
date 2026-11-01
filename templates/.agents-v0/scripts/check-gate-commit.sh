@@ -123,6 +123,8 @@ def load(text):
     except ValueError: return None
 
 def commit_cmd(ph):
+    if kind == "onboarding":  # JO-8: narrowed add, staged-path check and secret scan; never git add -A
+        return "the chain that `sh .agents-v0/scripts/gate-checks.sh commit_chain` prints"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 if mode == "message":
@@ -137,7 +139,9 @@ if mode == "message":
             fh.write(f"{story_id()}: release approved (squash-merge of feature/{slug})\n\n"
                      f"Story-Branch: feature/{slug}\nStory-Tip: {tip}\n")
         print(f"git add -A && git commit -F {path}")
-    elif kind == "program" or kind == "onboarding":
+    elif kind == "onboarding":
+        print(commit_cmd(phase))
+    elif kind == "program":
         print(commit_cmd(phase) + f" && git tag -a {phase}-v<n> -m \"{phase} approved\"   (n = 1, or the next free number for a revision)")
     else:
         print(commit_cmd(phase))

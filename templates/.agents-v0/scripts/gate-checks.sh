@@ -4,6 +4,7 @@
 #   sh .agents-v0/scripts/gate-checks.sh rules [key]        print the validated gate-rules (or one value)
 #   sh .agents-v0/scripts/gate-checks.sh paths              print the git common dir, ledger and grant paths
 #   sh .agents-v0/scripts/gate-checks.sh list               print every check and whether it is wired
+#   sh .agents-v0/scripts/gate-checks.sh commit_chain       print the onboard gate commit chain (JO-8); runs nothing
 #
 # Design: kit-eval/kitfix-plan-20261031/proposals/jiraiya-onboard-fix-design-20261101.md (revision 6),
 # "Keeping the scripts small" and gap 5. Each check is one function with one job and one refusal message, and
@@ -32,11 +33,11 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved"
+WIRED="approval_evidence gate_committed prereq_approved staged_secret_scan"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
-  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list\n' >&2
+  printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain\n' >&2
   printf 'checks: %s\n' "$CHECKS" >&2
   exit 2
 }
@@ -251,9 +252,60 @@ prereq_approved() {
 no_restart_without_reopen() {
   not_wired no_restart_without_reopen "no state change on a report awaiting review or approved without a granted --reopen" "JO-10 (Sensei 4A, 1A)"
 }
-# JO-8: the staged index holds no secret (secret_scan.py; exit 0 clean / 1 hits / 2 error).
+# JO-8 (design rev 6 flow step 8, N7A; Sasuke SOC-2/3/9/13): the one commit chain of the onboard gate.
+# onb_paths prints the onboard paths of gate-rules onboard_commit_paths that exist or are tracked (README.md is
+# skipped when it is neither, so the add never fails on it).
+onb_paths() {
+  for op_ in $(rule onboard_commit_paths); do
+    if [ -e "$op_" ] || [ -n "$(git ls-files -- "$op_" 2>/dev/null | head -n 1)" ]; then printf '%s\n' "$op_"; fi
+  done
+}
+# onb_msg_file prints the commit message file in the git dir (the scan reads it; the commit uses it).
+onb_msg_file() { git rev-parse --git-path agents-v0-onboard-commit-msg.txt; }
+# commit_chain: print the onboard gate commit chain, in order (narrowed add, staged-path check and secret scan,
+# commit with no pathspec, no -a and never --amend, the next onboard-v<n> tag). It runs nothing.
+commit_chain() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git work tree"
+  to_root
+  cc_paths="$(onb_paths | tr '\n' ' ')"
+  [ -n "$cc_paths" ] || die "none of gate-rules onboard_commit_paths exists"
+  cc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  cc_n=$(( ${cc_n:-0} + 1 ))
+  printf "git add --all -- %s':(exclude,glob)**/*.lock' && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && git commit -F %s && git tag -a onboard-v%s -m \"onboard approved\"\n" \
+    "$cc_paths" "$(onb_msg_file)" "$cc_n"
+}
+# staged_secret_scan: after the narrowed add and before the commit. Refuses when the index holds a path outside
+# the onboard paths or a *.lock file (named; nothing is unstaged), when nothing is staged, or when
+# secret_scan.py exits non-zero (1 hit, 2 could not scan: fail closed). The scanner's output passes through
+# unchanged (it never prints the secret; its allow-list is read from HEAD). Other dirty files are listed, not
+# swept in. Not here yet: the gate_committed range re-scan after the commit (design step 8, N40).
 staged_secret_scan() {
-  not_wired staged_secret_scan "the staged index must hold no secret (secret_scan.py)" "JO-8 (N7A)"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse staged_secret_scan "not a git work tree, so nothing can be scanned"
+  to_root
+  ss_root="$(pwd)"
+  ss_allowed="$(rule onboard_commit_paths)"
+  ss_staged="$(git diff --cached --name-only --no-renames)" || refuse staged_secret_scan "git could not read the index"
+  [ -n "$ss_staged" ] || refuse staged_secret_scan "nothing is staged; run the add of the commit chain first (gate-checks.sh commit_chain)"
+  ss_bad=""
+  for ss_p in $ss_staged; do
+    ss_in=0
+    for ss_a in $ss_allowed; do
+      case "$ss_p" in "$ss_a"|"$ss_a"/*) ss_in=1 ;; esac
+    done
+    case "$ss_p" in *.lock) ss_in=0 ;; esac
+    [ "$ss_in" = 1 ] || ss_bad="$ss_bad $ss_p"
+  done
+  [ -z "$ss_bad" ] || refuse staged_secret_scan "the index holds paths outside gate-rules onboard_commit_paths ($ss_allowed) or lock files:$ss_bad. Nothing was unstaged; unstage them yourself (git restore --staged -- <path>) or ask the user"
+  command -v python3 >/dev/null 2>&1 || refuse staged_secret_scan "python3 is missing, so the secret scan cannot run"
+  [ -f .agents-v0/scripts/secret_scan.py ] || refuse staged_secret_scan ".agents-v0/scripts/secret_scan.py is missing; reinstall the kit (install.sh --update)"
+  ss_msg="$(onb_msg_file)"
+  printf 'onboarding: onboard approved\n' > "$ss_msg" || refuse staged_secret_scan "cannot write the commit message file $ss_msg"
+  ss_rc=0
+  python3 .agents-v0/scripts/secret_scan.py --staged --root "$ss_root" --message-file "$ss_msg" || ss_rc=$?
+  [ "$ss_rc" = 0 ] || refuse staged_secret_scan "secret_scan.py exited $ss_rc (1: a hit, 2: it could not scan); the commit is refused"
+  ss_other="$(git status --porcelain=v1 -uall | sed -n 's/^.[^ ] //p; s/^?? //p' | sort -u | tr '\n' ' ')"
+  [ -z "$ss_other" ] || printf 'other uncommitted files, not in this commit: %s\n' "$ss_other"
+  ok staged_secret_scan "the index holds only onboard paths and no secret; commit with: git commit -F $ss_msg"
 }
 # 4A, N5A, 1A (1A-gap B): the grant parses, names <phase>, is newer than the last gate of <phase>, is at most
 # grant_max_age_seconds old, is unused (no GRANT-USED line, not in git history) and the run is attended.
@@ -285,6 +337,10 @@ case "$cmd" in
   rules)
     [ "$#" -le 1 ] || usage
     if [ "$#" = 1 ]; then rule "$1"; else load_rules; fi ;;
+  commit_chain)
+    [ "$#" = 0 ] || usage
+    load_rules > /dev/null
+    commit_chain ;;
   paths)
     [ "$#" = 0 ] || usage
     gcd="$(git_common_dir)"; lp="$(ledger_path)"; gp="$(grant_path)"

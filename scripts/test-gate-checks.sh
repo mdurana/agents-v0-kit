@@ -280,6 +280,7 @@ expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"
 out_has "list: prereq_approved is wired" "prereq_approved wired"
+out_has "list: staged_secret_scan is wired" "staged_secret_scan wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.

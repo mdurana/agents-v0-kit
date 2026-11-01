@@ -16,8 +16,9 @@
 #         (JO-7; BR-10..13 are Iruka's 03:23 follow-up findings).
 #   FL-9  the next phase (intake) refuses before the onboard gate commit and starts after it (JO-9).
 #   TP-n  the minimal install seeds the templates the skill points to (JO-6, E21).
-# Open (not built yet, so not tested here): the step 8 commit chain and the planted fake secret (JO-8; FL-8
-# stands in with a narrowed commit), the script-level resume refusal
+#   FL-8  the step 8 commit chain (JO-8): commit_chain, the staged-path check (N15), the planted FAKE secret
+#         (N6), the clean commit plus tag, other dirty work listed and left out (N7).
+# Open (not built yet, so not tested here): the gate_committed range re-scan (N40), the script-level resume refusal
 # (JO-10), N27 (baseline output never committed; needs JO-8), the unattended run, and the tier 2 replay.
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
@@ -101,6 +102,8 @@ sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md
 sh .agents-v0/scripts/check-onboarding-docs.sh --gate
 sh .agents-v0/scripts/sync-feature-state.sh --active-phase onboard --status awaiting_approval docs/agents-v0/onboarding/report.md
 sh .agents-v0/scripts/sync-feature-state.sh --approve onboard docs/agents-v0/onboarding/report.md
+sh .agents-v0/scripts/gate-checks.sh commit_chain
+sh .agents-v0/scripts/gate-checks.sh staged_secret_scan
 EOS
 cat > "$SKL" <<'EOS'
 sh .agents-v0/scripts/audit-brownfield-baseline.sh
@@ -332,11 +335,56 @@ mkdir -p "$T1_TMP/fl9" && printf '# orders\n' > "$T1_TMP/fl9/orders.md"
 fl9_req="docs/agents-v0/requirements/orders.md"
 expect_fail "FL-9 prereq_approved intake refuses before the onboard gate commit" "$r" sh "$GC" prereq_approved intake
 out_has "FL-9 names the uncommitted approval" "the onboard approval in $ST is not committed"
-# Step 8 stand-in until JO-8: a commit narrowed to docs/agents-v0, then the tag; gate_committed must pass
-G "$r" add -- docs/agents-v0 && G "$r" commit -qm "onboarding: onboard approved" && G "$r" tag -a onboard-v1 -m "onboard approved"
-expect_pass "FL-8 gate_committed onboard passes after the gate commit (JO-8 stand-in)" "$r" sh "$GC" gate_committed onboard
+# Step 8 (JO-8): the onboard gate commit chain, printed by the helper and run unchanged
+fl8_head="$(git -C "$r" rev-parse HEAD)"
+expect_pass "FL-8 commit_chain prints the chain" "$r" sh "$GC" commit_chain
+fl8_chain="$(cat "$T1_TMP/out.txt")"
+out_has "FL-8 the chain stages only the onboard paths, lock files excluded" "git add --all -- docs/agents-v0 README.md ':(exclude,glob)**/*.lock' && "
+out_has "FL-8 the chain scans after staging and before the commit" "&& sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && git commit -F .git/agents-v0-onboard-commit-msg.txt && "
+out_has "FL-8 the chain tags the first onboard gate onboard-v1" "git tag -a onboard-v1 -m \"onboard approved\""
+lacks "FL-8 the chain never sweeps with git add -A" "$T1_TMP/out.txt" "add -A"
+lacks "FL-8 the chain never amends" "$T1_TMP/out.txt" "--amend"
+fl8_add() { G "$r" add --all -- docs/agents-v0 README.md ':(exclude,glob)**/*.lock'; }
+# N7: a stray untracked file outside docs/agents-v0 is not staged. N15: a pre-staged file outside the list
+# refuses before the scan, and nothing is unstaged.
+printf 'stray\n' > "$r/src/stray.txt"
+printf 'def one():\n    return 1  # edited\n' > "$r/src/app.py"; G "$r" add -- src/app.py
+fl8_add
+expect_fail "FL-8 N15 staged_secret_scan refuses a pre-staged path outside the onboard paths" "$r" sh "$GC" staged_secret_scan
+out_has "FL-8 N15 the outside path is named" "REFUSED staged_secret_scan: the index holds paths outside gate-rules onboard_commit_paths (docs/agents-v0 README.md) or lock files: src/app.py"
+lacks "FL-8 N15 the refusal comes before the scan" "$T1_TMP/out.txt" "SECRET-SCAN"
+is_eq "FL-8 N15 nothing was unstaged" "$(git -C "$r" diff --cached --name-only -- src/app.py)" "src/app.py"
+G "$r" restore --staged -- src/app.py
+# N6: a planted FAKE secret (AKIA plus 16 capitals with the FAKE marker, made fresh here, not in the
+# allow-list) under docs/agents-v0 blocks the commit; the scanner's output passes through and never shows it
+fl8_key="AKIA$(printf 'FAKE%.0s' 1 2 3 4)"
+printf 'aws_access_key_id = %s\n' "$fl8_key" > "$r/docs/agents-v0/onboarding/fake-note.md"
+fl8_add
+expect_fail "FL-8 N6 staged_secret_scan blocks the planted fake secret" "$r" sh "$GC" staged_secret_scan
+out_has "FL-8 N6 the scanner's hit passes through" "HIT docs/agents-v0/onboarding/fake-note.md:1 content.aws-key-id lineSha256="
+out_has "FL-8 N6 the scanner's verdict passes through" "SECRET-SCAN REFUSED hits=1"
+out_has "FL-8 N6 the helper refuses on the scanner's exit" "REFUSED staged_secret_scan: secret_scan.py exited 1"
+lacks "FL-8 N6 the secret is never printed" "$T1_TMP/out.txt" "$fl8_key"
+is_eq "FL-8 N6 no commit was made" "$(git -C "$r" rev-parse HEAD)" "$fl8_head"
+if [ -f "$r/.agents-v0/secret-allowlist.json" ] && grep -q AKIAFAKE "$r/.agents-v0/secret-allowlist.json"; then
+  fail "FL-8 N6 the fake key is not in the allow-list"; else pass "FL-8 N6 the fake key is not in the allow-list"; fi
+mv "$r/docs/agents-v0/onboarding/fake-note.md" "$T1_TMP/fl8-fake-note.md"
+fl8_add
+# the clean case: the printed chain runs unchanged and makes one commit plus the tag
+expect_pass "FL-8 the printed chain commits the clean onboard gate" "$r" env GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com \
+  GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com sh -c "$fl8_chain"
+out_has "FL-8 the scan is clean" "SECRET-SCAN clean"
+out_has "FL-8 the clean scan passes" "OK staged_secret_scan: the index holds only onboard paths and no secret"
+out_has "FL-8 N7 other dirty files are listed, not swept in" "other uncommitted files, not in this commit: src/app.py src/stray.txt"
+is_eq "FL-8 one new commit on top of the old HEAD (no amend)" "$(git -C "$r" rev-parse HEAD^)" "$fl8_head"
+is_eq "FL-8 the commit message" "$(git -C "$r" log -1 --format=%s)" "onboarding: onboard approved"
+is_eq "FL-8 the tag is on the gate commit" "$(git -C "$r" rev-parse 'onboard-v1^{commit}')" "$(git -C "$r" rev-parse HEAD)"
 outside="$(git -C "$r" show --name-only --format= HEAD | grep -v '^docs/agents-v0/' || :)"
 is_eq "FL-8 the gate commit holds only docs/agents-v0 files" "$outside" ""
+is_eq "FL-8 N7 the stray file stays untracked" "$(git -C "$r" status --porcelain -- src/stray.txt)" "?? src/stray.txt"
+# gate_committed (check-gate-commit.sh, unchanged) still wants a clean tree: park the user's other work
+mv "$r/src/stray.txt" "$T1_TMP/fl8-stray.txt"; G "$r" checkout -q -- src/app.py
+expect_pass "FL-8 gate_committed onboard passes after the gate commit" "$r" sh "$GC" gate_committed onboard
 # Step 9 after the gate commit (JO-9): the next phase starts
 expect_pass "FL-9 prereq_approved intake passes after the onboard gate commit" "$r" sh "$GC" prereq_approved intake
 mkdir -p "$r/docs/agents-v0/requirements" && cp "$T1_TMP/fl9/orders.md" "$r/$fl9_req"
