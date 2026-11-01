@@ -33,8 +33,8 @@ GRANT_REL="agents-v0/reopen-grant"
 LEDGER_TRAILER="Agents-V0-Ledger"
 
 # Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
-WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan"
-CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
+WIRED="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok"
+CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan commit_msg_ok reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
   printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain\n' >&2
@@ -277,15 +277,85 @@ no_restart_without_reopen() {
 # JO-8 (design rev 6 flow step 8, N7A; Sasuke SOC-2/3/9/13): the one commit chain of the onboard gate.
 # onb_paths prints the onboard paths of gate-rules onboard_commit_paths that exist or are tracked (README.md is
 # skipped when it is neither, so the add never fails on it).
+# The rule values are split on spaces with globbing off, and each must be a plain path (letters, digits, . _ - /)
+# so the printed chain needs no quoting (gate-rules is kit-owned; anything else is an error, not a guess).
 onb_paths() {
-  for op_ in $(rule onboard_commit_paths); do
-    if [ -e "$op_" ] || [ -n "$(git ls-files -- "$op_" 2>/dev/null | head -n 1)" ]; then printf '%s\n' "$op_"; fi
+  op_list="$(rule onboard_commit_paths)"
+  set -f
+  for op_ in $op_list; do
+    case "$op_" in *[!A-Za-z0-9._/-]* | -* | /*) set +f; die "gate-rules onboard_commit_paths holds a path that is not plain: $op_" ;; esac
+    if [ -e "$op_" ] || [ -n "$(GIT_LITERAL_PATHSPECS=1 git ls-files -- "$op_" 2>/dev/null | head -n 1)" ]; then printf '%s\n' "$op_"; fi
   done
+  set +f
 }
-# onb_msg_file prints the commit message file in the git dir (the scan reads it; the commit uses it).
+# onb_msg_file prints the commit message file in the git dir (the scan reads it; the commit uses it);
+# onb_rec_file the scan record beside it (the sha256 of that message and the index tree the scan passed).
 onb_msg_file() { git rev-parse --git-path agents-v0-onboard-commit-msg.txt; }
+onb_rec_file() { git rev-parse --git-path agents-v0-onboard-commit-msg.scan; }
+# onb_scan_state: print "msg_sha256=<hash of the message file> tree=<git write-tree of the index> head=<HEAD>"
+# (exit 1 when the message file is missing or the index has no tree, e.g. unmerged entries).
+onb_scan_state() {
+  os_msg="$(onb_msg_file)"
+  [ -f "$os_msg" ] || return 1
+  os_sha="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$os_msg")" || return 1
+  os_tree="$(git write-tree 2>/dev/null)" || return 1
+  os_head="$(git rev-parse -q --verify HEAD 2>/dev/null || echo none)"
+  printf 'msg_sha256=%s tree=%s head=%s\n' "$os_sha" "$os_tree" "$os_head"
+}
+# staged_path_check <allowed paths>: read the index NUL-separated (`git diff --cached --name-only -z
+# --no-renames`) and check each path whole: no word splitting, no glob expansion, no pathspec magic (Iruka
+# probe 8). A path is allowed when it equals an onboard path or sits under one, and is not a *.lock file.
+# Exit 0 all allowed; 1 prints the refused paths (a name with a space, quote, backslash or control character is
+# printed JSON-quoted); 3 nothing is staged; 2 git could not read the index.
+staged_path_check() {
+  python3 - "$1" <<'PYSP'
+import json, subprocess, sys
+allowed = sys.argv[1].split()
+p = subprocess.Popen(["git", "diff", "--cached", "--name-only", "-z", "--no-renames"],
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+out, _ = p.communicate()
+if p.returncode != 0:
+    sys.exit(2)
+paths = [x.decode("utf-8", "surrogateescape") for x in out.split(b"\0") if x]
+if not paths:
+    sys.exit(3)
+def show(x):
+    return x if all(c.isprintable() and c not in ' "\\' for c in x) else json.dumps(x)
+bad = [x for x in paths
+       if x.endswith(".lock") or not any(x == a or x.startswith(a + "/") for a in allowed)]
+if bad:
+    print(" ".join(show(x) for x in bad))
+    sys.exit(1)
+PYSP
+}
+# other_dirty: the uncommitted files outside the index's staged set, read NUL-separated from git status (named
+# the same way as staged_path_check names them).
+other_dirty() {
+  python3 - <<'PYOD'
+import json, subprocess, sys
+p = subprocess.Popen(["git", "status", "--porcelain=v1", "-z", "-uall"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+out, _ = p.communicate()
+if p.returncode != 0:
+    sys.exit(2)
+items = out.split(b"\0")
+names, i = set(), 0
+while i < len(items):
+    e = items[i]; i += 1
+    if len(e) < 4:
+        continue
+    xy, path = e[:2].decode("ascii", "replace"), e[3:].decode("utf-8", "surrogateescape")
+    if xy[0] in "RC":
+        i += 1  # the rename/copy source follows
+    if xy == "??" or xy[1] != " ":
+        names.add(path)
+def show(x):
+    return x if all(c.isprintable() and c not in ' "\\' for c in x) else json.dumps(x)
+print(" ".join(show(x) for x in sorted(names)))
+PYOD
+}
 # commit_chain: print the onboard gate commit chain, in order (narrowed add, staged-path check and secret scan,
-# commit with no pathspec, no -a and never --amend, the next onboard-v<n> tag). It runs nothing.
+# the commit step's re-check of the scan record (commit_msg_ok), commit with no pathspec, no -a and never --amend,
+# the next onboard-v<n> tag). It runs nothing.
 commit_chain() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git work tree"
   to_root
@@ -293,7 +363,7 @@ commit_chain() {
   [ -n "$cc_paths" ] || die "none of gate-rules onboard_commit_paths exists"
   cc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
   cc_n=$(( ${cc_n:-0} + 1 ))
-  printf "git add --all -- %s':(exclude,glob)**/*.lock' && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && git commit -F %s && git tag -a onboard-v%s -m \"onboard approved\"\n" \
+  printf "git add --all -- %s':(exclude,glob)**/*.lock' && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F %s && git tag -a onboard-v%s -m \"onboard approved\"\n" \
     "$cc_paths" "$(onb_msg_file)" "$cc_n"
 }
 # staged_secret_scan: after the narrowed add and before the commit. Refuses when the index holds a path outside
@@ -306,28 +376,46 @@ staged_secret_scan() {
   to_root
   ss_root="$(pwd)"
   ss_allowed="$(rule onboard_commit_paths)"
-  ss_staged="$(git diff --cached --name-only --no-renames)" || refuse staged_secret_scan "git could not read the index"
-  [ -n "$ss_staged" ] || refuse staged_secret_scan "nothing is staged; run the add of the commit chain first (gate-checks.sh commit_chain)"
-  ss_bad=""
-  for ss_p in $ss_staged; do
-    ss_in=0
-    for ss_a in $ss_allowed; do
-      case "$ss_p" in "$ss_a"|"$ss_a"/*) ss_in=1 ;; esac
-    done
-    case "$ss_p" in *.lock) ss_in=0 ;; esac
-    [ "$ss_in" = 1 ] || ss_bad="$ss_bad $ss_p"
-  done
-  [ -z "$ss_bad" ] || refuse staged_secret_scan "the index holds paths outside gate-rules onboard_commit_paths ($ss_allowed) or lock files:$ss_bad. Nothing was unstaged; unstage them yourself (git restore --staged -- <path>) or ask the user"
-  command -v python3 >/dev/null 2>&1 || refuse staged_secret_scan "python3 is missing, so the secret scan cannot run"
+  command -v python3 >/dev/null 2>&1 || refuse staged_secret_scan "python3 is missing, so the staged-path check and the secret scan cannot run"
+  ss_rc=0
+  ss_bad="$(staged_path_check "$ss_allowed")" || ss_rc=$?
+  case "$ss_rc" in
+    0) ;;
+    1) refuse staged_secret_scan "the index holds paths outside gate-rules onboard_commit_paths ($ss_allowed) or lock files: $ss_bad. Nothing was unstaged; unstage them yourself (git restore --staged -- <path>) or ask the user" ;;
+    3) refuse staged_secret_scan "nothing is staged; run the add of the commit chain first (gate-checks.sh commit_chain)" ;;
+    *) refuse staged_secret_scan "git could not read the index" ;;
+  esac
   [ -f .agents-v0/scripts/secret_scan.py ] || refuse staged_secret_scan ".agents-v0/scripts/secret_scan.py is missing; reinstall the kit (install.sh --update)"
   ss_msg="$(onb_msg_file)"
   printf 'onboarding: onboard approved\n' > "$ss_msg" || refuse staged_secret_scan "cannot write the commit message file $ss_msg"
   ss_rc=0
   python3 .agents-v0/scripts/secret_scan.py --staged --root "$ss_root" --message-file "$ss_msg" || ss_rc=$?
   [ "$ss_rc" = 0 ] || refuse staged_secret_scan "secret_scan.py exited $ss_rc (1: a hit, 2: it could not scan); the commit is refused"
-  ss_other="$(git status --porcelain=v1 -uall | sed -n 's/^.[^ ] //p; s/^?? //p' | sort -u | tr '\n' ' ')"
+  ss_state="$(onb_scan_state)" || refuse staged_secret_scan "cannot record the scan (message file or index tree unreadable); the commit is refused"
+  printf '%s\n' "$ss_state" > "$(onb_rec_file)" || refuse staged_secret_scan "cannot write the scan record $(onb_rec_file); the commit is refused"
+  ss_other="$(other_dirty)" || ss_other=""
   [ -z "$ss_other" ] || printf 'other uncommitted files, not in this commit: %s\n' "$ss_other"
   ok staged_secret_scan "the index holds only onboard paths and no secret; commit with: git commit -F $ss_msg"
+}
+# commit_msg_ok: the commit step of the chain, right before `git commit -F` (Jiraiya; Sasuke's gap). Passes only
+# when the scan record staged_secret_scan wrote matches now: the same message file bytes (sha256), the same
+# index tree (git write-tree) and the same HEAD. A message or index changed after the scan, a missing record or a
+# record from an earlier commit is refused; nothing is printed from the message.
+commit_msg_ok() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse commit_msg_ok "not a git work tree"
+  to_root
+  command -v python3 >/dev/null 2>&1 || refuse commit_msg_ok "python3 is missing, so the scan record cannot be checked"
+  cm_rec="$(onb_rec_file)"
+  [ -f "$cm_rec" ] || refuse commit_msg_ok "no scan record ($cm_rec); run the whole chain from gate-checks.sh commit_chain"
+  cm_want="$(cat "$cm_rec")"
+  cm_now="$(onb_scan_state)" || refuse commit_msg_ok "the commit message file $(onb_msg_file) is missing or the index has no tree; run the whole chain again"
+  cm_w_msg="$(printf '%s\n' "$cm_want" | sed -n 's/^msg_sha256=\([0-9a-f]*\) .*/\1/p')"
+  cm_n_msg="$(printf '%s\n' "$cm_now" | sed -n 's/^msg_sha256=\([0-9a-f]*\) .*/\1/p')"
+  [ -n "$cm_w_msg" ] && [ "$cm_w_msg" = "$cm_n_msg" ] || refuse commit_msg_ok "the commit message file changed after staged_secret_scan; run the whole chain again (it rescans)"
+  cm_w_rest="${cm_want#* }"; cm_n_rest="${cm_now#* }"
+  [ "${cm_w_rest%% *}" = "${cm_n_rest%% *}" ] || refuse commit_msg_ok "the index changed after staged_secret_scan; run the whole chain again (it rescans)"
+  [ "$cm_want" = "$cm_now" ] || refuse commit_msg_ok "HEAD moved after staged_secret_scan (the record is from an earlier commit); run the whole chain again"
+  ok commit_msg_ok "the commit message and the index are the ones staged_secret_scan passed"
 }
 # 4A, N5A, 1A (1A-gap B): the grant parses, names <phase>, is newer than the last gate of <phase>, is at most
 # grant_max_age_seconds old, is unused (no GRANT-USED line, not in git history) and the run is attended.
@@ -376,7 +464,7 @@ case "$cmd" in
     [ "$#" = 1 ] || usage
     load_rules > /dev/null
     "$cmd" "$1" ;;
-  no_restart_without_reopen|staged_secret_scan|greenfield_record_ok|ledger_ok)
+  no_restart_without_reopen|staged_secret_scan|commit_msg_ok|greenfield_record_ok|ledger_ok)
     [ "$#" = 0 ] || usage
     load_rules > /dev/null
     "$cmd" ;;

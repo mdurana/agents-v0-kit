@@ -5,7 +5,8 @@
 # harness). Each helper check has a pass case and a refusal case with its exact message.
 # Test ids: jiraiya-onboard-test-cases-20261101.md (N1, N2, N3, N4, E7, E22, H1/H2 partial) plus AE-n / GC-n
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
-# NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9).
+# NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
+# Iruka probe 8).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -341,6 +342,43 @@ expect_fail "NR-9 sync refuses an onboard state change when gate-checks.sh is mi
 out_has "NR-9 names the missing helper" "FAIL: an onboard state change needs .agents-v0/scripts/gate-checks.sh (no_restart_without_reopen); reinstall the kit"
 mv "$T1_TMP/nr/gate-checks.sh" "$nr/$GC"
 
+# ===== JO-8 follow-up: staged path names (Iruka probe 8) ==========================================================
+# The staged list is read NUL-separated: no word splitting, no glob expansion, no pathspec magic.
+ss="$(onb_repo ss)"
+# lit_add <repo> <path>: stage one path literally (no pathspec magic or globbing)
+lit_add() ( GIT_LITERAL_PATHSPECS=1; export GIT_LITERAL_PATHSPECS; G "$1" add -- "$2" )
+ss_nl="$(printf 'nl\nname')"
+mkdir -p "$ss/docs/agents-v0/onboarding/modules"
+printf '# my mod\n' > "$ss/docs/agents-v0/onboarding/modules/my mod.md"; lit_add "$ss" "docs/agents-v0/onboarding/modules/my mod.md"
+expect_pass "SS-1 Iruka Q1 an onboard doc with a space in its name passes the path check" "$ss" sh "$GC" staged_secret_scan
+lacks "SS-1 the name is not split" "$T1_TMP/out.txt" "lock files: mod.md"
+q "$ss" G . reset -q
+printf 'x\n' > "$ss/docs/agents-v0/zz.md"; lit_add "$ss" docs/agents-v0/zz.md
+mkdir -p "$ss/[d]ocs/agents-v0" && printf 'outside\n' > "$ss/[d]ocs/agents-v0/zz.md"; lit_add "$ss" "[d]ocs/agents-v0/zz.md"
+expect_fail "SS-2 Iruka Q2 an outside path named like a glob of an onboard path is refused" "$ss" sh "$GC" staged_secret_scan
+out_has "SS-2 names the outside path" "or lock files: [d]ocs/agents-v0/zz.md. Nothing was unstaged"
+lacks "SS-2 the refusal comes before the scan" "$T1_TMP/out.txt" "SECRET-SCAN"
+q "$ss" G . reset -q
+printf '# nl\n' > "$ss/docs/agents-v0/onboarding/$ss_nl.md"; lit_add "$ss" "docs/agents-v0/onboarding/$ss_nl.md"
+is_eq "SS-3 setup: git stages a name with a newline" "$(git -C "$ss" diff --cached --name-only -z | tr '\0\n' '|~')" "docs/agents-v0/onboarding/nl~name.md|"
+expect_pass "SS-3 an onboard doc with a newline in its name passes the path check" "$ss" sh "$GC" staged_secret_scan
+q "$ss" G . reset -q
+mkdir -p "$ss/src/$ss_nl" && printf 'outside\n' > "$ss/src/$ss_nl/x.md"; lit_add "$ss" "src/$ss_nl/x.md"
+expect_fail "SS-4 an outside path with a newline in its name is refused" "$ss" sh "$GC" staged_secret_scan
+out_has "SS-4 names the whole path, quoted" 'or lock files: "src/nl\nname/x.md". Nothing was unstaged'
+q "$ss" G . reset -q
+mkdir -p "$ss/:(top)docs/agents-v0" && printf 'outside\n' > "$ss/:(top)docs/agents-v0/m.md"; lit_add "$ss" ":(top)docs/agents-v0/m.md"
+expect_fail "SS-5 an outside path that looks like pathspec magic is refused" "$ss" sh "$GC" staged_secret_scan
+out_has "SS-5 names it" "or lock files: :(top)docs/agents-v0/m.md. Nothing was unstaged"
+q "$ss" G . reset -q
+printf 'in\n' > "$ss/docs/agents-v0/:(exclude)m.md"; lit_add "$ss" "docs/agents-v0/:(exclude)m.md"
+expect_pass "SS-6 an onboard doc whose name looks like pathspec magic passes the path check" "$ss" sh "$GC" staged_secret_scan
+q "$ss" G . reset -q
+printf 'lock\n' > "$ss/docs/agents-v0/my deps.lock"; ( GIT_LITERAL_PATHSPECS=1; export GIT_LITERAL_PATHSPECS; G "$ss" add -f -- "docs/agents-v0/my deps.lock" )
+expect_fail "SS-7 a lock file with a space in its name is refused" "$ss" sh "$GC" staged_secret_scan
+out_has "SS-7 names it, quoted" 'or lock files: "docs/agents-v0/my deps.lock". Nothing was unstaged'
+q "$ss" G . reset -q
+
 # list reports the two wired checks
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
@@ -348,6 +386,7 @@ out_has "list: gate_committed is wired" "gate_committed wired"
 out_has "list: prereq_approved is wired" "prereq_approved wired"
 out_has "list: staged_secret_scan is wired" "staged_secret_scan wired"
 out_has "list: no_restart_without_reopen is wired" "no_restart_without_reopen wired"
+out_has "list: commit_msg_ok is wired" "commit_msg_ok wired"
 
 # ===== JO-3/JO-4 check-onboarding-docs.sh --gate ===============================================================
 # Design rev 6 lines 23, 63, 86, 110, 119, 127, 516; review jiraiya-review-of-onboard-flow-20261101.md:155-156.

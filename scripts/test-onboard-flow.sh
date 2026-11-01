@@ -17,7 +17,8 @@
 #   FL-9  the next phase (intake) refuses before the onboard gate commit and starts after it (JO-9).
 #   TP-n  the minimal install seeds the templates the skill points to (JO-6, E21).
 #   FL-8  the step 8 commit chain (JO-8): commit_chain, the staged-path check (N15), the planted FAKE secret
-#         (N6), the clean commit plus tag, other dirty work listed and left out (N7).
+#         (N6), the clean commit plus tag, other dirty work listed and left out (N7), and the commit step's
+#         re-check of the scan record (CM: rewritten message, missing record, changed index; Jiraiya/Sasuke).
 #   FL-10 the resume refusal (JO-10): resume while in_progress (E9), restart / blocked / clear-active / plain
 #         sync / --reopen while awaiting_approval (N8 N28 N29 N19), restart after the approval, and a moved or
 #         corrupt state after the gate commit (N30).
@@ -107,6 +108,7 @@ sh .agents-v0/scripts/sync-feature-state.sh --active-phase onboard --status awai
 sh .agents-v0/scripts/sync-feature-state.sh --approve onboard docs/agents-v0/onboarding/report.md
 sh .agents-v0/scripts/gate-checks.sh commit_chain
 sh .agents-v0/scripts/gate-checks.sh staged_secret_scan
+sh .agents-v0/scripts/gate-checks.sh commit_msg_ok
 EOS
 cat > "$SKL" <<'EOS'
 sh .agents-v0/scripts/audit-brownfield-baseline.sh
@@ -356,7 +358,11 @@ fl8_head="$(git -C "$r" rev-parse HEAD)"
 expect_pass "FL-8 commit_chain prints the chain" "$r" sh "$GC" commit_chain
 fl8_chain="$(cat "$T1_TMP/out.txt")"
 out_has "FL-8 the chain stages only the onboard paths, lock files excluded" "git add --all -- docs/agents-v0 README.md ':(exclude,glob)**/*.lock' && "
-out_has "FL-8 the chain scans after staging and before the commit" "&& sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && git commit -F .git/agents-v0-onboard-commit-msg.txt && "
+out_has "FL-8 the chain scans after staging, re-checks the scan record, then commits" "&& sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F .git/agents-v0-onboard-commit-msg.txt && "
+# the commit step of the printed chain: from the commit_msg_ok re-check up to (not including) the tag
+fl8_step="$(sed -n 's/.*&& \(sh \.agents-v0\/scripts\/gate-checks\.sh commit_msg_ok && git commit -F [^ ]*\) && git tag .*/\1/p' "$T1_TMP/out.txt")"
+case "$fl8_step" in "sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F "*) pass "FL-8 CM the commit step re-checks before git commit -F" ;;
+  *) fail "FL-8 CM the commit step re-checks before git commit -F (got '$fl8_step')"; fl8_step="false" ;; esac
 out_has "FL-8 the chain tags the first onboard gate onboard-v1" "git tag -a onboard-v1 -m \"onboard approved\""
 lacks "FL-8 the chain never sweeps with git add -A" "$T1_TMP/out.txt" "add -A"
 lacks "FL-8 the chain never amends" "$T1_TMP/out.txt" "--amend"
@@ -386,11 +392,35 @@ if [ -f "$r/.agents-v0/secret-allowlist.json" ] && grep -q AKIAFAKE "$r/.agents-
   fail "FL-8 N6 the fake key is not in the allow-list"; else pass "FL-8 N6 the fake key is not in the allow-list"; fi
 mv "$r/docs/agents-v0/onboarding/fake-note.md" "$T1_TMP/fl8-fake-note.md"
 fl8_add
+# CM (Jiraiya, Sasuke's gap): the commit step re-checks the scan record. A message rewritten after a clean scan,
+# a missing record and an index changed after the scan are all refused, and no commit is made.
+fl8_cm() { env GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com sh -c "$fl8_step"; }
+fl8_msg="$(git -C "$r" rev-parse --absolute-git-dir)/agents-v0-onboard-commit-msg.txt"
+fl8_rec="$(git -C "$r" rev-parse --absolute-git-dir)/agents-v0-onboard-commit-msg.scan"
+expect_pass "FL-8 CM setup: a clean scan" "$r" sh "$GC" staged_secret_scan
+printf 'aws_access_key_id = %s\n' "$fl8_key" >> "$fl8_msg"
+expect_fail "FL-8 CM a message rewritten after the scan is refused at the commit step" "$r" fl8_cm
+out_has "FL-8 CM names the changed message" "REFUSED commit_msg_ok: the commit message file changed after staged_secret_scan"
+lacks "FL-8 CM the rewritten secret is never printed" "$T1_TMP/out.txt" "$fl8_key"
+is_eq "FL-8 CM no commit was made (rewritten message)" "$(git -C "$r" rev-parse HEAD)" "$fl8_head"
+expect_pass "FL-8 CM setup: scan again" "$r" sh "$GC" staged_secret_scan
+mkdir -p "$T1_TMP/fl8cm" && mv "$fl8_rec" "$T1_TMP/fl8cm/scan-record"
+expect_fail "FL-8 CM a missing scan record is refused at the commit step" "$r" fl8_cm
+out_has "FL-8 CM names the missing record" "REFUSED commit_msg_ok: no scan record"
+is_eq "FL-8 CM no commit was made (missing record)" "$(git -C "$r" rev-parse HEAD)" "$fl8_head"
+expect_pass "FL-8 CM setup: scan once more" "$r" sh "$GC" staged_secret_scan
+printf 'aws_access_key_id = %s\n' "$fl8_key" > "$r/docs/agents-v0/onboarding/late-note.md"; G "$r" add -- docs/agents-v0/onboarding/late-note.md
+expect_fail "FL-8 CM an index changed after the scan is refused at the commit step" "$r" fl8_cm
+out_has "FL-8 CM names the changed index" "REFUSED commit_msg_ok: the index changed after staged_secret_scan"
+is_eq "FL-8 CM no commit was made (changed index)" "$(git -C "$r" rev-parse HEAD)" "$fl8_head"
+G "$r" restore --staged -- docs/agents-v0/onboarding/late-note.md; mv "$r/docs/agents-v0/onboarding/late-note.md" "$T1_TMP/fl8cm/late-note.md"
+fl8_add
 # the clean case: the printed chain runs unchanged and makes one commit plus the tag
 expect_pass "FL-8 the printed chain commits the clean onboard gate" "$r" env GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com \
   GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com sh -c "$fl8_chain"
 out_has "FL-8 the scan is clean" "SECRET-SCAN clean"
 out_has "FL-8 the clean scan passes" "OK staged_secret_scan: the index holds only onboard paths and no secret"
+out_has "FL-8 CM the commit step's re-check passes on the normal path" "OK commit_msg_ok: the commit message and the index are the ones staged_secret_scan passed"
 out_has "FL-8 N7 other dirty files are listed, not swept in" "other uncommitted files, not in this commit: src/app.py src/stray.txt"
 is_eq "FL-8 one new commit on top of the old HEAD (no amend)" "$(git -C "$r" rev-parse HEAD^)" "$fl8_head"
 is_eq "FL-8 the commit message" "$(git -C "$r" log -1 --format=%s)" "onboarding: onboard approved"
