@@ -741,15 +741,45 @@ turn-$k: gate commits out of order: $(tr '\n' ';' < "$RUN/gate-chain-order-$k.tx
 #   shell variables (the files in $RUN are evidence only). After the turn ledger_turn_ok runs from that copy, never
 #   the workspace one; a missing copy or a changed hash stops the run. H10 (kit_integrity_check) also stops the run
 #   (ledger_stop, TURN_CLASS=LEDGER) when any installed .agents-v0/scripts/gate-checks.sh changed, appeared or vanished.
+#   Pinned python3 (lead follow-up on 1b213d17): gate-checks.sh runs `python3` from PATH, and the agent (same OS user)
+#   can drop one in ~/.local/bin or another PATH dir it writes. At the first mark of the harness process, python3 is
+#   resolved (command -v, then realpath/readlink -f, so a venv symlink pins the real file) and refused when it lies in
+#   WS, MAIN, TEST_ROOT or ~/.local/bin, or cannot be resolved; its path and sha256 stay in shell variables (and the
+#   mark file). Every ledger_mark and ledger_turn_ok then runs with /bin/sh, a fresh harness dir holding only a
+#   python3 symlink to the pinned file first on PATH, no PATH entry inside HOME, TEST_ROOT, WS or MAIN, and
+#   PYTHONNOUSERSITE=1 (no user-site .pth); the pinned file is re-hashed before each, and a change stops the run.
 #   H10 (kit_integrity_check) reports a gate-checks.sh changed during the turn.
 ledger_gc_dir(){ local d; for d in "$WS" "$MAIN"; do
     [ -n "$d" ] && [ -f "$d/.agents-v0/scripts/gate-checks.sh" ] && grep -q '^  ledger_mark)' "$d/.agents-v0/scripts/gate-checks.sh" 2>/dev/null \
       && { printf '%s\n' "$d"; return 0; }; done; return 1; }
 ledger_stop(){ printf 'turn-%s %s\n' "$1" "$2" >> "$RUN/LEDGER-CHANGED"; TURN_CLASS=LEDGER
   post FINDING "N84 run=${RUN##*/} turn=$1: the gate ledger or its checker changed during the unattended turn, the run stops for a person (see ${RUN##*/}/LEDGER-CHANGED)"; }
-_LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA=""
-# ledger_turn_mark <k>: snapshots gate-checks.sh, takes the mark with the snapshot, writes "<dir>\t<mark>\t<sha256>"
-#   to $RUN/ledger-mark-<k>; returns 1 (run stops) when the snapshot or the mark fails.
+_LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA="" _LG_PY="" _LG_PYSHA=""
+_lg_real(){ realpath "$1" 2>/dev/null || readlink -f "$1" 2>/dev/null; }
+_lg_inside(){ local p="$1" d; for d in "$WS" "$MAIN" "$TEST_ROOT" "$HOME/.local/bin"; do
+    [ -n "$d" ] || continue; d="$(_lg_real "$d" || printf '%s' "$d")"; case "$p/" in "$d"/*) printf '%s\n' "$d"; return 0;; esac; done; return 1; }
+# _lg_path: the harness PATH without relative entries or entries inside HOME, TEST_ROOT, WS or MAIN
+_lg_path(){ local e out="" IFS=:; for e in $PATH; do case "$e" in /*) ;; *) continue;; esac
+    case "$e/" in "$HOME"/*|"${TEST_ROOT:-/nonexistent}"/*|"${WS:-/nonexistent}"/*|"${MAIN:-/nonexistent}"/*) continue;; esac
+    out="$out${out:+:}$e"; done; printf '%s\n' "${out:-/usr/bin:/bin}"; }
+_lg_hash(){ ( PATH="$(_lg_path)"; [ -f "$1" ] && sha256_cmd "$1" | cut -c1-64 ); }
+# _lg_pin <k>: pins python3 once per harness process, re-hashes it on every call; 1 (and ledger_stop) on a refusal
+_lg_pin(){ local k="$1" c r h w
+  if [ -z "$_LG_PY" ]; then
+    c="$(command -v python3 2>/dev/null)"; r="$( [ -n "$c" ] && _lg_real "$c")"
+    [ -n "$r" ] && [ -f "$r" ] || { ledger_stop "$k" "python3 cannot be resolved to a file (command -v: ${c:-none}), so the ledger cannot be checked with a pinned interpreter"; return 1; }
+    w="$(_lg_inside "$r")" && { ledger_stop "$k" "python3 resolves to $r, inside $w, which the agent can write; the ledger is not checked with it"; return 1; }
+    h="$(_lg_hash "$r")"; [ -n "$h" ] || { ledger_stop "$k" "python3 at $r cannot be hashed"; return 1; }
+    _LG_PY="$r" _LG_PYSHA="$h"; fi
+  h="$(_lg_hash "$_LG_PY")"
+  [ -n "$h" ] && [ "$h" = "$_LG_PYSHA" ] || { ledger_stop "$k" "the pinned python3 $_LG_PY is missing or changed (sha256 ${h:-absent}, pinned $_LG_PYSHA)"; return 1; }; }
+# _lg_gc <dir> <snapshot gate-checks.sh> <args>: runs the snapshot in <dir> with the pinned python3 (see above)
+_lg_gc(){ local d="$1" gc="$2" b; shift 2
+  b="$(dirname "$gc")/py.$$.$RANDOM"; mkdir "$b" && ln -s "$_LG_PY" "$b/python3" && [ "$(readlink "$b/python3")" = "$_LG_PY" ] \
+    || { echo "cannot set up the pinned python3 in $b"; return 2; }
+  ( cd "$d" && unset PYTHONPATH PYTHONHOME PYTHONSTARTUP && PATH="$b:$(_lg_path)" PYTHONNOUSERSITE=1 /bin/sh "$gc" "$@" ) 2>&1; }
+# ledger_turn_mark <k>: snapshots gate-checks.sh, takes the mark with the snapshot and the pinned python3, writes
+#   "<dir>\t<mark>\t<gate-checks sha256>\t<python3>\t<python3 sha256>" to $RUN/ledger-mark-<k>; returns 1 (run stops) when the snapshot or the mark fails.
 ledger_turn_mark(){ local k="$1" d out rc=0 snap="$RUN/ledger-gc/turn-$1"
   _LG_K="" _LG_DIR="" _LG_MARK="" _LG_GC="" _LG_SHA=""
   d="$(ledger_gc_dir)" || { echo "no gate-checks.sh with ledger_mark in the workspace: no N3A ledger to compare" > "$RUN/ledger-mark-$k.na"; return 0; }
@@ -757,10 +787,11 @@ ledger_turn_mark(){ local k="$1" d out rc=0 snap="$RUN/ledger-gc/turn-$1"
     && { [ ! -f "$d/.agents-v0/scripts/gate-rules" ] || cp "$d/.agents-v0/scripts/gate-rules" "$snap/gate-rules"; } \
     && _LG_SHA="$(sha256_cmd "$snap/gate-checks.sh" | cut -c1-64)" && [ -n "$_LG_SHA" ] \
     || { ledger_stop "$k" "the gate-checks.sh snapshot before the turn failed ($d -> $snap)"; return 1; }
-  out="$(cd "$d" && sh "$snap/gate-checks.sh" ledger_mark 2>&1)" || rc=$?
+  _lg_pin "$k" || return 1
+  out="$(_lg_gc "$d" "$snap/gate-checks.sh" ledger_mark)" || rc=$?
   if [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -Eqx 'absent|lines=(0|[1-9][0-9]*) sha256=[0-9a-f]{64}'; then
     _LG_K="$k" _LG_DIR="$d" _LG_MARK="$out" _LG_GC="$snap/gate-checks.sh"
-    printf '%s\t%s\t%s\n' "$d" "$out" "$_LG_SHA" > "$RUN/ledger-mark-$k"; return 0; fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$d" "$out" "$_LG_SHA" "$_LG_PY" "$_LG_PYSHA" > "$RUN/ledger-mark-$k"; return 0; fi
   ledger_stop "$k" "ledger_mark before the turn failed (rc=$rc): $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }
 # ledger_turn_check <k>: after turn k, ledger_turn_ok from the snapshot against the mark; returns 1 (run stops) on
 #   anything but OK, on a missing or changed snapshot, or when the mark was recorded but its variables are gone.
@@ -772,7 +803,8 @@ ledger_turn_check(){ local k="$1" d mark out rc=0 now
   now="$( [ -f "$_LG_GC" ] && sha256_cmd "$_LG_GC" | cut -c1-64)"
   [ -n "$now" ] && [ "$now" = "$_LG_SHA" ] \
     || { ledger_stop "$k" "the gate-checks.sh snapshot $_LG_GC is missing or changed during the turn (sha256 ${now:-absent}, was $_LG_SHA)"; return 1; }
-  out="$(cd "$d" && sh "$_LG_GC" ledger_turn_ok "$mark" 0 0 2>&1)" || rc=$?
+  _lg_pin "$k" || return 1
+  out="$(_lg_gc "$d" "$_LG_GC" ledger_turn_ok "$mark" 0 0)" || rc=$?
   printf '%s\n' "$out" > "$RUN/ledger-turn-$k.txt"
   [ "$rc" != 0 ] || return 0
   ledger_stop "$k" "ledger_turn_ok rc=$rc: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }

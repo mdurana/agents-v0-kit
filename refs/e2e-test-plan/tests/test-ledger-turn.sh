@@ -19,6 +19,10 @@
 #   LT-10 the checker itself (Jiraiya must-fix on c0e4492f): GRANT-USED appended AND the workspace gate-checks.sh
 #         rewritten so ledger_turn_ok exits 0 -> drive_run stops (RUN_END=LEDGER, one turn); gate-checks.sh edited
 #         with no ledger change -> LEDGER via H10; the harness's own snapshot changed -> LEDGER
+#   LT-11 the python3 gate-checks.sh runs (lead follow-up on 1b213d17): the agent drops a fake python3 (exit 0) in
+#         ~/.local/bin, which the harness PATH holds (as Ubuntu's ~/.profile adds it), and appends GRANT-USED ->
+#         RUN_END=LEDGER; a python3 resolving inside the workspace -> refused before the turn; the pinned python3
+#         changed during the turn -> LEDGER
 # Usage: bash tests/test-ledger-turn.sh   (exit 0 when every case passes). Removes only its own mktemp folder;
 #   inside it, files it replaces are moved to $TEST_ROOT/trash.
 set -u
@@ -59,6 +63,9 @@ case "$msg" in
         printf '#!/bin/sh\necho "OK ledger_turn_ok: faked"; exit 0\n' > "$ws/.agents-v0/scripts/gate-checks.sh" ;;
   gcedit) printf '# edited\n' >> "$ws/.agents-v0/scripts/gate-checks.sh" ;;
   snapedit) printf '# edited\n' >> "$run/ledger-gc/turn-$k/gate-checks.sh" ;;
+  fakepy) mkdir -p "$HOME/.local/bin" "$(dirname "$L")"; printf '#!/bin/sh\nexit 0\n' > "$HOME/.local/bin/python3"
+          chmod +x "$HOME/.local/bin/python3"; printf 'GRANT-USED %064d count=0\n' 0 >> "$L" ;;
+  pyswap:*) printf '# swapped\n' >> "${msg#pyswap:}" ;;
   scan) (cd "$ws" && mkdir -p docs/agents-v0 && echo "lt $k" > docs/agents-v0/lt-scan.md && git add -- docs/agents-v0/lt-scan.md \
           && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan; git restore --staged -- docs/agents-v0/lt-scan.md) > "$run/scan-$k.txt" 2>&1 ;;
 esac
@@ -74,7 +81,7 @@ islg(){ [ "$TURN_CLASS" = LEDGER ] && [ -s "$RUN/LEDGER-CHANGED" ]; }
 
 echo "-- LT-1 unchanged ledger"
 newrun; setledger; turn 1 noop
-[ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -q "^$MAIN	absent	[0-9a-f]\{64\}$" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
+[ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -q "^$MAIN	absent	[0-9a-f]\{64\}	/[^	]*	[0-9a-f]\{64\}$" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
   && ok "no ledger before or after -> mark absent, ledger_turn_ok OK, class $TURN_CLASS" || ko "absent/noop: class=$TURN_CLASS mark=$(cat "$RUN/ledger-mark-1" 2>&1) turn=$(cat "$RUN/ledger-turn-1.txt" 2>&1)"
 newrun; setledger "FAIL docs check 1" "FAIL docs check 2"; turn 1 noop
 [ "$TURN_CLASS" != LEDGER ] && [ ! -e "$RUN/LEDGER-CHANGED" ] && grep -q "	lines=2 sha256=" "$RUN/ledger-mark-1" 2>/dev/null && grep -q '^OK ledger_turn_ok' "$RUN/ledger-turn-1.txt" 2>/dev/null \
@@ -151,6 +158,25 @@ islg && grep -q 'H10: the installed gate-checks.sh changed' "$RUN/LEDGER-CHANGED
 fixgc
 newrun; setledger "FAIL docs check 1"; turn 1 snapedit
 islg && grep -q 'snapshot .* is missing or changed' "$RUN/LEDGER-CHANGED" && ok "the harness's snapshot changed -> LEDGER" || ko "snapedit: class=$TURN_CLASS $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+
+echo "-- LT-11 the python3 the ledger checks run"
+REALPY="$(readlink -f "$(command -v python3)")"; SAVE_PATH="$PATH" SAVE_HOME="$HOME"
+pywrap(){ mkdir -p "$1"; printf '#!/bin/sh\nexec %s "$@"\n' "$REALPY" > "$1/python3"; chmod +x "$1/python3"; }
+HOME="$SB/home"; mkdir -p "$HOME/.local/bin"; PATH="$HOME/.local/bin:$SAVE_PATH"
+away "$TEST_ROOT/HALT"; setledger "FAIL docs check 1"
+drive_run lt11 "$MAIN" "fakepy" onboard "onboard" 600 > /dev/null 2>&1
+[ "${RUN_END:-}" = LEDGER ] && [ "$(wc -l < "$RUN/turns.tsv")" = 1 ] && grep -q 'GRANT-USED line appended' "$RUN/LEDGER-CHANGED" \
+  && ok "fake ~/.local/bin/python3 + GRANT-USED -> the pinned python3 catches it, RUN_END=LEDGER, one turn" || ko "fakepy: RUN_END=${RUN_END:-} $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+away "$HOME/.local/bin/python3"; HOME="$SAVE_HOME"; away "$TEST_ROOT/HALT"
+_LG_PY=""; pywrap "$MAIN/.lt-bin"; PATH="$MAIN/.lt-bin:$SAVE_PATH"
+newrun; setledger; turn 1 noop
+islg && [ ! -e "$RUN/stub-ran-1" ] && grep -q "python3 resolves to $MAIN/.lt-bin/python3, inside" "$RUN/LEDGER-CHANGED" \
+  && ok "python3 inside the workspace -> refused before the turn" || ko "pyinside: class=$TURN_CLASS ran=$([ -e "$RUN/stub-ran-1" ] && echo yes) $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+_LG_PY=""; pywrap "$SB/pybin"; PATH="$SB/pybin:$SAVE_PATH"
+newrun; setledger; turn 1 "pyswap:$SB/pybin/python3"
+islg && grep -q "the pinned python3 $SB/pybin/python3 is missing or changed" "$RUN/LEDGER-CHANGED" && ok "the pinned python3 changed during the turn -> LEDGER" \
+  || ko "pyswap: class=$TURN_CLASS $(cat "$RUN/LEDGER-CHANGED" 2>&1)"
+PATH="$SAVE_PATH"; _LG_PY=""
 
 echo "== test-ledger-turn: $PASS passed, $FAILN failed"
 [ "$FAILN" = 0 ]
