@@ -1261,6 +1261,35 @@ N3A_SWAP_ALLOW = [
     "cp -r /tmp/d src/agents-v0", "mv /tmp/d notes/agents-v0", "rsync -a .git/agents-v0/ /tmp/backup/",
     "ls -la .git/agents-v0", "cp /tmp/f .git/info/exclude",
 ]
+N3B_BLOCK = [
+    "find .git/agents-v0 -delete",
+    "find .git -name gate-ledger -delete",
+    "find .GIT/Agents-V0 -type f -exec rm {} +",
+    "find .git/worktrees/wt1/agents-v0 -execdir rm -f {} \\;",
+    "find .git/agents-v0 -ok mv {} /tmp/x \\;",
+    "find .git -path '*agents-v0*' -exec sh -c 'truncate -s0 \"$1\"' _ {} \\;",
+    "find . -iname REOPEN-GRANT -exec shred -u {} +",
+    "( find .git/agents-v0 -exec unlink {} \\; )",
+    "if true; then find .git -name gate-ledger -exec bash -c 'rm \"$@\"' _ {} +; fi",
+    "x=$(find .git/agents-v0 -delete)",
+    "cp -l .git/agents-v0/gate-ledger ./l && echo forged >> ./l",
+    "cp --link .git/agents-v0/reopen-grant x",
+    "cp -al .GIT/agents-v0 ./snap",
+    "f=.git/agents-v0/gate-ledger; cp -la \"$f\" l",
+    "rsync -a --link-dest=\"$PWD/.git/agents-v0\" /tmp/s/ ./d/",
+    "python3 -c \"import os; os.link('.git/agents-v0/gate-ledger', 'l')\"",
+    "perl -e \"link('.git/agents-v0/reopen-grant', 'l')\"",
+    "git init --separate-git-dir=/tmp/g",
+    "git -C . -c x=y init --separate-git-dir /tmp/g .",
+    "env A=1 command git init --SEPARATE-GIT-DIR=/tmp/g",
+    "{ sh -c 'git init --separate-git-dir /tmp/g'; }",
+    "find docs/agents-v0 -name state.json -exec rm {} +",
+]
+N3B_KEEP = [
+    ("find .git/agents-v0 -type f -print -exec cat {} +", "allow"),
+    ("find build -name '*.o' -delete", "ask"),
+    ("git init", "allow"),
+]
 N3A_ALLOW = [
     "cat {L}", "cat {R}", "grep FAIL {L}", "wc -l {L}", "sha256sum {L}", "head -n 5 {L}", "tail -n 1 {L}",
     "git log -1", "git log --format=%B -1", "cp {L} /tmp/ledger-copy", "cat {L} > /tmp/x", "tail -n1 {L} | tee /tmp/x",
@@ -1343,6 +1372,15 @@ def n3a_cases(hp, tmp: str) -> list:
         out.append(("edit tool", p_, inproc_path(hp, p_, active), "block"))
     out.append(("edit tool, no docs/agents-v0 (unchanged)", N3A_L, inproc_path(hp, N3A_L, plain), "allow"))
     out.append(("edit tool, not the ledger", ".git/agents-v0/notes.txt", inproc_path(hp, ".git/agents-v0/notes.txt", active), "allow"))
+    # N3B (Kakashi 2026-11-02 07:17, Jiraiya 07:18, Kakashi 07:18): find that deletes or replaces, hard links whose
+    #   source is the ledger, and git init --separate-git-dir; denied whenever docs/agents-v0 exists.
+    for c in N3B_BLOCK:
+        add("N3B deny", c, active, "block")
+    for c in (N3B_BLOCK[0], N3B_BLOCK[17]):
+        add("N3B deny, onboarding approved", c, done, "block")
+    for c, want in N3B_KEEP:
+        add("N3B unchanged", c, active, want)
+    add("N3B no docs/agents-v0 (unchanged)", N3B_BLOCK[17], plain, "allow")
     return out
 
 

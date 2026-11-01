@@ -236,6 +236,10 @@ judge cursor-shell block "N3A: folder swap, mv onto it" "mv /tmp/d .git/agents-v
 judge cursor-shell block "N3A: folder swap, ln -s onto it" "ln -sfn /tmp/d .git/agents-v0"
 judge cursor-shell block "N3A: folder swap, cp -r onto it" "cp -r /tmp/d .git/agents-v0"
 judge cursor-shell block "N3A: folder swap, worktrees form" "mv /tmp/d .git/worktrees/wt1/agents-v0"
+# N3B (Kakashi, Jiraiya 2026-11-02): find that deletes, a hard link then an append, git init --separate-git-dir.
+judge cursor-shell block "N3B: find -exec rm on the ledger folder" "find .git/agents-v0 -exec rm {} +"
+judge cursor-shell block "N3B: hard link, then append" "cp -l $L ./l && echo forged >> ./l"
+judge cursor-shell block "N3B: git init --separate-git-dir" "git init --separate-git-dir=/tmp/g"
 
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2

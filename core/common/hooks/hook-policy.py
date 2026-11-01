@@ -746,6 +746,159 @@ def _ledger_related(t: str) -> bool:
         not _STATE_MENTION_OLD_RE.search(_CMD_TEXT[0]))
 
 
+# N3B (Sasuke; Kakashi's asks 2026-11-02 07:17 and 07:18, Jiraiya's 07:18): while docs/agents-v0 exists (mid-onboarding
+#   and after approval) three more ways to replace the ledger are denied, not asked:
+#   - find that deletes or replaces: -delete, -exec/-execdir/-ok/-okdir running rm, mv, shred, unlink, truncate (and
+#     cp, install, ln, link, tee, dd, sed, rsync, a script interpreter, or sh/bash -c with one of those or a
+#     redirect), and -fprint/-fprintf/-fls onto a protected file, when a start path is the agents-v0 folder or inside
+#     it, or starts above it (.git, the project, `/`) and the expression can reach the ledger or a state file (no
+#     -name/-path/-regex filter, a negation, or a filter that matches one; case-blind). The state files get the same
+#     rule (find -delete on them only asked before, and find -exec rm on them was allowed). Read-only finds stay allowed.
+#   - hard links whose source is the ledger, the grant, a folder holding them or a state file (cp -l/--link and short
+#     clusters like -al, cp -s, rsync --link-dest, python/perl os.link/link( one-liners); ln/link were already denied.
+#   - git init --separate-git-dir (any spelling git accepts) in a project with docs/agents-v0: it moves .git and the
+#     ledger out of reach and leaves a fresh one.
+_FIND_KILL_PROGS = frozenset({"rm", "mv", "shred", "unlink", "truncate", "cp", "install", "ln", "link", "tee", "dd",
+                              "sed", "rsync"})
+_FIND_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "mksh"})
+_FIND_SHELL_KILL_RE = re.compile(r"\b(?:rm|mv|shred|unlink|truncate|cp|install|ln|link|tee|dd|sed|rsync|perl|python3?"
+                                 r"|ruby|node)\b|>", re.I)
+_FIND_WRAPPERS = frozenset({"env", "command", "exec", "nice", "nohup", "sudo", "doas", "timeout", "stdbuf", "xargs"})
+_FIND_FILTERS = {"-name": "name", "-iname": "name", "-path": "path", "-ipath": "path", "-wholename": "path",
+                 "-iwholename": "path", "-regex": "regex", "-iregex": "regex", "-lname": "name", "-ilname": "name"}
+_FIND_WRITE_FILE = frozenset({"-fprint", "-fprint0", "-fprintf", "-fls"})
+_LINK_CALL_RE = re.compile(r"\b(?:sym)?link\s*\(|\b(?:hardlink|symlink|link)_to\b", re.I)
+
+
+def _find_destructive(parts: List[str]) -> Optional[str]:
+    if "-delete" in parts:
+        return "-delete"
+    for body in _find_exec_bodies(parts):
+        i = 0
+        while i < len(body) and (body[i].split("/")[-1] in _FIND_WRAPPERS or body[i].startswith("-")
+                                 or re.fullmatch(r"[A-Za-z_]\w*=.*|\d+[smhd]?", body[i])):
+            i += 1
+        if i >= len(body):
+            continue
+        prog = body[i].split("/")[-1].lower()
+        if prog in _FIND_KILL_PROGS or prog in SCRIPT_INTERPRETERS:
+            return f"-exec {prog}"
+        if prog in _FIND_SHELLS and _FIND_SHELL_KILL_RE.search(" ".join(body[i + 1:])):
+            return f"-exec {prog} -c"
+    return None
+
+
+def _find_roots(parts: List[str]) -> List[str]:
+    roots: List[str] = []
+    for a in parts[1:]:
+        if a in ("-H", "-L", "-P") or re.fullmatch(r"-O\d|-D", a):
+            continue
+        if a.startswith("-") or a in ("(", "!", "\\(", "\\!"):
+            break
+        roots.append(a)
+    return roots or ["."]
+
+
+def _find_pattern_hits(kind: str, pat: str, shown: str) -> bool:
+    if kind == "name":
+        return fnmatch.fnmatchcase(posixpath.basename(shown.rstrip("/")).lower(), pat.lower())
+    if kind == "path":
+        return fnmatch.fnmatchcase(shown.lower(), pat.lower())
+    try:
+        return bool(re.fullmatch(pat, shown, re.I))
+    except re.error:
+        return True
+
+
+def _find_hits_protected(parts: List[str]) -> Optional[str]:
+    """N3B: a find that deletes or replaces and can reach the ledger, the grant, their folder or a state file."""
+    for i, a in enumerate(parts[:-1]):
+        if a in _FIND_WRITE_FILE:
+            t = parts[i + 1]
+            if _is_ledger_path(_expand_known_vars(t)) or _state_target(t):
+                return t
+    how = _find_destructive(parts)
+    if not how:
+        return None
+    filters: List[tuple] = []
+    negated = False
+    for i, a in enumerate(parts):
+        if a in ("!", "\\!", "-not"):
+            negated = True
+        if a in _FIND_FILTERS and i + 1 < len(parts) and parts[i + 2:i + 3] != ["-prune"]:
+            filters.append((_FIND_FILTERS[a], parts[i + 1]))  # a pruned branch (-path ./.git -prune -o ...) acts on nothing
+    base = _BASE_DIR or _base_dir()
+    for r in _find_roots(parts):
+        e = _expand_known_vars(r)
+        if _unknown_target(r):
+            if _STATE_MENTION_RE.search(_CMD_TEXT[0]):
+                return f"{r} (find {how})"
+            continue
+        full = _abs_norm(e, base)
+        if not full:
+            continue
+        fl = full.lower().rstrip("/") or "/"
+        repos = {x for x in (_repo_root(base), _repo_root(full) if os.path.isdir(full) else None) if x}
+        for R in sorted(repos):
+            if not os.path.isdir(os.path.join(R, "docs", "agents-v0")):
+                continue
+            ledger = _ledger_candidates(R)
+            for c in sorted(ledger, key=lambda x: not x.endswith(("gate-ledger", "reopen-grant"))) + _state_candidates(R):
+                cl = posixpath.join(R.replace(os.sep, "/"), c).lower()
+                if c in ledger and c.lower().endswith("agents-v0") and fl.startswith(cl + "/"):
+                    return f"{r} (inside {c}; find {how})"
+                if not (fl == cl or cl.startswith(fl if fl == "/" else fl + "/")):
+                    continue
+                rel = cl[len(fl):].lstrip("/") if fl != "/" else cl.lstrip("/")
+                shown = r.rstrip("/") + ("/" + rel if rel else "") if r.rstrip("/") else "/" + rel
+                if negated or not filters or any(_find_pattern_hits(k, pt, shown) for k, pt in filters):
+                    return f"{shown} (find {how})"
+    return None
+
+
+def _link_source_protected(x: str) -> bool:
+    """N3B: a hard-link (or symlink) source that is the ledger, a folder holding it, or a state file."""
+    e = _expand_known_vars(x)
+    if _is_ledger_path(e) or _is_ledger_holder(e) or _ledger_folder_target(x, []) or _holds_state(x):
+        return True
+    return _unknown_target(x) and bool(_STATE_MENTION_RE.search(_CMD_TEXT[0]))
+
+
+def _git_init_separate(parts: List[str]) -> Optional[str]:
+    """N3B: git init --separate-git-dir (or a prefix git accepts) in a project that has docs/agents-v0."""
+    if _git_subcommand(parts) != "init":
+        return None
+    if not any(len(k) >= 4 and "--separate-git-dir".startswith(k)
+               for k in (a.split("=", 1)[0].lower() for a in parts if a.startswith("--"))):
+        return None
+    d = _BASE_DIR or _base_dir()
+    i = 1
+    while i < len(parts) and parts[i] != "init":
+        if parts[i] == "-C" and i + 1 < len(parts):
+            d = _abs_norm(_expand_known_vars(parts[i + 1]), d) or d
+            i += 2
+            continue
+        if parts[i].startswith("-C") and len(parts[i]) > 2:
+            d = _abs_norm(_expand_known_vars(parts[i][2:]), d) or d
+        i += 1
+    dirs: List[str] = []
+    j = i + 1
+    while j < len(parts):
+        a = parts[j]
+        if a in ("--separate-git-dir", "--template", "--object-format", "--ref-format", "-b", "--initial-branch",
+                 "--shared") and j + 1 < len(parts) and a != "--shared":
+            j += 2
+            continue
+        if not a.startswith("-"):
+            dirs.append(_abs_norm(_expand_known_vars(a), d) or d)
+        j += 1
+    for x in dirs or [d]:  # the directory git init sets up (the -C folder or the cwd without one)
+        R = _repo_root(x) if os.path.isdir(x) else None
+        if os.path.isdir(os.path.join(x, "docs", "agents-v0")) or (R and os.path.isdir(os.path.join(R, "docs", "agents-v0"))):
+            return ".git/agents-v0 (git init --separate-git-dir moves the git dir and leaves a fresh ledger)"
+    return None
+
+
 def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
     out = [dest]
     full = dest if dest.startswith("/") else os.path.join(_BASE_DIR or _base_dir(), dest)
@@ -978,10 +1131,21 @@ def _segment_writes_state(seg: str) -> Optional[str]:
     try:
         parts = shlex.split(seg, posix=True)
     except ValueError:
-        parts = seg.split()
+        try:  # N3B: find's `\;` is split at its `;`, which leaves a lone trailing backslash
+            parts = shlex.split(seg[:-1], posix=True) if seg.endswith("\\") else seg.split()
+        except ValueError:
+            parts = seg.split()
     if not parts:
         return None
     bin0 = parts[0].split("/")[-1]
+    if bin0 == "find":  # N3B
+        hit = _find_hits_protected(parts)
+        if hit:
+            return hit
+    if bin0 == "git":  # N3B
+        hit = _git_init_separate(parts)
+        if hit:
+            return hit
     if bin0 in _STATE_LANDING:
         tgt = None
         ops: List[str] = []
@@ -1029,6 +1193,22 @@ def _segment_writes_state(seg: str) -> Optional[str]:
             for x in swap_srcs:
                 if _ledger_folder_target(x, []) or _is_ledger_holder(_expand_known_vars(x)):
                     return x
+        # N3B (Jiraiya): a hard link (or cp -s symlink) made from the ledger, its folder or a state file is a second
+        #   name to write it through: cp -l/--link/-s (any short cluster: -al, -la, -rl), rsync --link-dest.
+        if bin0 == "cp" and any(a in ("--link", "--symbolic-link") or re.fullmatch(r"-[A-Za-z]*[ls][A-Za-z]*", a)
+                                for a in parts[1:]):
+            for x in swap_srcs:
+                if _link_source_protected(x):
+                    return x
+        if bin0 == "rsync":
+            for i, a in enumerate(parts):
+                ld = a.split("=", 1)[1] if a.startswith("--link-dest=") else (
+                    parts[i + 1] if a == "--link-dest" and i + 1 < len(parts) else None)
+                if ld is None:
+                    continue
+                at_dest = posixpath.join(swap_dest, ld) if swap_dest and not ld.startswith("/") else ld
+                if _link_source_protected(ld) or _link_source_protected(at_dest):
+                    return ld
         # A whole folder replaced or moved: mv of a folder that holds a state file (away, or onto one), and a
         #   recursive cp / rsync onto a folder that holds one. Copying such a folder elsewhere is a read: allowed.
         dest = tgt if tgt is not None else (ops[-1] if len(ops) >= 2 else None)
@@ -1179,6 +1359,10 @@ def _segment_writes_state(seg: str) -> Optional[str]:
     if bin0 in SCRIPT_INTERPRETERS and SCRIPT_WRITE_HINT.search(seg):
         for lit in _script_literals(parts):
             if _is_state_path(lit):
+                return lit
+    if bin0 in SCRIPT_INTERPRETERS and _LINK_CALL_RE.search(seg):  # N3B: os.link / link( from the ledger
+        for lit in _script_literals(parts):
+            if _is_ledger_path(lit) or _is_ledger_holder(lit) or _is_state_path(lit):
                 return lit
     return None
 
