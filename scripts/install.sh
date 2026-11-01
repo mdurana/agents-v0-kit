@@ -398,6 +398,9 @@ docs/agents-v0/design/system/threat-model.md
 docs/agents-v0/design/system/ops-readiness.md
 docs/agents-v0/design/system/_component.template.md
 docs/agents-v0/roadmap/_template.md
+docs/agents-v0/adr/_template.md
+docs/agents-v0/diagrams/sequences/_template.md
+docs/agents-v0/discovery/_template.md
 docs/agents-v0/backlog/export-params.md
 docs/agents-v0/backlog/tickets-sources.md
 docs/agents-v0/presentations/_params.md
@@ -473,6 +476,16 @@ docs/agents-v0/brownfield-onboarding.md
       [ -f "$KIT/templates/$rel" ] || continue
       copy_template_file "$rel"
     done
+  fi
+  # Onboard fix JO-6: the onboard-discovery skill points to the ADR, sequence and discovery templates
+  # (seeded from the minimal list above, only when missing) and to a workspace manifest example. The
+  # example is seeded as docs/agents-v0/_workspace.manifest.template.json, only when missing: the live
+  # docs/agents-v0/workspace.manifest.json is read by the orchestrator, so the example repos must not
+  # land there unasked (--with-starters still installs the live file, as before).
+  mf_dest="$t/docs/agents-v0/_workspace.manifest.template.json"
+  if [ ! -L "$mf_dest" ] && [ ! -f "$mf_dest" ] && [ -f "$KIT/templates/docs/agents-v0/workspace.manifest.json" ]; then
+    mkdir -p "$t/docs/agents-v0"
+    cp "$KIT/templates/docs/agents-v0/workspace.manifest.json" "$mf_dest"
   fi
   chmod_regular() {
     for f in "$@"; do
