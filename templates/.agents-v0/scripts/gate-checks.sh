@@ -162,8 +162,10 @@ FUTURE_SKEW = 120  # seconds a grant may be ahead of this clock (two machines' c
 MARK_RE = re.compile(r"^lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 EMPTY = hashlib.sha256(b"").hexdigest()
 
+SIM = None  # trailer mode: the prefix of a refusal found while checking the ledger as the gate commit would pin it
+
 def out(code, msg):
-    print(msg)
+    print(SIM + msg if SIM and code == 1 else msg)
     sys.exit(code)
 
 def git(*a):
@@ -393,9 +395,19 @@ elif mode == "trailer":
         stale = ["REOPEN-REFUSED grant=%s %sin the grant file when the scan for gate commit onboard-v%d wrote its trailer; "
                  "void unless that gate commit lands with this line in its trailer" % (sha(x), STALE_TEXT, nxt)
                  for x in g[len(named):]]
-        if stale:
-            append_ledger(stale)
-            lines = read_ledger()
+    else:
+        stale, nxt = [], max([int(a[0][len("onboard-v"):]) for a in anc] + [0]) + 1
+    # check the ledger as the gate commit would leave it, before writing anything: the new stale lines added and a
+    # gate commit pinning every line. A void stale line already at the end of the ledger joins the pinned run, so
+    # one that names no grant line (or a grant another line names) would make every later check refuse.
+    new = lines + [x.encode("utf-8") for x in stale]
+    SIM = ("nothing was written: with the trailer of gate commit onboard-v%d the ledger would read "
+           "as refused: " % nxt)
+    check_grants(new, anc + [("onboard-v%d" % nxt, len(new), prefix_sha(new, len(new)))])
+    SIM = None
+    if stale:
+        append_ledger(stale)
+        lines = read_ledger()
     out(0, "%s: lines=%d sha256=%s" % (key, len(lines), prefix_sha(lines, len(lines))))
 elif mode == "commit" and len(args) == 1:
     anc, lines, t, n = full_check()

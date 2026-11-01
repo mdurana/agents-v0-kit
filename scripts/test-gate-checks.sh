@@ -691,6 +691,22 @@ out_has "RS-5 says future" "grant line 25 is dated in the future"
 rs_g6="$(rg_line 60 onboard rs-skew-near)"; printf '%s\n' "$rs_g6" >> "$RG_GRANT"
 expect_pass "RS-5 a grant 60s ahead (within the 120s skew) passes" "$rg" rg_run
 is_eq "RS-5 it is the one used" "$(rg_last)" "GRANT-USED $(rg_h "$rs_g6") count=3"
+# RV (round 15, Iruka): a void stale line already at the end of the ledger would join the run the next gate commit
+# pins. The scan checks the ledger as that commit would leave it and refuses before writing anything.
+rv_keep="$T1_TMP/rg/rv-ledger.keep"; cp "$RG_LED" "$rv_keep"
+printf 'REOPEN-REFUSED grant=%s stale: in the grant file when the scan for gate commit onboard-v4 wrote its trailer; void\n' "$(rg_h FAKE-not-a-grant-line)" >> "$RG_LED"
+printf '%s\n' "$(rg_line 0 onboard rv-one)" >> "$RG_GRANT"
+printf '\nRevision RV.\n' >> "$rg/docs/agents-v0/architecture.md"
+expect_fail "RV-1 (Iruka repro) the chain stops when a void stale line names no grant" "$rg" lg_gate "$rg" 4
+out_has "RV-1 says why, before writing" "nothing was written: with the trailer of gate commit onboard-v4 the ledger would read as refused: ledger line"
+is_eq "RV-1 no line was written" "$(wc -l < "$RG_LED" | tr -d ' ')" "$(($(wc -l < "$rv_keep" | tr -d ' ') + 1))"
+is_eq "RV-1 no gate commit landed" "$(git -C "$rg" tag -l onboard-v4)" ""
+cp "$rv_keep" "$RG_LED"; printf 'REOPEN-REFUSED grant=%s stale: forged\n' "$(rg_h "$rs_g6")" >> "$RG_LED"
+expect_fail "RV-2 the chain stops when a void stale line names a used grant" "$rg" lg_gate "$rg" 4
+out_has "RV-2 names the pinned clash" "also names, and the stale one is pinned by a gate commit"
+cp "$rv_keep" "$RG_LED"
+expect_pass "RV-3 with the stray line gone the chain lands" "$rg" lg_gate "$rg" 4
+expect_pass "RV-3 ledger_ok passes after it" "$rg" sh "$GC" ledger_ok
 
 # N84: unattended turns. The harness marks the ledger before a turn and compares after it.
 expect_pass "N84 ledger_mark prints the mark" "$lg" sh "$GC" ledger_mark
