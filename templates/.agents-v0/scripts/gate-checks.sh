@@ -15,8 +15,9 @@
 #   REFUSED <check>: <reason>              exit 1, the check refused
 #   NOT-WIRED <check>: <rule> ...          exit 3, the check exists but its logic is not built yet
 #   error: ...  (stderr)                   exit 2, usage error or unreadable/invalid gate-rules
-# A caller treats every exit code but 0 as a stop (fail closed). Step 0 wires the plumbing only (dispatch,
-# gate-rules loading and validation, the ledger and grant paths); every check is NOT-WIRED until its fix turn.
+# A caller treats every exit code but 0 as a stop (fail closed). Step 0 wired the plumbing (dispatch,
+# gate-rules loading and validation, the ledger and grant paths); a check stays NOT-WIRED until its fix turn
+# (wired so far: see WIRED below and `list`).
 set -eu
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -30,6 +31,8 @@ GRANT_REL="agents-v0/reopen-grant"
 # Every gate commit carries this trailer (N3A): Agents-V0-Ledger: lines=<n> sha256=<hash of the first n lines>.
 LEDGER_TRAILER="Agents-V0-Ledger"
 
+# Checks whose logic is built (a wired check may still carry TODOs for later fixes; see its comment).
+WIRED="approval_evidence"
 CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reopen staged_secret_scan reopen_grant_ok greenfield_record_ok baseline_ok ledger_ok"
 
 usage() {
@@ -97,10 +100,52 @@ not_wired() { printf 'NOT-WIRED %s: %s. Not yet wired (step 0 skeleton; built by
 
 need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in *[!a-z-]*) die "$1: bad phase name: $2" ;; esac; }
 
-# JO-2: a gate needs approval evidence for <phase> (the approval record, not report text).
+# Onboarding paths, relative to the repo root (sync-feature-state.sh writes the state and reads the phase result
+# at these paths; the agent writes the phase result).
+ONB_DIR="docs/agents-v0/onboarding"
+ONB_STATE="$ONB_DIR/state.json"
+ONB_RESULT="$ONB_DIR/phase-result.md"
+
+# to_root: run from the repo root when inside a git work tree (sync and the docs check use root-relative paths).
+to_root() {
+  if top="$(git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$top" ]; then cd "$top" || die "cannot cd to $top"; fi
+}
+
+# state_field <file> <key>: one value of a state JSON file; a list prints space-separated. Exit 1 when the
+# file is missing or not valid JSON (the caller refuses).
+state_field() {
+  python3 - "$1" "$2" <<'PYSF'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    sys.exit(1)
+if not isinstance(data, dict):
+    sys.exit(1)
+v = data.get(sys.argv[2])
+print(" ".join(str(x) for x in v) if isinstance(v, list) else ("" if v is None else str(v)))
+PYSF
+}
+
+# JO-2 (design rev 6 lines 25, 95, 167): --approve <phase> needs recorded evidence, never report text. For
+# onboard: the state says onboard is awaiting_approval, phase-result.md exists, and the onboarding docs check
+# passes. The helper runs the docs check itself (read-only) and judges no doc content.
+# TODO(JO-3/JO-4): run `check-onboarding-docs.sh --gate` on the gate-rules onboard_gate_docs list once JO-3/JO-4
+# build that mode; until then this proves only that today's default docs check passes, not that the gate
+# docs are complete (design line 167). JO-2 stays open until then.
 approval_evidence() {
   need_phase approval_evidence "${1:-}"
-  not_wired approval_evidence "phase $1 needs recorded approval evidence before its gate" "JO-2"
+  [ "$1" = onboard ] || not_wired approval_evidence "phase $1 needs recorded approval evidence before its gate (only onboard is wired)" "the fix turn for $1"
+  to_root
+  [ -f "$ONB_STATE" ] || refuse approval_evidence "there is no onboarding state ($ONB_STATE); onboard has not run"
+  ae_phase="$(state_field "$ONB_STATE" activePhase)" || refuse approval_evidence "$ONB_STATE is not valid JSON; stop and ask the user"
+  ae_status="$(state_field "$ONB_STATE" activeStatus)" || refuse approval_evidence "$ONB_STATE is not valid JSON; stop and ask the user"
+  [ "$ae_phase" = onboard ] || refuse approval_evidence "the active phase is ${ae_phase:-none}, not onboard awaiting_approval"
+  [ "$ae_status" = awaiting_approval ] || refuse approval_evidence "onboard status is ${ae_status:-none}, not awaiting_approval"
+  [ -s "$ONB_RESULT" ] || refuse approval_evidence "$ONB_RESULT is missing or empty"
+  [ -f "$HERE/check-onboarding-docs.sh" ] || refuse approval_evidence "$HERE/check-onboarding-docs.sh is missing; reinstall the kit (install.sh --update)"
+  sh "$HERE/check-onboarding-docs.sh" >/dev/null 2>&1 || refuse approval_evidence "the onboarding docs check failed (check-onboarding-docs.sh); run it, fix the docs, and ask again"
+  ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed"
 }
 # JO-1: wraps check-gate-commit.sh unchanged; the gate commit of <phase> holds only allowed paths.
 gate_committed() {
@@ -160,7 +205,9 @@ case "$cmd" in
     printf 'git_common_dir=%s\nledger=%s\ngrant=%s\n' "$gcd" "$lp" "$gp" ;;
   list)
     [ "$#" = 0 ] || usage
-    for c in $CHECKS; do printf '%s not-wired\n' "$c"; done ;;
+    for c in $CHECKS; do
+      case " $WIRED " in *" $c "*) printf '%s wired\n' "$c" ;; *) printf '%s not-wired\n' "$c" ;; esac
+    done ;;
   approval_evidence|gate_committed|prereq_approved|reopen_grant_ok|baseline_ok)
     [ "$#" = 1 ] || usage
     load_rules > /dev/null

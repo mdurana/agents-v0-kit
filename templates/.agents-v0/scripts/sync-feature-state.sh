@@ -150,6 +150,26 @@ if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
   fi
 fi
 
+# Onboard approval evidence (onboard fix JO-2, design rev 6 lines 25 and 95): --approve onboard records the
+# approval only when gate-checks.sh approval_evidence passes (onboard awaiting_approval, phase-result.md on disk,
+# the onboarding docs check passes). A missing helper refuses; there is no override.
+case "$art" in
+  docs/agents-v0/onboarding/*.md | */docs/agents-v0/onboarding/*.md)
+    if [ "$approve_lc" = onboard ]; then
+      ae_script="$(dirname "$0")/gate-checks.sh"
+      if [ ! -f "$ae_script" ]; then
+        printf 'FAIL: --approve onboard needs %s; reinstall the kit (install.sh --update). Do not approve.\n' "$ae_script" >&2
+        exit 1
+      fi
+      if ! ae_out="$(sh "$ae_script" approval_evidence onboard 2>&1)"; then
+        printf '%s\n' "$ae_out" >&2
+        printf 'FAIL: --approve onboard refused: no approval evidence. Do not approve; finish onboard and set it awaiting_approval first.\n' >&2
+        exit 1
+      fi
+    fi
+    ;;
+esac
+
 # Feature-branch guard (kitfix-20261031-branch-guard). Design, Build, Verify and the pre-merge
 # Release work of a feature story happen only on feature/<feature>, in the worktree that
 # feature-worktree.sh created after the user authorised the branch (v0-intake step 7). Run
@@ -346,6 +366,11 @@ for line in clean_text.splitlines():
         if reopened_re.match(cells[3]):
             reopen_rows += 1
         rows[p_key] = cells
+
+# Onboard fix JO-2 (SKO-5, design rev 6 lines 22 and 83): on the onboarding report a typed Delivery approvals
+# row is never an approval and never a reopen; only --approve onboard (with approval evidence) and --reopen count.
+if onboarding:
+    rows, reopen_rows = {}, 0
 
 approved_list = [p for p in (prev.get("approvedPhases") or []) if p in phases]
 prev_last = (prev.get("lastApprovedPhase") or "").lower()

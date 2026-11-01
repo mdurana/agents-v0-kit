@@ -29,6 +29,8 @@ cp "$KIT"/templates/.agents-v0/scripts/resolve-layout.sh \
    "$KIT"/templates/.agents-v0/scripts/collect-dependency-graphs.sh \
    "$KIT"/templates/.agents-v0/scripts/check-onboarding-docs.sh \
    "$KIT"/templates/.agents-v0/scripts/sync-feature-state.sh \
+   "$KIT"/templates/.agents-v0/scripts/gate-checks.sh \
+   "$KIT"/templates/.agents-v0/scripts/gate-rules \
    "$KIT"/templates/.agents-v0/scripts/audit-brownfield-baseline.sh "$r/.agents-v0/scripts/"
 mkdir -p "$r/.agents-v0/ui/react"
 cp "$KIT/core/ui/react/pack.json" "$r/.agents-v0/ui/react/pack.json"
@@ -293,6 +295,11 @@ expect_pass "state: onboarding in progress" "$r" sh .agents-v0/scripts/sync-feat
 has "state: written beside the report" "$r/docs/agents-v0/onboarding/state.json" '"activePhase": "onboard"'
 has "state: feature is onboarding" "$r/docs/agents-v0/onboarding/state.json" '"feature": "onboarding"'
 has "state: baseCommit pinned from report commit header" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
+# Onboard fix JO-2: --approve onboard needs approval evidence (awaiting_approval, phase-result.md, docs check);
+# approving straight from in_progress is refused (test-cases N2).
+expect_fail "state: approval straight from in_progress is refused (JO-2)" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
+expect_pass "state: onboarding awaiting approval" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --active-phase onboard --status awaiting_approval
+printf 'phase: onboard\nstatus: awaiting_approval\ncommit: abcdef1234567\n' > "$r/docs/agents-v0/onboarding/phase-result.md"
 expect_pass "state: approval clears the active phase" "$r" sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/onboarding/report.md --approve onboard --clear-active
 has "state: last approved phase is onboard" "$r/docs/agents-v0/onboarding/state.json" '"lastApprovedPhase": "onboard"'
 has "state: baseCommit preserved across approval sync" "$r/docs/agents-v0/onboarding/state.json" '"baseCommit": "abcdef1234567"'
