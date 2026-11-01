@@ -3,9 +3,11 @@
 #   sh scripts/tier1.sh [--time-limit <seconds>] [--report <file>] [-- <command...>]
 # Default command: validate-kit.sh with KIT_SKIP_APP_TEMPLATE_TEST=1. The Maven and network app-template
 # test is not tier 1 (design rev 6). `-- <command...>` runs that command instead (used by the harness
-# self-test). --time-limit stops the run once it passes the limit and exits 124, naming the limit. With no
-# --time-limit there is no limit: the number is set from the first measured run and goes in only after
-# Sensei OKs it (N8A). --report writes one line to <file>:
+# self-test). --time-limit stops the run once it passes the limit and exits 124, naming the limit. The
+# default limit is 600 seconds (N8A; first measured green run 354s; Sensei 2026-11-02 01:55 Manila:
+# "Tier 1 limit A: 600 seconds OK"). Tier 1 refuses to start without PyYAML, checked with the python3 on
+# PATH that the hook checks use, before the timer starts (Sensei 01:55: "PyYAML A: tier 1 refuses to
+# start without PyYAML"). --report writes one line to <file>:
 #   tier1 PASS|FAIL|TIMEOUT <full kit commit> clean|dirty <seconds>s <time>
 # Ctrl-C, TERM or HUP stops the whole run (exit 130, 143, 129). Refuses when any AGENTS_V0_* test switch
 # is set. Kit-only file: it is not installed into projects.
@@ -14,7 +16,7 @@ set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$KIT/scripts/lib/tier1-vars.sh"
 t1_guard_env || exit 2
-limit=""; report=""
+limit=600; report=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --time-limit) [ $# -ge 2 ] || { echo 'tier1: --time-limit needs a number of seconds' >&2; exit 2; }; limit="$2"; shift 2 ;;
@@ -28,6 +30,13 @@ if [ -n "$limit" ]; then
   [ "$limit" -ge 1 ] || { echo 'tier1: --time-limit must be at least 1' >&2; exit 2; }
 fi
 [ $# -gt 0 ] || set -- env KIT_SKIP_APP_TEMPLATE_TEST=1 sh "$KIT/scripts/validate-kit.sh"
+# PyYAML (Sensei, PyYAML A). Checked before the timer, so a refusal never counts toward the limit.
+py="$(command -v python3 2>/dev/null || true)"
+if [ -z "$py" ] || ! "$py" -c 'import yaml' >/dev/null 2>&1; then
+  printf 'tier1: PyYAML is missing for %s; tier 1 refuses to start (four hook checks need it, and install.sh requires it).\n' "${py:-python3 (not found on PATH)}" >&2
+  printf 'tier1: install it with: python3 -m pip install pyyaml   (or apk add py3-yaml, apt install python3-yaml, or on Intel macOS: sh templates/.agents-v0/scripts/host-tools-macports.sh --install)\n' >&2
+  exit 2
+fi
 commit="$(git -C "$KIT" rev-parse HEAD 2>/dev/null || echo unknown)"
 tree=clean; [ -z "$(git -C "$KIT" status --porcelain 2>/dev/null)" ] || tree=dirty
 flag="$(mktemp "${TMPDIR:-/tmp}/kit-tier1-timeout.XXXXXX")"   # empty; the watchdog writes "timeout" into it

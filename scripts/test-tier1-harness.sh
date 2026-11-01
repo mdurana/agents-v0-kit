@@ -77,6 +77,22 @@ sleep 1; kill -TERM "$tp"; set +e; wait "$tp"; rc=$?; set -e
 [ "$rc" = 143 ] && pass "a TERM stops tier1.sh with exit 143" || fail "a TERM stops tier1.sh with exit 143 (got $rc)"
 sleep 2
 if ps -eo args= | grep -q '^sleep 40$'; then fail "no process is left after a TERM"; else pass "no process is left after a TERM"; fi
+# Sensei 01:55 "Tier 1 limit A: 600 seconds OK" (N8A): 600 seconds is the default limit.
+expect_pass "tier1.sh runs with the default limit" "$T1_TMP" sh "$T" -- true
+has "tier1.sh default time limit is 600 seconds" "$T1_TMP/out.txt" "limit 600s"
+# Sensei 01:55 "PyYAML A: tier 1 refuses to start without PyYAML": checked with the python3 on PATH (the one
+# the hook checks use), before the timer starts. A fake python3 that fails `import yaml`; nothing is uninstalled.
+nopy="$T1_TMP/no-yaml-bin"; mkdir -p "$nopy"
+realpy="$(command -v python3)"
+printf '#!/bin/sh\ncase "$*" in *yaml*) echo "ModuleNotFoundError: No module named yaml" >&2; exit 1 ;; esac\nexec "%s" "$@"\n' "$realpy" > "$nopy/python3"
+chmod +x "$nopy/python3"
+set +e; PATH="$nopy:$PATH" sh "$T" --report "$T1_TMP/rep-noyaml" -- sh -c ': > "$1"' _ "$T1_TMP/ran-noyaml" > "$T1_TMP/o.txt" 2>&1; rc=$?; set -e
+[ "$rc" = 2 ] && pass "tier1.sh refuses to start without PyYAML (exit 2)" || fail "tier1.sh refuses to start without PyYAML (exit 2, got $rc)"
+has "the PyYAML refusal says what is missing" "$T1_TMP/o.txt" "PyYAML is missing"
+has "the PyYAML refusal gives an install hint" "$T1_TMP/o.txt" "python3 -m pip install pyyaml"
+has "the PyYAML refusal names the python3 it checked" "$T1_TMP/o.txt" "$nopy/python3"
+[ ! -e "$T1_TMP/ran-noyaml" ] && pass "without PyYAML the tier 1 command never starts" || fail "without PyYAML the tier 1 command never starts"
+[ ! -e "$T1_TMP/rep-noyaml" ] && pass "a PyYAML refusal writes no timed report" || fail "a PyYAML refusal writes no timed report"
 expect_fail "tier1.sh refuses --time-limit 0" "$T1_TMP" sh "$T" --time-limit 0 -- true
 expect_fail "tier1.sh refuses a non-number limit" "$T1_TMP" sh "$T" --time-limit 5m -- true
 expect_fail "tier1.sh refuses --time-limit with no value" "$T1_TMP" sh "$T" --time-limit
@@ -99,7 +115,13 @@ unm2="$(src 'rm -f "$T1_TMP/.kit-tier1-owned"; printf "%s\n" "$T1_TMP"')"
 if TMPDIR="$T1_TMP/does-not-exist" sh -c 'KIT="$1"; . "$1/scripts/lib/tier1-harness.sh"' _ "$KIT" > "$T1_TMP/o.txt" 2>&1; then
   fail "a missing temp root stops the harness"; else pass "a missing temp root stops the harness"; fi
 [ ! -e /.kit-tier1-owned ] && pass "no marker is written at the filesystem root" || fail "no marker is written at the filesystem root"
-# This suite made $keep, $unm and $unm2 itself in this run, so it may remove them.
-rm -rf "$keep" "$unm" "$unm2"
+# This suite made $keep, $unm and $unm2 itself in this run, so it may remove them, and only after the same
+# checks cleanup makes: a real folder (not a symlink) directly under the temp root, with a kit-tier1 name and no `..`.
+for d in "$keep" "$unm" "$unm2"; do
+  case "$d" in *..*|*//*) fail "not removing $d: the path has .. or //"; continue ;; esac
+  case "${d##*/}" in kit-tier1.??????|kit-tier1-keep.??????) ;; *) fail "not removing $d: not a kit-tier1 folder"; continue ;; esac
+  [ "$(cd "${d%/*}" 2>/dev/null && pwd -P)" = "$T1_ROOT" ] || { fail "not removing $d: not directly under $T1_ROOT"; continue; }
+  if [ -d "$d" ] && [ ! -L "$d" ]; then rm -rf "$d"; fi
+done
 
 t1_done test-tier1-harness
