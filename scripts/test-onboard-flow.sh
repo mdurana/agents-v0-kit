@@ -83,7 +83,8 @@ prose_check() {
 r="$(t1_repo flow --commit)"
 mkdir -p "$r/src" && printf 'def main():\n    return 1\n# end\n' > "$r/src/app.py"
 G "$r" add -- src/app.py && G "$r" commit -qm "fixture: source"
-t1_install "$r" || { printf 'test-onboard-flow: install.sh failed\n' >&2; exit 2; }
+# --with-antigravity: the PR-* checks cover the opt-in Antigravity copies too (test-agy-opt-in.sh: default has none)
+t1_install "$r" --with-antigravity || { printf 'test-onboard-flow: install.sh failed\n' >&2; exit 2; }
 if ! t1_hash_ok "$r"; then
   cat "$T1_TMP/hash.txt" >&2
   printf 'test-onboard-flow: refusing to run: check-installed-kit.sh did not print HASH-OK for the fixture\n' >&2

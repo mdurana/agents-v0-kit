@@ -316,7 +316,8 @@ mkdir -p "$n1/t1" "$n1/t2"; git -C "$n1/t1" init -q; git -C "$n1/t2" init -q
 #   must pin the root-owned /usr/bin/python3, not the first python3 on PATH.
 mkdir -p "$n1/wrapbin"; printf '#!/bin/sh\nexec /usr/bin/python3 "$@"\n' > "$n1/wrapbin/python3"; chmod +x "$n1/wrapbin/python3"
 if [ -x /usr/bin/python3 ]; then
-  PATH="$n1/wrapbin:$PATH" sh "$KIT/scripts/install.sh" "$n1/t1" >/dev/null 2>"$n1/inst1.err" || err "N-1 install with a python3 wrapper on PATH failed: $(cat "$n1/inst1.err")"
+  # --with-antigravity: the pin is checked in both adapters (the Antigravity one is opt-in)
+  PATH="$n1/wrapbin:$PATH" sh "$KIT/scripts/install.sh" --with-antigravity "$n1/t1" >/dev/null 2>"$n1/inst1.err" || err "N-1 install with a python3 wrapper on PATH failed: $(cat "$n1/inst1.err")"
   for a in .agents .cursor; do
     [ "$(cat "$n1/t1/$a/hooks/hook-python" 2>/dev/null)" = /usr/bin/python3 ] || err "N-1 install did not pin /usr/bin/python3 in $a/hooks/hook-python (got: $(cat "$n1/t1/$a/hooks/hook-python" 2>/dev/null))"
   done

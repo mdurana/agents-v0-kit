@@ -32,8 +32,10 @@ CGL=.agents-v0/scripts/check-delivery-gate-local.sh
 PRE=.agents-v0/hooks/pre-commit
 CIF=.agents-v0/ci/gate.sh
 
-# upd <kit> <repo> <log>: install.sh --update from <kit>; validate-kit is not re-entered (KIT_VALIDATING=1).
-upd() { KIT_VALIDATING=1 sh "$1/scripts/install.sh" --update "$2" > "$3" 2>&1; }
+# upd <kit> <repo> <log> [flags]: install.sh --update from <kit>; validate-kit is not re-entered (KIT_VALIDATING=1).
+# The era and E36 fixtures have the Antigravity tree (an era install wrote it; E36 installs it), so their
+# --update passes --with-antigravity (the opt-in adapter is refreshed as before; test-agy-opt-in.sh has the rest).
+upd() { k_="$1"; r_="$2"; l_="$3"; shift 3; KIT_VALIDATING=1 sh "$k_/scripts/install.sh" --update "$@" "$r_" > "$l_" 2>&1; }
 # kit_copy <name>: a copy of this kit (no .git) under $T1_TMP, for list-only changes; prints its path.
 kit_copy() {
   k_="$T1_TMP/$1"; mkdir -p "$k_"
@@ -95,7 +97,7 @@ here "fixture: the $ERA install seeded .gitlab-ci.yml" "$A/.gitlab-ci.yml"
 here "fixture: the $ERA install seeded $VERIFY" "$A/$VERIFY"
 mkdir -p "$A/.agents-v0/ci"; printf '#!/bin/sh\necho my own check\n' > "$A/.agents-v0/ci/my-check.sh"
 keep "$A" "$T1_TMP/A0"
-upd "$KIT" "$A" "$T1_TMP/A1.log" && pass "--update of the unedited $ERA install" || fail "--update of the unedited $ERA install (see $T1_TMP/A1.log)"
+upd "$KIT" "$A" "$T1_TMP/A1.log" --with-antigravity && pass "--update of the unedited $ERA install" || fail "--update of the unedited $ERA install (see $T1_TMP/A1.log)"
 
 B="$(era edited)"
 printf '\n# our own pipeline tweak\n' >> "$B/.gitlab-ci.yml"
@@ -103,7 +105,7 @@ printf '* @acme/owners\n' >> "$B/.gitlab/CODEOWNERS"
 printf '\n# edited by the team\n' >> "$B/$VERIFY"
 printf '\n# edited by the team\n' >> "$B/$CIF"
 keep "$B" "$T1_TMP/B0"
-upd "$KIT" "$B" "$T1_TMP/B1.log" && pass "--update of the edited $ERA install" || fail "--update of the edited $ERA install (see $T1_TMP/B1.log)"
+upd "$KIT" "$B" "$T1_TMP/B1.log" --with-antigravity && pass "--update of the edited $ERA install" || fail "--update of the edited $ERA install (see $T1_TMP/B1.log)"
 
 # N68: user CI files, unedited (A) and edited (B)
 for v in A B; do
@@ -149,7 +151,7 @@ has "N71(2): check-installed-kit warns about the edited $VERIFY" "$T1_TMP/ckB.tx
 for v in A B; do
   eval "r=\$$v"
   t1_snapshot "$r" "$T1_TMP/${v}s1"
-  upd "$KIT" "$r" "$T1_TMP/${v}2.log" || fail "E35 ($v): the second --update runs (see $T1_TMP/${v}2.log)"
+  upd "$KIT" "$r" "$T1_TMP/${v}2.log" --with-antigravity || fail "E35 ($v): the second --update runs (see $T1_TMP/${v}2.log)"
   t1_snapshot "$r" "$T1_TMP/${v}s2"
   if cmp -s "$T1_TMP/${v}s1" "$T1_TMP/${v}s2"; then pass "E35 ($v): the second --update changes nothing"
   else fail "E35 ($v): the second --update changes nothing ($(diff "$T1_TMP/${v}s1" "$T1_TMP/${v}s2" | head -4 | tr '\n' ' '))"; fi
@@ -178,7 +180,9 @@ fi # HIST_OK
 # --- E36: the step is general (only list entries change) ----------------------------------------------
 K2="$(kit_copy kit-e36)"
 R="$(t1_repo e36 --commit)"
-t1_install "$R" || fail "E36: fresh install for the synthetic entries"
+t1_install "$R" --with-antigravity || fail "E36: fresh install for the synthetic entries"
+R2="$(t1_repo e36-noagy --commit)"
+t1_install "$R2" --with-antigravity || fail "E36: second agy install (--update without the flag)"
 E36P=".agents/skills/v0-release/SKILL.md .agents/commands/v0-release.md .cursor/commands/v0-release.md"
 mkdir -p "$T1_TMP/e36-0"
 for f in $E36P; do
@@ -191,7 +195,7 @@ done
 # a later retirement: the kit stops shipping /v0-release (data, not code) and lists its installed copies
 mkdir -p "$T1_TMP/held"; mv "$K2/core/common/commands/v0-release.md" "$T1_TMP/held/"
 printf '\n# edited by the team\n' >> "$R/.cursor/commands/v0-release.md"; cp "$R/.cursor/commands/v0-release.md" "$T1_TMP/e36-edited"
-upd "$K2" "$R" "$T1_TMP/E1.log" || fail "E36: --update with synthetic entries runs (see $T1_TMP/E1.log)"
+upd "$K2" "$R" "$T1_TMP/E1.log" --with-antigravity || fail "E36: --update with synthetic entries runs (see $T1_TMP/E1.log)"
 for f in .agents/skills/v0-release/SKILL.md .agents/commands/v0-release.md; do
   same_file "E36: unedited agy copy $f is in $TR/ with the same bytes" "$T1_TMP/e36-0/$f" "$R/$TR/$f"
   gone "E36: unedited agy copy $f is gone from its old path" "$R/$f"
@@ -203,6 +207,13 @@ has "E36: check-installed-kit warns about the edited Cursor copy" "$T1_TMP/ckE.t
 cp "$T1_TMP/e36-0/.agents/commands/v0-release.md" "$R/.agents/commands/v0-release.md"
 if ck "$K2" "$R" "$T1_TMP/ckE2.txt"; then fail "E36: an unedited agy copy put back fails check-installed-kit"; else pass "E36: an unedited agy copy put back fails check-installed-kit"; fi
 has "E36: the failure names the agy path" "$T1_TMP/ckE2.txt" "RETIRED-LEFT .agents/commands/v0-release.md"
+# without --with-antigravity the opt-in .agents/ tree is not touched: its retired copies stay, byte-identical
+upd "$K2" "$R2" "$T1_TMP/E3.log" || fail "E36: --update without --with-antigravity runs (see $T1_TMP/E3.log)"
+for f in .agents/skills/v0-release/SKILL.md .agents/commands/v0-release.md; do
+  same_file "E36 (no --with-antigravity): retired agy copy $f stays in place, byte-identical" "$T1_TMP/e36-0/$f" "$R2/$f"
+  gone "E36 (no --with-antigravity): nothing in $TR/ for $f" "$R2/$TR/$f"
+  has "E36 (no --with-antigravity): --update notes it left $f" "$T1_TMP/E3.log" "NOTE: retired kit file $f left as is"
+done
 
 # --- safety: a missing or malformed list fails before anything changes ---------------------------------
 # Synthetic retired kit files (no history needed): KS lists them with the hashes of known bytes.

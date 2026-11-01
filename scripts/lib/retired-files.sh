@@ -79,15 +79,23 @@ rf_no_link() {
   done
 }
 
-# rf_cleanup <project root> <list>: apply the rules above. Exit 1 only when the list is bad (nothing moved).
+# rf_cleanup <project root> <list> [<keep prefix>]: apply the rules above. Exit 1 only when the list is bad
+# (nothing moved). A path under <keep prefix> (install.sh passes .agents/ without --with-antigravity: the
+# Antigravity tree is opt-in) is left exactly as it is, with a note.
 rf_cleanup() {
-  rf_t="$1"; rf_list="$2"
+  rf_t="$1"; rf_list="$2"; rf_keep="${3:-}"
   rf_check_list "$rf_list" || return 1
   rf_all="$(rf_entries "$rf_list")" || return 1
   while read -r rf_k rf_p; do
     [ -n "$rf_p" ] || continue
     rf_src="$rf_t/$rf_p"
     [ -e "$rf_src" ] || [ -L "$rf_src" ] || continue
+    if [ -n "$rf_keep" ] && [ "$rf_k" = kit-managed ]; then
+      case "$rf_p" in "$rf_keep"*)
+        printf 'NOTE: retired kit file %s left as is (Antigravity adapter, opt-in); install.sh --update --with-antigravity moves it to trash/.\n' "$rf_p"
+        continue ;;
+      esac
+    fi
     if [ "$rf_k" = user-owned ]; then
       printf 'NOTE: %s is your file: the kit no longer manages it, and --update left it unchanged.\n' "$rf_p"
       continue

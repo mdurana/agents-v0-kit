@@ -3,8 +3,9 @@
 # AGENTS_V0_* override code (kitfix-20261031-installed-no-overrides).
 #   sh scripts/check-installed-kit.sh [--expect-trace-mode warn|fail] <project checkout>
 # For every file in templates/.agents-v0/scripts the installed copy must equal the kit file after
-# strip-test-overrides.sh; every file in core/common/hooks must equal .agents/hooks/<file> (and
-# .cursor/hooks/<file> when that adapter is installed). No installed script may still read an
+# strip-test-overrides.sh; every file in core/common/hooks must equal .cursor/hooks/<file>, and
+# .agents/hooks/<file> when the opt-in Antigravity adapter is installed (install.sh --with-antigravity;
+# its lines name the refresh command). No installed script may still read an
 # AGENTS_V0_* variable (comments and the kit-fetch switch AGENTS_V0_FETCH_KIT of resolve-kit-root.sh
 # excepted). With --expect-trace-mode, check-traceability.sh --print-mode in the project must report
 # that mode. Retired kit files (scripts/lib/retired-files.txt): RETIRED-LEFT <path> for an unedited one still
@@ -48,8 +49,9 @@ for d in .agents/hooks .cursor/hooks; do
   for f in "$KIT"/core/common/hooks/*; do
     [ -f "$f" ] || continue
     b="${f##*/}"; n=$((n + 1))
-    if [ ! -e "$P/$d/$b" ]; then printf 'MISSING %s/%s\n' "$d" "$b"; bad=1
-    elif [ "$(h < "$f")" != "$(h < "$P/$d/$b")" ]; then printf 'DIFF %s/%s\n' "$d" "$b"; bad=1; fi
+    hint=""; [ "$d" = .cursor/hooks ] || hint=" (Antigravity, opt-in: refresh with install.sh --update --with-antigravity)"
+    if [ ! -e "$P/$d/$b" ]; then printf 'MISSING %s/%s%s\n' "$d" "$b" "$hint"; bad=1
+    elif [ "$(h < "$f")" != "$(h < "$P/$d/$b")" ]; then printf 'DIFF %s/%s%s\n' "$d" "$b" "$hint"; bad=1; fi
   done
 done
 rf_status "$P" "$RETIRED_LIST" || bad=1

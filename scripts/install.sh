@@ -2,7 +2,7 @@
 # install.sh — install the agents-v0 delivery kit into a target repo (Cursor).
 #
 # Usage:
-#   install.sh [--pack <id>] [--with-starters] <target-repo>
+#   install.sh [--pack <id>] [--with-starters] [--with-antigravity] <target-repo>
 #       First install: seeds .cursor/ adapter tree and project templates only where missing.
 #       --pack chooses which example pack's rules and skills land in .cursor (default
 #       java, the example cursor seed only). This does not set the profile Pack row.
@@ -13,7 +13,7 @@
 #       Pin the kit commit in docs/agents-v0/kit-pin and symlink .cursor and
 #       .agents-v0/scripts into that checkout. Kit files are not copied into the project.
 #
-#   install.sh --update [--quick] [--allow-in-flight] <target-repo>
+#   install.sh --update [--quick] [--allow-in-flight] [--with-antigravity] <target-repo>
 #       Runs validate-kit.sh, then refreshes kit-managed files (rules, agents,
 #       commands, skills, hooks, scripts, reference docs). Target-owned
 #       templates are seeded only when missing. The full validation builds and
@@ -21,6 +21,13 @@
 #       that one test (KIT_SKIP_APP_TEMPLATE_TEST=1) and keeps every other check,
 #       for an offline or air-gapped machine. --update refuses while a story is in
 #       progress (a state.json with a non-empty activePhase); --allow-in-flight overrides.
+#
+#   --with-antigravity (first install or --update; opt-in, Sensei agy scope A)
+#       Also installs or refreshes the Antigravity adapter tree: .agents/hooks.json and .agents/rules/org,
+#       agents, commands, skills and hooks (with the hook-python pin). The Antigravity adapter is unproven,
+#       so a default install or --update writes no .agents/ file, and an --update without this flag leaves an
+#       existing .agents/ exactly as it is (never deleted, moved or refreshed; install.sh prints a note).
+#       Not with --link (scripts/link-project.sh links the kit tree as it is).
 #
 #   --test-overrides (kit test suites only; kitfix-20261031-installed-no-overrides)
 #       Keeps the `# >>> kit-test-override` blocks in the installed .agents-v0/scripts. Without it (the
@@ -47,6 +54,7 @@ KIT="$(cd "$(dirname "$0")/.." && pwd)"
 UPDATE=0
 QUICK=0
 WITH_STARTERS=0
+WITH_ANTIGRAVITY=0
 LINK=0
 LINK_FORCE=0
 LINK_URL=""
@@ -60,7 +68,7 @@ TEST_OVERRIDES=0
 HOOK_PYTHON_ARG=""
 
 usage() {
-  printf 'usage: %s [--pack <id>] [--with-starters] [--git-hooks] [--hook-python <abs-path>] [--update [--quick] [--allow-in-flight]] [--test-overrides] <target-repo>\n' "$(basename "$0")" >&2
+  printf 'usage: %s [--pack <id>] [--with-starters] [--with-antigravity] [--git-hooks] [--hook-python <abs-path>] [--update [--quick] [--allow-in-flight]] [--test-overrides] <target-repo>\n' "$(basename "$0")" >&2
   printf '       %s --link --commit <sha> (--url <git-url> | --path <kit-dir>) [--force] <target-repo>\n' "$(basename "$0")" >&2
   exit 1
 }
@@ -322,7 +330,9 @@ install_templates() {
   [ -f "$t/.gitignore" ] || cp "$KIT/templates/.gitignore" "$t/.gitignore"
   if [ "$UPDATE" = 1 ]; then
     # User CI files stay byte-identical; unedited retired kit files move to trash/; edited ones stay, with a warning.
-    rf_cleanup "$t" "$RETIRED_LIST" || exit 1
+    # Without --with-antigravity the opt-in .agents/ tree is left exactly as it is (nothing moved to trash/).
+    if [ "$WITH_ANTIGRAVITY" = 1 ]; then rf_cleanup "$t" "$RETIRED_LIST" || exit 1
+    else rf_cleanup "$t" "$RETIRED_LIST" .agents/ || exit 1; fi
     cp "$KIT/AGENTS.md" "$t/AGENTS.md"
     # macOS AppleDouble files (._*) break Checkstyle and test globs; an existing .gitignore gains the rule.
     if [ -f "$t/.gitignore" ] && ! grep -Eq '^\._\*$' "$t/.gitignore"; then
@@ -538,6 +548,10 @@ while [ $# -gt 0 ]; do
       WITH_STARTERS=1
       shift
       ;;
+    --with-antigravity)
+      WITH_ANTIGRAVITY=1
+      shift
+      ;;
     --link)
       LINK=1
       shift
@@ -600,6 +614,7 @@ if [ -n "$PACK" ] && [ ! -f "$KIT/core/$PACK/pack.json" ]; then
 fi
 [ "$QUICK" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --quick applies to --update only\n' >&2; usage; }
 [ "$ALLOW_IN_FLIGHT" = 0 ] || [ "$UPDATE" = 1 ] || { printf 'error: --allow-in-flight applies to --update only\n' >&2; usage; }
+[ "$WITH_ANTIGRAVITY" = 0 ] || [ "$LINK" = 0 ] || { printf 'error: --with-antigravity applies to a copy install or --update, not --link\n' >&2; usage; }
 [ -d "$TARGET" ] || { printf 'error: target not found: %s\n' "$TARGET" >&2; exit 1; }
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
@@ -707,7 +722,11 @@ if [ "$WITH_STARTERS" = 1 ]; then
   install_starters "$TARGET_ABS"
 fi
 install_cursor "$TARGET_ABS"
-install_antigravity "$TARGET_ABS"
+if [ "$WITH_ANTIGRAVITY" = 1 ]; then
+  install_antigravity "$TARGET_ABS"
+elif [ -e "$TARGET_ABS/.agents" ]; then
+  printf 'NOTE: .agents/ (Antigravity adapter, opt-in) left as is; refresh it with install.sh --update --with-antigravity\n'
+fi
 ignore_hook_python "$TARGET_ABS"
 sh "$TARGET_ABS/.agents-v0/scripts/update-agents-model.sh"
 
