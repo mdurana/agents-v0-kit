@@ -533,6 +533,127 @@ REMOTE_WRITE_CASES = [
 # Unattended mode with an allow-list that would approve these commands if they were only an ask.
 REMOTE_WRITE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(gh:*),Shell(glab:*),Shell(git:push*),Shell(git:*)"}
 
+# Jiraiya's third look (items A and B, onboard fix, Sasuke): every other push spelling and every gh call that is not a
+#   known read. Judged in-process (one import of hook-policy.py, no process per case) to keep tier 1 inside its time
+#   limit; inproc_parity() checks that the in-process verdict matches the real entry for a block and an allow.
+#   Each case runs attended and unattended, like REMOTE_WRITE_CASES.
+REMOTE_WRITE_INPROC_CASES = [
+    # Jiraiya third look, item A: push in every spelling (Sensei's full token stays on the box; the hook is the block)
+    ("git-push origin main", "block"),
+    ("/usr/lib/git-core/git-push origin main", "block"),
+    ("/usr/libexec/git-core/git-send-pack ../bare main", "block"),
+    ("git lfs push origin main", "block"),
+    ("git lfs push --all origin", "block"),
+    ("git-lfs push origin main", "block"),
+    ("git submodule foreach git push", "block"),
+    ("git submodule foreach --recursive 'git push origin HEAD'", "block"),
+    ("git submodule foreach 'gh pr create --fill'", "block"),
+    ("git send-email --to=x@example.invalid HEAD~1", "block"),
+    ("git-send-email HEAD~1", "block"),
+    ("git imap-send < 0001.patch", "block"),
+    ("git p4 submit", "block"),
+    ("git svn dcommit", "block"),
+    ("git http-push https://example.invalid/r.git main", "block"),
+    ("find . -name .git -exec git push \\;", "block"),
+    ("find . -maxdepth 1 -type d -execdir git -C {} push +", "block"),
+    ("find . -ok gh pr merge 12 \\;", "block"),
+    ("x=push; git $x", "block"),
+    ("x=push; git \"$x\" origin main", "block"),
+    ("git ${x} origin main", "block"),
+    ("git $(echo push) origin main", "block"),
+    ("git `echo push`", "block"),
+    ("git -C . $op origin", "block"),
+    ("git lfs ls-files", "allow"),
+    ("git submodule foreach git status", "allow"),
+    ("git submodule status", "allow"),
+    ("find . -name '*.java' -exec grep -l Foo {} +", "allow"),
+    # Jiraiya third look, item B: more gh writes, gh auth token, unknown subcommands (aliases, extensions)
+    ("gh ssh-key add ~/.ssh/id_ed25519.pub", "block"),
+    ("gh ssh-key delete 1", "block"),
+    ("gh gpg-key add key.asc", "block"),
+    ("gh extension install owner/gh-ext", "block"),
+    ("gh ext install owner/gh-ext", "block"),
+    ("gh extension upgrade --all", "block"),
+    ("gh project item-add 1 --owner o --url https://github.com/o/r/issues/1", "block"),
+    ("gh project create --owner o --title x", "block"),
+    ("gh project item-edit --id x", "block"),
+    ("gh project field-create 1 --owner o --name x", "block"),
+    ("gh project delete 1 --owner o", "block"),
+    ("gh project close 1 --owner o", "block"),
+    ("gh project link 1 --owner o --repo r", "block"),
+    ("gh codespace create -r o/r", "block"),
+    ("gh cs create", "block"),
+    ("gh codespace ssh", "block"),
+    ("gh auth setup-git", "block"),
+    ("gh auth logout", "block"),
+    ("gh auth login --with-token", "block"),
+    ("gh auth refresh -s delete_repo", "block"),
+    ("gh auth token", "block"),
+    ("gh auth token -h github.com", "block"),
+    ("gh co 1", "block"),
+    ("gh ship", "block"),
+    ("gh my-extension run", "block"),
+    ("gh config set editor vim", "block"),
+    ("gh repo deploy-key add key.pub", "block"),
+    ("gh secret set TOKEN", "block"),
+    ("gh org list", "allow"),
+    ("gh auth status", "allow"),
+    ("gh search prs --author @me", "allow"),
+    ("gh run view 12 --log", "allow"),
+    ("gh run list", "allow"),
+    ("gh workflow list", "allow"),
+    ("gh issue view 3", "allow"),
+    ("gh status", "allow"),
+    ("gh project list --owner o", "allow"),
+    ("gh project item-list 1 --owner o", "allow"),
+    ("gh codespace list", "allow"),
+    ("gh extension list", "allow"),
+    ("gh ssh-key list", "allow"),
+    ("gh repo deploy-key list", "allow"),
+    ("gh --version", "allow"),
+    ("gh help pr", "allow"),
+    ("gh pr view 12 --json title", "allow"),
+    # a variable or substitution as the command name cannot be judged: refused
+    ("g=gh; $g pr create --fill", "block"),
+    ("$g pr merge 12", "block"),
+    ("\"$GH\" pr merge 12", "block"),
+    ("${GH:-gh} pr merge 12", "block"),
+    ("$(which gh) pr create --fill", "block"),
+    ("`which git` push origin main", "block"),
+    ("cmd=git; $cmd push", "block"),
+]
+_HOOK_ENV_KEYS = ("HOOK_CWD", "AGY_ALLOW_TOOLS", "TEST_ROOT", "PLAN_DIR", "CURSOR_CONFIG_DIR")
+
+
+def load_policy():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("kit_hook_policy_inproc", POLICY)
+    hp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hp)
+    return hp
+
+
+def inproc_shell(hp, cmd: str, env: dict = None) -> str:
+    """The verdict main() would print for `hook-policy.py shell` with HOOK_CMD=cmd, without a new process."""
+    saved = {k: os.environ.get(k) for k in _HOOK_ENV_KEYS}
+    for k in _HOOK_ENV_KEYS:
+        os.environ.pop(k, None)
+    os.environ.update(env or {})
+    old = os.getcwd()
+    os.chdir(CWD or old)
+    try:
+        action, _msg = hp.classify_command(cmd)
+        if action == "allow" and hp.may_print_secrets(cmd):
+            action = "block"
+        return action
+    finally:
+        os.chdir(old)
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
 # N10 / N46 (onboard fix, Sasuke): gate-rules and the secret allow-list are guard files. An agent cannot edit,
 #   replace, rename, restore or remove them, by the edit tool or by the shell (SOC-11).
 SECRET_ALLOWLIST_PATH_CASES = [
@@ -1199,6 +1320,13 @@ def main() -> int:
     for cmd, want in REMOTE_WRITE_CASES:
         check(shell(cmd), want, f"N63/E33 remote write (attended) `{cmd}`")
         check(shell(cmd, env=REMOTE_WRITE_UNATTENDED_ENV), want, f"N63/E33 remote write (unattended) `{cmd}`")
+    hp = load_policy()
+    for cmd in ("gh auth token", "gh pr view 12"):  # the in-process verdict is the entry point's verdict
+        check(inproc_shell(hp, cmd), shell(cmd), f"in-process parity `{cmd}`")
+    for cmd, want in REMOTE_WRITE_INPROC_CASES:
+        check(inproc_shell(hp, cmd), want, f"Jiraiya A/B remote write (attended, in-process) `{cmd}`")
+        check(inproc_shell(hp, cmd, REMOTE_WRITE_UNATTENDED_ENV), want,
+              f"Jiraiya A/B remote write (unattended, in-process) `{cmd}`")
     for p, want in SECRET_ALLOWLIST_PATH_CASES:
         check(path(p), want, f"N10/N46 guard file path {p}")
     for cmd, want in SECRET_ALLOWLIST_SHELL_CASES:
@@ -1254,7 +1382,8 @@ def main() -> int:
         check(got, want, f"JN-4 shell/session start-up {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + len(SECRET_ALLOWLIST_PATH_CASES)
+    total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
+             + len(SECRET_ALLOWLIST_PATH_CASES)
              + len(SECRET_ALLOWLIST_SHELL_CASES) + len(stcases) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
