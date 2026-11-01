@@ -87,7 +87,7 @@ SHELL_CASES = [
     ("cd x && git push --force", "block"),
     ("git status; git reset --hard", "block"),
     ("git clean -fdx", "block"),
-    ("git push", "ask"),
+    ("git push", "block"),  # N11C: an agent never pushes, in any mode (was ask at 36b86cf)
     ("git commit -m x", "ask"),
     # kitfix-20261031-installed-no-overrides: no test-override reinstall, no policy edit by shell
     ("sh ../kit/scripts/install.sh --update --test-overrides .", "block"),
@@ -253,16 +253,17 @@ SHELL_CASES = [
     ("glab mr approve 12", "block"),
     ("glab api -X PUT projects/1/merge_requests/2/merge", "block"),
     ("glab api projects/1/merge_requests/2/approve -X POST", "block"),
-    ("glab api -X POST projects/1/issues", "ask"),
-    ("glab api projects/1/merge_requests/2 -f title=x", "ask"),
+    # N11C (Sasuke, onboard fix): every glab write is denied in every mode (these asked at 36b86cf).
+    ("glab api -X POST projects/1/issues", "block"),
+    ("glab api projects/1/merge_requests/2 -f title=x", "block"),
     ("glab api projects/1/merge_requests/2", "allow"),
-    ("glab mr create --fill", "ask"),
+    ("glab mr create --fill", "block"),
     ("glab mr view 12", "allow"),
     ("glab mr list", "allow"),
-    ("glab ci trigger delivery-approval", "ask"),
+    ("glab ci trigger delivery-approval", "block"),
     ("glab ci status", "allow"),
-    ("glab release create v1.0.0", "ask"),
-    ("glab variable set TOKEN x", "ask"),
+    ("glab release create v1.0.0", "block"),
+    ("glab variable set TOKEN x", "block"),
     ("git tag v1.0.0", "ask"),
     ("git tag -a v1.0.0 -m x", "ask"),
     ("git tag -d v1.0.0", "ask"),
@@ -416,6 +417,150 @@ PATH_CASES = [
     ("docs/agents-v0/program.state.json", "block"),
     ("docs/agents-v0/milestones/p0.md", "ask"),
     ("src/Main.java", "allow"),
+]
+
+
+# N63 / E33 (onboard fix, Sasuke): gh, glab and git push writes are denied for an agent in every mode (N11C), on both
+#   hook flavours (one hook-policy.py). Read-only calls stay allowed. Each case runs attended and unattended (an
+#   allow-list that would otherwise approve the command), so no mode turns the deny into an ask or an allow.
+REMOTE_WRITE_CASES = [
+    # gh pull requests: create, merge, approve and other writes
+    ("gh pr create --fill", "block"),
+    ("gh pr merge 12 --squash", "block"),
+    ("gh pr merge --auto --merge 12", "block"),
+    ("gh pr review 12 --approve", "block"),
+    ("gh pr review --approve", "block"),
+    ("gh -R org/repo pr merge 12", "block"),
+    ("gh pr close 12", "block"),
+    ("gh pr edit 12 --title x", "block"),
+    ("gh pr comment 12 --body x", "block"),
+    ("gh pr view 12", "allow"),
+    ("gh pr list", "allow"),
+    ("gh pr diff 12", "allow"),
+    ("gh pr checks 12", "allow"),
+    ("gh pr status", "allow"),
+    # gh repo writes
+    ("gh repo create org/new --private", "block"),
+    ("gh repo delete org/old --yes", "block"),
+    ("gh repo edit --visibility public", "block"),
+    ("gh repo rename new-name", "block"),
+    ("gh repo archive org/old", "block"),
+    ("gh repo fork org/repo", "block"),
+    ("gh repo view org/repo", "allow"),
+    ("gh repo list org", "allow"),
+    # gh release writes
+    ("gh release create v1.0.0", "block"),
+    ("gh release delete v1.0.0 --yes", "block"),
+    ("gh release edit v1.0.0 --draft=false", "block"),
+    ("gh release upload v1.0.0 app.zip", "block"),
+    ("gh release view v1.0.0", "allow"),
+    ("gh release list", "allow"),
+    # gh api: a non-GET method or any field / input is a write; a plain GET is a read
+    ("gh api repos/o/r/pulls/1/merge -X PUT", "block"),
+    ("gh api -X DELETE repos/o/r", "block"),
+    ("gh api --method PATCH repos/o/r", "block"),
+    ("gh api --method=PATCH repos/o/r", "block"),
+    ("gh api -XPOST repos/o/r/issues", "block"),
+    ("gh api repos/o/r/issues -f title=x", "block"),
+    ("gh api repos/o/r/issues -F title=x", "block"),
+    ("gh api repos/o/r/issues --field title=x", "block"),
+    ("gh api repos/o/r/issues --raw-field title=x", "block"),
+    ("gh api repos/o/r/issues --input body.json", "block"),
+    ("gh api graphql -f query='mutation { x }'", "block"),
+    ("gh api repos/o/r/pulls/1", "allow"),
+    ("gh api -X GET repos/o/r/pulls", "allow"),
+    ("gh api --method GET repos/o/r", "allow"),
+    ("gh api repos/o/r/pulls --jq '.[].title'", "allow"),
+    # glab writes (merge and approve already blocked; the rest asked at 36b86cf)
+    ("glab mr merge 12", "block"),
+    ("glab mr approve 12", "block"),
+    ("glab mr create --fill", "block"),
+    ("glab mr update 12 --title x", "block"),
+    ("glab mr close 12", "block"),
+    ("glab api -X POST projects/1/issues", "block"),
+    ("glab api projects/1/issues --method=POST", "block"),
+    ("glab ci run", "block"),
+    ("glab release create v1.0.0", "block"),
+    ("glab variable set TOKEN x", "block"),
+    ("glab mr view 12", "allow"),
+    ("glab api projects/1/merge_requests", "allow"),
+    # git push to any remote (force-push already blocked)
+    ("git push", "block"),
+    ("git push origin feature/x", "block"),
+    ("git push -u origin HEAD", "block"),
+    ("git push --mirror backup", "block"),
+    ("git push --tags", "block"),
+    ("git -C ../other push origin main", "block"),
+    ("git -c remote.origin.url=https://example.invalid/x.git push origin main", "block"),
+    ("git --git-dir=.git push origin main", "block"),
+    ("git send-pack ../bare main", "block"),
+    ("git subtree push --prefix=lib origin lib", "block"),
+    ("git -c alias.p=push p origin main", "block"),
+    ("git -c 'alias.sync=!git push' sync", "block"),
+    ("git config alias.ship push", "block"),
+    ("git config --global alias.ship '!git push origin HEAD'", "block"),
+    ("git stash push -m wip", "allow"),
+    ("git fetch", "allow"),
+    ("git status", "allow"),
+    ("git log --oneline -3", "allow"),
+    # E33 evasion forms: env prefixes, wrappers, absolute paths, quoting, sh -c, chains, substitution, aliases
+    ("GH_TOKEN=x gh pr merge 12", "block"),
+    ("env GH_TOKEN=x gh api -X DELETE repos/o/r", "block"),
+    ("env -u GH_HOST gh pr merge 12", "block"),
+    ("command gh pr merge 12", "block"),
+    ("/usr/bin/gh pr merge 12", "block"),
+    ("/opt/homebrew/bin/gh pr create --fill", "block"),
+    ("\\gh pr merge 12", "block"),
+    ("'gh' pr merge 12", "block"),
+    ('"gh" "pr" "merge" 12', "block"),
+    ("sh -c 'gh pr merge 12'", "block"),
+    ("bash -c \"gh api -X DELETE repos/o/r\"", "block"),
+    ("bash -lc 'git push origin main'", "block"),
+    ("nohup gh release create v1 &", "block"),
+    ("timeout 30 git push origin main", "block"),
+    ("xargs gh pr merge < ids.txt", "block"),
+    ("eval 'git push origin main'", "block"),
+    ("echo $(gh pr merge 12)", "block"),
+    ("git status && git push origin main", "block"),
+    ("true; glab mr create --fill", "block"),
+    ("/usr/bin/git push origin main", "block"),
+    ("command git push", "block"),
+    ("env GIT_TRACE=1 git push origin main", "block"),
+    ("/usr/local/bin/glab mr create", "block"),
+    ("gh alias set ship 'pr merge'", "block"),
+    ("glab alias set ship 'mr merge'", "block"),
+]
+# Unattended mode with an allow-list that would approve these commands if they were only an ask.
+REMOTE_WRITE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(gh:*),Shell(glab:*),Shell(git:push*),Shell(git:*)"}
+
+# N10 / N46 (onboard fix, Sasuke): gate-rules and the secret allow-list are guard files. An agent cannot edit,
+#   replace, rename, restore or remove them, by the edit tool or by the shell (SOC-11).
+SECRET_ALLOWLIST_PATH_CASES = [
+    (".agents-v0/secret-allowlist.json", "block"),
+    ("/w/portal/.agents-v0/secret-allowlist.json", "block"),
+    (".agents-v0/scripts/gate-rules", "block"),
+    ("/w/portal/.agents-v0/scripts/gate-rules", "block"),
+    (".agents-v0/scripts/secret_scan.py", "block"),
+    ("docs/agents-v0/secret-allowlist.json", "allow"),
+]
+SECRET_ALLOWLIST_SHELL_CASES = [
+    ("sed -i s/x/y/ .agents-v0/secret-allowlist.json", "block"),
+    ("echo '{}' > .agents-v0/secret-allowlist.json", "block"),
+    ("printf x | tee .agents-v0/secret-allowlist.json", "block"),
+    ("cp /tmp/a.json .agents-v0/secret-allowlist.json", "block"),
+    ("mv .agents-v0/secret-allowlist.json /tmp/a.json", "block"),
+    ("rm .agents-v0/secret-allowlist.json", "block"),
+    ("git rm .agents-v0/secret-allowlist.json", "block"),
+    ("git mv .agents-v0/secret-allowlist.json x.json", "block"),
+    ("git checkout other -- .agents-v0/secret-allowlist.json", "block"),
+    ("git restore --source=other .agents-v0/secret-allowlist.json", "block"),
+    ("python3 -c \"open('.agents-v0/secret-allowlist.json','w').write('{}')\"", "block"),
+    ("sed -i s/x/y/ .agents-v0/scripts/gate-rules", "block"),
+    ("echo x >> .agents-v0/scripts/gate-rules", "block"),
+    ("git checkout other -- .agents-v0/scripts/gate-rules", "block"),
+    ("cat .agents-v0/secret-allowlist.json", "allow"),
+    ("git show HEAD:.agents-v0/secret-allowlist.json", "allow"),
+    ("cat .agents-v0/scripts/gate-rules", "allow"),
 ]
 
 
@@ -633,7 +778,7 @@ def kit_git_cases(tmp: str) -> list:
             ("git show HEAD:.agents-v0/policy.conf", "allow", "show own blob"), ("git cat-file -p HEAD", "allow", "cat-file own"),
             ("git -C ../portal-feat log -1", "allow", "-C sibling worktree (same repo)"), (f"git -C {feat} status", "allow", "-C worktree"),
             (f"git -C {lib} log -1", "allow", "-C an unrelated repo"), ("git worktree list", "allow", "worktree list"),
-            ("git push origin feature/x", "ask", "push asks as before"), (f"ls -la {b}", "allow", "ls a bundle")]:
+            ("git push origin feature/x", "block", "push is denied in every mode (N11C)"), (f"ls -la {b}", "allow", "ls a bundle")]:
         add(cmd, want, label=label)
     add("git fetch origin", "allow", label="fetch origin from the worktree", cwd=feat)
     add(f"git clone {b} /tmp/kitx", "allow", env={}, label="attended: clone (unchanged)")
@@ -987,6 +1132,13 @@ def main() -> int:
         check(shell(cmd), want, f"shell `{cmd}`")
     for p, want in PATH_CASES:
         check(path(p), want, f"path {p}")
+    for cmd, want in REMOTE_WRITE_CASES:
+        check(shell(cmd), want, f"N63/E33 remote write (attended) `{cmd}`")
+        check(shell(cmd, env=REMOTE_WRITE_UNATTENDED_ENV), want, f"N63/E33 remote write (unattended) `{cmd}`")
+    for p, want in SECRET_ALLOWLIST_PATH_CASES:
+        check(path(p), want, f"N10/N46 guard file path {p}")
+    for cmd, want in SECRET_ALLOWLIST_SHELL_CASES:
+        check(shell(cmd), want, f"N10/N46 guard file shell `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1032,7 +1184,8 @@ def main() -> int:
         check(got, want, f"JN-4 shell/session start-up {label}: `{arg}`")
     shutil.rmtree(tmp, ignore_errors=True)
 
-    total = (len(SHELL_CASES) + len(PATH_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+    total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + len(SECRET_ALLOWLIST_PATH_CASES)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

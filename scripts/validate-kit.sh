@@ -313,6 +313,9 @@ sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
 # SOC-4/SOC-9: the shared staged-content secret scan (secret_scan.py, its allow-list, check-lessons parity).
 [ -f scripts/test-secret-scan.py ] || err "scripts/test-secret-scan.py missing"
 python3 scripts/test-secret-scan.py || err "scripts/test-secret-scan.py failed"
+# N11C/N64: gh, glab and git push are denied through the agy hook entry point, in every mode.
+[ -f scripts/test-agy-remote-writes.sh ] || err "scripts/test-agy-remote-writes.sh missing"
+sh scripts/test-agy-remote-writes.sh || err "scripts/test-agy-remote-writes.sh failed"
 # JO-1..JO-4 (Sai): gate-checks.sh and its rules file, driven through the onboard gate.
 [ -f scripts/test-gate-checks.sh ] || err "scripts/test-gate-checks.sh missing"
 sh scripts/test-gate-checks.sh || err "scripts/test-gate-checks.sh failed"
