@@ -170,7 +170,7 @@ gate_committed() {
     refuse gate_committed "the onboard gate is not committed (check-gate-commit.sh); commit it, then tag it onboard-v<n>"
   fi
   case "$gc_out" in *"skipped (kit test override)"*)
-    refuse gate_committed "check-gate-commit.sh skipped its check (AGENTS_V0_SKIP_COMMIT_CHECK); a skipped check is not a gate commit" ;;
+    refuse gate_committed "check-gate-commit.sh skipped its check (kit test override); a skipped check is not a gate commit" ;;
   esac
   gc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
   [ -n "$gc_n" ] || refuse gate_committed "no onboard-v<n> tag on the onboard gate commit; tag it: git tag -a onboard-v1 -m \"onboard approved\""
