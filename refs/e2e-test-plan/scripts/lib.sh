@@ -263,6 +263,8 @@ classify(){ # <rc> <stderr> <jsonl> <stalled>
   else echo AGENT-ERROR; fi; }
 run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; sets TURN_CLASS
   local k="$1" msg="$2" allow="$3" rem cap pid rc sz last=0 lastch st=0 mark drv
+  # N84: once the gate ledger changed in this run, no further turn starts (the run stops for a person)
+  [ ! -e "$RUN/LEDGER-CHANGED" ] || { TURN_CLASS=LEDGER; return; }
   rem=$(( RUN_DEADLINE - $(now) )); cap=$TURN_CAP; [ "$rem" -lt "$cap" ] && cap=$rem; [ "$cap" -gt 60 ] || { TURN_CLASS=CAP; return; }
   printf '%s\n' "$msg" > "$RUN/turn-$k.prompt"; printf '%s\n' "$allow" > "$RUN/turn-$k.allow"
   # kitfix-20261031-tools-root: on a V3 copy or with REQUIRE_FAIL_MODES=1 the turn loop gets no ~/.local/bin (the agent's
@@ -292,6 +294,7 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   gate_chain "$WS" HEAD > "$RUN/gate-chain-before-$k.tsv" 2>/dev/null || :   # HARNESS-FIX 2026-10-31 (H9)
   kit_integrity "$MAIN" "$WS" > "$RUN/kit-integrity-before-$k.tsv" 2>/dev/null || :   # HARNESS-FIX 2026-10-31 (H10)
   harness_integrity > "$RUN/harness-integrity-before-$k.tsv" 2>/dev/null || :   # kitfix-20261031-harness-lock (H10)
+  ledger_turn_mark "$k" || { rm -f "$WS/.agents/hooks/unattended-allow" 2>/dev/null; TURN_CLASS=LEDGER; return; }   # N84: the gate ledger's mark before the turn (fail closed)
   local audit_a_before=0 audit_c_before=0
   [ -f "$WS/.agents/hooks/audit.jsonl" ] && audit_a_before=$(wc -l < "$WS/.agents/hooks/audit.jsonl" | tr -d ' ')
   [ -f "$WS/.cursor/hooks/audit.jsonl" ] && audit_c_before=$(wc -l < "$WS/.cursor/hooks/audit.jsonl" | tr -d ' ')
@@ -327,6 +330,7 @@ run_turn(){ # <k> <message> <allow csv or -> ; uses RUN WS CHAT RUN_DEADLINE ; s
   guard_override_scan "$k"; gate_chain_check "$k"   # HARNESS-FIX 2026-10-31 (kitfix-20261031-guard-override: H8, H9)
   kit_integrity_check "$k"   # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides: H10)
   harness_integrity_check "$k"   # kitfix-20261031-harness-lock (H10)
+  ledger_turn_check "$k" || :   # N84: compare the gate ledger with its mark; a change sets TURN_CLASS=LEDGER
   state_dump > "$RUN/state-after-$k.tsv"
   printf 'turn-%s\trc=%s\tclass=%s\n' "$k" "$rc" "$TURN_CLASS" >> "$RUN/turns.tsv"
   post TURN-END "run=${RUN##*/} turn=$k class=$TURN_CLASS rc=$rc"; }
@@ -347,7 +351,7 @@ gate_pending(){ local g; gfile="$(comm -13 "$RUN/state-before-$1.tsv" "$RUN/stat
 # drive_run <name> <workspace> <prompt> <context> "<allowed gates>" <timeout>
 #   allowed gates: words from approvals.tsv (roadmap architecture plan onboard intake design build verify maintain release branch)
 #   context: scripted-answers.tsv context (phase name, or "negative")
-# Sets RUN (evidence dir), RUN_END (NORMAL-END|GATE-HELD|CAP|STALL|INFRA|USAGE|AUTH|AGENT-ERROR|MAX-TURNS), GATES_SENT.
+# Sets RUN (evidence dir), RUN_END (NORMAL-END|GATE-HELD|CAP|STALL|INFRA|USAGE|AUTH|AGENT-ERROR|MAX-TURNS|LEDGER), GATES_SENT.
 drive_run(){
   local name="$1" ws="$2" prompt="$3" ctx="$4" allowed="$5" tmo="$6" n=1 try=0 k gate gfile line text allow answers sent
   local pg="${IN_STORY_GATE:-}" pgf="${IN_STORY_GATE_FILE:-}" mfile   # STAGED HARNESS-FIX 2026-10-30 (in-story resume)
@@ -397,6 +401,8 @@ drive_run(){
       esac
       case "$TURN_CLASS" in
         USAGE|AUTH) halt "$TURN_CLASS in ${RUN##*/}"; RUN_END=$TURN_CLASS; return 0;;
+        LEDGER) halt "LEDGER-CHANGED in ${RUN##*/}: the gate ledger changed during an unattended turn (N84), stop the run and ask the user (see ${RUN##*/}/LEDGER-CHANGED)"
+                RUN_END=LEDGER; return 0;;
         STALL|INFRA) RUN_END=$TURN_CLASS; break;;
         CAP|AGENT-ERROR) RUN_END=$TURN_CLASS; return 0;;
       esac
@@ -453,6 +459,7 @@ SEMI=0
 harness_complete(){ # <gate> <allow> <state file>
   local g="$1" a="$2" f="$3" w slug
   [ "$a" != - ] || return 0
+  [ ! -e "$RUN/LEDGER-CHANGED" ] || return 0   # N84: the run stops for a person, the harness completes no gate
   case "$g" in
     branch) slug="${STORY_SLUG:-}"; [ -n "$slug" ] || return 0
             if [ "${STORY_KIND:-feature}" = maintain ]; then [ -n "$(wt_for_branch "maintain/$slug")" ] && return 0
@@ -718,6 +725,37 @@ turn-$k: gate commits out of order: $(tr '\n' ';' < "$RUN/gate-chain-order-$k.tx
   [ -n "$out" ] || return 0
   printf '%s\n' "${out#?}" >> "$RUN/GATE-CHAIN-BROKEN"
   post FINDING "H9 run=${RUN##*/} turn=$k: story gate commits rewritten or out of order (see ${RUN##*/}/GATE-CHAIN-BROKEN)"; }
+# N84 (design rev 6, "Ledger integrity (N3A)": unattended runs compare the gate ledger before and after each turn).
+#   The installed gate-checks.sh does the compare: ledger_mark before the turn, ledger_turn_ok <mark> <FAIL seen>
+#   <REOPEN-REFUSED seen> after it. The harness passes 0 and 0: no kit script writes FAIL lines yet (gate-checks.sh
+#   gap 10), and the harness cannot see from outside the turn whether a --reopen run was refused after the ledger
+#   check, so it claims none (the stricter, fail-closed reading). Any line appended during an unattended turn, a
+#   GRANT-USED line, an edit, a cut or a deleted ledger stops the run: $RUN/LEDGER-CHANGED, a FINDING,
+#   TURN_CLASS=LEDGER, and drive_run halts (HALT). A mark that cannot be taken stops the run before the turn starts.
+#   A gate commit in the turn (staged_secret_scan's ledger trailer step) may create the empty ledger (OK), or name an
+#   unnamed grant line stale with a REOPEN-REFUSED grant=<sha> line (2d60290b), which also stops the run.
+#   A kit without the N3A ledger (no gate-checks.sh with ledger_mark in WS or MAIN) is skipped (ledger-mark-<k>.na).
+#   H10 (kit_integrity_check) reports a gate-checks.sh changed during the turn.
+ledger_gc_dir(){ local d; for d in "$WS" "$MAIN"; do
+    [ -n "$d" ] && [ -f "$d/.agents-v0/scripts/gate-checks.sh" ] && grep -q '^  ledger_mark)' "$d/.agents-v0/scripts/gate-checks.sh" 2>/dev/null \
+      && { printf '%s\n' "$d"; return 0; }; done; return 1; }
+ledger_stop(){ printf 'turn-%s %s\n' "$1" "$2" >> "$RUN/LEDGER-CHANGED"; TURN_CLASS=LEDGER
+  post FINDING "N84 run=${RUN##*/} turn=$1: the gate ledger changed during the unattended turn, the run stops for a person (see ${RUN##*/}/LEDGER-CHANGED)"; }
+# ledger_turn_mark <k>: writes "<dir>\t<mark>" to $RUN/ledger-mark-<k>; returns 1 (run stops) when the mark fails.
+ledger_turn_mark(){ local k="$1" d out rc=0
+  d="$(ledger_gc_dir)" || { echo "no gate-checks.sh with ledger_mark in the workspace: no N3A ledger to compare" > "$RUN/ledger-mark-$k.na"; return 0; }
+  out="$(cd "$d" && sh .agents-v0/scripts/gate-checks.sh ledger_mark 2>&1)" || rc=$?
+  if [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -Eqx 'absent|lines=(0|[1-9][0-9]*) sha256=[0-9a-f]{64}'; then
+    printf '%s\t%s\n' "$d" "$out" > "$RUN/ledger-mark-$k"; return 0; fi
+  ledger_stop "$k" "ledger_mark before the turn failed (rc=$rc): $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }
+# ledger_turn_check <k>: after turn k, ledger_turn_ok against the mark; returns 1 (run stops) on anything but OK.
+ledger_turn_check(){ local k="$1" d mark out rc=0
+  [ -s "$RUN/ledger-mark-$k" ] || return 0
+  IFS="$(printf '\t')" read -r d mark < "$RUN/ledger-mark-$k"
+  out="$(cd "$d" && sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok "$mark" 0 0 2>&1)" || rc=$?
+  printf '%s\n' "$out" > "$RUN/ledger-turn-$k.txt"
+  [ "$rc" != 0 ] || return 0
+  ledger_stop "$k" "ledger_turn_ok rc=$rc: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; return 1; }
 # HARNESS-FIX 2026-10-31 (kitfix-20261031-installed-no-overrides, H10). The real defence against an agent
 #   switching a kit check off is that the installed scripts no longer read any AGENTS_V0_* override (install.sh strips
 #   that code; H8 above is only a text speed bump). What is left is changing the installed kit itself: editing,

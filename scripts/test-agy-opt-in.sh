@@ -135,7 +135,7 @@ if sh "$KIT/scripts/install.sh" --with-antigravty "$U" > "$T1_TMP/typo.log" 2>&1
 else pass "unknown option --with-antigravty: install.sh exits non-zero"; fi
 has "unknown option: the error names it" "$T1_TMP/typo.log" "unknown option: --with-antigravty"
 [ ! -e "$U/.cursor" ] && [ ! -e "$U/.agents" ] && [ ! -e "$U/.agents-v0" ] && [ -z "$(git -C "$U" status --porcelain)" ] && pass "unknown option: the target is untouched" || fail "unknown option: the target is untouched"
-if sh "$KIT/scripts/install.sh" --update --quick --bogus "$A" > "$T1_TMP/typo2.log" 2>&1; then fail "unknown option with --update: refused"
+if KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --update --quick --bogus "$A" > "$T1_TMP/typo2.log" 2>&1; then fail "unknown option with --update: refused"
 else has "unknown option with --update: refused, option named" "$T1_TMP/typo2.log" "unknown option: --bogus"; fi
 t1_install "$U" --with-antigravity && [ -f "$U/.agents/hooks.json" ] && pass "the correctly spelled --with-antigravity still installs" || fail "the correctly spelled --with-antigravity still installs"
 V="$(t1_repo dashdash --commit)"
