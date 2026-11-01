@@ -256,10 +256,9 @@ grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pa
 grep -Fq '.agents-v0/scripts/[^/]+\.(sh|py)$' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.{sh,py} script"
 grep -Fq '.agents-v0/hooks/' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/hooks/ git hook"
 grep -Fq 'AGENTS\.md$' core/common/hooks/hook-policy.py || err "hook-policy must protect AGENTS.md"
-grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX"
-python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' templates/.gitlab-ci.yml >/dev/null 2>&1 || err ".gitlab-ci.yml does not parse as YAML"
-for ci_ref in $(grep -oE '\.agents-v0/scripts/[A-Za-z0-9_-]+\.sh' templates/.gitlab-ci.yml | sort -u); do
-  [ -f "templates/$ci_ref" ] || err ".gitlab-ci.yml names $ci_ref but templates/$ci_ref does not exist"
+# E28: GitLab CI is retired (the files sit in trash/gitlab-ci-retired-20261102/); they must not be shipped again.
+for gl_retired in templates/.gitlab-ci.yml templates/.gitlab/CODEOWNERS templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh; do
+  [ ! -e "$gl_retired" ] || err "$gl_retired: retired GitLab file is shipped again (E28); it belongs in trash/gitlab-ci-retired-20261102/"
 done
 grep -Fq 'endpoint-stacks.md' templates/.agents-v0/scripts/discover-codebase.sh || err "discover-codebase.sh must propose non-Spring endpoint rows"
 grep -Fq 'import endpoint_scan' templates/.agents-v0/scripts/discover-codebase.sh || err "discover-codebase.sh must use the shared endpoint scanner"
@@ -365,12 +364,13 @@ cmp -s scripts/audit-brownfield-baseline.sh templates/.agents-v0/scripts/audit-b
 [ -f scripts/test-baseline-record.sh ] || err "scripts/test-baseline-record.sh missing (JO-15a)"
 sh scripts/test-baseline-record.sh || err "scripts/test-baseline-record.sh failed"
 # Onboard fix (Sensei 2026-11-02 00:38, option A): --update archives retired kit files to trash/, never removes.
-for f in scripts/lib/retired-files.sh scripts/lib/retired-files.txt scripts/test-update-retired-cleanup.sh; do
+for f in scripts/lib/retired-files.sh scripts/lib/retired-files.txt scripts/test-update-retired-cleanup.sh scripts/test-gitlab-retired.sh; do
   [ -f "$f" ] || err "$f missing (retired-files cleanup)"
 done
 ! grep -v '^[[:space:]]*#' scripts/lib/retired-files.sh | grep -Eq '(^|[^A-Za-z0-9_-])(rm|unlink|rmdir)([[:space:]]|$)' \
   || err "scripts/lib/retired-files.sh holds rm or unlink (N69: the cleanup moves files to trash/, it never removes)"
 sh scripts/test-update-retired-cleanup.sh || err "scripts/test-update-retired-cleanup.sh failed"
+sh scripts/test-gitlab-retired.sh || err "scripts/test-gitlab-retired.sh failed"
 sh scripts/test-maintain.sh || err "scripts/test-maintain.sh failed"
 [ -f scripts/test-design-build.sh ] || err "scripts/test-design-build.sh missing"
 sh scripts/test-design-build.sh || err "scripts/test-design-build.sh failed"
@@ -405,9 +405,7 @@ grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.
 
 # 11. Required template artifacts.
 for artifact in \
-  templates/.gitlab-ci.yml \
   templates/.gitlab/merge_request_templates/default.md \
-  templates/.gitlab/CODEOWNERS \
   templates/docs/agents-v0/architecture.md \
   templates/docs/agents-v0/network.md \
   templates/docs/agents-v0/project-profile.md \
@@ -419,7 +417,6 @@ for artifact in \
   templates/.agents-v0/scripts/feature-worktree.sh \
   templates/.agents-v0/scripts/check-attempt-budget.sh \
   templates/.agents-v0/scripts/check-failure-brief.sh \
-  templates/.agents-v0/scripts/verify-gitlab-ci-prereqs.sh \
   templates/.agents-v0/scripts/export-audit-pack.sh \
   templates/.agents-v0/scripts/generate-repo-map.sh \
   templates/.agents-v0/scripts/collect-dependency-graphs.sh \

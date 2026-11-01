@@ -336,9 +336,7 @@ install_templates() {
   # overwrites the lessons a project has accepted.
   minimal="
 .gitignore
-.gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
-.gitlab/CODEOWNERS
 .agents-v0/scripts/packlib.py
 .agents-v0/scripts/endpoint_scan.py
 .agents-v0/scripts/resolve-layout.sh
@@ -366,7 +364,6 @@ install_templates() {
 .agents-v0/scripts/render-mr-body.sh
 .agents-v0/scripts/release-notes.sh
 .agents-v0/scripts/resolve-integration-branch.sh
-.agents-v0/scripts/verify-gitlab-ci-prereqs.sh
 .agents-v0/scripts/export-audit-pack.sh
 .agents-v0/scripts/update-agents-model.sh
 .agents-v0/scripts/host-tools-macports.sh
@@ -417,7 +414,6 @@ docs/agents-v0/agents-v0-kit.md
 docs/agents-v0/quality-gates-engineering-principles.md
 docs/agents-v0/greenfield-onboarding.md
 docs/agents-v0/brownfield-onboarding.md
-.gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .agents-v0/hooks/pre-push
 "
@@ -436,7 +432,7 @@ docs/agents-v0/brownfield-onboarding.md
         docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh \
         .agents-v0/scripts/resolve-integration-branch.sh .agents-v0/scripts/feature-worktree.sh \
-        .agents-v0/scripts/verify-gitlab-ci-prereqs.sh .agents-v0/scripts/export-audit-pack.sh \
+        .agents-v0/scripts/export-audit-pack.sh \
         .agents-v0/scripts/update-agents-model.sh .agents-v0/scripts/host-tools-macports.sh \
         .agents-v0/scripts/activate-stack-pack.sh .agents-v0/scripts/resolve-kit-root.sh \
         .agents-v0/scripts/run-local-container.sh .agents-v0/scripts/stories-status.sh .agents-v0/scripts/check-lessons.sh \
@@ -666,9 +662,6 @@ if [ "$LINK" = 1 ]; then
   [ "$LINK_FORCE" = 0 ] || set -- "$@" --force
   sh "$KIT/scripts/link-project.sh" "$@" "$TARGET_ABS"
   install_templates "$TARGET_ABS"
-  if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
-    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml.\n' >&2
-  fi
   printf 'Linked agents-v0 into %s (kit files stay in the pinned checkout).\n' "$TARGET_ABS"
   exit 0
 fi
