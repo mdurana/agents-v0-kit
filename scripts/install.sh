@@ -328,6 +328,8 @@ install_templates() {
   # project-owned docs (lessons.md, lessons-archive.md). The scripts are kit-managed and are refreshed
   # by --update (always list below). The docs are seeded only when missing, so --update never
   # overwrites the lessons a project has accepted.
+  # Carried from 6e833b5c (workflow-fixes-onboard), Design: D1: guard-common.sh and secret_scan.py are kit-managed
+  # (refreshed by --update, below); .agents-v0/secret-allowlist.json is project-owned and only seeded when missing.
   minimal="
 .gitignore
 .gitlab-ci.yml
@@ -353,6 +355,9 @@ install_templates() {
 .agents-v0/scripts/discover-codebase.sh
 .agents-v0/scripts/check-onboarding-docs.sh
 .agents-v0/scripts/audit-brownfield-baseline.sh
+.agents-v0/scripts/guard-common.sh
+.agents-v0/scripts/secret_scan.py
+.agents-v0/secret-allowlist.json
 .agents-v0/scripts/render-mr-body.sh
 .agents-v0/scripts/release-notes.sh
 .agents-v0/scripts/resolve-integration-branch.sh
@@ -416,7 +421,7 @@ docs/agents-v0/brownfield-onboarding.md
         .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \
         .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/check-story-dependencies.sh \
         .agents-v0/scripts/check-release-evidence.sh .agents-v0/scripts/check-database-runtime.sh .agents-v0/scripts/check-tests-ran.sh .agents-v0/scripts/check-gate-commit.sh .agents-v0/scripts/check-traceability.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
-        .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
+        .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/guard-common.sh .agents-v0/scripts/secret_scan.py .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh \

@@ -401,12 +401,14 @@ def _rm_is_recursive(parts: List[str]) -> bool:
 #   relative path after `cd .agents-v0`. KIT_CONTAINER_RE matches the guard folders themselves, their parents
 #   (.agents-v0, .agents, .cursor) and anything inside them; the path is also resolved against the command's
 #   directory (cd prefix or payload cwd), so `cd .agents-v0 && mv scripts x` is caught. H10 stays the backstop.
+# Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
 KIT_CONTAINER_RE = re.compile(
-    r"(^|/)(?:\.agents-v0(?:/(?:scripts|hooks|ci|packs)(?:/.*)?|/policy\.conf)?"
+    r"(^|/)(?:\.agents-v0(?:/(?:scripts|hooks|ci|packs)(?:/.*)?|/policy\.conf|/secret-allowlist\.json)?"
     r"|\.agents(?:/(?:hooks|rules|agents|commands|skills)(?:/.*)?|/hooks\.json)?"
     r"|\.cursor(?:/(?:hooks|rules|agents|commands|skills)(?:/.*)?|/hooks\.json|/cli\.json)?)/*$"
 )
-KIT_CONTAINER_MSG = ("the kit's guard files (.agents-v0/scripts, .agents-v0/hooks, .agents-v0/policy.conf, the agent "
+KIT_CONTAINER_MSG = ("the kit's guard files (.agents-v0/scripts, .agents-v0/hooks, .agents-v0/policy.conf, "
+                     ".agents-v0/secret-allowlist.json, the agent "
                      "hooks and rules) cannot be removed, renamed, replaced or restored by an agent: {}. "
                      "Report the problem instead.")
 # Programs whose every path operand changes or removes it, and those where only the target changes.
@@ -1425,6 +1427,304 @@ def _segment_uses_outside_kit(seg: str, stdin_exec: bool, hook_root: str) -> Opt
                 return why
     return None
 
+# Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
+# N63 / N11C (onboard fix, Sasuke): gh, glab and git push change the remote: pull or merge requests, approvals,
+#   repositories, releases, pipelines, CI variables, branches. An agent never runs them, in any mode, supervised
+#   included: they are a block, never an ask, so no unattended allow-list (AGY_ALLOW_TOOLS, unattended-allow) can
+#   turn them into an allow. Read-only calls (gh pr view, gh pr list, gh api GET, glab mr view) stay allowed.
+#   Evasion forms (env prefixes, command/exec/nohup wrappers, absolute paths, quoting, sh -c, $(...), chains) are
+#   unwrapped by split_segments/_expand_wrapper before this runs; git aliases are resolved below.
+REMOTE_WRITE_MSG = ("{} changes the remote; an agent never runs it, in any mode, supervised included (N11C). "
+                    "Sensei runs it himself in his own terminal: hand over the exact command and stop.")
+# gh flags that take a value as the next token (so the value is not read as a subcommand).
+_GH_VALUED_FLAGS = {"-R", "--repo", "--hostname", "-X", "--method", "-H", "--header", "-f", "-F", "--field",
+                    "--raw-field", "--input", "-q", "--jq", "-t", "--template", "-p", "--preview", "--cache",
+                    "-b", "--body", "-B", "--base", "--title", "-T", "-m", "--message", "-L", "--limit"}
+# Jiraiya third look (item B): gh is judged against an allow-list of read-only commands; every other gh call is
+#   denied. gh aliases (`gh co 1`) and extensions (`gh my-ext`) run anything, so an unknown top-level command is a
+#   deny too. GH_WRITES only names the writes (for the message and the regression list); it is not the fence.
+GH_READS = {
+    "pr": {"list", "view", "diff", "checks", "status", "checkout"},
+    "issue": {"list", "view", "status"},
+    "repo": {"list", "view", "clone"},
+    "release": {"list", "view", "download"},
+    "run": {"list", "view", "watch", "download"},
+    "workflow": {"list", "view"},
+    "search": None,  # None: every subcommand reads (gh search repos|issues|prs|code|commits)
+    "status": None, "browse": None, "help": None, "version": None, "completion": None,
+    "auth": {"status"},  # token, login, logout, refresh, setup-git, switch: denied
+    "gist": {"list", "view", "clone"},
+    "label": {"list"},
+    "secret": {"list"},
+    "variable": {"list", "get"},
+    "cache": {"list"},
+    "ruleset": {"list", "view", "check"},
+    "project": {"list", "view", "field-list", "item-list"},
+    "codespace": {"list", "view"}, "cs": {"list", "view"},
+    "extension": {"list", "search", "browse"}, "ext": {"list", "search", "browse"},
+    "ssh-key": {"list"},
+    "gpg-key": {"list"},
+    "org": {"list"},
+    "alias": {"list"},
+    "config": {"get", "list"},
+    "attestation": {"verify", "download"},
+}
+GH_WRITES = {
+    "pr": {"create", "new", "merge", "review", "close", "reopen", "edit", "ready", "comment", "lock", "unlock",
+           "update-branch", "revert"},
+    "repo": {"create", "new", "delete", "edit", "rename", "archive", "unarchive", "fork", "sync", "set-default"},
+    "release": {"create", "new", "delete", "edit", "upload", "delete-asset"},
+    "issue": {"create", "new", "close", "reopen", "edit", "delete", "comment", "transfer", "pin", "unpin", "lock",
+              "unlock", "develop"},
+    "secret": {"set", "delete", "remove"},
+    "variable": {"set", "delete", "remove"},
+    "workflow": {"run", "enable", "disable"},
+    "run": {"rerun", "cancel", "delete"},
+    "label": {"create", "edit", "delete", "clone"},
+    "gist": {"create", "new", "edit", "delete", "rename"},
+    "alias": {"set", "import", "delete"},
+    "cache": {"delete"},
+    "ruleset": set(),
+    "ssh-key": {"add", "delete"},
+    "gpg-key": {"add", "delete"},
+    "extension": {"install", "upgrade", "remove", "create", "exec"},
+    "project": {"create", "edit", "delete", "close", "copy", "link", "unlink", "mark-template", "field-create",
+                "field-delete", "item-add", "item-create", "item-edit", "item-delete", "item-archive"},
+    "codespace": {"create", "delete", "edit", "ssh", "cp", "code", "jupyter", "ports", "rebuild", "stop"},
+    "auth": {"login", "logout", "refresh", "setup-git", "switch"},
+}
+UNRESOLVED_CMD_MSG = ("`{}`: the shell fills this in at run time, so the guard cannot tell whether it pushes or "
+                      "writes to GitHub; an agent spells the command out (N11C). Anything that changes the remote, "
+                      "Sensei runs himself in his own terminal.")
+GH_UNKNOWN_MSG = ("`gh {}` is not a known read-only gh command: it may be an alias or an extension, which can push or "
+                  "merge, so an agent does not run it, in any mode (N11C). Use the read it stands for (gh pr view, "
+                  "gh run view, ...); anything that changes the remote, Sensei runs himself in his own terminal.")
+GH_TOKEN_MSG = ("gh auth token prints the GitHub token; an agent never reads it, in any mode (N11C). "
+                "Sensei runs gh himself in his own terminal: hand over the exact command and stop.")
+GLAB_WRITES = {("mr", "create"), ("mr", "new"), ("mr", "update"), ("mr", "close"), ("mr", "reopen"),
+               ("mr", "delete"), ("mr", "note"), ("mr", "rebase"), ("mr", "revoke"),
+               ("ci", "run"), ("ci", "trigger"), ("ci", "retry"), ("ci", "cancel"), ("ci", "delete"),
+               ("release", "create"), ("release", "delete"), ("release", "upload"),
+               ("variable", "set"), ("variable", "update"), ("variable", "delete"),
+               ("repo", "create"), ("repo", "delete"), ("repo", "fork"), ("repo", "archive"), ("repo", "transfer"),
+               ("alias", "set"), ("alias", "delete")}
+_PUSH_WORD_RE = re.compile(r"(?:^|[\s!;&|(])(?:push|send-pack)\b|\bsvn\s+dcommit\b|\bsubtree\s+push\b")
+# Common git subcommands: anything else may be an alias, which is looked up in the repository's git config.
+_GIT_BUILTINS = {"add", "am", "apply", "archive", "bisect", "blame", "branch", "bundle", "cat-file", "check-ignore",
+                 "checkout", "cherry", "cherry-pick", "clean", "clone", "commit", "config", "describe", "diff",
+                 "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep", "hash-object", "help", "init", "log",
+                 "ls-files", "ls-remote", "ls-tree", "merge", "merge-base", "mv", "notes", "pull", "push",
+                 "range-diff", "rebase", "reflog", "remote", "reset", "restore", "rev-list", "rev-parse", "revert",
+                 "rm", "shortlog", "show", "show-ref", "sparse-checkout", "stash", "status", "submodule", "switch",
+                 "symbolic-ref", "tag", "update-index", "update-ref", "var", "verify-commit", "version",
+                 "whatchanged", "worktree", "write-tree", "send-pack", "subtree", "svn", "p4", "lfs",
+                 "send-email", "imap-send", "http-push", "request-pull", ""}
+# Jiraiya third look (item A): git subcommands that send commits or patches somewhere other than this checkout.
+_GIT_SEND_SUBS = {"push", "send-pack", "send-email", "imap-send", "http-push"}
+_GIT_DASH_RE = re.compile(r"git-[a-z][a-z0-9-]*")  # git-push, /usr/lib/git-core/git-push: the same subcommand
+_FIND_EXEC_FLAGS = {"-exec", "-execdir", "-ok", "-okdir"}
+
+
+def _unresolved(tok: str) -> bool:
+    """A word the shell fills in at run time ($x, ${x}, $(...), `...`): the hook cannot know what it becomes."""
+    return "$" in tok or "`" in tok
+
+
+def _find_exec_bodies(parts: List[str]) -> List[List[str]]:
+    """The commands find runs: the words after -exec/-execdir/-ok/-okdir, up to `;` or `+`."""
+    out: List[List[str]] = []
+    i = 0
+    while i < len(parts):
+        if parts[i] in _FIND_EXEC_FLAGS:
+            j = i + 1
+            body: List[str] = []
+            while j < len(parts) and parts[j] not in (";", "\\;", "+"):
+                body.append(parts[j])
+                j += 1
+            if body:
+                out.append(body)
+            i = j
+        i += 1
+    return out
+
+
+def _text_remote_write(text: str) -> Optional[str]:
+    """The remote write in a command another command runs (find -exec, git submodule foreach), if any."""
+    for seg in split_segments(text):
+        seg = _strip_env_prefix(seg.strip())
+        if not seg:
+            continue
+        try:
+            parts = shlex.split(seg, posix=True)
+        except ValueError:
+            parts = seg.split()
+        what = _parts_remote_write(parts)
+        if what:
+            return what
+    return None
+
+
+def _parts_remote_write(parts: List[str]) -> Optional[str]:
+    """What remote write (or unjudgeable command name) one parsed command is, for nested commands."""
+    if not parts:
+        return None
+    if _unresolved(parts[0]):
+        return "a command name from a variable or substitution"
+    b = parts[0].split("/")[-1]
+    if _GIT_DASH_RE.fullmatch(b):
+        parts, b = ["git", b[4:]] + parts[1:], "git"
+    if b == "gh":
+        return _gh_verdict(parts)
+    if b == "glab":
+        pairs = set(zip(parts[1:], parts[2:]))
+        if ("mr", "merge") in pairs or ("mr", "approve") in pairs:
+            return "glab mr merge/approve"
+        return _glab_verdict(parts)
+    if b == "git":
+        sub = _git_subcommand(parts)
+        return _git_remote_write(parts, sub, parts.index(sub) if sub in parts else len(parts))
+    if b == "find":
+        for body in _find_exec_bodies(parts):
+            what = _text_remote_write(shlex.join(body))
+            if what:
+                return f"find -exec {what}"
+    return None
+
+
+def _api_is_write(args: List[str]) -> bool:
+    """gh/glab api: a non-GET method, or any field or input, is a write (a plain GET is a read)."""
+    i = 0
+    while i < len(args):
+        a = args[i]
+        method = None
+        if a in ("-X", "--method"):
+            method = args[i + 1] if i + 1 < len(args) else "?"
+            i += 1
+        elif a.startswith("--method="):
+            method = a.split("=", 1)[1]
+        elif a.startswith("-X") and len(a) > 2:
+            method = a[2:]
+        elif a in ("-f", "-F", "--field", "--raw-field", "--input") or re.match(r"^-[fF].", a) or re.match(
+                r"^--(?:field|raw-field|input)=", a):
+            return True
+        if method is not None and method.strip("'\"").upper() != "GET":
+            return True
+        i += 1
+    return False
+
+
+def _gh_positionals(args: List[str]) -> List[str]:
+    pos: List[str] = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--":
+            pos.extend(args[i + 1:])
+            break
+        if a.startswith("-"):
+            if a in _GH_VALUED_FLAGS:
+                i += 1
+            i += 1
+            continue
+        pos.append(a)
+        i += 1
+    return pos
+
+
+def _gh_verdict(parts: List[str]) -> Optional[str]:
+    """None for a known gh read; else what the call is (a write, a token read, or an unknown command or alias)."""
+    pos = _gh_positionals(parts[1:])
+    if not pos:
+        return None  # gh, gh --version, gh --help
+    top = pos[0]
+    sub = pos[1] if len(pos) > 1 else ""
+    if any("$" in t or "`" in t for t in pos[:2]):
+        return f"gh {top} {sub} (a subcommand from a variable or substitution cannot be checked)".replace("  ", " ")
+    if top == "api":
+        return f"gh api {sub or ''} with a write method or fields".replace("  ", " ") if _api_is_write(parts[1:]) else None
+    if top == "repo" and sub in ("deploy-key", "autolink"):
+        third = pos[2] if len(pos) > 2 else ""
+        return None if third in ("", "list", "view") else f"gh repo {sub} {third}"
+    if top not in GH_READS:
+        return f"gh {top} (unknown)"
+    reads = GH_READS[top]
+    if reads is None or sub == "" or sub in reads or sub in ("help", "--help", "-h"):
+        return None
+    return f"gh {top} {sub}"
+
+
+def _glab_verdict(parts: List[str]) -> Optional[str]:
+    pairs = set(zip(parts[1:], parts[2:]))
+    if "api" in parts[1:3] and _api_is_write(parts[1:]):
+        return "a state-changing glab api call"
+    hit = sorted(pairs & GLAB_WRITES)
+    if hit:
+        return "glab " + " ".join(hit[0])
+    return None
+
+
+def _git_alias_value(parts: List[str], sub: str) -> str:
+    """The alias a git subcommand stands for: from a -c alias.X=... on the command line, else the repo config."""
+    if sub in _GIT_BUILTINS:
+        return ""
+    i = 1
+    while i < len(parts) and parts[i] != sub:
+        if parts[i] == "-c" and i + 1 < len(parts):
+            k, _, v = parts[i + 1].partition("=")
+            if k.lower() == f"alias.{sub}".lower():
+                return v or "?"
+            i += 2
+            continue
+        i += 1
+    base = _base_dir()
+    for j, p in enumerate(parts[:-1]):
+        if p == "-C":
+            base = os.path.join(base, os.path.expanduser(parts[j + 1]))
+    try:
+        r = subprocess.run(["git", "-C", base, "config", "--get", f"alias.{sub}"], capture_output=True, text=True,
+                           timeout=5)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _git_remote_write(parts: List[str], sub: str, sub_idx: int) -> Optional[str]:
+    """git push (any remote), send-pack, subtree push, svn dcommit, and aliases that stand for them."""
+    args = parts[sub_idx + 1:]
+    if _unresolved(sub):
+        return f"git {sub} (a subcommand from a variable or substitution cannot be checked)"
+    if sub in _GIT_SEND_SUBS:
+        return f"git {sub}"
+    if sub == "lfs" and "push" in args:
+        return "git lfs push"
+    if sub == "p4" and "submit" in args:
+        return "git p4 submit"
+    if sub == "submodule" and "foreach" in args:
+        body = [a for a in args[args.index("foreach") + 1:] if a not in ("--recursive", "-q", "--quiet")]
+        inner = _text_remote_write(" ".join(body)) if body else None
+        if inner:
+            return f"git submodule foreach ({inner})"
+    if sub == "subtree" and "push" in args:
+        return "git subtree push"
+    if sub == "svn" and "dcommit" in args:
+        return "git svn dcommit"
+    # -c alias.X=<...push...> defines a push alias for this command, whatever it then runs.
+    for j in range(1, sub_idx):
+        if parts[j - 1] == "-c" and parts[j].lower().startswith("alias.") and _PUSH_WORD_RE.search(
+                " " + parts[j].partition("=")[2]):
+            return "a git alias for push"
+    if sub == "config":
+        keys = [k for k, a in enumerate(args) if a.lower().startswith("alias.")]
+        for k in keys:
+            val = args[k].partition("=")[2] + " " + " ".join(args[k + 1:])
+            if _PUSH_WORD_RE.search(" " + val):
+                return "defining a git alias for push"
+    alias = _git_alias_value(parts, sub)
+    if alias and _PUSH_WORD_RE.search(" " + alias):
+        return f"git {sub} (an alias for push)"
+    return None
+
+
 def classify_segment(seg: str) -> Tuple[Action, str]:
     seg = _strip_env_prefix(seg.strip())
     if not seg:
@@ -1499,32 +1799,51 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if not parts:
         return "allow", ""
     bin0 = parts[0].split("/")[-1]
+    # Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
+    # Jiraiya third look (items A and B): a command name the shell fills in at run time (`$g pr create`,
+    #   `$(which gh) ...`) cannot be judged, so it is refused; git-push (or /usr/lib/git-core/git-push) is git push.
+    if _unresolved(parts[0]):
+        return "block", UNRESOLVED_CMD_MSG.format(" ".join(parts[:3]))
+    if _GIT_DASH_RE.fullmatch(bin0):
+        parts, bin0 = ["git", bin0[4:]] + parts[1:], "git"
+    if bin0 == "git" and _unresolved(_git_subcommand(parts)):
+        return "block", UNRESOLVED_CMD_MSG.format("git " + _git_subcommand(parts))
+    if bin0 == "gh" and any(_unresolved(t) for t in _gh_positionals(parts[1:])[:2]):
+        return "block", UNRESOLVED_CMD_MSG.format(" ".join(parts[:3]))
+    if bin0 == "find":
+        what = _parts_remote_write(parts)
+        if what:
+            return "block", REMOTE_WRITE_MSG.format(what)
 
     if bin0 == "rm" and _rm_is_recursive(parts):
         return "block", "recursive rm is blocked without explicit human approval."
     if bin0 == "find" and "-delete" in parts:
         return "ask", "find -delete removes files; requires explicit user approval."
 
+    # Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
+    if bin0 == "gh":
+        pos = _gh_positionals(parts[1:])
+        if pos[:2] == ["auth", "token"]:
+            return "block", GH_TOKEN_MSG
+        if pos and pos[0] != "api" and pos[0] not in GH_READS:
+            return "block", GH_UNKNOWN_MSG.format(pos[0])
+        what = _gh_verdict(parts)
+        if what:
+            return "block", REMOTE_WRITE_MSG.format(what)
+
     if bin0 == "glab":
         pairs = set(zip(parts[1:], parts[2:]))
         joined = " ".join(parts[1:])
+        own = " Sensei runs it himself in his own terminal."
         if ("mr", "merge") in pairs:
-            return "block", "glab mr merge requires explicit human authorization."
+            return "block", "glab mr merge requires explicit human authorization." + own
         if ("mr", "approve") in pairs:
-            return "block", "approving a merge request is a human act, not an agent action."
-        if "api" in parts[1:3]:
-            if re.search(r"/(merge|approve)\b", joined):
-                return "block", "merging or approving a merge request through glab api is blocked."
-            mutating = any(x in parts for x in ("-f", "-F", "--field", "--raw-field", "--input"))
-            for i, tok in enumerate(parts[:-1]):
-                if tok in ("-X", "--method") and parts[i + 1].upper() != "GET":
-                    mutating = True
-            if mutating:
-                return "ask", "a state-changing glab api call requires explicit user approval."
-        if pairs & {("mr", "create"), ("mr", "update"), ("mr", "close"), ("mr", "reopen"), ("mr", "delete"),
-                    ("ci", "run"), ("ci", "trigger"), ("ci", "retry"), ("release", "create"), ("release", "delete"),
-                    ("variable", "set"), ("variable", "update"), ("variable", "delete")}:
-            return "ask", "this glab command changes the merge request, pipeline, release, or CI variables; it requires explicit user approval."
+            return "block", "approving a merge request is a human act, not an agent action." + own
+        if "api" in parts[1:3] and re.search(r"/(merge|approve)\b", joined):
+            return "block", "merging or approving a merge request through glab api is blocked." + own
+        what = _glab_verdict(parts)
+        if what:  # N11C: these asked at 36b86cf; an ask can become an allow when unattended, so they block now
+            return "block", REMOTE_WRITE_MSG.format(what)
 
     if bin0 == "git":
         sub = _git_subcommand(parts)
@@ -1557,7 +1876,10 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
                     "+"
                 ) or "/+" in tok:
                     return "block", "git force-push is not allowed (ai-agent-conduct.mdc)."
-            return "ask", "git push requires explicit user approval."
+            return "block", REMOTE_WRITE_MSG.format("git push")
+        remote = _git_remote_write(parts, sub, sub_idx)
+        if remote:
+            return "block", REMOTE_WRITE_MSG.format(remote)
         if sub == "commit":
             # kitfix-20261031-gate-commit: one commit per approved gate; a gate commit is never amended.
             # kitfix-20261031-no-amend: git also accepts the abbreviations --am, --ame, --amen.
@@ -1912,6 +2234,11 @@ PROTECTED_PATH_PATTERNS = [
     re.compile(r"(^|/)\.agents-v0/packs/.+\.(json|sh|py)$"),
     re.compile(r"(^|/)\.agents-v0/hooks/[^/]+$"),
     re.compile(r"(^|/)\.agents-v0/policy\.conf$"),  # kitfix-20261031-installed-no-overrides: trace mode
+    # Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
+    # onboard fix SOC-11 (Sasuke): the gate rule values and the secret-scan allow-list are guard files. The
+    #   allow-list is read from HEAD only, so an agent's edit would never count; it is still never an agent's edit.
+    re.compile(r"(^|/)\.agents-v0/scripts/gate-rules$"),
+    re.compile(r"(^|/)\.agents-v0/secret-allowlist\.json$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),

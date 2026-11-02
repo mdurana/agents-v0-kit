@@ -3,10 +3,24 @@
 # When the branch name's last segment matches docs/agents-v0/requirements/<feature>.state.json
 # or docs/agents-v0/maintain/<id>/state.json, verifies that the state has verifyPassed=true
 # or lastApprovedPhase in (verify, release).
+# Design: D1 (onboard redo): first, every commit the push sends is secret-scanned through
+# .agents-v0/scripts/guard-common.sh scan-push (secret_scan.py --commits); a hit, or a scan that cannot run, refuses
+# the push. A missing guard-common.sh refuses too (fail closed): reinstall with install.sh --update.
 set -eu
 
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
+
+# git gives the refs on stdin; read them once, the secret scan and the state check below both use them.
+refs="$(cat)"
+if [ ! -f ".agents-v0/scripts/guard-common.sh" ]; then
+  printf 'pre-push: .agents-v0/scripts/guard-common.sh is missing, so the pushed commits cannot be secret-scanned; push refused (run install.sh --update).\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$refs" | sh .agents-v0/scripts/guard-common.sh scan-push "${1:-}"; then
+  printf 'pre-push: secret scan refused the push.\n' >&2
+  exit 1
+fi
 
 if [ -f ".agents-v0/scripts/check-lessons.sh" ]; then
   sh .agents-v0/scripts/check-lessons.sh
@@ -70,6 +84,8 @@ if not (verify_passed or last_app in ("verify", "release") or "verify" in approv
     )
     sys.exit(1)
 PY
-done
+done <<EOF_REFS
+$refs
+EOF_REFS
 
 exit 0
