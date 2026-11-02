@@ -267,6 +267,7 @@ ESCALATION_MSG = ("{} is not used by the kit. Do not escalate privileges or swit
                   "or permission and stop (for a database, run .agents-v0/scripts/check-database-runtime.sh).")
 _XARGS_OPTS_WITH_ARG = frozenset({"-n", "-P", "-L", "-l", "-d", "-E", "-e", "-s", "-a", "--max-args", "--max-procs",
                                   "--max-lines", "--delimiter", "--eof", "--max-chars", "--arg-file"})
+_XARGS_KEEP = [False]  # N3C: split_segments leaves `xargs <cmd>` whole while _xargs_verdict reads it
 
 
 # Jiraiya 36a0dce1 review: a segment whose first word is a shell reserved word (`if true`, `then git push`,
@@ -359,7 +360,7 @@ def _expand_wrapper(seg: str, keywords: bool = True) -> List[str]:
                 i += 1
         if i < len(parts):
             return split_segments(" ".join(parts[i:]))
-    if bin0 == "xargs" and len(parts) >= 2:
+    if bin0 == "xargs" and len(parts) >= 2 and not _XARGS_KEEP[0]:
         i = 1
         while i < len(parts) and parts[i].startswith("-"):
             if parts[i] in ("-I", "--replace", "-i") or parts[i] in _XARGS_OPTS_WITH_ARG:
@@ -897,6 +898,110 @@ def _git_init_separate(parts: List[str]) -> Optional[str]:
         if os.path.isdir(os.path.join(x, "docs", "agents-v0")) or (R and os.path.isdir(os.path.join(R, "docs", "agents-v0"))):
             return ".git/agents-v0 (git init --separate-git-dir moves the git dir and leaves a fresh ledger)"
     return None
+
+
+# N3C (Sasuke; Jiraiya's request 2026-11-02 08:11 on a056c9c3): xargs and parallel run a command on paths read from
+#   their input, which the hook never sees (`echo .git/agents-v0/gate-ledger | xargs rm`, `find .git | xargs rm -f`,
+#   `xargs rm < list.txt`). While docs/agents-v0 exists they are judged as the command they run: a command that
+#   deletes or writes files (rm, mv, shred, unlink, truncate, cp, dd, tee, ln, link, install, rsync, sed -i / perl -i,
+#   sh/bash/zsh/dash -c, a python/perl/ruby/node one-liner) is blocked, a read-only one (grep, cat, head, tail, wc, ls,
+#   sha256sum, stat, file, echo, bare xargs) is allowed, anything else asks. xargs options (-0 -r -t -p, -n -P -L -s -I
+#   -d -E -a and long forms) and wrappers (env, command, nice, nohup, timeout, sudo, ...) are skipped; ( ), { }, $( ),
+#   if bodies, pipes and `<` are covered by the segment split. Without docs/agents-v0 nothing changes (xargs rm is
+#   judged as plain rm, as before).
+_XARGS_ARG_OPTS = frozenset({"-n", "-P", "-L", "-s", "-d", "-E", "-a", "-I", "--max-args", "--max-procs", "--max-lines",
+                             "--delimiter", "--eof", "--max-chars", "--arg-file", "--process-slot-var"})
+_PARALLEL_ARG_OPTS = frozenset({"-j", "--jobs", "-a", "--arg-file", "-n", "-N", "-d", "--delimiter", "-E", "-I", "-S",
+                                "--sshlogin", "-P", "--max-procs", "-L", "-s", "--colsep", "-C", "--delay",
+                                "--timeout", "--joblog", "--results", "--tmpdir", "--workdir", "--wd", "--max-args",
+                                "--max-lines", "--max-replace-args", "--basefile", "--tag-string"})
+_XARGS_WRITERS = frozenset({"rm", "mv", "shred", "unlink", "truncate", "cp", "dd", "tee", "ln", "link", "install",
+                            "rsync", "rmdir", "sponge"})
+_XARGS_SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh", "mksh"})
+_XARGS_READERS = frozenset({"grep", "egrep", "fgrep", "rg", "cat", "head", "tail", "wc", "ls", "sha256sum", "sha1sum",
+                            "sha512sum", "md5sum", "cksum", "stat", "file", "echo", "printf", "basename", "dirname",
+                            "realpath", "readlink", "du", "diff", "cmp", "true"})
+_XARGS_WRAP_ARG = {"env": ("-u", "--unset", "-C", "--chdir"), "nice": ("-n", "--adjustment"),
+                   "sudo": ("-u", "-g", "-C", "-D", "-R", "-T"), "doas": ("-u",), "timeout": ("-k", "-s",
+                   "--kill-after", "--signal"), "ionice": ("-c", "-n", "-p"), "stdbuf": ("-i", "-o", "-e")}
+_XARGS_WRAPPERS = frozenset({"env", "command", "nice", "nohup", "timeout", "sudo", "doas", "stdbuf", "exec", "time",
+                             "setsid", "ionice", "builtin"})
+XARGS_BLOCK_MSG = ("{} runs `{}` on paths it reads from its input, which the hook cannot check: while docs/agents-v0 "
+                   "exists (the gate ledger, the reopen grant and the state files are protected) a command that deletes "
+                   "or writes files is never run through xargs or parallel. Name the files on the command line instead.")
+XARGS_ASK_MSG = ("{} runs `{}` on paths it reads from its input, which the hook cannot check; while docs/agents-v0 "
+                 "exists that needs your approval.")
+
+
+def _xargs_inner(parts: List[str]) -> List[str]:
+    """The command xargs / parallel runs (options and wrappers skipped); [] when it runs the default echo."""
+    bin0 = parts[0].lstrip("\\").split("/")[-1]
+    with_arg = _XARGS_ARG_OPTS if bin0 == "xargs" else _PARALLEL_ARG_OPTS
+    i = 1
+    while i < len(parts) and parts[i].startswith("-") and parts[i] != "-":
+        i += 2 if parts[i] in with_arg else 1
+    rest: List[str] = []
+    k = i
+    while k < len(parts):  # drop `< file` / `<<< word` redirects
+        if parts[k] in ("<", "<<<"):
+            k += 2
+            continue
+        rest.append(parts[k])
+        k += 1
+    if bin0 == "parallel" and ":::" in rest:
+        rest = rest[:rest.index(":::")]
+    j = 0
+    while j < len(rest):
+        b = rest[j].lstrip("\\").split("/")[-1]
+        if b not in _XARGS_WRAPPERS:
+            break
+        j += 1
+        while j < len(rest) and (rest[j].startswith("-") or (b == "env" and "=" in rest[j])):
+            j += 2 if rest[j] in _XARGS_WRAP_ARG.get(b, ()) else 1
+        if b == "timeout" and j < len(rest):
+            j += 1  # the duration
+    return rest[j:]
+
+
+def _xargs_verdict(cmd: str) -> Optional[Tuple[str, str]]:
+    root = _repo_root(_BASE_DIR or _base_dir())
+    if not root or not os.path.isdir(os.path.join(root, "docs", "agents-v0")):
+        return None
+    if not re.search(r"\b(?:xargs|parallel)\b", cmd):
+        return None
+    _XARGS_KEEP[0] = True
+    try:
+        segs = split_segments(cmd)
+    finally:
+        _XARGS_KEEP[0] = False
+    ask: Optional[Tuple[str, str]] = None
+    for seg in segs:
+        seg = _strip_env_prefix(re.sub(r"^\s*(?:(?:if|then|else|elif|do|while|until|!|\{|\()\s+)+", "", seg.strip()))
+        try:
+            parts = shlex.split(seg, posix=True)
+        except ValueError:
+            try:
+                parts = shlex.split(seg[:-1], posix=True) if seg.endswith("\\") else seg.split()
+            except ValueError:
+                parts = seg.split()
+        if not parts or parts[0].lstrip("\\").split("/")[-1] not in ("xargs", "parallel"):
+            continue
+        b0 = parts[0].lstrip("\\").split("/")[-1]
+        inner = _xargs_inner(parts)
+        if not inner:
+            continue  # bare xargs runs echo
+        prog = inner[0].lstrip("\\").split("/")[-1].lower()
+        shown = " ".join(inner[:3])
+        writes = prog in _XARGS_WRITERS or (
+            prog in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", a) for a in inner[1:])) or (
+            prog in _XARGS_SHELLS and any(re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", a) for a in inner[1:])) or (
+            prog in SCRIPT_INTERPRETERS | {"python"} and any(re.fullmatch(r"-[A-Za-z]*[ce]", a) for a in inner[1:]))
+        if writes:
+            return "block", XARGS_BLOCK_MSG.format(b0, shown)
+        if prog in _XARGS_READERS:
+            continue
+        ask = ask or ("ask", XARGS_ASK_MSG.format(b0, shown))
+    return ask
 
 
 def _landing_paths(dest: str, srcs: List[str], as_dir: bool) -> List[str]:
@@ -3308,6 +3413,11 @@ def _classify_command_core(cmd: str) -> Tuple[Action, str]:
     ob = _onboard_commit_block(cmd)  # JO-8
     if ob:
         return "block", ob
+    xa = _xargs_verdict(cmd)  # N3C
+    if xa and xa[0] == "block":
+        return xa
+    if xa and worst != "block":
+        worst, msg = "ask", xa[1]
     stdin_exec = unattended and any(_segment_reads_stdin_program(sg) for sg in segments)
     hook_root = _project_root(_base_dir()) if unattended else ""
     if unattended:

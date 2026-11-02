@@ -240,6 +240,10 @@ judge cursor-shell block "N3A: folder swap, worktrees form" "mv /tmp/d .git/work
 judge cursor-shell block "N3B: find -exec rm on the ledger folder" "find .git/agents-v0 -exec rm {} +"
 judge cursor-shell block "N3B: hard link, then append" "cp -l $L ./l && echo forged >> ./l"
 judge cursor-shell block "N3B: git init --separate-git-dir" "git init --separate-git-dir=/tmp/g"
+# N3C (Jiraiya 2026-11-02 08:11): xargs runs a command on paths the hook never sees.
+judge cursor-shell block "N3C: xargs rm on the ledger" "echo $L | xargs rm"
+judge cursor-shell block "N3C: xargs sh -c with a redirect" "printf '%s\\n' $G | xargs -I{} sh -c ': > {}'"
+judge cursor-shell allow "N3C: xargs grep stays allowed" "find . -name '*.md' | xargs grep -l x"
 
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2

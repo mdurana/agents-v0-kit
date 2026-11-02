@@ -1290,6 +1290,34 @@ N3B_KEEP = [
     ("find build -name '*.o' -delete", "ask"),
     ("git init", "allow"),
 ]
+N3C_BLOCK = [
+    "echo .git/agents-v0/gate-ledger | xargs rm",
+    "find .git | xargs rm -f",
+    "find .git -print0 | xargs -0 truncate -s0",
+    "printf '%s\\n' .git/agents-v0/reopen-grant | xargs -I{} sh -c ': > {}'",
+    "find docs/agents-v0 -name state.json | xargs rm",
+    "xargs rm < list.txt",
+    "xargs -a list.txt -n 1 -P 2 shred -u",
+    "ls .git/agents-v0 | xargs --null --max-args=1 env A=1 nice mv -t /tmp",
+    "echo x | xargs -r -t timeout 5 cp /tmp/forged",
+    "cat list | xargs -d '\\n' sed -i 1d",
+    "echo .GIT/Agents-V0/Gate-Ledger | xargs -I % tee -a %",
+    "( find .git -type f | xargs ln -sf /tmp/x )",
+    "{ find .git -type f | xargs install -m 644 /tmp/x; }",
+    "x=$(echo .git/agents-v0/gate-ledger | xargs unlink)",
+    "if true; then find .git | xargs bash -c 'rm \"$@\"' _; fi",
+    "echo .git/agents-v0/gate-ledger | parallel rm",
+    "find .git | xargs python3 -c \"import sys, os; [os.remove(p) for p in sys.argv[1:]]\"",
+    "find .git | xargs command rsync -a /tmp/x/",
+]
+N3C_KEEP = [
+    ("find . -name '*.py' | xargs grep -l foo", "allow"),
+    ("find .git/agents-v0 -type f -print0 | xargs -0 sha256sum", "allow"),
+    ("find . | xargs", "allow"),
+    ("echo a | xargs -n1 -I{} cat {}", "allow"),
+    ("find . | xargs git add", "ask"),
+    ("ls | xargs -P 4 make", "ask"),
+]
 N3A_ALLOW = [
     "cat {L}", "cat {R}", "grep FAIL {L}", "wc -l {L}", "sha256sum {L}", "head -n 5 {L}", "tail -n 1 {L}",
     "git log -1", "git log --format=%B -1", "cp {L} /tmp/ledger-copy", "cat {L} > /tmp/x", "tail -n1 {L} | tee /tmp/x",
@@ -1381,6 +1409,15 @@ def n3a_cases(hp, tmp: str) -> list:
     for c, want in N3B_KEEP:
         add("N3B unchanged", c, active, want)
     add("N3B no docs/agents-v0 (unchanged)", N3B_BLOCK[17], plain, "allow")
+    # N3C (Jiraiya 2026-11-02 08:11 on a056c9c3): xargs / parallel run a command on paths the hook never sees.
+    for c in N3C_BLOCK:
+        add("N3C xargs deny", c, active, "block")
+    for c in (N3C_BLOCK[0], N3C_BLOCK[4]):
+        add("N3C xargs deny, onboarding approved", c, done, "block")
+    for c, want in N3C_KEEP:
+        add("N3C xargs keep", c, active, want)
+    for c, want in (("find . | xargs rm -f", "allow"), ("find . | xargs rm -rf", "block")):
+        add("N3C no docs/agents-v0 (as plain rm)", c, plain, want)
     return out
 
 
