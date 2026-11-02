@@ -7,7 +7,8 @@
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
 # Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
-# ledger_turn_ok) and FC-n (round 17: the fresh-clone hint on the missing-ledger refusal).
+# ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal) and LZ-n (round 18:
+# onboard-v<n> tags with a leading zero).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -902,6 +903,35 @@ mv "$GFC_LED" "$T1_TMP/fc-gf-ledger.moved"
 expect_fail "FC-7 with the tag, the missing ledger is refused" "$gfc" sh "$GC" ledger_ok
 out_has "FC-7 with the tag, the hint says copy from the original checkout" "copies gate-ledger and, when it exists, reopen-grant from the original checkout"
 lacks "FC-7 with the tag, no create-empty hint" "$T1_TMP/out.txt" "creates the empty ledger"
+# LZ-n (round 18, Iruka review of 6255b114): an onboard-v<n> tag with a leading zero. git and python read
+# onboard-v011 as 11, but the shell's $(( )) reads 011 as octal 9 and stops on 08, so commit_chain printed the
+# wrong next tag (onboard-v10) or died. Every check now refuses such a tag and names it; onboard-v10 still works.
+# lz_clone <name> <tag>: a clone of the FC original with both files copied and <tag> on the newest gate commit.
+lz_clone() {
+  lz_d="$T1_TMP/$1"; git clone -q "$fo" "$lz_d"; mkdir -p "$(fc_dir "$lz_d")"
+  cp "$FO_LED" "$(fc_dir "$lz_d")/gate-ledger"; cp "$FO_GRANT" "$(fc_dir "$lz_d")/reopen-grant"
+  G "$lz_d" tag -a "$2" -m "onboard approved" onboard-v2
+}
+LZ_SHELLS="sh"; for sh_ in dash bash; do if command -v "$sh_" >/dev/null 2>&1; then LZ_SHELLS="$LZ_SHELLS $sh_"; fi; done
+for lz_t in onboard-v011 onboard-v08; do
+  lz_clone "lz-$lz_t" "$lz_t"
+  expect_rc "LZ-1 ledger_ok refuses the leading-zero tag $lz_t" 1 "$lz_d" sh "$GC" ledger_ok
+  out_has "LZ-1 ledger_ok names $lz_t" "REFUSED ledger_ok: ledger changed, ask the user (the tag $lz_t has a leading zero"
+  expect_rc "LZ-1 gate_committed refuses the leading-zero tag $lz_t" 1 "$lz_d" sh "$GC" gate_committed onboard
+  out_has "LZ-1 gate_committed names $lz_t" "the tag $lz_t has a leading zero"
+  for sh_ in $LZ_SHELLS; do
+    expect_rc "LZ-2 $sh_: commit_chain refuses the leading-zero tag $lz_t" 1 "$lz_d" "$sh_" "$GC" commit_chain
+    out_has "LZ-2 $sh_: commit_chain names $lz_t" "REFUSED commit_chain: the tag $lz_t has a leading zero"
+    lacks "LZ-2 $sh_: commit_chain prints no chain with $lz_t" "$T1_TMP/out.txt" "git tag -a"
+  done
+done
+lz_clone lz-ten onboard-v10
+expect_pass "LZ-3 onboard-v10 (no leading zero) passes ledger_ok" "$lz_d" sh "$GC" ledger_ok
+out_has "LZ-3 onboard-v10 is the newest anchor" "trailer of onboard-v10 (lines=3)"
+for sh_ in $LZ_SHELLS; do
+  expect_pass "LZ-3 $sh_: commit_chain runs with onboard-v10" "$lz_d" "$sh_" "$GC" commit_chain
+  out_has "LZ-3 $sh_: the next tag is onboard-v11" "git tag -a onboard-v11 -m"
+done
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"

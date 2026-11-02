@@ -229,6 +229,10 @@ def root_anchor():
         out(1, "%s must record lines=0 sha256=%s (the empty ledger), not lines=%d" % (where, EMPTY, n))
     return [(where, 0, EMPTY)]
 
+LZ_TEXT = ("the tag %s has a leading zero; onboard-v<n> tags are numbered without one, because the kit reads the "
+           "number as decimal in python and as octal in the shell. Stop and show the user: a person (never an agent) "
+           "replaces that tag")
+
 def tag_no(anc):
     return [int(a[0][len("onboard-v"):]) for a in anc if a[0].startswith("onboard-v")]
 
@@ -236,7 +240,13 @@ def anchors():
     r = git("tag", "-l", "onboard-v*")
     if r.returncode != 0:
         out(1, "git could not list the onboard-v<n> tags")
-    tags = [t for t in r.stdout.decode("utf-8", "replace").split("\n") if re.match(r"^onboard-v[0-9]+$", t)]
+    # onboard-v<n> with n = 0 or no leading zero (round 18): git and int() read onboard-v011 as 11, but the shell's
+    # $(( )) reads 011 as octal 9 and stops on 08, so a leading-zero tag is refused here and in commit_chain.
+    names = r.stdout.decode("utf-8", "replace").split("\n")
+    for t in names:
+        if re.fullmatch(r"onboard-v0[0-9]+", t):
+            out(1, LZ_TEXT % t)
+    tags = [t for t in names if re.fullmatch(r"onboard-v(0|[1-9][0-9]*)", t)]
     found = root_anchor()
     for t in sorted(tags, key=lambda x: int(x[len("onboard-v"):])):
         c = git("rev-parse", "-q", "--verify", t + "^{commit}")
@@ -642,10 +652,19 @@ approval_evidence() {
   fi
   ok approval_evidence "onboard is awaiting_approval, $ONB_RESULT exists and the onboarding docs check passed (--gate)"
 }
+# onb_tag_n prints the highest n of the onboard-v<n> tags (n is 0 or has no leading zero), or nothing.
+# onb_tag_zero <check> refuses as <check> when an onboard-v<n> tag has a leading zero (round 18): $(( )) reads
+# onboard-v011 as octal 9 and stops on 08, while the ledger check reads 11 (the same text as LZ_TEXT there).
+onb_tag_n() { git tag -l 'onboard-v*' | grep -E '^onboard-v(0|[1-9][0-9]*)$' | sed 's/^onboard-v//' | sort -n | tail -n 1; }
+onb_tag_zero() {
+  oz_t="$(git tag -l 'onboard-v*' | grep -E '^onboard-v0[0-9]+$' | head -n 1)"
+  [ -z "$oz_t" ] || refuse "$1" "the tag $oz_t has a leading zero; onboard-v<n> tags are numbered without one, because the kit reads the number as decimal in python and as octal in the shell. Stop and show the user: a person (never an agent) replaces that tag"
+}
 # onb_tag_check <check>: the newest onboard-v<n> tag is on this branch and holds the current onboard approval
 # (state.json approval at the tag equals HEAD's). Sets gc_tag; refuses as <check> otherwise.
 onb_tag_check() {
-  gc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  onb_tag_zero "$1"
+  gc_n="$(onb_tag_n)"
   [ -n "$gc_n" ] || refuse "$1" "no onboard-v<n> tag on the onboard gate commit; tag it: git tag -a onboard-v1 -m \"onboard approved\""
   gc_tag="onboard-v$gc_n"
   git merge-base --is-ancestor "$gc_tag^{commit}" HEAD 2>/dev/null || refuse "$1" "$gc_tag is not on this branch (not an ancestor of HEAD)"
@@ -738,7 +757,7 @@ prereq_approved() {
   if ! pa_msg="$(onb_tag_check prereq_approved)"; then
     printf '%s\n' "$pa_msg" | sed "s/^REFUSED prereq_approved: /REFUSED prereq_approved: $pa_need; /"; exit 1
   fi
-  pa_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  pa_n="$(onb_tag_n)"
   ok prereq_approved "$1: onboard is approved and committed (state.json committed, tagged onboard-v$pa_n)"
 }
 # JO-10 (design rev 6 flow step 2; Sakura SKO-1/2/3; N8 N28 N29 N30 E9): no state change on an onboard report
@@ -855,7 +874,8 @@ commit_chain() {
   to_root
   cc_paths="$(onb_paths | tr '\n' ' ')"
   [ -n "$cc_paths" ] || die "none of gate-rules onboard_commit_paths exists"
-  cc_n="$(git tag -l 'onboard-v*' | sed -n 's/^onboard-v\([0-9][0-9]*\)$/\1/p' | sort -n | tail -n 1)"
+  onb_tag_zero commit_chain
+  cc_n="$(onb_tag_n)"
   cc_n=$(( ${cc_n:-0} + 1 ))
   printf "git add --all -- %s':(exclude,glob)**/*.lock' && sh .agents-v0/scripts/gate-checks.sh staged_secret_scan && sh .agents-v0/scripts/gate-checks.sh commit_msg_ok && git commit -F %s && git tag -a onboard-v%s -m \"onboard approved\"\n" \
     "$cc_paths" "$(onb_msg_file)" "$cc_n"
