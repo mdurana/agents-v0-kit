@@ -96,6 +96,19 @@ expect_out "H7 hook: the refusal names sneaky.txt" 'sneaky\.txt'
 expect_out "H7 hook: the refusal says the root commit is not trusted" 'not trusted'
 if grep -Eq 'Greenfield bootstrap complete|Greenfield root commit [0-9a-f]|OK greenfield_record_ok' "$tmp/out.txt"; then fail "H7 hook: the output never says success"; sed 's/^/    /' "$tmp/out.txt" >&2; else pass "H7 hook: the output never says success"; fi
 if grep -q "$fake_key" "$tmp/out.txt"; then fail "H7 hook: the key is never printed"; else pass "H7 hook: the key is never printed"; fi
+# The untrusted-root marker goes in .git/agents-v0/ beside the gate ledger (the folder the hooks protect),
+# and writing it leaves the ledger as it was: empty, a regular file.
+m="$t/.git/agents-v0/untrusted-root"
+[ -f "$m" ] && pass "H7 hook: .git/agents-v0/untrusted-root is written" || fail "H7 hook: .git/agents-v0/untrusted-root is written"
+check "H7 hook: the marker names the root commit" "$(sed -n 's/^rootCommit=//p' "$m" 2>/dev/null)" "$(git -C "$t" rev-parse HEAD 2>/dev/null)"
+check "H7 hook: no marker under .git/agents-v0-bootstrap/" "$(ls "$t/.git/agents-v0-bootstrap" 2>/dev/null | grep -c untrusted || true)" 0
+check "H7 hook: the gate ledger is still an empty regular file" "$([ -f "$t/.git/agents-v0/gate-ledger" ] && [ ! -s "$t/.git/agents-v0/gate-ledger" ] && echo empty)" empty
+expect_out "H7 hook: the refusal names the marker" 'marked it in .*\.git/agents-v0/untrusted-root'
+check "H7: a successful bootstrap writes no untrusted-root marker" "$([ -e "$tmp/green/.git/agents-v0/untrusted-root" ] && echo present || echo absent)" absent
+# A leftover marker in an unborn repo is refused before anything is written.
+d="$tmp/marker"; newrepo "$d"; mkdir -p "$d/.git/agents-v0"; printf 'rootCommit=x\n' > "$d/.git/agents-v0/untrusted-root"
+refused "an untrusted-root marker in an unborn repo" "$d"
+expect_out "the refusal names the untrusted-root marker" 'untrusted-root'
 
 # ---- H7 with --scaffold-app: the root commit is the kit plus the record; the extracted app stays out -------
 # (the app is the first story's to commit; the skeleton's app/backend/mvnw is a secret-scan hit, and the
