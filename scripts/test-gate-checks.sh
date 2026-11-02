@@ -1038,7 +1038,7 @@ for sh_ in $LZ_SHELLS; do
   expect_pass "LZ-3 $sh_: commit_chain runs with onboard-v10" "$lz_d" "$sh_" "$GC" commit_chain
   out_has "LZ-3 $sh_: the next tag is onboard-v11" "git tag -a onboard-v11 -m"
 done
-# LA-n (round 19, legacy option A): a repo onboarded before the kit kept the gate ledger has onboard-v<n> tags with
+# LA-n (round 19, legacy option A; round 20: legacy means made before the ledger kit, and a real terminal): a repo onboarded before the kit kept the gate ledger has onboard-v<n> tags with
 # no Agents-V0-Ledger trailer, and every ledger check refuses them. The person adopts them once with
 # `gate-checks.sh adopt_legacy_tags` (the hook denies it to the agent): it writes <git common dir>/agents-v0/
 # legacy-adoption (tags, commits, time, kit version, HEAD and the ledger lines it pins), refuses a second run, and the
@@ -1046,20 +1046,65 @@ done
 # writes nothing. The typed answer stands in for the person in their own terminal.
 la_rec() { printf '%s/legacy-adoption\n' "$(fc_dir "$1")"; }
 la_led() { printf '%s/gate-ledger\n' "$(fc_dir "$1")"; }
-# la_run <answer> <shell>: adopt_legacy_tags with <answer> typed at the prompt
-la_run() { printf '%s\n' "$1" | "$2" "$GC" adopt_legacy_tags; }
+# la_pty <answer> <command...>: run the command on a real pty (stdin, stdout and /dev/tty are the pty) and type
+# <answer> at the "Type adopt" prompt (<EOF> types end of input); prints what the terminal showed, exits as the command
+la_pty() { python3 -c 'import os, pty, select, sys
+ans, cmd = sys.argv[1], sys.argv[2:]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(cmd[0], cmd)
+buf, sent = b"", False
+while True:
+    r = select.select([fd], [], [], 60)[0]
+    if not r:
+        break
+    try:
+        d = os.read(fd, 4096)
+    except OSError:
+        break
+    if not d:
+        break
+    buf += d
+    if not sent and b"Type adopt" in buf:
+        os.write(fd, b"\x04" if ans == "<EOF>" else ans.encode() + b"\n")
+        sent = True
+st = os.waitpid(pid, 0)[1]
+sys.stdout.write(buf.decode("utf-8", "replace").replace("\r\n", "\n"))
+sys.exit(os.waitstatus_to_exitcode(st))' "$@"; }
+# la_run <answer> <shell>: adopt_legacy_tags in a terminal (a pty), with <answer> typed at the prompt
+la_run() { la_pty "$1" "$2" "$GC" adopt_legacy_tags; }
 # la_none <desc> <repo>: no record was written
 # la_cat: the record (nothing when it is missing, so a missing record fails the checks, not the suite)
 la_cat() { cat "$LA_REC" 2>/dev/null || :; }
 la_none() { if [ -e "$(la_rec "$2")" ] || [ -L "$(la_rec "$2")" ]; then fail "$1"; else pass "$1"; fi; }
-# la_mk <name>: a clone of the FC original with no tags and no ledger, then two legacy gate commits with no trailer
-# tagged onboard-v1 and onboard-v2 (the shape of a repo onboarded before the ledger)
+# la_tree <name> <base tree|-> <mode,blob,path>...: a tree built in a scratch index of the repo $la_d (from the base
+# tree, or empty for -) with those entries added; prints the tree
+la_tree() { la_ix="$T1_TMP/la-index-$1"; shift
+  if [ "$1" = - ]; then GIT_INDEX_FILE="$la_ix" git -C "$la_d" read-tree --empty; else GIT_INDEX_FILE="$la_ix" git -C "$la_d" read-tree "$1"; fi; shift
+  for e_ in "$@"; do GIT_INDEX_FILE="$la_ix" git -C "$la_d" update-index --add --cacheinfo "$e_"; done
+  GIT_INDEX_FILE="$la_ix" git -C "$la_d" write-tree; }
+# la_ct <tree> <parent> <message>: a commit of that tree on that parent (prints it)
+la_ct() { lg_env git -C "$la_d" commit-tree "$1" -p "$2^{commit}" -m "$3"; }
+la_blob() { printf '%s' "$1" | git -C "$la_d" hash-object -w --stdin; }
+# la_mk <name>: a clone of the FC original with no tags and no ledger, then the history of a repo onboarded before
+# the ledger: onboard-v1 on a commit with no gate-checks.sh at all (an older kit), onboard-v2 on a commit whose
+# gate-checks.sh predates the ledger (no Agents-V0-Ledger, no gate-ledger), both with the approved onboarding state
+# and no trailer; then the kit update to today's kit (the fixture's own tree) on top. Nothing in the work tree changes.
 la_mk() {
   la_d="$T1_TMP/$1"; git clone -q --no-tags "$fo" "$la_d"
-  G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved (legacy, before the gate ledger)"
-  G "$la_d" tag -a onboard-v1 -m "onboard approved"
-  G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved again (legacy)"
-  G "$la_d" tag -a onboard-v2 -m "onboard approved"
+  la_t0="$(git -C "$la_d" rev-parse 'HEAD^{tree}')"; la_st="$(git -C "$la_d" rev-parse "HEAD:$ST")"
+  la_old="$(la_blob '#!/bin/sh
+# FAKE- gate-checks.sh of a kit before the ledger: gate rules only
+exit 0
+')"
+  la_tr1="$(la_tree "$1-1" - "100644,$(la_blob 'FAKE- legacy app
+'),README.md" "100644,$la_st,$ST")"
+  la_tr2="$(la_tree "$1-2" "$la_t0" "100755,$la_old,.agents-v0/scripts/gate-checks.sh")"
+  la_c1="$(la_ct "$la_tr1" HEAD "onboarding: onboard approved (legacy, an older kit)")"
+  G "$la_d" tag -a onboard-v1 -m "onboard approved" "$la_c1"
+  la_c2="$(la_ct "$la_tr2" "$la_c1" "onboarding: onboard approved again (legacy, before the gate ledger)")"
+  G "$la_d" tag -a onboard-v2 -m "onboard approved" "$la_c2"
+  G "$la_d" update-ref -m "fixture: the kit update" HEAD "$(la_ct "$la_t0" "$la_c2" "kit: update to the gate-ledger kit")"
 }
 # la_ledger <repo>: the legacy ledger the person keeps: two FAIL lines and one used grant (with its grant file)
 la_ledger() { mkdir -p "$(fc_dir "$1")"; printf 'FAIL docs check\nFAIL docs check\nGRANT-USED %s count=2\n' "$fc_h1" > "$(la_led "$1")"
@@ -1109,10 +1154,42 @@ for sh_ in $LZ_SHELLS; do
     out_has "LA-6 $sh_: it shows the record before asking" "  tag=onboard-v2 $(git -C "$lp" rev-parse onboard-v2^{commit})"
     out_has "LA-6 $sh_: it says nothing was written" "REFUSED adopt_legacy_tags: not confirmed (the answer was not adopt), so nothing was written"
   done
-  expect_rc "LA-6 $sh_: no answer at all (end of input) is not a confirmation" 1 "$lp" "$sh_" "$GC" adopt_legacy_tags < /dev/null
+  expect_rc "LA-6 $sh_: no answer at all (end of input typed at the terminal) is not a confirmation" 1 "$lp" la_run "<EOF>" "$sh_"
   out_has "LA-6 $sh_: end of input writes nothing" "not confirmed (the answer was not adopt), so nothing was written"
 done
 la_none "LA-6 nothing was written" "$lp"
+printf 'adopt\n' > "$T1_TMP/la-answer.txt"
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-22 $sh_: a piped answer is refused" 1 "$lp" sh -c 'printf "adopt\n" | "$0" "$1" adopt_legacy_tags' "$sh_" "$GC"
+  out_has "LA-22 $sh_: the pipe is named" "REFUSED adopt_legacy_tags: standard input is not a terminal: the person runs this in their own terminal and types adopt there; piped or redirected input is refused, so nothing was written"
+  lacks "LA-22 $sh_: a piped run shows no prompt" "$T1_TMP/out.txt" "Type adopt"
+  expect_rc "LA-22 $sh_: an answer redirected from a file is refused" 1 "$lp" "$sh_" "$GC" adopt_legacy_tags < "$T1_TMP/la-answer.txt"
+  out_has "LA-22 $sh_: the redirect is named" "REFUSED adopt_legacy_tags: standard input is not a terminal"
+done
+# stdin, stdout and stderr on a pty that is not the controlling terminal (a new session that never opened it), so
+# [ -t 0 ] holds but /dev/tty cannot be opened
+la_noctty() { python3 -c 'import os, sys
+m, sl = os.openpty()
+pid = os.fork()
+if pid == 0:
+    os.setsid(); os.close(m)
+    for fd in (0, 1, 2):
+        os.dup2(sl, fd)
+    os.execvp(sys.argv[1], sys.argv[1:])
+os.close(sl); buf = b""
+while True:
+    try:
+        d = os.read(m, 4096)
+    except OSError:
+        break
+    if not d:
+        break
+    buf += d
+sys.stdout.write(buf.decode("utf-8", "replace").replace("\r\n", "\n"))
+sys.exit(os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))' "$@"; }
+expect_rc "LA-22 a terminal on stdin with no /dev/tty is refused" 1 "$lp" la_noctty sh "$GC" adopt_legacy_tags
+out_has "LA-22 no /dev/tty: refused cleanly" "REFUSED adopt_legacy_tags: cannot open /dev/tty: the person runs this in their own terminal and types adopt there; nothing was written"
+la_none "LA-22 nothing was written" "$lp"
 # tag shapes that refuse: each on its own clone (the suite never deletes or moves a tag back to make room)
 la_mk la-lz; la_ledger "$la_d"; G "$la_d" tag -a onboard-v03 -m "onboard approved" onboard-v2
 for sh_ in $LZ_SHELLS; do
@@ -1120,7 +1197,7 @@ for sh_ in $LZ_SHELLS; do
   out_has "LA-7 $sh_: it names the tag" "REFUSED adopt_legacy_tags: the tag onboard-v03 has a leading zero"
 done
 la_none "LA-7 nothing was written" "$la_d"
-la_mk la-side; la_ledger "$la_d"; G "$la_d" checkout -q -b side onboard-v1
+la_mk la-side; la_ledger "$la_d"; G "$la_d" checkout -q -b side "$(la_ct "$la_t0" onboard-v1 "kit: a side branch")"
 for sh_ in $LZ_SHELLS; do
   expect_rc "LA-8 $sh_: adoption refuses a tag that HEAD does not reach" 1 "$la_d" la_run adopt "$sh_"
   out_has "LA-8 $sh_: it names the tag" "REFUSED adopt_legacy_tags: the tag onboard-v2 ($(git -C "$la_d" rev-parse --short=12 onboard-v2^{commit})) is not reachable from HEAD"
@@ -1148,6 +1225,42 @@ G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved" -m "$(lt_tra
 expect_rc "LA-11 adoption refuses legacy tags mixed with a trailer tag" 1 "$la_d" la_run adopt sh
 out_has "LA-11 it names the trailer tag" "the gate commit onboard-v3 ($(git -C "$la_d" rev-parse --short=12 onboard-v3^{commit})) carries an Agents-V0-Ledger trailer"
 la_none "LA-11 a mixed repo: nothing was written" "$la_d"
+# LA-23..LA-27 (round 20, Jiraiya must-fix): a fresh tag on a commit made with today's kit is not a legacy tag
+la_d="$T1_TMP/la-fresh"; git clone -q --no-tags "$fo" "$la_d"; la_ledger "$la_d"
+G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved"; G "$la_d" tag onboard-v1 HEAD
+laf="$la_d"; G "$laf" worktree add -q -b la-fresh-wt "$T1_TMP/la-fresh-wt" HEAD
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-23 $sh_: an agent-made tag on a ledger-era commit is refused" 1 "$laf" la_run adopt "$sh_"
+  out_has "LA-23 $sh_: it names the tag and the ledger-era kit" "REFUSED adopt_legacy_tags: the tag onboard-v1 ($(git -C "$laf" rev-parse --short=12 HEAD)) is not a legacy tag: its commit already holds .agents-v0/scripts/gate-checks.sh from a kit that keeps the gate ledger (it names Agents-V0-Ledger and gate-ledger), so the tag was made after the ledger and must carry the Agents-V0-Ledger trailer. Nothing was written"
+  lacks "LA-23 $sh_: no prompt" "$T1_TMP/out.txt" "Type adopt"
+  expect_rc "LA-23 $sh_: refused from a linked worktree too" 1 "$T1_TMP/la-fresh-wt" la_run adopt "$sh_"
+  out_has "LA-23 $sh_: the worktree refusal names the tag" "the tag onboard-v1 ($(git -C "$laf" rev-parse --short=12 HEAD)) is not a legacy tag"
+done
+la_none "LA-23 nothing was written" "$laf"
+expect_rc "LA-23 the fresh tag still refuses ledger_ok with the trailer hint" 1 "$laf" sh "$GC" ledger_ok
+out_has "LA-23 ledger_ok names the fresh tag" "the gate commit onboard-v1 ("
+la_mk la-mixf; la_ledger "$la_d"; G "$la_d" tag -a onboard-v3 -m "onboard approved" HEAD
+expect_rc "LA-24 legacy tags mixed with a fresh tag on the kit-update commit are refused" 1 "$la_d" la_run adopt sh
+out_has "LA-24 it names the fresh tag" "the tag onboard-v3 ($(git -C "$la_d" rev-parse --short=12 HEAD)) is not a legacy tag: its commit already holds .agents-v0/scripts/gate-checks.sh"
+la_none "LA-24 nothing was written" "$la_d"
+la_mk la-tpl; la_ledger "$la_d"
+la_c="$(la_ct "$(la_tree tpl - "100644,$(la_blob 'FAKE- kit checkout
+'),README.md" "100644,$la_st,$ST" "100644,$(git -C "$la_d" rev-parse 'HEAD:.agents-v0/scripts/gate-checks.sh'),templates/.agents-v0/scripts/gate-checks.sh")" onboard-v2 "onboarding: on the kit's own checkout")"
+G "$la_d" tag -a onboard-v3 -m "onboard approved" "$la_c"
+expect_rc "LA-25 a tag on a commit with the ledger kit at the templates path is refused" 1 "$la_d" la_run adopt sh
+out_has "LA-25 it names the templates path" "the tag onboard-v3 ($(printf '%s' "$la_c" | cut -c1-12)) is not a legacy tag: its commit already holds templates/.agents-v0/scripts/gate-checks.sh from a kit that keeps the gate ledger"
+la_mk la-link; la_ledger "$la_d"
+la_c="$(la_ct "$(la_tree link "$la_t0" "120000,$(la_blob 'FAKE-target'),.agents-v0/scripts/gate-checks.sh")" onboard-v2 "onboarding: gate-checks.sh as a symlink")"
+G "$la_d" tag -a onboard-v3 -m "onboard approved" "$la_c"
+expect_rc "LA-26 a tag whose gate-checks.sh is a symlink is refused" 1 "$la_d" la_run adopt sh
+out_has "LA-26 it says the file is not regular" "the tag onboard-v3 ($(printf '%s' "$la_c" | cut -c1-12)) cannot be adopted: .agents-v0/scripts/gate-checks.sh in its commit is not a regular file (120000 blob "
+la_mk la-nost; la_ledger "$la_d"
+la_c="$(la_ct "$(la_tree nost - "100644,$(la_blob 'FAKE- before onboarding
+'),README.md")" onboard-v2 "chore: no onboarding state")"
+G "$la_d" tag -a onboard-v3 -m "onboard approved" "$la_c"
+expect_rc "LA-27 a tag on a commit with no approved onboarding state is refused" 1 "$la_d" la_run adopt sh
+out_has "LA-27 it names the missing state" "the tag onboard-v3 ($(printf '%s' "$la_c" | cut -c1-12)) is not a legacy onboard gate commit: its commit has no docs/agents-v0/onboarding/state.json with onboard in approvedPhases"
+la_none "LA-23..27 nothing was written" "$la_d"
 
 # the adoption itself, under each shell, run from a linked worktree: the record lands in the git common dir
 for sh_ in $LZ_SHELLS; do

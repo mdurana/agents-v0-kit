@@ -162,7 +162,7 @@ ledger_py() {
   lp_g="$(grant_path)" || exit 2
   lp_a="$(adopt_path)" || exit 2
   python3 - "$lp_l" "$lp_g" "$lp_a" "$LEDGER_TRAILER" "$@" <<'PYLG'
-import hashlib, os, re, subprocess, sys
+import hashlib, json, os, re, subprocess, sys
 ledger, grant, adopt, key, mode, args = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
 TRAILER_RE = re.compile(r"^" + re.escape(key) + r": lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 KEY_RE = re.compile(r"^\s*" + re.escape(key) + r"\s*:", re.I)
@@ -302,6 +302,52 @@ def read_adoption():
     rec["n"] = int(rec["ledgerLines"])
     return rec
 
+# Round 20 (Jiraiya, must-fix): a trailer-less tag is only adoptable when its commit predates the ledger kit. Every
+# gate-checks.sh the kit ever shipped (from its first commit, 61195e24) holds the trailer key and the ledger file
+# name, so a tagged commit whose tree has either in gate-checks.sh (installed path, or the kit's own templates path)
+# was made with a ledger-era kit, and a tag on it must carry the trailer. A real legacy gate commit (the pre-ledger
+# chain: --approve onboard, then git add -A, commit, tag) also holds the approved onboarding state.
+LEDGER_MARKERS = (key.encode(), b"gate-ledger")
+KIT_GC_PATHS = (".agents-v0/scripts/gate-checks.sh", "templates/.agents-v0/scripts/gate-checks.sh")
+ONB_STATE_PATH = "docs/agents-v0/onboarding/state.json"
+
+def tree_blob(c, path, t):
+    # the bytes of <path> in commit c, or None when the tree has no such path; anything but a regular file refuses
+    r = git("ls-tree", "-z", c, "--", path)
+    if r.returncode != 0:
+        out(1, "git could not read the tree of the tag %s (%s); nothing was written" % (t, c[:12]))
+    ent = [e for e in r.stdout.split(b"\0") if e]
+    if not ent:
+        return None
+    meta, _, name = ent[0].partition(b"\t")
+    f = meta.split(b" ")
+    if len(ent) != 1 or len(f) != 3 or name.decode("utf-8", "replace") != path or f[1] != b"blob" or f[0] not in (b"100644", b"100755"):
+        out(1, "the tag %s (%s) cannot be adopted: %s in its commit is not a regular file (%s), so the kit cannot tell "
+               "which kit made it; nothing was written. Stop and show the user" % (t, c[:12], path, clean(meta.decode("utf-8", "replace"))))
+    b = git("cat-file", "blob", f[2].decode())
+    if b.returncode != 0:
+        out(1, "the tag %s (%s) cannot be adopted: git could not read %s in its commit; nothing was written" % (t, c[:12], path))
+    return b.stdout
+
+def legacy_commit_ok(t, c):
+    for p in KIT_GC_PATHS:
+        data = tree_blob(c, p, t)
+        hit = [m.decode() for m in LEDGER_MARKERS if data is not None and m in data]
+        if hit:
+            out(1, "the tag %s (%s) is not a legacy tag: its commit already holds %s from a kit that keeps the gate ledger "
+                   "(it names %s), so the tag was made after the ledger and must carry the %s trailer. Nothing was "
+                   "written. Stop and show the user: a person (never an agent) replaces that tag with the gate commit "
+                   "chain from sh .agents-v0/scripts/gate-checks.sh commit_chain" % (t, c[:12], p, " and ".join(hit), key))
+    st = tree_blob(c, ONB_STATE_PATH, t)
+    try:
+        ap = json.loads(st.decode("utf-8")).get("approvedPhases") if st is not None else None
+    except (ValueError, AttributeError):
+        ap = None
+    if not isinstance(ap, list) or "onboard" not in ap:
+        out(1, "the tag %s (%s) is not a legacy onboard gate commit: its commit has no %s with onboard in approvedPhases "
+               "(a legacy gate commit was made right after --approve onboard); nothing was written. Stop and show the "
+               "user" % (t, c[:12], ONB_STATE_PATH))
+
 def adopted_list(rec):
     return ", ".join(sorted(rec["tags"], key=lambda x: int(x[len("onboard-v"):])))
 
@@ -350,6 +396,7 @@ def anchors(adopting=False):
         where = "the gate commit %s (%s)" % (t, sha[:12])
         if not any(KEY_RE.match(x) for x in msg.split("\n")):
             if adopting:
+                legacy_commit_ok(t, sha)
                 legacy.append((t, sha))
                 continue
             if rec is not None and t in rec["tags"]:
@@ -1317,8 +1364,12 @@ untrusted-root marker exists; there is no onboard-v<n> tag; any onboard-v<n> tag
 not a legacy repo); a tag has a leading zero, does not name a commit, or is not reachable from HEAD; the ledger
 is missing (create it as an empty file first if this repo never had one, or copy it from the checkout that kept
 it), is not a regular file, lacks its final newline, holds a line that is not a FAIL, GRANT-USED or
-REOPEN-REFUSED line, or names grants that do not match the grant file. It shows the record and writes it only
-when you type adopt and press Enter. Review the ledger first: an edit made before the adoption cannot be detected
+REOPEN-REFUSED line, or names grants that do not match the grant file; a tag's commit already holds a gate-checks.sh
+from a kit that keeps the gate ledger (it names Agents-V0-Ledger or gate-ledger: the tag was made after the ledger and
+needs the trailer), holds gate-checks.sh as anything but a regular file, or has no
+docs/agents-v0/onboarding/state.json with onboard approved. It shows the record and writes it only when you type
+adopt and press Enter in your own terminal: standard input must be a terminal and the answer is read from /dev/tty,
+so piped or redirected input (printf adopt | ..., < file) is refused. Review the ledger first: an edit made before the adoption cannot be detected
 afterwards. A fresh clone has no record; copy legacy-adoption, gate-ledger and reopen-grant from the original
 checkout's agents-v0/ to the clone's (never rerun the adoption there).
 ADOPTHELP
@@ -1343,12 +1394,16 @@ adopt_legacy_tags() {
     1) refuse adopt_legacy_tags "$al_body" ;;
     *) die "adopt_legacy_tags: ${al_body:-the ledger check could not run}" ;;
   esac
+  # round 20 (Jiraiya, should-fix): a second layer under the hook rule. The answer comes from the person's terminal,
+  # never from a pipe or a file. An agent's terminal tool may allocate a pty, so this is not the main boundary.
+  [ -t 0 ] || refuse adopt_legacy_tags "standard input is not a terminal: the person runs this in their own terminal and types adopt there; piped or redirected input is refused, so nothing was written"
+  (: < /dev/tty) 2>/dev/null || refuse adopt_legacy_tags "cannot open /dev/tty: the person runs this in their own terminal and types adopt there; nothing was written"
   printf 'adopt_legacy_tags: this writes %s, once, with:
 ' "$al_rec"
   printf '%s
 ' "$al_body" | sed 's/^/  /'
   printf 'Type adopt and press Enter to write it (anything else writes nothing): '
-  al_ans=""; IFS= read -r al_ans || :
+  al_ans=""; IFS= read -r al_ans < /dev/tty || :
   printf '
 '
   [ "$al_ans" = adopt ] || refuse adopt_legacy_tags "not confirmed (the answer was not adopt), so nothing was written"
