@@ -662,6 +662,9 @@ SECRET_ALLOWLIST_PATH_CASES = [
     ("/w/portal/.agents-v0/secret-allowlist.json", "block"),
     (".agents-v0/scripts/gate-rules", "block"),
     ("/w/portal/.agents-v0/scripts/gate-rules", "block"),
+    # Design: D1 (gate-rules path fix): the file lives at .agents-v0/gate-rules (D2); both paths are guard files.
+    (".agents-v0/gate-rules", "block"),
+    ("/w/portal/.agents-v0/gate-rules", "block"),
     (".agents-v0/scripts/secret_scan.py", "block"),
     ("docs/agents-v0/secret-allowlist.json", "allow"),
 ]
@@ -680,6 +683,9 @@ SECRET_ALLOWLIST_SHELL_CASES = [
     ("sed -i s/x/y/ .agents-v0/scripts/gate-rules", "block"),
     ("echo x >> .agents-v0/scripts/gate-rules", "block"),
     ("git checkout other -- .agents-v0/scripts/gate-rules", "block"),
+    ("echo x >> .agents-v0/gate-rules", "block"),
+    ("sed -i s/x/y/ .agents-v0/gate-rules", "block"),
+    ("cat .agents-v0/gate-rules", "allow"),
     ("cat .agents-v0/secret-allowlist.json", "allow"),
     ("git show HEAD:.agents-v0/secret-allowlist.json", "allow"),
     ("cat .agents-v0/scripts/gate-rules", "allow"),

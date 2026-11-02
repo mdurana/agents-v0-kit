@@ -2237,7 +2237,8 @@ PROTECTED_PATH_PATTERNS = [
     # Carried from 8d89d6f1/64da9195 (workflow-fixes-onboard), Design: D1.
     # onboard fix SOC-11 (Sasuke): the gate rule values and the secret-scan allow-list are guard files. The
     #   allow-list is read from HEAD only, so an agent's edit would never count; it is still never an agent's edit.
-    re.compile(r"(^|/)\.agents-v0/scripts/gate-rules$"),
+    # Design: D1 (gate-rules path fix): gate-rules lives at .agents-v0/gate-rules (D2); the old path stays covered.
+    re.compile(r"(^|/)\.agents-v0/(scripts/)?gate-rules$"),
     re.compile(r"(^|/)\.agents-v0/secret-allowlist\.json$"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
