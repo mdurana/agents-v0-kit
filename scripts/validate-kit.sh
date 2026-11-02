@@ -352,6 +352,8 @@ done
 grep -Fq 'git merge --squash feature/<feature>' core/common/commands/v0-local-release.md || err "v0-local-release must squash-merge a feature story"
 [ -f scripts/test-gate-commit.sh ] || err "scripts/test-gate-commit.sh missing"
 sh scripts/test-gate-commit.sh || err "scripts/test-gate-commit.sh failed"
+[ -f scripts/test-bootstrap-greenfield.sh ] || err "scripts/test-bootstrap-greenfield.sh missing (N2A, N9A)"
+sh scripts/test-bootstrap-greenfield.sh || err "scripts/test-bootstrap-greenfield.sh failed"
 # kitfix-20261031-installed-no-overrides: installed scripts carry no AGENTS_V0_* override code
 for f in scripts/strip-test-overrides.sh scripts/check-installed-kit.sh scripts/test-installed-overrides.sh; do
   [ -f "$f" ] || err "$f missing (kitfix-20261031-installed-no-overrides)"

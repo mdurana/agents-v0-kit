@@ -4,7 +4,14 @@
 # Usage:
 #   bootstrap-greenfield.sh [--profile service|ui|app] [--pack <id>] [--scaffold-app] <target-repo>
 #
-# Prerequisite: <target-repo> exists (may be empty). --scaffold-app extracts
+# Prerequisite: <target-repo> is a new, empty git repo of its own: `git init` output only, no commit, no
+# other file or folder (design rev 6 "Greenfield record": 5A, N2A, N9A). Bootstrap never runs `git init`.
+# It refuses, before writing anything, a folder with no .git (N67, N78: hint `git init`), a folder inside a
+# parent repo (N79), a folder holding anything beside .git (N65), a repo with a commit (N66), a used gate
+# ledger, and a missing git identity. It then installs the kit and makes the repo's one root commit by exact
+# path: everything it wrote plus .agents-v0/greenfield-record.json, scanned for secrets, its message ending
+# with the lines=0 ledger trailer from gate-checks.sh greenfield_trailer; greenfield_record_ok must pass.
+# --scaffold-app extracts
 # templates/app/p0-platform-skeleton.tar.gz when --pack is omitted or is java.
 # Any other --pack skips that archive and points at that pack's scaffold-service skill.
 # Guide in the kit repo:
@@ -13,6 +20,8 @@
 # --profile fills docs/agents-v0/project-profile.md Layout and verify commands when those
 # cells are still placeholders. Omit it to infer service, ui, or app from the tree.
 set -eu
+# Bootstrap works on <target-repo> only: no git variable from the caller may point it at another repo.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY 2>/dev/null || true
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE=""
@@ -65,13 +74,82 @@ esac
   exit 1
 }
 
-TARGET_ABS="$(cd "$TARGET" && pwd)"
+TARGET_ABS="$(cd "$TARGET" && pwd -P)"
+
+# ---- entry check (N9A, N2A): refuse before anything is written -----------------------------------------
+# E34 allow-list: the tool folders Cursor or agy create when they open an empty folder. Empty until Iruka's
+# open-empty-folder test records them (with the tool versions); until then any entry beside .git is refused.
+E34_ALLOW=""
+BROWNFIELD_HINT="Greenfield bootstrap is for a new repo only: create the repo empty (git init, or a hosted repo with no README, .gitignore or license), or use brownfield onboarding (docs/agents-v0/brownfield-onboarding.md, then /v0-onboard)."
+refuse_entry() {
+  printf 'REFUSED bootstrap-greenfield: %s\n' "$1" >&2
+  printf 'Nothing was written.\n' >&2
+  exit 1
+}
+G() { git -C "$TARGET_ABS" "$@"; }
+
+entry_check() {
+  entries=""
+  for e in "$TARGET_ABS"/* "$TARGET_ABS"/.[!.]* "$TARGET_ABS"/..?*; do
+    { [ -e "$e" ] || [ -L "$e" ]; } || continue
+    name="${e##*/}"
+    [ "$name" = .git ] && continue
+    case " $E34_ALLOW " in *" $name "*) continue ;; esac
+    if [ -d "$e" ] && [ ! -L "$e" ]; then name="$name/"; fi
+    entries="${entries:+$entries, }$name"
+  done
+  if [ ! -e "$TARGET_ABS/.git" ] && [ ! -L "$TARGET_ABS/.git" ]; then
+    top="$(G rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$top" ]; then
+      # N79 (Sasuke): the root commit and the record would land in the parent repo.
+      refuse_entry "$TARGET_ABS has no .git of its own and sits inside the git repo $top, so the root commit and the greenfield record would land in that repo (N79). Create the new repo in a folder outside $top, then rerun."
+    fi
+    # N67 (empty folder), N78 (files, no .git): bootstrap never runs git init (N9A).
+    if [ -n "$entries" ]; then
+      refuse_entry "$TARGET_ABS has no .git (N78). Bootstrap never runs git init. It also holds $entries, and greenfield bootstrap needs an empty folder. $BROWNFIELD_HINT For a new repo: empty the folder (or pick a new one), run git init in it ( git -C $TARGET_ABS init ), then rerun."
+    fi
+    refuse_entry "$TARGET_ABS has no .git (N67). Bootstrap never runs git init: run git init in the folder ( git -C $TARGET_ABS init ), then rerun."
+  fi
+  top="$(G rev-parse --show-toplevel 2>/dev/null || true)"
+  top_p="$( [ -n "$top" ] && cd "$top" 2>/dev/null && pwd -P || true)"
+  if [ "$top_p" != "$TARGET_ABS" ]; then
+    refuse_entry "$TARGET_ABS/.git does not make $TARGET_ABS a git work tree of its own (git reports the top level as '${top:-none}'; N79). Run git init in the folder, or create the new repo in a folder outside any other repo, then rerun."
+  fi
+  if G rev-parse -q --verify 'HEAD^{commit}' >/dev/null 2>&1 || [ -n "$(G rev-list -n 1 --all 2>/dev/null)" ]; then
+    refuse_entry "the repo $TARGET_ABS already has a commit (N66); the greenfield record belongs in the repo's only root commit. $BROWNFIELD_HINT"
+  fi
+  if [ -n "$(G for-each-ref --count=1 2>/dev/null)" ]; then
+    refuse_entry "the repo $TARGET_ABS already has refs ($(G for-each-ref --count=1 --format='%(refname)')); it is not a new repo (N66). $BROWNFIELD_HINT"
+  fi
+  if [ -n "$entries" ]; then
+    refuse_entry "$TARGET_ABS is not empty (N65): it holds $entries beside .git. $BROWNFIELD_HINT"
+  fi
+  if [ -n "$(G ls-files 2>/dev/null | head -n 1)" ]; then
+    refuse_entry "the index of $TARGET_ABS already holds staged paths (N65); a new repo has an empty index. $BROWNFIELD_HINT"
+  fi
+  gcd="$(G rev-parse --git-common-dir 2>/dev/null)" || refuse_entry "git cannot read the repo in $TARGET_ABS"
+  case "$gcd" in /*) ;; *) gcd="$TARGET_ABS/$gcd" ;; esac
+  led="$gcd/agents-v0/gate-ledger"
+  if [ -e "$led" ] || [ -L "$led" ]; then
+    { [ -f "$led" ] && [ ! -L "$led" ] && [ ! -s "$led" ]; } || refuse_entry "the gate ledger $led is not an empty regular file; a new repo starts with an empty ledger. $BROWNFIELD_HINT"
+  fi
+  # The root commit is made by this script, so a missing identity must stop it before the install.
+  if ! G var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! G var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+    refuse_entry "git has no user name and email for $TARGET_ABS, so the root commit cannot be made. Set them (git -C $TARGET_ABS config user.name \"Your Name\" and git -C $TARGET_ABS config user.email you@example.com), then rerun."
+  fi
+  command -v python3 >/dev/null 2>&1 || refuse_entry "python3 is missing; the install, the secret scan and the record check need it."
+}
+entry_check
 
 if [ -n "$PACK" ]; then
   "$KIT/scripts/install.sh" --with-starters --pack "$PACK" "$TARGET_ABS"
 else
   "$KIT/scripts/install.sh" --with-starters "$TARGET_ABS"
 fi
+# The root commit carries the kit (H7: kit files plus the record and nothing else): the paths the install
+# wrote, listed now, before --scaffold-app adds the app. The later steps below fill some of these files.
+GF_KIT_PATHS="$(git -C "$TARGET_ABS" rev-parse --path-format=absolute --git-path agents-v0-greenfield-kit-paths)"
+git -C "$TARGET_ABS" ls-files -z --others --exclude-standard > "$GF_KIT_PATHS" || { printf 'error: cannot list the paths the install wrote\n' >&2; exit 1; }
 
 if [ "$SCAFFOLD_APP" = 1 ]; then
   if [ -z "$PACK" ] || [ "$PACK" = "java" ]; then
@@ -429,6 +507,69 @@ if [ -n "$PACK" ] && [ -f "$TARGET_ABS/.agents-v0/scripts/activate-stack-pack.sh
   (cd "$TARGET_ABS" && sh .agents-v0/scripts/activate-stack-pack.sh "$PACK" >/dev/null)
 fi
 
+# ---- the greenfield root commit (5A, N2A, N3A; gate-checks.sh greenfield_trailer and greenfield_record_ok) ---
+GF_RECORD=".agents-v0/greenfield-record.json"
+stop_commit() {
+  printf 'error: %s\n' "$1" >&2
+  # Nothing stays staged in a repo with no commit (the record and the kit files stay in the work tree).
+  git -C "$TARGET_ABS" rev-parse -q --verify HEAD >/dev/null 2>&1 || git -C "$TARGET_ABS" read-tree --empty 2>/dev/null || true
+  printf 'The kit is installed in %s, but the greenfield root commit was not completed. Fix the cause; to start again, use a new empty repo (git init) and rerun.\n' "$TARGET_ABS" >&2
+  exit 1
+}
+kit_sha_of() {
+  # The same form as install.sh writes into .agents-kit-version: 12 hex, -dirty when the kit has changes.
+  ks="$(git -C "$KIT" rev-parse --short=12 HEAD 2>/dev/null || true)"
+  case "$ks" in
+    ''|*[!0-9a-f]*) printf 'unknown'; return 0 ;;
+  esac
+  [ -z "$(git -C "$KIT" status --porcelain 2>/dev/null | head -n 1)" ] || ks="$ks-dirty"
+  printf '%s' "$ks"
+}
+greenfield_root_commit() {
+  cd "$TARGET_ABS"
+  gc=".agents-v0/scripts/gate-checks.sh"
+  [ -f "$gc" ] || stop_commit "$gc is missing after the install"
+  gt_rc=0; trailer="$(sh "$gc" greenfield_trailer)" || gt_rc=$?
+  [ "$gt_rc" = 0 ] || stop_commit "gate-checks.sh greenfield_trailer refused (exit $gt_rc): $trailer"
+  case "$trailer" in
+    *'
+'*|'') stop_commit "gate-checks.sh greenfield_trailer did not print one trailer line" ;;
+    'Agents-V0-Ledger: lines=0 sha256='*) ;;
+    *) stop_commit "gate-checks.sh greenfield_trailer printed an unexpected trailer: $trailer" ;;
+  esac
+  at="$(date '+%Y-%m-%dT%H:%M:%S%z' | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')"
+  ks="$(kit_sha_of)"
+  [ ! -e "$GF_RECORD" ] && [ ! -L "$GF_RECORD" ] || stop_commit "$GF_RECORD already exists; the install must not write it"
+  printf '{"kind": "greenfield", "bootstrapAt": "%s", "kitSha": "%s"}\n' "$at" "$ks" > "$GF_RECORD" || stop_commit "cannot write $GF_RECORD"
+  chmod 644 "$GF_RECORD"
+  # Add by exact path (JO-8 chain; never git add -A): the paths the install wrote, then the record.
+  lst="$(git rev-parse --path-format=absolute --git-path agents-v0-greenfield-commit-paths)"
+  { cat "$GF_KIT_PATHS" && printf '%s\0' "$GF_RECORD"; } | LC_ALL=C sort -z -u > "$lst" || stop_commit "cannot write the path list $lst"
+  [ -s "$GF_KIT_PATHS" ] || stop_commit "the install wrote no path to commit"
+  git --literal-pathspecs add --pathspec-from-file="$lst" --pathspec-file-nul || stop_commit "git add of the bootstrap paths failed"
+  # Staged-path check: the index holds exactly those paths, the record among them.
+  git ls-files -z | LC_ALL=C sort -z | cmp -s - "$lst" || stop_commit "the index does not hold exactly the paths the install wrote plus $GF_RECORD"
+  git ls-files --error-unmatch -- "$GF_RECORD" >/dev/null 2>&1 || stop_commit "$GF_RECORD is not staged"
+  msg="$(git rev-parse --git-path agents-v0-greenfield-commit-msg.txt)"
+  printf 'agents-v0: greenfield bootstrap (kit %s)\n\n%s\n' "$ks" "$trailer" > "$msg" || stop_commit "cannot write the commit message file $msg"
+  [ -f .agents-v0/scripts/secret_scan.py ] || stop_commit ".agents-v0/scripts/secret_scan.py is missing after the install"
+  sc_rc=0; python3 .agents-v0/scripts/secret_scan.py --staged --root "$TARGET_ABS" --message-file "$msg" || sc_rc=$?
+  [ "$sc_rc" = 0 ] || stop_commit "secret_scan.py exited $sc_rc (1: a hit, 2: it could not scan); nothing was committed"
+  git commit -q -F "$msg" || stop_commit "git commit of the greenfield root commit failed"
+  rm -f "$msg" "$lst" "$GF_KIT_PATHS"
+  # The trailer must be the message's last line, and the only Agents-V0-Ledger line (a commit-msg hook could add lines).
+  body="$(git log -1 --format=%B)"
+  [ "$(printf '%s\n' "$body" | sed '/^[[:space:]]*$/d' | tail -n 1)" = "$trailer" ] || stop_commit "the root commit's message does not end with $trailer (a commit-msg hook may have added lines)"
+  [ "$(printf '%s\n' "$body" | grep -c '^Agents-V0-Ledger:')" = 1 ] || stop_commit "the root commit's message holds more than one Agents-V0-Ledger line"
+  gr_rc=0; gr_out="$(sh "$gc" greenfield_record_ok)" || gr_rc=$?
+  [ "$gr_rc" = 0 ] || stop_commit "gate-checks.sh greenfield_record_ok exited $gr_rc after the root commit: $gr_out"
+  printf 'Greenfield root commit %s (%s); %s\n' "$(git rev-parse --short=12 HEAD)" "$trailer" "$gr_out"
+  left="$(git ls-files --others --exclude-standard --directory | head -n 20 | tr '\n' ' ')"
+  [ -z "$left" ] || printf 'Not in the root commit (the scaffolded app and what it changed; commit it with your first story): %s\n' "$left"
+  [ -z "$(git diff --name-only | head -n 1)" ] || printf 'Changed after the install and not in the root commit: %s\n' "$(git diff --name-only | head -n 20 | tr '\n' ' ')"
+}
+greenfield_root_commit
+
 printf '\nGreenfield bootstrap complete.\n'
 if [ "$SCAFFOLD_APP" = 1 ] && [ -z "$CLI_PACK" ]; then
   printf 'No --pack was given. Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
@@ -442,5 +583,4 @@ else
   printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with scaffold-service.\n'
   printf '      wire the reports named in pack.json; Pack java uses maven/. See docker/README.md\n'
 fi
-printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
 printf 'Then start P0-A with /v0-build or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md\n'
