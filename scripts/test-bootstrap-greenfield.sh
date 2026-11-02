@@ -76,6 +76,27 @@ expect_out "H7: bootstrap reports the root commit and the record check" 'greenfi
 refused "H7: a rerun" "$t"
 expect_out "H7: a rerun says the repo already has a commit" 'already has a commit'
 
+# bootstrap keeps its own work files (path lists, message) in .git/agents-v0-bootstrap/, overwritten by the
+# next run and never deleted; nothing of its own is left loose in .git (Jiraiya review of cb70d10f).
+check "H7: the work files are kept in .git/agents-v0-bootstrap/" "$(ls "$t/.git/agents-v0-bootstrap" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" "commit-msg.txt commit-paths kit-paths "
+check "H7: no work file loose in .git" "$(ls "$t/.git" | grep -c '^agents-v0-greenfield' || true)" 0
+
+# ---- H7 MUST-FIX (Jiraiya review of cb70d10f): a pre-commit hook that stages a file the scan never read ----
+# The hook writes sneaky.txt holding an AWS-style key id and git adds it. The key is fake and built here at
+# run time, so this file never holds one. bootstrap must compare the committed tree with the scanned one and
+# refuse loudly: non-zero, REFUSED, never a success line, and the key is never printed.
+fake_key="AKIA""FAKE0TEST0KEY000"
+t="$tmp/hook-sneak"; newrepo "$t"; mkdir -p "$tmp/hooks-sneak"
+printf '#!/bin/sh\nprintf "aws_access_key_id = %%s\\n" "%s" > sneaky.txt\ngit add sneaky.txt\n' "$fake_key" > "$tmp/hooks-sneak/pre-commit"
+chmod +x "$tmp/hooks-sneak/pre-commit"
+git -C "$t" config core.hooksPath "$tmp/hooks-sneak"
+if boot "$t"; then fail "H7 hook: a pre-commit hook that stages sneaky.txt: refused (exit 0)"; else pass "H7 hook: a pre-commit hook that stages sneaky.txt: refused"; fi
+expect_out "H7 hook: the refusal says REFUSED and that the commit hooks changed the tree" 'REFUSED bootstrap-greenfield: .*commit hooks changed the tree'
+expect_out "H7 hook: the refusal names sneaky.txt" 'sneaky\.txt'
+expect_out "H7 hook: the refusal says the root commit is not trusted" 'not trusted'
+if grep -Eq 'Greenfield bootstrap complete|Greenfield root commit [0-9a-f]|OK greenfield_record_ok' "$tmp/out.txt"; then fail "H7 hook: the output never says success"; sed 's/^/    /' "$tmp/out.txt" >&2; else pass "H7 hook: the output never says success"; fi
+if grep -q "$fake_key" "$tmp/out.txt"; then fail "H7 hook: the key is never printed"; else pass "H7 hook: the key is never printed"; fi
+
 # ---- H7 with --scaffold-app: the root commit is the kit plus the record; the extracted app stays out -------
 # (the app is the first story's to commit; the skeleton's app/backend/mvnw is a secret-scan hit, and the
 # allow-list Sensei approves can only be committed after the root commit)

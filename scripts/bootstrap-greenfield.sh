@@ -148,7 +148,11 @@ else
 fi
 # The root commit carries the kit (H7: kit files plus the record and nothing else): the paths the install
 # wrote, listed now, before --scaffold-app adds the app. The later steps below fill some of these files.
-GF_KIT_PATHS="$(git -C "$TARGET_ABS" rev-parse --path-format=absolute --git-path agents-v0-greenfield-kit-paths)"
+# Bootstrap's own work files (these path lists, the commit message) live in .git/agents-v0-bootstrap/: git
+# never stages anything under .git, each run overwrites them, and bootstrap deletes none of them.
+GF_WORK="$(git -C "$TARGET_ABS" rev-parse --path-format=absolute --git-path agents-v0-bootstrap)"
+mkdir -p "$GF_WORK" || { printf 'error: cannot create %s\n' "$GF_WORK" >&2; exit 1; }
+GF_KIT_PATHS="$GF_WORK/kit-paths"
 git -C "$TARGET_ABS" ls-files -z --others --exclude-standard > "$GF_KIT_PATHS" || { printf 'error: cannot list the paths the install wrote\n' >&2; exit 1; }
 
 if [ "$SCAFFOLD_APP" = 1 ]; then
@@ -513,7 +517,18 @@ stop_commit() {
   printf 'error: %s\n' "$1" >&2
   # Nothing stays staged in a repo with no commit (the record and the kit files stay in the work tree).
   git -C "$TARGET_ABS" rev-parse -q --verify HEAD >/dev/null 2>&1 || git -C "$TARGET_ABS" read-tree --empty 2>/dev/null || true
-  printf 'The kit is installed in %s, but the greenfield root commit was not completed. Fix the cause; to start again, use a new empty repo (git init) and rerun.\n' "$TARGET_ABS" >&2
+  if git -C "$TARGET_ABS" rev-parse -q --verify HEAD >/dev/null 2>&1; then
+    printf 'The kit is installed in %s and a root commit exists, but it failed the check above: it is not a trusted greenfield root commit. Do not build on it; start again in a new empty repo (git init) and rerun.\n' "$TARGET_ABS" >&2
+  else
+    printf 'The kit is installed in %s, but the greenfield root commit was not completed. Fix the cause; to start again, use a new empty repo (git init) and rerun.\n' "$TARGET_ABS" >&2
+  fi
+  exit 1
+}
+# A commit hook (pre-commit, prepare-commit-msg, commit-msg) can stage or change files after the secret scan:
+# the committed tree must be the tree that was scanned. Bootstrap never rewrites history or deletes the commit.
+refuse_hook_tree() {
+  printf 'REFUSED bootstrap-greenfield: the commit hooks changed the tree of the root commit %s: git committed tree %s, but the secret scan and the staged-path check read tree %s. Paths the hooks added, changed or removed: %s\n' "$1" "$3" "$2" "$4" >&2
+  printf 'The root commit %s is not trusted: it holds content the secret scan never read and is not the kit plus the greenfield record (H7). greenfield_record_ok cannot see this, so do not rely on it for this repo. Bootstrap left the commit in place (it never rewrites history) and stopped: do not push or onboard this repo. Move this repo aside, create a new empty repo (git init), turn off for it the hooks that stage files at commit time (core.hooksPath, .git/hooks/pre-commit, prepare-commit-msg, commit-msg), then rerun bootstrap.\n' "$1" >&2
   exit 1
 }
 kit_sha_of() {
@@ -543,20 +558,26 @@ greenfield_root_commit() {
   printf '{"kind": "greenfield", "bootstrapAt": "%s", "kitSha": "%s"}\n' "$at" "$ks" > "$GF_RECORD" || stop_commit "cannot write $GF_RECORD"
   chmod 644 "$GF_RECORD"
   # Add by exact path (JO-8 chain; never git add -A): the paths the install wrote, then the record.
-  lst="$(git rev-parse --path-format=absolute --git-path agents-v0-greenfield-commit-paths)"
+  lst="$GF_WORK/commit-paths"
   { cat "$GF_KIT_PATHS" && printf '%s\0' "$GF_RECORD"; } | LC_ALL=C sort -z -u > "$lst" || stop_commit "cannot write the path list $lst"
   [ -s "$GF_KIT_PATHS" ] || stop_commit "the install wrote no path to commit"
   git --literal-pathspecs add --pathspec-from-file="$lst" --pathspec-file-nul || stop_commit "git add of the bootstrap paths failed"
   # Staged-path check: the index holds exactly those paths, the record among them.
   git ls-files -z | LC_ALL=C sort -z | cmp -s - "$lst" || stop_commit "the index does not hold exactly the paths the install wrote plus $GF_RECORD"
   git ls-files --error-unmatch -- "$GF_RECORD" >/dev/null 2>&1 || stop_commit "$GF_RECORD is not staged"
-  msg="$(git rev-parse --git-path agents-v0-greenfield-commit-msg.txt)"
+  msg="$GF_WORK/commit-msg.txt"
   printf 'agents-v0: greenfield bootstrap (kit %s)\n\n%s\n' "$ks" "$trailer" > "$msg" || stop_commit "cannot write the commit message file $msg"
   [ -f .agents-v0/scripts/secret_scan.py ] || stop_commit ".agents-v0/scripts/secret_scan.py is missing after the install"
   sc_rc=0; python3 .agents-v0/scripts/secret_scan.py --staged --root "$TARGET_ABS" --message-file "$msg" || sc_rc=$?
   [ "$sc_rc" = 0 ] || stop_commit "secret_scan.py exited $sc_rc (1: a hit, 2: it could not scan); nothing was committed"
+  scanned_tree="$(git write-tree)" || stop_commit "git write-tree of the scanned index failed; nothing was committed"
   git commit -q -F "$msg" || stop_commit "git commit of the greenfield root commit failed"
-  rm -f "$msg" "$lst" "$GF_KIT_PATHS"
+  root="$(git rev-parse --short=12 HEAD)"
+  committed_tree="$(git rev-parse 'HEAD^{tree}')" || stop_commit "cannot read the tree of the root commit $root"
+  if [ "$committed_tree" != "$scanned_tree" ]; then
+    changed="$(git diff-tree -r --no-renames --name-status "$scanned_tree" "$committed_tree" | head -n 20 | tr '\t' ' ' | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+    refuse_hook_tree "$root" "$scanned_tree" "$committed_tree" "${changed:-unknown}"
+  fi
   # The trailer must be the message's last line, and the only Agents-V0-Ledger line (a commit-msg hook could add lines).
   body="$(git log -1 --format=%B)"
   [ "$(printf '%s\n' "$body" | sed '/^[[:space:]]*$/d' | tail -n 1)" = "$trailer" ] || stop_commit "the root commit's message does not end with $trailer (a commit-msg hook may have added lines)"
