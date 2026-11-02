@@ -781,3 +781,8 @@ printf 'Greenfield: %s/bootstrap-greenfield.sh — see docs/agents-v0/greenfield
 if [ "$UPDATE" = 0 ]; then
   printf 'To refresh after kit changes: %s --update <target-repo>\n' "$(basename "$0")"
 fi
+# agy has no hook protection yet (Sensei 09:37 Manila: "keep agy out of this fix, docs and the agy install warn it
+# has no hook protection yet"): its hooks.json does not load, so say so once, last, on stderr with the other warnings.
+if [ "$WITH_ANTIGRAVITY" = 1 ]; then
+  printf '%s\n' "WARNING: Antigravity (agy) support is not guarded yet. The kit's hooks do not load in agy, so nothing blocks writes to the ledger, the untrusted-root marker, state.json, or a push. Use Cursor for supervised runs until the agy package ships." >&2
+fi

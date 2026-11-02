@@ -6,6 +6,8 @@
 # --update --with-antigravity refreshes it. check-installed-kit.sh is HASH-OK in both modes and checks .agents/hooks
 # whenever it is there. A changed model in .cursor/model-config.json does not reach .agents/ on a no-flag --update
 # (update-agents-model.sh --no-antigravity), and install.sh refuses an unknown option such as --with-antigravty.
+# An install or --update with --with-antigravity warns once, on stderr, that agy has no hook protection yet (Sensei
+# 09:37 Manila: "docs and the agy install warn it has no hook protection yet"); without the flag it never does.
 # Tier 1: offline, temp folders only.
 set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,6 +27,12 @@ rest_snap() {
 no_agy() { # <label> <repo>
   if [ -e "$2/.agents" ]; then fail "$1: no .agents/ at all ($(cd "$2" && find .agents | head -5 | tr '\n' ' '))"; else pass "$1: no .agents/ at all"; fi
 }
+AGY_WARN='WARNING: Antigravity (agy) support is not guarded yet. The kit'"'"'s hooks do not load in agy, so nothing blocks writes to the ledger, the untrusted-root marker, state.json, or a push. Use Cursor for supervised runs until the agy package ships.'
+# warn_once <label> <file>: the agy warning is in <file> exactly once, as a whole line
+warn_once() {
+  n_="$(grep -cxF "$AGY_WARN" "$2" || :)"
+  [ "$n_" = 1 ] && pass "$1: the agy no-hook-protection warning, once" || fail "$1: the agy no-hook-protection warning, once (found ${n_:-0})"
+}
 upd() { KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --update "$@" > "$T1_TMP/upd.log" 2>&1; }
 
 # --- 1. static: the flag, its usage text and header, and validate-kit --------------------------------------------
@@ -38,19 +46,26 @@ has "validate-kit --target checks .agents/ only when it is installed" "$KIT/scri
 D="$(t1_repo default --commit)"
 t1_install "$D" && pass "default install runs" || fail "default install runs"
 no_agy "default install" "$D"
+lacks "default install: no agy warning" "$T1_TMP/install.log" "not guarded yet"
 [ -f "$D/.cursor/hooks.json" ] && [ -x "$D/.cursor/hooks/pre-shell.sh" ] && pass "default install: the Cursor adapter is installed" || fail "default install: the Cursor adapter is installed"
 if t1_hash_ok "$D"; then pass "default install: check-installed-kit HASH-OK"; else fail "default install: check-installed-kit HASH-OK ($(cat "$T1_TMP/hash.txt"))"; fi
 lacks "default install: check-installed-kit reports nothing about .agents/" "$T1_TMP/hash.txt" ".agents/"
 upd "$D" && pass "default install: --update runs" || fail "default install: --update runs (see $T1_TMP/upd.log)"
 no_agy "default install, --update" "$D"
 lacks "default install, --update: no agy note" "$T1_TMP/upd.log" "--with-antigravity"
+lacks "default install, --update: no agy warning" "$T1_TMP/upd.log" "not guarded yet"
 W="$(t1_repo starters --commit)"
 t1_install "$W" --with-starters && pass "--with-starters install runs" || fail "--with-starters install runs"
 no_agy "--with-starters install" "$W"
 
 # --- 3. --with-antigravity: the agy tree as before; nothing else differs from a default install ---------------------
 A="$(t1_repo agy --commit)"
-t1_install "$A" --with-antigravity && pass "--with-antigravity install runs" || fail "--with-antigravity install runs"
+if sh "$KIT/scripts/install.sh" --with-antigravity "$A" > "$T1_TMP/agy.out" 2> "$T1_TMP/agy.err"; then pass "--with-antigravity install runs"
+else fail "--with-antigravity install runs ($(tail -3 "$T1_TMP/agy.err" | tr '\n' ' '))"; fi
+warn_once "--with-antigravity install, stderr" "$T1_TMP/agy.err"
+lacks "--with-antigravity install: the warning is not on stdout" "$T1_TMP/agy.out" "not guarded yet"
+w_="$(grep -nxF "$AGY_WARN" "$T1_TMP/agy.err" | cut -d: -f1)"; e_="$(wc -l < "$T1_TMP/agy.err" | tr -d ' ')"
+[ -n "$w_" ] && [ "$w_" = "$e_" ] && pass "--with-antigravity install: the warning is the last stderr line (end of the summary)" || fail "--with-antigravity install: the warning is the last stderr line (line ${w_:-none} of $e_)"
 if cmp -s "$KIT/core/common/adapters/antigravity/hooks.json" "$A/.agents/hooks.json"; then pass "opt-in: .agents/hooks.json is the kit adapter"; else fail "opt-in: .agents/hooks.json is the kit adapter"; fi
 hk=0; for f in "$KIT"/core/common/hooks/*; do [ -f "$f" ] || continue; cmp -s "$f" "$A/.agents/hooks/${f##*/}" || hk=1; done
 [ "$hk" = 0 ] && pass "opt-in: every core/common/hooks file is in .agents/hooks byte for byte" || fail "opt-in: every core/common/hooks file is in .agents/hooks byte for byte"
@@ -85,6 +100,7 @@ else fail "agy project, --update (no flag): every .agents/ file is byte-identica
 [ -z "$(git -C "$A" status --porcelain -- .agents)" ] && pass "agy project, --update (no flag): git sees no change under .agents/" || fail "agy project, --update (no flag): git sees no change under .agents/"
 [ ! -e "$A/trash" ] && pass "agy project, --update (no flag): nothing moved to trash/" || fail "agy project, --update (no flag): nothing moved to trash/"
 has "agy project, --update (no flag): a note says how to refresh .agents/" "$T1_TMP/upd.log" "install.sh --update --with-antigravity"
+lacks "agy project, --update (no flag): no agy warning (the flag is not given)" "$T1_TMP/upd.log" "not guarded yet"
 if t1_hash_ok "$A"; then pass "agy project, --update (no flag): check-installed-kit HASH-OK"; else fail "agy project, --update (no flag): check-installed-kit HASH-OK ($(cat "$T1_TMP/hash.txt"))"; fi
 
 # --- 5. a stale .agents/hooks fails check-installed-kit with the refresh hint; --update --with-antigravity fixes it --
@@ -97,12 +113,14 @@ if cmp -s "$KIT/core/common/hooks/pre-shell.sh" "$A/.agents/hooks/pre-shell.sh";
 if t1_hash_ok "$A"; then pass "--update --with-antigravity: check-installed-kit HASH-OK"; else fail "--update --with-antigravity: check-installed-kit HASH-OK ($(cat "$T1_TMP/hash.txt"))"; fi
 [ -f "$A/.agents/project-own.txt" ] && pass "--update --with-antigravity: a project file under .agents/ stays" || fail "--update --with-antigravity: a project file under .agents/ stays"
 lacks "--update --with-antigravity: no refresh note" "$T1_TMP/upd.log" "left as is"
+warn_once "--update --with-antigravity" "$T1_TMP/upd.log"
 
 # --- 6. --with-antigravity does not apply to --link ----------------------------------------------------------------
 L="$(t1_repo link --commit)"
 if sh "$KIT/scripts/install.sh" --link --commit HEAD --path "$KIT" --with-antigravity "$L" > "$T1_TMP/link.log" 2>&1; then fail "--link --with-antigravity is refused"
 else has "--link --with-antigravity is refused" "$T1_TMP/link.log" "--with-antigravity"; fi
 no_agy "--link --with-antigravity" "$L"
+lacks "--link --with-antigravity (refused): no agy warning" "$T1_TMP/link.log" "not guarded yet"
 
 # --- 7. a changed model in .cursor/model-config.json: --update without the flag still leaves .agents/ untouched -----
 # Jiraiya (97e29d5c review): update-agents-model.sh rewrote the model: line of .agents/agents/*.md on a no-flag
