@@ -7,8 +7,8 @@
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
 # Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
-# ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal) LZ-n (round 18:
-# onboard-v<n> tags with a leading zero) and GW-n (round 18: greenfield_record_ok wired into prereq_approved and
+# ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal; FC-8 and FC-7 G3 round
+# 18), LZ-n (round 18: onboard-v<n> tags with a leading zero) and GW-n (round 18: greenfield_record_ok wired into prereq_approved and
 # onboard; orphan roots, whole-value fields, the untrusted-root marker).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
@@ -519,7 +519,13 @@ expect_fail "N80 second reopen: a wrong count on the older line is refused" "$lg
 out_has "N80 second reopen names the count" "ledger line 3 says count=1, but the FAIL lines before it give 2"
 printf '%s\n' "$lg_g2" > "$LG_GRANT"; lg_back; printf 'GRANT-USED %s count=2\nGRANT-USED %s count=2\n' "$lg_gh" "$lg_h2" >> "$LG_LED"
 expect_fail "N80 second reopen: an overwritten (not appended) grant file is refused" "$lg" sh "$GC" ledger_ok
-out_has "N80 second reopen says why" "(an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+out_has "N80 second reopen says why" "(this line names a hash that is not a grant line here, or an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+# N80 (Iruka R1): a forged REOPEN-REFUSED grant= line with a hash that was never a grant line, before the one real
+# grant line: the grant file is as the person wrote it, so the hint names the unknown hash first
+printf '%s\n' "$lg_g2" > "$LG_GRANT"; lg_back; printf 'REOPEN-REFUSED grant=%s FAKE-forged refusal\nGRANT-USED %s count=2\n' "$(printf '%064d' 9)" "$lg_h2" >> "$LG_LED"
+expect_fail "N80 R1 a forged REOPEN-REFUSED hash before the real grant is refused" "$lg" sh "$GC" ledger_ok
+out_has "N80 R1 the hint names the unknown hash first" "ledger line 3 is a REOPEN-REFUSED line that names no grant in $LG_GRANT (this line names a hash that is not a grant line here, or an earlier grant line is gone"
+lacks "N80 R1 the hint no longer opens with the overwrite alone" "$T1_TMP/out.txt" "(an earlier grant line is gone"
 lg_back
 mv "$LG_GRANT" "$T1_TMP/lg/reopen-grant.moved"
 
@@ -577,10 +583,10 @@ out_has "RG-4 names the edited unused line" "ledger line 7 is a REOPEN-REFUSED l
 lacks "RG-4 (6) no overwritten hint on the unused edit" "$T1_TMP/out.txt" "overwritten"
 printf '%s\n%s\n' "$rg_l2" "$rg_l3" > "$RG_GRANT"
 expect_fail "RG-4 (2) a removed used line is refused" "$rg" sh "$GC" ledger_ok
-out_has "RG-4 (6) the removal shows the overwritten hint" "ledger line 5 is a GRANT-USED line that names no grant in $RG_GRANT (an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+out_has "RG-4 (6) the removal shows the overwritten hint" "ledger line 5 is a GRANT-USED line that names no grant in $RG_GRANT (this line names a hash that is not a grant line here, or an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
 printf '%s\n%s\n' "$rg_l1" "$rg_l3" > "$RG_GRANT"
 expect_fail "RG-4 (2) a removed unused line is refused" "$rg" sh "$GC" ledger_ok
-out_has "RG-4 (6) names it with the hint" "ledger line 7 is a REOPEN-REFUSED line that names no grant in $RG_GRANT (an earlier grant line is gone"
+out_has "RG-4 (6) names it with the hint" "ledger line 7 is a REOPEN-REFUSED line that names no grant in $RG_GRANT (this line names a hash that is not a grant line here, or an earlier grant line is gone"
 printf '%s\n%s\n%s\n' "$rg_l2" "$rg_l1" "$rg_l3" > "$RG_GRANT"
 expect_fail "RG-4 (2) reordered lines are refused" "$rg" sh "$GC" ledger_ok
 out_has "RG-4 names the order" "grant line 1 of $RG_GRANT is not the grant that ledger line 5 named (grant lines were reordered"
@@ -798,7 +804,8 @@ out_has "GF-5 says missing" "is missing at HEAD or differs from the root commit"
 G "$gq" checkout -q main
 mv "$gq/.git/agents-v0/gate-ledger" "$T1_TMP/gf-ledger.keep"
 expect_fail "GF-6 a missing ledger under the root trailer is refused" "$gq" sh "$GC" ledger_ok
-out_has "GF-6 never reads as empty" "the ledger $gq/.git/agents-v0/gate-ledger is missing, but the gate commit the greenfield root commit"
+out_has "GF-6 never reads as empty" "the ledger $gq/.git/agents-v0/gate-ledger is missing, but the greenfield root commit $(git -C "$gq" rev-list --max-parents=0 HEAD | cut -c1-12) recorded lines=0"
+lacks "GF-6 the root anchor is not called a gate commit" "$T1_TMP/out.txt" "the gate commit the greenfield"
 mv "$T1_TMP/gf-ledger.keep" "$gq/.git/agents-v0/gate-ledger"
 gb="$(t1_repo gf-brown --commit)"; t1_install "$gb" || fail "install.sh into gf-brown"
 G "$gb" add -A >/dev/null; G "$gb" commit -qm installed
@@ -853,6 +860,7 @@ out_has "FC-1 keeps the missing-ledger refusal" "REFUSED ledger_ok: ledger chang
 out_has "FC-1 the hint says to copy both files from the original checkout" "if this checkout is a fresh clone, the person (never an agent) copies gate-ledger and, when it exists, reopen-grant from the original checkout's git common dir (agents-v0/;"
 out_has "FC-1 the hint names this checkout's ledger and grant paths" "to $FC_LED and $FC_GRANT"
 out_has "FC-1 the hint names the paths command" "sh .agents-v0/scripts/gate-checks.sh paths"
+out_has "FC-1 (round 18, Iruka F2/F3) the hint says when to copy" "copies them only after every pending (unused) grant line in the original's reopen-grant has been used or refused there (a pending grant copied into the clone could be used once in each checkout; a grant used before the copy is refused as already used)"
 out_has "FC-1 the hint states the stuck state" "if the original checkout is gone, stop and tell the user"
 lacks "FC-1 no create-empty hint once an onboard-v<n> tag exists" "$T1_TMP/out.txt" "creates the empty ledger"
 if [ -e "${FC_LED%/gate-ledger}" ]; then fail "FC-1 the refusal creates nothing"; else pass "FC-1 the refusal creates nothing"; fi
@@ -881,17 +889,26 @@ out_has "FC-5 names the hash" "the first 3 lines of the ledger no longer match t
 head -n 3 "$FO_LED" > "$FC_LED"
 expect_pass "FC-6 known gap 1: a copy that drops the GRANT-USED line written after the newest anchor passes" "$fc" sh "$GC" ledger_ok
 out_has "FC-6 it passes on the anchored lines alone" "OK ledger_ok: the ledger matches the Agents-V0-Ledger trailer of onboard-v2 (lines=3)"
+# FC-8 (round 18, Iruka F2/F3): copy only after every pending grant was used or refused in the original. A full
+# copy made after grant 2 was used there (its GRANT-USED line is in the copy) cannot use grant 2 again.
+cp "$FO_LED" "$FC_LED"; cp "$FO_GRANT" "$FC_GRANT"
+expect_rc "FC-8 a copy made after the original used grant 2 refuses it in the clone" 1 "$fc" sh "$GC" reopen_grant_ok onboard
+out_has "FC-8 names the use" "REFUSED reopen_grant_ok: the last grant line (grant line 2) was already used (ledger line 5)"
+expect_pass "FC-8 the original checkout's ledger still passes" "$fo" sh "$GC" ledger_ok
 # FC-7 (Iruka): a greenfield clone with only the root anchor; the empty ledger passes until an onboard-v<n> tag exists
 gf_root fc-gf "$gf_tr" "$GFJ"; gfo="$T1_TMP/fc-gf"
 gfc="$T1_TMP/fc-gf-clone"; git clone -q "$gfo" "$gfc"
 GFC_LED="$(fc_dir "$gfc")/gate-ledger"
 expect_fail "FC-7 a root-anchor-only clone refuses the missing ledger" "$gfc" sh "$GC" ledger_ok
-out_has "FC-7 keeps the refusal" "the ledger $GFC_LED is missing, but the gate commit the greenfield root commit"
+out_has "FC-7 keeps the refusal" "the ledger $GFC_LED is missing, but the greenfield root commit $(git -C "$gfc" rev-list --max-parents=0 HEAD | cut -c1-12) recorded lines=0"
+lacks "FC-7 the root anchor is not called a gate commit" "$T1_TMP/out.txt" "the gate commit the greenfield"
 out_has "FC-7 the hint says to create the empty ledger" "if this checkout is a fresh clone of a greenfield repo with no onboard-v<n> tag yet, the person (never an agent) creates the empty ledger file $GFC_LED"
 lacks "FC-7 no stuck-state line while the root anchor alone applies" "$T1_TMP/out.txt" "if the original checkout is gone"
 mkdir -p "${GFC_LED%/gate-ledger}"; : > "$GFC_LED"
 expect_pass "FC-7 the person's empty ledger passes under the root anchor alone" "$gfc" sh "$GC" ledger_ok
 out_has "FC-7 names the root anchor" "trailer of the greenfield root commit"
+gfu="$T1_TMP/fc-gf-unreach"; git clone -q "$gfo" "$gfu"; GFU_LED="$(fc_dir "$gfu")/gate-ledger"
+mkdir -p "${GFU_LED%/gate-ledger}"; : > "$GFU_LED"
 printf 'FAIL docs check\n' >> "$(fc_dir "$gfo")/gate-ledger"; printf 'gate\n' > "$gfo/gate.txt"; G "$gfo" add gate.txt
 G "$gfo" commit -qm "onboarding: onboard approved
 
@@ -900,6 +917,11 @@ expect_pass "FC-7 setup: the original passes with its first gate (lines=1)" "$gf
 G "$gfc" fetch -q --tags origin; G "$gfc" merge -q --ff-only origin/main
 expect_fail "FC-7 the empty ledger is refused once an onboard-v<n> tag exists" "$gfc" sh "$GC" ledger_ok
 out_has "FC-7 names the tag" "the ledger has 0 lines, fewer than the 1 that the gate commit onboard-v1 recorded"
+# FC-7 (round 18, Iruka G3): the tag fetched but its commit not reachable from HEAD (no merge) still refuses
+G "$gfu" fetch -q --tags origin
+if git -C "$gfu" merge-base --is-ancestor onboard-v1 HEAD; then fail "FC-7 G3 setup: onboard-v1 is not reachable from HEAD"; else pass "FC-7 G3 setup: onboard-v1 is not reachable from HEAD"; fi
+expect_rc "FC-7 G3 a fetched tag whose commit HEAD does not reach still refuses the empty ledger" 1 "$gfu" sh "$GC" ledger_ok
+out_has "FC-7 G3 names the tag" "REFUSED ledger_ok: ledger changed, ask the user (the ledger has 0 lines, fewer than the 1 that the gate commit onboard-v1 recorded)"
 mv "$GFC_LED" "$T1_TMP/fc-gf-ledger.moved"
 expect_fail "FC-7 with the tag, the missing ledger is refused" "$gfc" sh "$GC" ledger_ok
 out_has "FC-7 with the tag, the hint says copy from the original checkout" "copies gate-ledger and, when it exists, reopen-grant from the original checkout"

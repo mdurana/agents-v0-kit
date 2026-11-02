@@ -274,20 +274,27 @@ def clone_hint(anc):
                 "from the original checkout to keep the lines written there since" % ledger)
     return ("if this checkout is a fresh clone, the person (never an agent) copies gate-ledger and, when it exists, "
             "reopen-grant from the original checkout's git common dir (agents-v0/; sh .agents-v0/scripts/gate-checks.sh "
-            "paths prints both paths in each checkout) to %s and %s; the kit has no other way to start the ledger in a "
-            "clone, so if the original checkout is gone, stop and tell the user" % (ledger, grant))
+            "paths prints both paths in each checkout) to %s and %s, and copies them only after every pending (unused) "
+            "grant line in the original's reopen-grant has been used or refused there (a pending grant copied into the "
+            "clone could be used once in each checkout; a grant used before the copy is refused as already used); the "
+            "kit has no other way to start the ledger in a clone, so if the original checkout is gone, stop and tell "
+            "the user" % (ledger, grant))
+
+def anchor_name(t):
+    # an anchor is a gate commit (its onboard-v<n> tag) or "the greenfield root commit <sha>" (root_anchor)
+    return "the gate commit " + t if t.startswith("onboard-v") else t
 
 def check_anchors(lines, anc):
     if lines is None:
         if anc:
             t, n, _ = anc[-1]
-            out(1, "the ledger %s is missing, but the gate commit %s recorded lines=%d; a missing ledger never reads as zero failures; %s" % (ledger, t, n, clone_hint(anc)))
+            out(1, "the ledger %s is missing, but %s recorded lines=%d; a missing ledger never reads as zero failures; %s" % (ledger, anchor_name(t), n, clone_hint(anc)))
         return None, 0
     for t, n, h in anc:
         if len(lines) < n:
-            out(1, "the ledger has %d lines, fewer than the %d that the gate commit %s recorded" % (len(lines), n, t))
+            out(1, "the ledger has %d lines, fewer than the %d that %s recorded" % (len(lines), n, anchor_name(t)))
         if prefix_sha(lines, n) != h:
-            out(1, "the first %d lines of the ledger no longer match the sha256 that the gate commit %s recorded (an earlier line was edited)" % (n, t))
+            out(1, "the first %d lines of the ledger no longer match the sha256 that %s recorded (an earlier line was edited)" % (n, anchor_name(t)))
     if not anc:
         return None, 0
     # the newest gate commit is the highest onboard-v<n> (anchors() sorts by number; the reopen time check and the
@@ -295,7 +302,7 @@ def check_anchors(lines, anc):
     # gate never records fewer lines than an older one.
     for (t0, n0, _), (t1, n1, _) in zip(anc, anc[1:]):
         if n1 < n0:
-            out(1, "the gate commit %s recorded lines=%d, fewer than the %d of the older gate commit %s (the ledger only grows)" % (t1, n1, n0, t0))
+            out(1, "%s recorded lines=%d, fewer than the %d of the older %s (the ledger only grows)" % (anchor_name(t1), n1, n0, anchor_name(t0).replace("the ", "", 1)))
     t, n, _ = anc[-1]
     return t, n
 
@@ -391,8 +398,11 @@ def check_grants(lines, anc):
         if not g:
             msg += " (the grant file is empty)"
         elif any(h2 in where and where[h2] < o2 for o2, (i2, h2, _) in enumerate(named) if o2 > o):
-            # a grant named after this one now sits higher in the file than its place: lines above it are gone
-            msg += " (an earlier grant line is gone: the grant file was overwritten instead of appended, or a line was removed)"
+            # a grant named after this one now sits higher in the file than its place: either this line names a hash
+            # that was never a grant line here (a forged or foreign line, Iruka R1), or lines above it are gone. The
+            # two read the same from the files, so the hint names both.
+            msg += (" (this line names a hash that is not a grant line here, or an earlier grant line is gone: the grant "
+                    "file was overwritten instead of appended, or a line was removed)")
         out(1, msg)
     for o, (i, h, k) in enumerate(named):
         if o >= len(hs) or hs[o] != h:
