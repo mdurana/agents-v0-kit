@@ -8,8 +8,9 @@
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
 # Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
 # ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal; FC-8 and FC-7 G3 round
-# 18), LZ-n (round 18: onboard-v<n> tags with a leading zero) and GW-n (round 18: greenfield_record_ok wired into prereq_approved and
-# onboard; orphan roots, whole-value fields, the untrusted-root marker).
+# 18), LZ-n (round 18: onboard-v<n> tags with a leading zero), GW-n (round 18: greenfield_record_ok wired into prereq_approved and
+# onboard; orphan roots, whole-value fields, the untrusted-root marker) and LA-n (round 19: adopt_legacy_tags, the
+# person's one-time adoption of trailer-less legacy onboard-v<n> tags, and the ledger checks honouring its record).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -758,7 +759,7 @@ q "$lg" G . commit -q --allow-empty -m "onboarding: onboard approved (no trailer
 q "$lg" G . tag -a onboard-v3 -m "onboard approved"
 expect_fail "N83 a gate commit with no trailer is refused" "$lg" sh "$GC" ledger_ok
 out_has "N83 names the missing trailer" "REFUSED ledger_ok: ledger changed, ask the user (the gate commit onboard-v3 ("
-out_has "N83 no trailer" "has no Agents-V0-Ledger trailer)"
+out_has "N83 no trailer" "has no Agents-V0-Ledger trailer; if this repo's onboard-v<n> tags were made before the kit kept the gate ledger"
 q "$lg" G . commit -q --allow-empty -m "onboarding: onboard approved" -m "Agents-V0-Ledger: lines=two sha256=$LG_EMPTY"
 q "$lg" G . tag -f -a onboard-v3 -m "onboard approved"
 expect_fail "N83 a gate commit with a malformed trailer is refused" "$lg" sh "$GC" ledger_ok
@@ -1037,6 +1038,199 @@ for sh_ in $LZ_SHELLS; do
   expect_pass "LZ-3 $sh_: commit_chain runs with onboard-v10" "$lz_d" "$sh_" "$GC" commit_chain
   out_has "LZ-3 $sh_: the next tag is onboard-v11" "git tag -a onboard-v11 -m"
 done
+# LA-n (round 19, legacy option A): a repo onboarded before the kit kept the gate ledger has onboard-v<n> tags with
+# no Agents-V0-Ledger trailer, and every ledger check refuses them. The person adopts them once with
+# `gate-checks.sh adopt_legacy_tags` (the hook denies it to the agent): it writes <git common dir>/agents-v0/
+# legacy-adoption (tags, commits, time, kit version, HEAD and the ledger lines it pins), refuses a second run, and the
+# ledger checks then count the adopted tags as anchors. Any other trailer-less tag still refuses. Each refusal below
+# writes nothing. The typed answer stands in for the person in their own terminal.
+la_rec() { printf '%s/legacy-adoption\n' "$(fc_dir "$1")"; }
+la_led() { printf '%s/gate-ledger\n' "$(fc_dir "$1")"; }
+# la_run <answer> <shell>: adopt_legacy_tags with <answer> typed at the prompt
+la_run() { printf '%s\n' "$1" | "$2" "$GC" adopt_legacy_tags; }
+# la_none <desc> <repo>: no record was written
+# la_cat: the record (nothing when it is missing, so a missing record fails the checks, not the suite)
+la_cat() { cat "$LA_REC" 2>/dev/null || :; }
+la_none() { if [ -e "$(la_rec "$2")" ] || [ -L "$(la_rec "$2")" ]; then fail "$1"; else pass "$1"; fi; }
+# la_mk <name>: a clone of the FC original with no tags and no ledger, then two legacy gate commits with no trailer
+# tagged onboard-v1 and onboard-v2 (the shape of a repo onboarded before the ledger)
+la_mk() {
+  la_d="$T1_TMP/$1"; git clone -q --no-tags "$fo" "$la_d"
+  G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved (legacy, before the gate ledger)"
+  G "$la_d" tag -a onboard-v1 -m "onboard approved"
+  G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved again (legacy)"
+  G "$la_d" tag -a onboard-v2 -m "onboard approved"
+}
+# la_ledger <repo>: the legacy ledger the person keeps: two FAIL lines and one used grant (with its grant file)
+la_ledger() { mkdir -p "$(fc_dir "$1")"; printf 'FAIL docs check\nFAIL docs check\nGRANT-USED %s count=2\n' "$fc_h1" > "$(la_led "$1")"
+  printf '%s\n' "$fc_gl1" > "$(fc_dir "$1")/reopen-grant"; }
+LA_HINT="has no Agents-V0-Ledger trailer; if this repo's onboard-v<n> tags were made before the kit kept the gate ledger, the person (never an agent) adopts them once in their own terminal with sh .agents-v0/scripts/gate-checks.sh adopt_legacy_tags"
+la_mk la-pre; lp="$la_d"; LP_LED="$(la_led "$lp")"
+expect_rc "LA-1 before adoption, ledger_ok refuses the legacy tags" 1 "$lp" sh "$GC" ledger_ok
+out_has "LA-1 ledger_ok names the first legacy tag" "REFUSED ledger_ok: ledger changed, ask the user (the gate commit onboard-v1 ("
+out_has "LA-1 ledger_ok says how the person adopts them" "$LA_HINT"
+out_has "LA-1 ledger_ok names the fresh-clone copy" "in a fresh clone of a repo that already adopted them, the person copies legacy-adoption, gate-ledger and reopen-grant from the original checkout's agents-v0/ instead). Stop and show the user)"
+expect_rc "LA-1 before adoption, gate_committed refuses the legacy tags" 1 "$lp" sh "$GC" gate_committed onboard
+out_has "LA-1 gate_committed says how the person adopts them" "$LA_HINT"
+expect_pass "LA-2 adopt_legacy_tags --help prints the usage" "$lp" sh "$GC" adopt_legacy_tags --help
+out_has "LA-2 the usage names the command" "usage: sh .agents-v0/scripts/gate-checks.sh adopt_legacy_tags [--help]"
+out_has "LA-2 the usage says the person runs it once" "The person runs this once per repo, in their own terminal; an agent never runs it (the hook denies it)."
+expect_rc "LA-2 adopt_legacy_tags with an unknown argument is a usage error" 2 "$lp" sh "$GC" adopt_legacy_tags --force
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-3 $sh_: adoption refuses a missing ledger" 1 "$lp" la_run adopt "$sh_"
+  out_has "LA-3 $sh_: it names the missing ledger" "REFUSED adopt_legacy_tags: the ledger $LP_LED is missing, so there is nothing to pin: if this repo never had one, the person (never an agent) creates it as an empty file first"
+  la_none "LA-3 $sh_: nothing was written" "$lp"
+done
+la_ledger "$lp"; cp "$LP_LED" "$T1_TMP/la-pre-ledger.keep"
+printf 'NOT A LEDGER LINE\n' >> "$LP_LED"
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-4 $sh_: adoption refuses a malformed ledger line" 1 "$lp" la_run adopt "$sh_"
+  out_has "LA-4 $sh_: it names the line" "REFUSED adopt_legacy_tags: nothing was written: the ledger cannot be adopted: ledger line 4 is not a well-formed FAIL, GRANT-USED or REOPEN-REFUSED line"
+  la_none "LA-4 $sh_: nothing was written" "$lp"
+done
+printf 'FAIL no newline' >> "$LP_LED"
+expect_rc "LA-4 adoption refuses a ledger without its final newline" 1 "$lp" la_run adopt sh
+out_has "LA-4 it names the missing newline" "has no newline (every kit write ends in one)"
+cp "$T1_TMP/la-pre-ledger.keep" "$LP_LED"; printf 'GRANT-USED %s count=2\n' "$fc_h2" >> "$LP_LED"
+expect_rc "LA-4 adoption refuses a GRANT-USED line that names no grant" 1 "$lp" la_run adopt sh
+out_has "LA-4 it names the grant mismatch" "nothing was written: the ledger cannot be adopted: ledger line 4 is a GRANT-USED line that names no grant in"
+cp "$T1_TMP/la-pre-ledger.keep" "$LP_LED"
+la_none "LA-4 nothing was written" "$lp"
+printf 'rootCommit=%s\nreason=FAKE-test\n' "$(git -C "$lp" rev-parse HEAD)" > "$(fc_dir "$lp")/untrusted-root"
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-5 $sh_: adoption refuses with the untrusted-root marker" 1 "$lp" la_run adopt "$sh_"
+  out_has "LA-5 $sh_: it names the marker" "REFUSED adopt_legacy_tags: the untrusted-root marker $(fc_dir "$lp")/untrusted-root exists"
+done
+mv "$(fc_dir "$lp")/untrusted-root" "$T1_TMP/la-untrusted-root.aside"
+la_none "LA-5 nothing was written" "$lp"
+for sh_ in $LZ_SHELLS; do
+  for la_a in no "" "adopt now"; do
+    expect_rc "LA-6 $sh_: the answer '$la_a' is not a confirmation" 1 "$lp" la_run "$la_a" "$sh_"
+    out_has "LA-6 $sh_: it shows the record before asking" "  tag=onboard-v2 $(git -C "$lp" rev-parse onboard-v2^{commit})"
+    out_has "LA-6 $sh_: it says nothing was written" "REFUSED adopt_legacy_tags: not confirmed (the answer was not adopt), so nothing was written"
+  done
+  expect_rc "LA-6 $sh_: no answer at all (end of input) is not a confirmation" 1 "$lp" "$sh_" "$GC" adopt_legacy_tags < /dev/null
+  out_has "LA-6 $sh_: end of input writes nothing" "not confirmed (the answer was not adopt), so nothing was written"
+done
+la_none "LA-6 nothing was written" "$lp"
+# tag shapes that refuse: each on its own clone (the suite never deletes or moves a tag back to make room)
+la_mk la-lz; la_ledger "$la_d"; G "$la_d" tag -a onboard-v03 -m "onboard approved" onboard-v2
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-7 $sh_: adoption refuses a leading-zero tag" 1 "$la_d" la_run adopt "$sh_"
+  out_has "LA-7 $sh_: it names the tag" "REFUSED adopt_legacy_tags: the tag onboard-v03 has a leading zero"
+done
+la_none "LA-7 nothing was written" "$la_d"
+la_mk la-side; la_ledger "$la_d"; G "$la_d" checkout -q -b side onboard-v1
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-8 $sh_: adoption refuses a tag that HEAD does not reach" 1 "$la_d" la_run adopt "$sh_"
+  out_has "LA-8 $sh_: it names the tag" "REFUSED adopt_legacy_tags: the tag onboard-v2 ($(git -C "$la_d" rev-parse --short=12 onboard-v2^{commit})) is not reachable from HEAD"
+done
+la_none "LA-8 nothing was written" "$la_d"
+la_mk la-tree; la_ledger "$la_d"; G "$la_d" tag onboard-v3 "HEAD^{tree}"
+expect_rc "LA-9 adoption refuses a tag that names no commit" 1 "$la_d" la_run adopt sh
+out_has "LA-9 it names the tag" "REFUSED adopt_legacy_tags: the tag onboard-v3 does not name a commit"
+la_none "LA-9 nothing was written" "$la_d"
+la_d="$T1_TMP/la-none"; git clone -q --no-tags "$fo" "$la_d"; la_ledger "$la_d"
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-10 $sh_: adoption refuses a repo with no onboard-v<n> tag" 1 "$la_d" la_run adopt "$sh_"
+  out_has "LA-10 $sh_: it says there is nothing to adopt" "REFUSED adopt_legacy_tags: there is no onboard-v<n> tag to adopt"
+done
+la_none "LA-10 nothing was written" "$la_d"
+la_d="$T1_TMP/la-new"; git clone -q "$fo" "$la_d"; mkdir -p "$(fc_dir "$la_d")"
+cp "$FO_LED" "$(la_led "$la_d")"; cp "$FO_GRANT" "$(fc_dir "$la_d")/reopen-grant"
+for sh_ in $LZ_SHELLS; do
+  expect_rc "LA-11 $sh_: adoption refuses a repo whose tags carry the trailer" 1 "$la_d" la_run adopt "$sh_"
+  out_has "LA-11 $sh_: it names the trailer tag" "REFUSED adopt_legacy_tags: the gate commit onboard-v1 ($(git -C "$la_d" rev-parse --short=12 onboard-v1^{commit})) carries an Agents-V0-Ledger trailer, so this repo is not a legacy repo"
+done
+la_none "LA-11 nothing was written" "$la_d"
+la_mk la-mix; la_ledger "$la_d"
+G "$la_d" commit -q --allow-empty -m "onboarding: onboard approved" -m "$(lt_trailer "$la_d")"; G "$la_d" tag -a onboard-v3 -m "onboard approved"
+expect_rc "LA-11 adoption refuses legacy tags mixed with a trailer tag" 1 "$la_d" la_run adopt sh
+out_has "LA-11 it names the trailer tag" "the gate commit onboard-v3 ($(git -C "$la_d" rev-parse --short=12 onboard-v3^{commit})) carries an Agents-V0-Ledger trailer"
+la_none "LA-11 a mixed repo: nothing was written" "$la_d"
+
+# the adoption itself, under each shell, run from a linked worktree: the record lands in the git common dir
+for sh_ in $LZ_SHELLS; do
+  la_mk "la-ok-$sh_"; la="$la_d"; la_ledger "$la"; LA_REC="$(la_rec "$la")"; LA_LED="$(la_led "$la")"
+  law="$T1_TMP/la-ok-$sh_-wt"; G "$la" worktree add -q -b la-wt "$law" HEAD
+  expect_rc "LA-12 $sh_: the first adoption, from a linked worktree, is OK" 0 "$law" la_run adopt "$sh_"
+  out_has "LA-12 $sh_: it shows where it writes" "adopt_legacy_tags: this writes $LA_REC, once, with:"
+  out_has "LA-12 $sh_: it asks for the answer" "Type adopt and press Enter to write it (anything else writes nothing): "
+  out_has "LA-12 $sh_: it says what it wrote" "OK adopt_legacy_tags: wrote $LA_REC; the ledger matches the legacy adoption record $LA_REC (adopted tag onboard-v2) (lines=3) and its 0 later line(s) are well formed"
+  if [ -f "$LA_REC" ] && [ ! -L "$LA_REC" ]; then pass "LA-12 $sh_: the record is a regular file in the git common dir"; else fail "LA-12 $sh_: the record is a regular file in the git common dir"; fi
+  la_wgd="$(cd "$law" && cd "$(git rev-parse --git-dir)" && pwd)"
+  if [ -e "$la_wgd/agents-v0/legacy-adoption" ]; then fail "LA-12 $sh_: no record in the worktree's own git dir"; else pass "LA-12 $sh_: no record in the worktree's own git dir"; fi
+  la_kit="unknown"; if [ -f "$la/.agents-kit-version" ]; then la_kit="$(sed -n 's/^[^+]*+\([0-9a-f]\{7,40\}\(-dirty\)\{0,1\}\)$/\1/p' "$la/.agents-kit-version")"; [ -n "$la_kit" ] || la_kit="unknown"; fi
+  is_eq "LA-13 $sh_: the record has 8 lines" "$(la_cat | wc -l | tr -d ' ')" "8"
+  is_eq "LA-13 $sh_: line 1 is the header" "$(la_cat | sed -n 1p)" "# agents-v0 legacy tag adoption record: written once by the person with gate-checks.sh adopt_legacy_tags; never edit, never commit"
+  if la_cat | sed -n 2p | grep -Eq '^adoptedAt=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$'; then pass "LA-13 $sh_: line 2 is adoptedAt with the local offset"; else fail "LA-13 $sh_: line 2 is adoptedAt with the local offset (got '$(la_cat | sed -n 2p)')"; fi
+  is_eq "LA-13 $sh_: line 3 is the kit sha" "$(la_cat | sed -n 3p)" "kitSha=$la_kit"
+  is_eq "LA-13 $sh_: line 4 is HEAD" "$(la_cat | sed -n 4p)" "head=$(git -C "$law" rev-parse HEAD)"
+  is_eq "LA-13 $sh_: line 5 is the ledger's line count" "$(la_cat | sed -n 5p)" "ledgerLines=3"
+  is_eq "LA-13 $sh_: line 6 is the ledger's sha256" "$(la_cat | sed -n 6p)" "ledgerSha256=$(lg_sha "$LA_LED")"
+  is_eq "LA-13 $sh_: line 7 is onboard-v1 and its commit" "$(la_cat | sed -n 7p)" "tag=onboard-v1 $(git -C "$la" rev-parse onboard-v1^{commit})"
+  is_eq "LA-13 $sh_: line 8 is onboard-v2 and its commit" "$(la_cat | sed -n 8p)" "tag=onboard-v2 $(git -C "$la" rev-parse onboard-v2^{commit})"
+  la_ck="$(la_cat | cksum)"
+  expect_rc "LA-14 $sh_: a second adoption, from the main checkout, is refused" 1 "$la" la_run adopt "$sh_"
+  out_has "LA-14 $sh_: it names the existing record" "REFUSED adopt_legacy_tags: the legacy adoption record $LA_REC already exists (adopted at $(la_cat | sed -n 's/^adoptedAt=//p')): adoption runs once per repo, so nothing was written"
+  lacks "LA-14 $sh_: it does not ask again" "$T1_TMP/out.txt" "Type adopt"
+  expect_rc "LA-14 $sh_: a second adoption from the worktree is refused too" 1 "$law" la_run adopt "$sh_"
+  is_eq "LA-14 $sh_: the record is unchanged" "$(la_cat | cksum)" "$la_ck"
+  expect_rc "LA-15 $sh_: after adoption, ledger_ok passes in the main checkout" 0 "$la" "$sh_" "$GC" ledger_ok
+  out_has "LA-15 $sh_: the adopted record is the anchor" "OK ledger_ok: the ledger matches the legacy adoption record $LA_REC (adopted tag onboard-v2) (lines=3)"
+  expect_rc "LA-15 $sh_: after adoption, ledger_ok passes in the linked worktree" 0 "$law" "$sh_" "$GC" ledger_ok
+  expect_rc "LA-15 $sh_: after adoption, gate_committed passes the ledger guard" 0 "$la" "$sh_" "$GC" gate_committed onboard
+done
+# after the adoption (the last shell's repo): edits, a bad record, a moved tag, the next gate commit, a clone
+printf 'FAIL docs check\n' >> "$LA_LED"
+expect_pass "LA-16 a FAIL line after the adoption is a later line" "$la" sh "$GC" ledger_ok
+out_has "LA-16 it counts one later line" "(lines=3) and its 1 later line(s) are well formed"
+cp "$LA_LED" "$T1_TMP/la-ledger.keep"
+printf 'FAIL edited\nFAIL docs check\nGRANT-USED %s count=2\nFAIL docs check\n' "$fc_h1" > "$LA_LED"
+expect_rc "LA-16 an edit of an adopted line refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-16 it names the record" "REFUSED ledger_ok: ledger changed, ask the user (the first 3 lines of the ledger no longer match the sha256 that the legacy adoption record $LA_REC (adopted tag onboard-v1) recorded (an earlier line was edited))"
+head -n 2 "$T1_TMP/la-ledger.keep" > "$LA_LED"
+expect_rc "LA-16 a cut ledger refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-16 it names the record's count" "the ledger has 2 lines, fewer than the 3 that the legacy adoption record $LA_REC (adopted tag onboard-v1) recorded"
+cp "$T1_TMP/la-ledger.keep" "$LA_LED"
+cp "$LA_REC" "$T1_TMP/la-record.keep" || :
+printf 'tag=onboard-v3 %s\n' "$(git -C "$la" rev-parse HEAD)" >> "$LA_REC"
+expect_rc "LA-17 a record that names a tag that does not exist refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-17 it names the gone tag" "the legacy adoption record $LA_REC adopted onboard-v3 ("
+cp "$T1_TMP/la-record.keep" "$LA_REC" || :; printf 'note=FAKE-edit\n' >> "$LA_REC"
+expect_rc "LA-17 an edited record refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-17 it says the record is not valid" "REFUSED ledger_ok: ledger changed, ask the user (the legacy adoption record $LA_REC is not valid (line 9 must be tag=onboard-v<n> <commit sha>)"
+cp "$T1_TMP/la-record.keep" "$LA_REC" || :; sed 's/^ledgerLines=3$/ledgerLines=03/' "$T1_TMP/la-record.keep" > "$LA_REC" || :
+expect_rc "LA-17 a record with a malformed field refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-17 it names the field" "is not valid (line 5 must be ledgerLines=<0|[1-9][0-9]*>)"
+cp "$T1_TMP/la-record.keep" "$LA_REC" || :
+expect_pass "LA-17 the restored record passes" "$la" sh "$GC" ledger_ok
+la_v2="$(git -C "$la" rev-parse onboard-v2^{commit})"
+G "$la" tag -f -a onboard-v2 -m "onboard approved" onboard-v1
+expect_rc "LA-18 an adopted tag moved after the adoption refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-18 it says the tag was moved" "the tag onboard-v2 names $(git -C "$la" rev-parse --short=12 onboard-v1^{commit}), but the legacy adoption record $LA_REC adopted it at $(printf '%s' "$la_v2" | cut -c1-12) (the tag was moved after the adoption)"
+G "$la" tag -f -a onboard-v2 -m "onboard approved" "$la_v2"
+expect_pass "LA-18 the tag moved back passes" "$la" sh "$GC" ledger_ok
+for sh_ in $LZ_SHELLS; do
+  expect_pass "LA-19 $sh_: commit_chain runs after the adoption" "$la" "$sh_" "$GC" commit_chain
+  out_has "LA-19 $sh_: the next tag is onboard-v3" "git tag -a onboard-v3 -m"
+done
+printf '\nRevision after the adoption.\n' >> "$la/docs/agents-v0/architecture.md"
+expect_pass "LA-19 the first gate commit after the adoption runs the chain" "$la" lg_gate "$la" 3
+expect_pass "LA-19 the new gate commit's trailer anchors the ledger" "$la" sh "$GC" ledger_ok
+out_has "LA-19 onboard-v3 is the newest anchor" "the ledger matches the Agents-V0-Ledger trailer of onboard-v3 (lines=4)"
+lac="$T1_TMP/la-clone"; git clone -q "$la" "$lac"
+expect_rc "LA-20 a fresh clone of an adopted repo refuses without the record" 1 "$lac" sh "$GC" ledger_ok
+out_has "LA-20 it says to copy the record" "in a fresh clone of a repo that already adopted them, the person copies legacy-adoption, gate-ledger and reopen-grant from the original checkout's agents-v0/ instead"
+mkdir -p "$(fc_dir "$lac")"; cp "$LA_REC" "$(la_rec "$lac")" || :; cp "$LA_LED" "$(la_led "$lac")"; cp "$(fc_dir "$la")/reopen-grant" "$(fc_dir "$lac")/reopen-grant"
+expect_pass "LA-20 with the three files copied, the clone passes" "$lac" sh "$GC" ledger_ok
+expect_rc "LA-20 the clone refuses a new adoption" 1 "$lac" la_run adopt sh
+out_has "LA-20 it names the copied record" "the legacy adoption record $(la_rec "$lac") already exists"
+G "$la" commit -q --allow-empty -m "onboarding: onboard approved (no trailer, after the adoption)"; G "$la" tag -a onboard-v4 -m "onboard approved"
+expect_rc "LA-21 a trailer-less tag made after the adoption refuses" 1 "$la" sh "$GC" ledger_ok
+out_has "LA-21 it says the tag is not adopted" "the gate commit onboard-v4 ($(git -C "$la" rev-parse --short=12 onboard-v4^{commit})) has no Agents-V0-Ledger trailer, and it is not one of the tags the legacy adoption record $LA_REC adopted (onboard-v1, onboard-v2, at $(la_cat | sed -n 's/^adoptedAt=//p')); adoption runs once"
+expect_rc "LA-21 gate_committed refuses it too" 1 "$la" sh "$GC" gate_committed onboard
+out_has "LA-21 gate_committed says the tag is not adopted" "and it is not one of the tags the legacy adoption record"
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"

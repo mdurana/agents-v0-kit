@@ -7,6 +7,8 @@
 #   sh .agents-v0/scripts/gate-checks.sh commit_chain       print the onboard gate commit chain (JO-8); runs nothing
 #   sh .agents-v0/scripts/gate-checks.sh ledger_mark        print the gate ledger's mark (N84: lines=<n> sha256=<h>, or absent)
 #   sh .agents-v0/scripts/gate-checks.sh greenfield_trailer create the empty ledger, print the greenfield root trailer
+#   sh .agents-v0/scripts/gate-checks.sh adopt_legacy_tags  the person only, once per repo: adopt the onboard-v<n> tags
+#                                                           made before the gate ledger (adopt_legacy_tags --help)
 #
 # Design: kit-eval/kitfix-plan-20261031/proposals/jiraiya-onboard-fix-design-20261101.md (revision 6),
 # "Keeping the scripts small" and gap 5. Each check is one function with one job and one refusal message, and
@@ -36,6 +38,10 @@ GRANT_REL="agents-v0/reopen-grant"
 # bootstrap-greenfield.sh writes this marker (rootCommit=, reason=, markedAt= lines) beside the ledger when a root
 # commit exists but failed a check; greenfield_record_ok refuses while it exists (round 18).
 UNTRUSTED_REL="agents-v0/untrusted-root"
+# adopt_legacy_tags writes this record once, when the person adopts the onboard-v<n> tags that have no
+# Agents-V0-Ledger trailer (made before the kit had the ledger; round 19, legacy option A). The ledger check then
+# counts each adopted tag as an anchor of the ledger the record pinned; any other tag without a trailer refuses.
+ADOPT_REL="agents-v0/legacy-adoption"
 # Every gate commit carries this trailer (N3A): Agents-V0-Ledger: lines=<n> sha256=<hash of the first n lines>.
 LEDGER_TRAILER="Agents-V0-Ledger"
 
@@ -46,6 +52,7 @@ CHECKS="approval_evidence gate_committed prereq_approved no_restart_without_reop
 usage() {
   printf 'usage: sh .agents-v0/scripts/gate-checks.sh <check> [arg] | rules [key] | paths | list | commit_chain | ledger_mark | greenfield_trailer\n' >&2
   printf '       sh .agents-v0/scripts/gate-checks.sh ledger_turn_ok <mark> <fails seen> <refusals seen>\n' >&2
+  printf '       sh .agents-v0/scripts/gate-checks.sh adopt_legacy_tags [--help]   (the person only, once per repo)\n' >&2
   printf 'checks: %s\n' "$CHECKS" >&2
   exit 2
 }
@@ -103,6 +110,7 @@ git_common_dir() {
 # Callers assign these to a variable first (v="$(ledger_path)") so a die in the subshell stops the script.
 ledger_path() { gcd="$(git_common_dir)" || exit 2; printf '%s/%s\n' "$gcd" "$LEDGER_REL"; }
 grant_path() { gcd="$(git_common_dir)" || exit 2; printf '%s/%s\n' "$gcd" "$GRANT_REL"; }
+adopt_path() { gcd="$(git_common_dir)" || exit 2; printf '%s/%s\n' "$gcd" "$ADOPT_REL"; }
 
 # --- checks ---------------------------------------------------------------------------------------------
 ok() { printf 'OK %s: %s\n' "$1" "$2"; exit 0; }
@@ -152,9 +160,10 @@ need_phase() { [ -n "${2:-}" ] || die "$1 needs a phase argument"; case "$2" in 
 ledger_py() {
   lp_l="$(ledger_path)" || exit 2
   lp_g="$(grant_path)" || exit 2
-  python3 - "$lp_l" "$lp_g" "$LEDGER_TRAILER" "$@" <<'PYLG'
+  lp_a="$(adopt_path)" || exit 2
+  python3 - "$lp_l" "$lp_g" "$lp_a" "$LEDGER_TRAILER" "$@" <<'PYLG'
 import hashlib, os, re, subprocess, sys
-ledger, grant, key, mode, args = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]
+ledger, grant, adopt, key, mode, args = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6:]
 TRAILER_RE = re.compile(r"^" + re.escape(key) + r": lines=(0|[1-9][0-9]*) sha256=([0-9a-f]{64})$")
 KEY_RE = re.compile(r"^\s*" + re.escape(key) + r"\s*:", re.I)
 FAIL_RE = re.compile(r"^FAIL(?: [^\x00-\x1f\x7f]+)?$")
@@ -236,10 +245,87 @@ LZ_TEXT = ("the tag %s has a leading zero; onboard-v<n> tags are numbered withou
            "number as decimal in python and as octal in the shell. Stop and show the user: a person (never an agent) "
            "replaces that tag")
 
+# The legacy adoption record (round 19, legacy option A): written once by the person with adopt_legacy_tags, in
+# the git common dir next to the ledger (the hooks protect .git/agents-v0/). Strict format, one key per line:
+#   ADOPT_HEAD / adoptedAt=<local time> / kitSha=<7-40 hex[-dirty]|unknown> / head=<commit> / ledgerLines=<n> /
+#   ledgerSha256=<64 hex of the first n ledger lines> / tag=onboard-v<n> <commit> (one or more, ascending)
+ADOPT_HEAD = ("# agents-v0 legacy tag adoption record: written once by the person with gate-checks.sh "
+              "adopt_legacy_tags; never edit, never commit")
+ADOPT_KEYS = ["adoptedAt", "kitSha", "head", "ledgerLines", "ledgerSha256"]
+OID = r"(?:[0-9a-f]{40}|[0-9a-f]{64})"
+ADOPT_VAL = {
+    "adoptedAt": r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}",
+    "kitSha": r"unknown|[0-9a-f]{7,40}(?:-dirty)?",
+    "head": OID,
+    "ledgerLines": r"0|[1-9][0-9]*",
+    "ledgerSha256": r"[0-9a-f]{64}",
+}
+ADOPTED = {}  # tag -> the record, for the anchors the record adopted (anchor_name)
+
+def read_adoption():
+    if not os.path.lexists(adopt):
+        return None
+    def bad(why):
+        out(1, "the legacy adoption record %s is not valid (%s); the person writes it once with sh "
+               ".agents-v0/scripts/gate-checks.sh adopt_legacy_tags and nobody edits it. Stop and show the user"
+               % (adopt, why))
+    if os.path.islink(adopt) or not os.path.isfile(adopt):
+        bad("it is not a regular file")
+    with open(adopt, "rb") as f:
+        data = f.read()
+    if not data.endswith(b"\n"):
+        bad("its last line has no newline")
+    if b"\r" in data:
+        bad("it holds a carriage return")
+    s = text(data)
+    if s is None:
+        bad("it is not UTF-8")
+    L = s.split("\n")[:-1]
+    if not L or L[0] != ADOPT_HEAD:
+        bad("line 1 is not the record header")
+    if len(L) < len(ADOPT_KEYS) + 2:
+        bad("it has %d lines; it needs the header, %s and at least one tag= line" % (len(L), ", ".join(ADOPT_KEYS)))
+    rec = {"path": adopt, "tags": {}}
+    for i, (k, x) in enumerate(zip(ADOPT_KEYS, L[1:]), 2):
+        if not x.startswith(k + "=") or not re.fullmatch(ADOPT_VAL[k], x[len(k) + 1:]):
+            bad("line %d must be %s=<%s>" % (i, k, ADOPT_VAL[k]))
+        rec[k] = x[len(k) + 1:]
+    last = -1
+    for i, x in enumerate(L[len(ADOPT_KEYS) + 1:], len(ADOPT_KEYS) + 2):
+        m = re.fullmatch(r"tag=onboard-v(0|[1-9][0-9]*) (%s)" % OID, x)
+        if not m:
+            bad("line %d must be tag=onboard-v<n> <commit sha>" % i)
+        if int(m.group(1)) <= last:
+            bad("line %d: the tag= lines must be in ascending order, each tag once" % i)
+        last = int(m.group(1))
+        rec["tags"]["onboard-v" + m.group(1)] = m.group(2)
+    rec["n"] = int(rec["ledgerLines"])
+    return rec
+
+def adopted_list(rec):
+    return ", ".join(sorted(rec["tags"], key=lambda x: int(x[len("onboard-v"):])))
+
+def legacy_hint(t, sha, rec):
+    where = "the gate commit %s (%s) has no %s trailer" % (t, sha[:12], key)
+    if rec is None:
+        return ("%s; if this repo's onboard-v<n> tags were made before the kit kept the gate ledger, the person (never "
+                "an agent) adopts them once in their own terminal with sh .agents-v0/scripts/gate-checks.sh "
+                "adopt_legacy_tags (in a fresh clone of a repo that already adopted them, the person copies "
+                "legacy-adoption, gate-ledger and reopen-grant from the original checkout's agents-v0/ instead). Stop "
+                "and show the user" % where)
+    return ("%s, and it is not one of the tags the legacy adoption record %s adopted (%s, at %s); adoption runs once, "
+            "so a tag made after it must carry the trailer (replace it with the gate commit chain from sh "
+            ".agents-v0/scripts/gate-checks.sh commit_chain). Stop and show the user"
+            % (where, rec["path"], adopted_list(rec), rec["adoptedAt"]))
+
 def tag_no(anc):
     return [int(a[0][len("onboard-v"):]) for a in anc if a[0].startswith("onboard-v")]
 
-def anchors():
+def anchors(adopting=False):
+    # adopting (adopt mode): returns (root anchor, [(tag, commit)] of the trailer-less tags) and refuses any tag
+    # that has a trailer, so the record only ever adopts a repo whose every tag predates the ledger.
+    rec = None if adopting else read_adoption()
+    legacy = []
     r = git("tag", "-l", "onboard-v*")
     if r.returncode != 0:
         out(1, "git could not list the onboard-v<n> tags")
@@ -261,8 +347,34 @@ def anchors():
             out(1, "git could not read the gate commit %s" % t)
         body = b.stdout.decode("utf-8", "surrogateescape")
         msg = body.split("\n\n", 1)[1] if "\n\n" in body else ""
-        n, h = trailer_of(msg, "the gate commit %s (%s)" % (t, sha[:12]))
+        where = "the gate commit %s (%s)" % (t, sha[:12])
+        if not any(KEY_RE.match(x) for x in msg.split("\n")):
+            if adopting:
+                legacy.append((t, sha))
+                continue
+            if rec is not None and t in rec["tags"]:
+                if rec["tags"][t] != sha:
+                    out(1, "the tag %s names %s, but the legacy adoption record %s adopted it at %s (the tag was moved "
+                           "after the adoption). Stop and show the user: a person (never an agent) puts the tag back"
+                           % (t, sha[:12], rec["path"], rec["tags"][t][:12]))
+                ADOPTED[t] = rec
+                found.append((t, rec["n"], rec["ledgerSha256"]))
+                continue
+            out(1, legacy_hint(t, sha, rec))
+        if adopting:
+            out(1, "%s carries an %s trailer, so this repo is not a legacy repo: adoption is only for a repo whose "
+                   "every onboard-v<n> tag was made before the kit kept the gate ledger, and nothing was written"
+                   % (where, key))
+        n, h = trailer_of(msg, where)
         found.append((t, n, h))
+    if adopting:
+        return found, legacy
+    if rec is not None:
+        for t in sorted(rec["tags"], key=lambda x: int(x[len("onboard-v"):])):
+            if t not in ADOPTED:
+                out(1, "the legacy adoption record %s adopted %s (%s), but that tag is gone, moved or no longer names a "
+                       "commit. Stop and show the user: a person (never an agent) puts the tag back"
+                       % (rec["path"], t, rec["tags"][t][:12]))
     return found
 
 def clone_hint(anc):
@@ -281,7 +393,10 @@ def clone_hint(anc):
             "the user" % (ledger, grant))
 
 def anchor_name(t):
-    # an anchor is a gate commit (its onboard-v<n> tag) or "the greenfield root commit <sha>" (root_anchor)
+    # an anchor is a gate commit (its onboard-v<n> tag), a legacy tag the adoption record adopted (the record pins
+    # the ledger then), or "the greenfield root commit <sha>" (root_anchor)
+    if t in ADOPTED:
+        return "the legacy adoption record %s (adopted tag %s)" % (ADOPTED[t]["path"], t)
     return "the gate commit " + t if t.startswith("onboard-v") else t
 
 def check_anchors(lines, anc):
@@ -452,7 +567,44 @@ if mode == "check":
         out(0, "no gate commit yet and no ledger")
     if t is None:
         out(0, "no gate commit yet; the ledger's %d line(s) are well formed" % len(lines))
+    if t in ADOPTED:
+        out(0, "the ledger matches %s (lines=%d) and its %d later line(s) are well formed" % (anchor_name(t), n, len(lines) - n))
     out(0, "the ledger matches the %s trailer of %s (lines=%d) and its %d later line(s) are well formed" % (key, t, n, len(lines) - n))
+elif mode == "adopt" and len(args) == 1:
+    # read-only: prints the record that adopt_legacy_tags writes (the shell checks the record and the untrusted-root
+    # marker first, asks the person, then writes it with noclobber). args[0] is the kit version file's text.
+    import datetime
+    anc, legacy = anchors(adopting=True)
+    if not legacy:
+        out(1, "there is no onboard-v<n> tag to adopt: adoption is only for a repo whose onboard-v<n> tags were made "
+               "before the kit kept the gate ledger, and nothing was written")
+    hd = git("rev-parse", "-q", "--verify", "HEAD^{commit}")
+    if hd.returncode != 0:
+        out(1, "HEAD names no commit, so the legacy tags cannot be checked; nothing was written")
+    head = hd.stdout.decode().strip()
+    for t, c in legacy:
+        if git("merge-base", "--is-ancestor", c, head).returncode != 0:
+            out(1, "the tag %s (%s) is not reachable from HEAD (%s): adopt from the branch that holds every onboard "
+                   "gate commit; nothing was written" % (t, c[:12], head[:12]))
+    lines = read_ledger()
+    if lines is None:
+        out(1, "the ledger %s is missing, so there is nothing to pin: if this repo never had one, the person (never "
+               "an agent) creates it as an empty file first; if another checkout of this repo kept one, the person "
+               "copies gate-ledger (and reopen-grant) from there. Nothing was written" % ledger)
+    SIM = "nothing was written: the ledger cannot be adopted: "
+    t, n = check_anchors(lines, anc)
+    check_appended(lines, n)
+    check_grants(lines, anc)
+    pinned = [(t, len(lines), prefix_sha(lines, len(lines))) for t, _ in legacy]
+    check_anchors(lines, anc + pinned)
+    check_grants(lines, anc + pinned)
+    SIM = None
+    m = re.fullmatch(r"[^+\s]*\+([0-9a-f]{7,40}(?:-dirty)?)\s*", args[0])
+    kit = m.group(1) if m else "unknown"
+    at = datetime.datetime.now().astimezone().replace(microsecond=0).isoformat()
+    body = [ADOPT_HEAD, "adoptedAt=" + at, "kitSha=" + kit, "head=" + head, "ledgerLines=%d" % len(lines),
+            "ledgerSha256=" + prefix_sha(lines, len(lines))] + ["tag=%s %s" % x for x in legacy]
+    out(0, "\n".join(body))
 elif mode == "trailer":
     anc, lines, t, n = full_check()
     if lines is None:
@@ -1141,6 +1293,76 @@ ledger_turn_ok() {
   esac
 }
 
+# adopt_legacy_tags (round 19, legacy option A; the person only, once per repo, in their own terminal; the hook
+# denies it to the agent). A repo onboarded before the kit kept the gate ledger has onboard-v<n> tags with no
+# Agents-V0-Ledger trailer, and every ledger check refuses them. This writes the record ADOPT_REL in the git common
+# dir (shared by every worktree; not in the repo, so a commit or tag cannot make one) naming each tag and its commit,
+# when, the kit version and the ledger lines it pins. After that, the adopted tags count as anchors of that ledger;
+# any other trailer-less tag still refuses. Writes nothing unless the person types adopt.
+adopt_help() {
+  cat <<'ADOPTHELP'
+usage: sh .agents-v0/scripts/gate-checks.sh adopt_legacy_tags [--help]
+
+The person runs this once per repo, in their own terminal; an agent never runs it (the hook denies it).
+
+A repo onboarded before the kit kept the gate ledger has onboard-v<n> tags without an Agents-V0-Ledger trailer,
+and every ledger check (ledger_ok, gate_committed, ...) refuses them. This adopts those tags: it writes the record
+<git common dir>/agents-v0/legacy-adoption (sh .agents-v0/scripts/gate-checks.sh paths prints the common dir) with
+the tags and their commits, the time, the kit version (.agents-kit-version), HEAD, and the number and sha256 of the
+gate ledger lines it pins. The ledger checks then count each adopted tag as an anchor of those lines. A tag made
+later must carry the trailer (the gate commit chain from commit_chain), and a moved adopted tag refuses.
+
+It refuses, and writes nothing, when: the record already exists (adoption runs once; a second run names it); the
+untrusted-root marker exists; there is no onboard-v<n> tag; any onboard-v<n> tag carries the trailer (the repo is
+not a legacy repo); a tag has a leading zero, does not name a commit, or is not reachable from HEAD; the ledger
+is missing (create it as an empty file first if this repo never had one, or copy it from the checkout that kept
+it), is not a regular file, lacks its final newline, holds a line that is not a FAIL, GRANT-USED or
+REOPEN-REFUSED line, or names grants that do not match the grant file. It shows the record and writes it only
+when you type adopt and press Enter. Review the ledger first: an edit made before the adoption cannot be detected
+afterwards. A fresh clone has no record; copy legacy-adoption, gate-ledger and reopen-grant from the original
+checkout's agents-v0/ to the clone's (never rerun the adoption there).
+ADOPTHELP
+}
+adopt_legacy_tags() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse adopt_legacy_tags "not a git work tree, so there are no tags to adopt"
+  to_root
+  al_gcd="$(git_common_dir)" || exit 2
+  al_rec="$al_gcd/$ADOPT_REL"
+  if [ -e "$al_rec" ] || [ -L "$al_rec" ]; then
+    al_at="$(sed -n 's/^adoptedAt=//p' "$al_rec" 2>/dev/null | head -n 1 | grep -E '^[0-9T:+-]{10,30}$' || :)"
+    refuse adopt_legacy_tags "the legacy adoption record $al_rec already exists${al_at:+ (adopted at $al_at)}: adoption runs once per repo, so nothing was written. If the ledger check refuses, stop and show the user; nobody edits or replaces that record"
+  fi
+  al_mark="$al_gcd/$UNTRUSTED_REL"
+  if [ -e "$al_mark" ] || [ -L "$al_mark" ]; then
+    refuse adopt_legacy_tags "the untrusted-root marker $al_mark exists: bootstrap-greenfield.sh marked this repo as not trusted, so nothing in it is adopted and nothing was written. Stop and show the user"
+  fi
+  al_kit=""; [ -f .agents-kit-version ] && [ ! -L .agents-kit-version ] && al_kit="$(head -n 1 .agents-kit-version 2>/dev/null || :)"
+  al_rc=0; al_body="$(ledger_py adopt "$al_kit")" || al_rc=$?
+  case "$al_rc" in
+    0) ;;
+    1) refuse adopt_legacy_tags "$al_body" ;;
+    *) die "adopt_legacy_tags: ${al_body:-the ledger check could not run}" ;;
+  esac
+  printf 'adopt_legacy_tags: this writes %s, once, with:
+' "$al_rec"
+  printf '%s
+' "$al_body" | sed 's/^/  /'
+  printf 'Type adopt and press Enter to write it (anything else writes nothing): '
+  al_ans=""; IFS= read -r al_ans || :
+  printf '
+'
+  [ "$al_ans" = adopt ] || refuse adopt_legacy_tags "not confirmed (the answer was not adopt), so nothing was written"
+  mkdir -p "$al_gcd/agents-v0" || die "adopt_legacy_tags: cannot create $al_gcd/agents-v0"
+  # noclobber: the shell creates the record with O_EXCL, so a record that appeared meanwhile is never overwritten
+  if ! (set -C; printf '%s
+' "$al_body" > "$al_rec") 2>/dev/null; then
+    refuse adopt_legacy_tags "could not create $al_rec (it appeared meanwhile, or the folder is not writable); nothing was overwritten. Stop and show the user"
+  fi
+  al_rc=0; al_chk="$(ledger_py check)" || al_rc=$?
+  [ "$al_rc" = 0 ] || refuse adopt_legacy_tags "wrote $al_rec, but the ledger check still refuses ($al_chk). Stop and show the user"
+  ok adopt_legacy_tags "wrote $al_rec; $al_chk"
+}
+
 # --- dispatch -------------------------------------------------------------------------------------------
 [ "$#" -ge 1 ] || usage
 cmd="$1"; shift
@@ -1161,6 +1383,10 @@ case "$cmd" in
   greenfield_trailer)
     [ "$#" = 0 ] || usage
     greenfield_trailer ;;
+  adopt_legacy_tags)
+    if [ "$#" = 1 ] && { [ "$1" = --help ] || [ "$1" = -h ]; }; then adopt_help; exit 0; fi
+    [ "$#" = 0 ] || { adopt_help >&2; exit 2; }
+    adopt_legacy_tags ;;
   ledger_turn_ok)
     [ "$#" = 3 ] || usage
     ledger_turn_ok "$1" "$2" "$3" ;;
