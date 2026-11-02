@@ -1,0 +1,23 @@
+# gate-rules: paths and prerequisites per command. Data only, no logic: the guard scripts read it
+# (guard-common.sh gc_rule) and implement each named prerequisite. Design: D2 (onboard redo,
+# kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md, "The split").
+#
+# Format: one rule per line, `<command> <key> <value>`; the value is the rest of the line.
+# Lines starting with # and blank lines are ignored. A key appears once per command.
+# Paths are relative to the repository root. Only the onboard entry is filled for now (D2).
+
+# --- onboard (/v0-onboard, guard-onboard.sh) -----------------------------------------------------
+onboard phase onboard
+onboard feature onboarding
+onboard state docs/agents-v0/onboarding/state.json
+onboard artifact docs/agents-v0/onboarding/report.md
+onboard template docs/agents-v0/onboarding/_report.template.md
+# start: prerequisites (checked in this order), then the status it sets.
+onboard start.requires git-work-tree kit-installed not-approved not-awaiting-approval
+onboard start.status in_progress
+onboard start.next Run discovery and write the onboarding docs (report.md and modules/).
+# block: the status it sets, and the next step it records when the caller gives none.
+onboard block.status blocked
+onboard block.next Fix the blocker, then run /v0-onboard again; it resumes from the files on disk.
+# shown when onboard is already approved (start refuses)
+onboard approved.next /v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain

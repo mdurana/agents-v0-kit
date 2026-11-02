@@ -1,8 +1,8 @@
 #!/bin/sh
 # guard-common.sh: the shared guard of the onboard redo (design: kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md,
 # "The split"). It is meant to be the only writer of workflow state (state file, approval record, secret scan, commit and
-# tag, branch checks). Design line D1 builds only the base and the secret scan; the state writers, the commit and tag
-# and the approval record come with later lines (D2 to D4, DA), which extend this file.
+# tag, branch checks). D1 built the base and the secret scan; D2 adds the gate-rules reader and the state writer
+# (gc_rule, gc_state_get, gc_state_set). The commit and tag and the approval record come with later lines (D3, D4, DA).
 #
 # Run:
 #   sh .agents-v0/scripts/guard-common.sh scan-staged [--message-file FILE]
@@ -54,6 +54,88 @@ gc_state_file() {
     maintain) [ -n "${2:-}" ] || return 2; printf 'docs/agents-v0/maintain/%s/state.json\n' "$2" ;;
     *) return 2 ;;
   esac
+}
+
+# --- gate rules and state (Design: D2) --------------------------------------------------------------------------------
+# gc_rule <command> <key>: print the value of `<command> <key> <value>` from .agents-v0/gate-rules (data only);
+# exit 1 when the file or the rule is missing.
+gc_rule() {
+  gc_rules="${GC_RULES:-$GC_HERE/../gate-rules}"
+  [ -f "$gc_rules" ] || return 1
+  awk -v c="$1" -v k="$2" '
+    /^[[:space:]]*#/ || NF < 3 { next }
+    $1 == c && $2 == k { sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, ""); print; found = 1; exit }
+    END { exit found ? 0 : 1 }' "$gc_rules"
+}
+# gc_state_get <state file> <key>: print a top-level value of a state file (empty when the file or key is missing).
+gc_state_get() {
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+try:
+    v = json.load(open(sys.argv[1], encoding="utf-8")).get(sys.argv[2], "")
+except FileNotFoundError:
+    v = ""
+if isinstance(v, (list, dict)):
+    print(json.dumps(v))
+elif isinstance(v, bool):
+    print("true" if v else "false")
+else:
+    print(v)
+PY
+}
+# gc_state_set <state file> <feature> <artifact> <key>=<value>...: the one state writer (design: "guard-common.sh is
+# the only writer of state"). Sets the given string keys (activePhase, activeStatus, blockedReason, nextStep) and
+# updatedAt, keeps every other key, and writes atomically under <state file>.lock (the lock sync-feature-state.sh
+# takes). A missing file is created with the keys sync-feature-state.sh writes, so stories-status.sh reads it.
+# Not a CLI step on purpose: only guard scripts call it, after their own checks.
+gc_state_set() {
+  [ $# -ge 4 ] || gc_die "gc_state_set: needs <state file> <feature> <artifact> <key>=<value>..."
+  python3 - "$@" <<'PY'
+import datetime, fcntl, json, os, subprocess, sys, tempfile
+
+out, feature, artifact = sys.argv[1], sys.argv[2], sys.argv[3]
+keys = {"activePhase", "activeStatus", "blockedReason", "nextStep"}
+statuses = {"in_progress", "awaiting_approval", "blocked"}
+sets = {}
+for pair in sys.argv[4:]:
+    k, sep, v = pair.partition("=")
+    if not sep or k not in keys:
+        print(f"error: gc_state_set: cannot set {k!r} (allowed: {', '.join(sorted(keys))})", file=sys.stderr)
+        raise SystemExit(2)
+    sets[k] = v
+if "activeStatus" in sets and sets["activeStatus"] not in statuses:
+    print(f"error: gc_state_set: activeStatus must be one of {', '.join(sorted(statuses))}", file=sys.stderr)
+    raise SystemExit(2)
+os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+lock = open(out + ".lock", "w", encoding="utf-8")
+fcntl.flock(lock, fcntl.LOCK_EX)
+try:
+    if os.path.isfile(out):
+        try:
+            data = json.load(open(out, encoding="utf-8"))
+        except ValueError as exc:
+            print(f"REFUSED state: corrupt JSON in {out}: {exc}")
+            raise SystemExit(1)
+    else:
+        head = subprocess.run(["git", "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, text=True).stdout.strip()
+        data = {"feature": feature, "tier": "standard", "lastApprovedPhase": "", "approvedPhases": [],
+                "phaseDates": {}, "phaseTimes": {}, "activePhase": "", "activeStatus": "", "blockedReason": "",
+                "verifyPassed": False, "reopenCount": 0, "helperBriefHashes": [], "artifact": artifact,
+                "baseCommit": head, "updatedAt": "", "artifacts": {"primary": artifact},
+                "evidence": {"build": [], "verify": []}}
+    data.update(sets)
+    data["updatedAt"] = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+        fh.write("\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, out)
+finally:
+    fcntl.flock(lock, fcntl.LOCK_UN)
+    lock.close()
+PY
 }
 
 # --- branch check ---------------------------------------------------------------------------------------------------
