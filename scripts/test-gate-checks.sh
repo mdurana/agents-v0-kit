@@ -7,7 +7,7 @@
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
 # Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
-# ledger_turn_ok).
+# ledger_turn_ok) and FC-n (round 17: the fresh-clone hint on the missing-ledger refusal).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -444,7 +444,7 @@ lg_back
 # N82: the ledger is deleted (moved away); never read as zero failures
 mkdir -p "$T1_TMP/lg"; mv "$LG_LED" "$T1_TMP/lg/gate-ledger.moved"
 expect_fail "N82 ledger_ok refuses a missing ledger once a gate commit exists" "$lg" sh "$GC" ledger_ok
-out_has "N82 says ledger changed, ask the user" "REFUSED ledger_ok: ledger changed, ask the user (the ledger $LG_LED is missing, but the gate commit onboard-v2 recorded lines=2; a missing ledger never reads as zero failures)"
+out_has "N82 says ledger changed, ask the user" "REFUSED ledger_ok: ledger changed, ask the user (the ledger $LG_LED is missing, but the gate commit onboard-v2 recorded lines=2; a missing ledger never reads as zero failures; if this checkout is a fresh clone, the person (never an agent) copies gate-ledger"
 expect_fail "N82 approval_evidence refuses on the missing ledger" "$lg" sh "$GC" approval_evidence onboard
 out_has "N82 approval_evidence names the ledger" "REFUSED approval_evidence: ledger changed, ask the user"
 expect_fail "N82 the next gate commit chain refuses on the missing ledger" "$lg" lg_gate "$lg" 3
@@ -823,6 +823,85 @@ gf_root gf-one "Agents-V0-Ledger: lines=1 sha256=$(printf 'FAIL\n' | sha256sum |
 printf 'FAIL\n' > "$T1_TMP/gf-one/.git/agents-v0/gate-ledger"
 expect_fail "GF-11 a root trailer other than lines=0 is refused" "$T1_TMP/gf-one" sh "$GC" greenfield_record_ok
 out_has "GF-11 says lines=0" "must record lines=0 sha256="
+# FC-n (round 17, fresh-clone option A; handoff note sai-step0-gate-checks-handoff-20261102.md lines 739-834): the
+# ledger and the grant file live in the git common dir, so `git clone` copies neither. ledger_ok keeps refusing the
+# missing ledger, and the refusal now says how the person starts it: copy gate-ledger and reopen-grant from the
+# original checkout, or (a greenfield clone with only the root anchor, no onboard-v<n> tag) create the empty ledger.
+# Nothing in the kit copies or creates them; the copies below stand in for the person's own terminal.
+fc_dir() { printf '%s/agents-v0\n' "$(cd "$1" && cd "$(git rev-parse --git-common-dir)" && pwd)"; }
+fo="$(onb_repo fc-orig)"
+FO_LED="$(fc_dir "$fo")/gate-ledger"; FO_GRANT="$(fc_dir "$fo")/reopen-grant"
+to_awaiting "$fo"; q "$fo" sh "$SFS" "$REP" --approve onboard
+expect_pass "FC setup: the first gate commit chain runs in the original checkout" "$fo" lg_gate "$fo" 1
+fc_gl1="grant 2026-11-02T06:00:00+08:00 phase=onboard reason=FAKE-retry by=FAKE-person"
+fc_gl2="grant 2026-11-02T07:00:00+08:00 phase=onboard reason=FAKE-again by=FAKE-person"
+fc_h1="$(rg_h "$fc_gl1")"; fc_h2="$(rg_h "$fc_gl2")"
+printf 'FAIL docs check\nFAIL docs check\nGRANT-USED %s count=2\n' "$fc_h1" >> "$FO_LED"
+printf '%s\n' "$fc_gl1" > "$FO_GRANT"
+printf '\nRevision.\n' >> "$fo/docs/agents-v0/architecture.md"
+expect_pass "FC setup: the second gate commit anchors two FAIL lines and a GRANT-USED line" "$fo" lg_gate "$fo" 2
+# after the newest anchor (onboard-v2, lines=3): one more FAIL and a second reopen, not anchored by any gate yet
+printf 'FAIL docs check\nGRANT-USED %s count=3\n' "$fc_h2" >> "$FO_LED"; printf '%s\n' "$fc_gl2" >> "$FO_GRANT"
+expect_pass "FC setup: the original checkout's ledger passes" "$fo" sh "$GC" ledger_ok
+fc="$T1_TMP/fc-clone"; git clone -q "$fo" "$fc"
+FC_LED="$(fc_dir "$fc")/gate-ledger"; FC_GRANT="$(fc_dir "$fc")/reopen-grant"
+if [ -e "${FC_LED%/gate-ledger}" ]; then fail "FC-1 a fresh clone has no ledger and no grant file"; else pass "FC-1 a fresh clone has no ledger and no grant file"; fi
+expect_fail "FC-1 ledger_ok refuses the fresh clone's missing ledger" "$fc" sh "$GC" ledger_ok
+out_has "FC-1 keeps the missing-ledger refusal" "REFUSED ledger_ok: ledger changed, ask the user (the ledger $FC_LED is missing, but the gate commit onboard-v2 recorded lines=3; a missing ledger never reads as zero failures; "
+out_has "FC-1 the hint says to copy both files from the original checkout" "if this checkout is a fresh clone, the person (never an agent) copies gate-ledger and, when it exists, reopen-grant from the original checkout's git common dir (agents-v0/;"
+out_has "FC-1 the hint names this checkout's ledger and grant paths" "to $FC_LED and $FC_GRANT"
+out_has "FC-1 the hint names the paths command" "sh .agents-v0/scripts/gate-checks.sh paths"
+out_has "FC-1 the hint states the stuck state" "if the original checkout is gone, stop and tell the user"
+lacks "FC-1 no create-empty hint once an onboard-v<n> tag exists" "$T1_TMP/out.txt" "creates the empty ledger"
+if [ -e "${FC_LED%/gate-ledger}" ]; then fail "FC-1 the refusal creates nothing"; else pass "FC-1 the refusal creates nothing"; fi
+expect_fail "FC-1 gate_committed refuses the same way" "$fc" sh "$GC" gate_committed onboard
+out_has "FC-1 gate_committed carries the hint" "REFUSED gate_committed: ledger changed, ask the user (the ledger $FC_LED is missing"
+# FC-2: the person copies both files from the original checkout
+mkdir -p "${FC_LED%/gate-ledger}"; cp "$FO_LED" "$FC_LED"; cp "$FO_GRANT" "$FC_GRANT"
+expect_pass "FC-2 the person's copy of the ledger and the grant file passes" "$fc" sh "$GC" ledger_ok
+out_has "FC-2 names the newest anchor" "OK ledger_ok: the ledger matches the Agents-V0-Ledger trailer of onboard-v2 (lines=3)"
+is_eq "FC-2 the original checkout's ledger is unchanged" "$(lg_sha "$FO_LED")" "$(lg_sha "$FC_LED")"
+# FC-3: the ledger copied without the grant file
+mv "$FC_GRANT" "$T1_TMP/fc-grant.moved"
+expect_fail "FC-3 a ledger copied without the grant file is refused" "$fc" sh "$GC" ledger_ok
+out_has "FC-3 names the missing grant file" "ledger line 3 is a GRANT-USED line, but there is no grant file ($FC_GRANT)"
+mv "$T1_TMP/fc-grant.moved" "$FC_GRANT"
+# FC-4: a cut copy
+head -n 2 "$FO_LED" > "$FC_LED"
+expect_fail "FC-4 a copy shorter than the newest anchor is refused" "$fc" sh "$GC" ledger_ok
+out_has "FC-4 names the count" "the ledger has 2 lines, fewer than the 3 that the gate commit onboard-v2 recorded"
+# FC-5: a ledger from another repo (same length, other lines)
+printf 'FAIL other repo\nFAIL other repo\nFAIL other repo\n' > "$FC_LED"
+expect_fail "FC-5 a ledger copied from another repo is refused" "$fc" sh "$GC" ledger_ok
+out_has "FC-5 names the hash" "the first 3 lines of the ledger no longer match the sha256 that the gate commit onboard-v2 recorded"
+# FC-6 (Jiraiya; known gap 1): a copy that keeps only the anchored lines drops the FAIL and the GRANT-USED line
+# written after onboard-v2, and passes; the second grant line is then the unnamed last line again in the clone.
+head -n 3 "$FO_LED" > "$FC_LED"
+expect_pass "FC-6 known gap 1: a copy that drops the GRANT-USED line written after the newest anchor passes" "$fc" sh "$GC" ledger_ok
+out_has "FC-6 it passes on the anchored lines alone" "OK ledger_ok: the ledger matches the Agents-V0-Ledger trailer of onboard-v2 (lines=3)"
+# FC-7 (Iruka): a greenfield clone with only the root anchor; the empty ledger passes until an onboard-v<n> tag exists
+gf_root fc-gf "$gf_tr" "$GFJ"; gfo="$T1_TMP/fc-gf"
+gfc="$T1_TMP/fc-gf-clone"; git clone -q "$gfo" "$gfc"
+GFC_LED="$(fc_dir "$gfc")/gate-ledger"
+expect_fail "FC-7 a root-anchor-only clone refuses the missing ledger" "$gfc" sh "$GC" ledger_ok
+out_has "FC-7 keeps the refusal" "the ledger $GFC_LED is missing, but the gate commit the greenfield root commit"
+out_has "FC-7 the hint says to create the empty ledger" "if this checkout is a fresh clone of a greenfield repo with no onboard-v<n> tag yet, the person (never an agent) creates the empty ledger file $GFC_LED"
+lacks "FC-7 no stuck-state line while the root anchor alone applies" "$T1_TMP/out.txt" "if the original checkout is gone"
+mkdir -p "${GFC_LED%/gate-ledger}"; : > "$GFC_LED"
+expect_pass "FC-7 the person's empty ledger passes under the root anchor alone" "$gfc" sh "$GC" ledger_ok
+out_has "FC-7 names the root anchor" "trailer of the greenfield root commit"
+printf 'FAIL docs check\n' >> "$(fc_dir "$gfo")/gate-ledger"; printf 'gate\n' > "$gfo/gate.txt"; G "$gfo" add gate.txt
+G "$gfo" commit -qm "onboarding: onboard approved
+
+$(lt_trailer "$gfo")"; G "$gfo" tag -a onboard-v1 -m "onboard approved"
+expect_pass "FC-7 setup: the original passes with its first gate (lines=1)" "$gfo" sh "$GC" ledger_ok
+G "$gfc" fetch -q --tags origin; G "$gfc" merge -q --ff-only origin/main
+expect_fail "FC-7 the empty ledger is refused once an onboard-v<n> tag exists" "$gfc" sh "$GC" ledger_ok
+out_has "FC-7 names the tag" "the ledger has 0 lines, fewer than the 1 that the gate commit onboard-v1 recorded"
+mv "$GFC_LED" "$T1_TMP/fc-gf-ledger.moved"
+expect_fail "FC-7 with the tag, the missing ledger is refused" "$gfc" sh "$GC" ledger_ok
+out_has "FC-7 with the tag, the hint says copy from the original checkout" "copies gate-ledger and, when it exists, reopen-grant from the original checkout"
+lacks "FC-7 with the tag, no create-empty hint" "$T1_TMP/out.txt" "creates the empty ledger"
 expect_pass "list runs" "$a" sh "$GC" list
 out_has "list: approval_evidence is wired" "approval_evidence wired"
 out_has "list: gate_committed is wired" "gate_committed wired"

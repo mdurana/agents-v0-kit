@@ -252,11 +252,23 @@ def anchors():
         found.append((t, n, h))
     return found
 
+def clone_hint(anc):
+    # round 17 (fresh-clone option A): the ledger and the grant file live in the git common dir, so a clone has
+    # neither. The refusal stays; the hint says how the person starts the ledger. Nothing here copies or creates it.
+    if not tag_no(anc):
+        return ("if this checkout is a fresh clone of a greenfield repo with no onboard-v<n> tag yet, the person (never "
+                "an agent) creates the empty ledger file %s (the root commit recorded lines=0), or copies gate-ledger "
+                "from the original checkout to keep the lines written there since" % ledger)
+    return ("if this checkout is a fresh clone, the person (never an agent) copies gate-ledger and, when it exists, "
+            "reopen-grant from the original checkout's git common dir (agents-v0/; sh .agents-v0/scripts/gate-checks.sh "
+            "paths prints both paths in each checkout) to %s and %s; the kit has no other way to start the ledger in a "
+            "clone, so if the original checkout is gone, stop and tell the user" % (ledger, grant))
+
 def check_anchors(lines, anc):
     if lines is None:
         if anc:
             t, n, _ = anc[-1]
-            out(1, "the ledger %s is missing, but the gate commit %s recorded lines=%d; a missing ledger never reads as zero failures" % (ledger, t, n))
+            out(1, "the ledger %s is missing, but the gate commit %s recorded lines=%d; a missing ledger never reads as zero failures; %s" % (ledger, t, n, clone_hint(anc)))
         return None, 0
     for t, n, h in anc:
         if len(lines) < n:
