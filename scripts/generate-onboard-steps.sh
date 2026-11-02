@@ -1,15 +1,18 @@
 #!/bin/sh
-# generate-onboard-steps.sh (onboard redo, Design: D5): copy `guard-onboard.sh steps` into the generated block of
-# core/common/commands/v0-onboard.md, between the BEGIN and END marker lines, byte for byte.
-# Run: sh scripts/generate-onboard-steps.sh          rewrite the block
-#      sh scripts/generate-onboard-steps.sh --check  exit 1 when the block differs from the guard's output
+# generate-onboard-steps.sh (onboard redo, Design: D5, D7): copy `guard-onboard.sh steps` into the generated block of
+# core/common/commands/v0-onboard.md and of the user doc templates/docs/agents-v0/brownfield-onboarding.md, between
+# the BEGIN and END marker lines, byte for byte.
+# Run: sh scripts/generate-onboard-steps.sh          rewrite the blocks
+#      sh scripts/generate-onboard-steps.sh --check  exit 1 when a block differs from the guard's output
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOC="$ROOT/core/common/commands/v0-onboard.md"
+DOCS="$ROOT/core/common/commands/v0-onboard.md $ROOT/templates/docs/agents-v0/brownfield-onboarding.md"
 steps="$(sh "$ROOT/templates/.agents-v0/scripts/guard-onboard.sh" steps)" || { printf 'FAIL: guard-onboard.sh steps failed\n' >&2; exit 2; }
-python3 - "$DOC" "${1:-}" "$steps" <<'PY'
-import sys
+for DOC in $DOCS; do
+python3 - "$DOC" "${1:-}" "$steps" <<'PY' || exit $?
+import os, sys
 doc, mode, steps = sys.argv[1], sys.argv[2], sys.argv[3]
+name = os.path.basename(doc)
 begin = "<!-- BEGIN generated: sh .agents-v0/scripts/guard-onboard.sh steps (scripts/generate-onboard-steps.sh); do not edit -->"
 end = "<!-- END generated -->"
 text = open(doc, encoding="utf-8").read()
@@ -20,10 +23,11 @@ _, tail = rest.split(end, 1)
 new = head + begin + "\n" + steps + "\n" + end + tail
 if mode == "--check":
     if new != text:
-        print("FAIL: the v0-onboard.md step block differs from guard-onboard.sh steps; run sh scripts/generate-onboard-steps.sh", file=sys.stderr); sys.exit(1)
-    print("OK: the v0-onboard.md step block matches guard-onboard.sh steps"); sys.exit(0)
+        print(f"FAIL: the {name} step block differs from guard-onboard.sh steps; run sh scripts/generate-onboard-steps.sh", file=sys.stderr); sys.exit(1)
+    print(f"OK: the {name} step block matches guard-onboard.sh steps"); sys.exit(0)
 if mode:
     print("usage: generate-onboard-steps.sh [--check]", file=sys.stderr); sys.exit(2)
 open(doc, "w", encoding="utf-8").write(new)
-print("OK: wrote the v0-onboard.md step block")
+print(f"OK: wrote the {name} step block")
 PY
+done

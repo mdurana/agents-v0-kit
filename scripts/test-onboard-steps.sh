@@ -12,6 +12,7 @@ check() { if [ "$1" = 0 ]; then ok "$2"; else bad "$2" "${3:-}"; fi; }
 DOC="$ROOT/core/common/commands/v0-onboard.md"
 AG="$ROOT/core/common/agents/codebase-documenter.md"
 SK="$ROOT/core/common/skills/onboard-discovery/SKILL.md"
+BF="$ROOT/templates/docs/agents-v0/brownfield-onboarding.md"
 
 out="$(sh "$ROOT/scripts/generate-onboard-steps.sh" --check 2>&1)"; check $? "generator --check: the block matches guard-onboard.sh steps" "$out"
 steps="$(sh "$ROOT/templates/.agents-v0/scripts/guard-onboard.sh" steps)"
@@ -21,11 +22,13 @@ for s in start block ready commit; do
   printf '%s' "$block" | grep -qF "sh .agents-v0/scripts/guard-onboard.sh $s"; check $? "block: names guard-onboard.sh $s"
 done
 printf '%s' "$block" | grep -qF 'guard-common.sh approve onboard'; check $? "block: names Sensei's approve step"
+bfblock="$(sed -n '/^<!-- BEGIN generated:/,/^<!-- END generated -->$/p' "$BF" | sed '1d;$d')"
+[ -n "$steps" ] && [ "$bfblock" = "$steps" ]; check $? "brownfield-onboarding.md (D7): the user doc lists the same steps as the guard"
 
 # A hand edit inside the block is caught (on a temp copy of the kit files the generator reads).
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/test-onboard-steps.XXXXXX")"; trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/scripts" "$tmp/core/common/commands" "$tmp/templates/.agents-v0/scripts"
-cp "$ROOT/scripts/generate-onboard-steps.sh" "$tmp/scripts/" && cp "$DOC" "$tmp/core/common/commands/"
+mkdir -p "$tmp/scripts" "$tmp/core/common/commands" "$tmp/templates/.agents-v0/scripts" "$tmp/templates/docs/agents-v0"
+cp "$ROOT/scripts/generate-onboard-steps.sh" "$tmp/scripts/" && cp "$DOC" "$tmp/core/common/commands/" && cp "$BF" "$tmp/templates/docs/agents-v0/"
 cp "$ROOT/templates/.agents-v0/scripts/guard-onboard.sh" "$ROOT/templates/.agents-v0/scripts/guard-common.sh" "$tmp/templates/.agents-v0/scripts/"
 cp "$ROOT/templates/.agents-v0/gate-rules" "$tmp/templates/.agents-v0/"
 sed -i 's/^3\. List the discovered modules\./3. List the modules./' "$tmp/core/common/commands/v0-onboard.md"
@@ -35,7 +38,7 @@ out="$(sh "$tmp/scripts/generate-onboard-steps.sh" 2>&1)" && out="$(sh "$tmp/scr
 check $? "generator: rewriting the block makes --check pass again" "$out"
 
 # The prose and the documenter: no old state writer, no git add -A, no shell.
-! grep -q 'sync-feature-state.sh\|git add -A' "$DOC"; check $? "v0-onboard.md: no sync-feature-state.sh or git add -A" "$(grep -n 'sync-feature-state.sh\|git add -A' "$DOC")"
+! grep -q 'sync-feature-state.sh\|git add -A' "$DOC" "$BF"; check $? "v0-onboard.md and brownfield-onboarding.md: no sync-feature-state.sh or git add -A" "$(grep -n 'sync-feature-state.sh\|git add -A' "$DOC" "$BF")"
 grep -qF 'kitfix-20261031-gate-commit' "$DOC"; check $? "v0-onboard.md: keeps the gate-commit marker"
 ! awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f&&/^[[:space:]]*-[[:space:]]*shell$/{x=1} END{exit !x}' "$AG"; check $? "codebase-documenter: no shell tool"
 ! grep -q 'sync-feature-state.sh\|sh \.agents-v0/scripts' "$AG" "$SK"; check $? "documenter and skill: run no kit script" "$(grep -n 'sync-feature-state.sh\|sh \.agents-v0/scripts' "$AG" "$SK")"

@@ -39,7 +39,7 @@ S="$proj/docs/agents-v0/onboarding/state.json"
 lib() { (cd "$proj" && GC_HERE="$G" GUARD_COMMON_LIB=1 && . "$G/guard-common.sh" && "$@"); }
 approval_ok() { (cd "$proj" && GC_HERE="$G" GUARD_COMMON_LIB=1 && . "$G/guard-common.sh" && gc_approval_ok onboard) 2>&1; }
 
-# onboarding started (D2) and ready for approval (D3 `ready` is not built yet: set through the state writer).
+# onboarding started (D2) and ready for approval (set through the state writer, so this test does not depend on D3 `ready`).
 out="$(cd "$proj" && sh "$G/guard-onboard.sh" start 2>&1)"; check $? "setup: guard-onboard.sh start" "$out"
 out="$(lib gc_state_set docs/agents-v0/onboarding/state.json onboarding docs/agents-v0/onboarding/report.md activeStatus=awaiting_approval 2>&1)"
 check $? "setup: state set to awaiting_approval through gc_state_set" "$out"

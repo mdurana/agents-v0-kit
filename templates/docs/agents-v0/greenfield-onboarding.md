@@ -116,4 +116,4 @@ hardening, P5 release readiness) when those files are not already seeded.
 
 - Non-engineering overview: [user-guide.md](user-guide.md)
 - Model routing: [model-routing-matrix.md](model-routing-matrix.md)
-- Brownfield / legacy repos: [brownfield-onboarding.md](brownfield-onboarding.md)
+- Brownfield / legacy repos: [brownfield-onboarding.md](brownfield-onboarding.md). `/v0-onboard` is for an existing codebase only; its steps are listed there, generated from `guard-onboard.sh steps`.
