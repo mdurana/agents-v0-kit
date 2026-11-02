@@ -672,12 +672,17 @@ def _is_onboard_msg_path(p: str) -> bool:
 #   archiving with --remove-files / zip -m, or extracting or copying recursively onto them is denied. ln that names
 #   them (either side) is denied. Reads (cat, grep, cp out, tar -c) and running gate-checks.sh stay allowed.
 #   Known gap (as for state.json): a script the agent wrote first and then runs (sh x.sh, python3 x.py).
-_LEDGER_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0/(?:gate-ledger|reopen-grant)$", re.I)
+# Marker (Sasuke; Jiraiya, Kakashi on 13585735): every file under that agents-v0 folder (any depth, any name, case-blind)
+#   gets the ledger's protection, not only gate-ledger and reopen-grant: bootstrap-greenfield.sh's untrusted-root
+#   marker, and any file the kit adds there later. The hook allows no agent append to any of them (gate-checks.sh
+#   appends to the ledger itself, outside the hook), so nothing changes for the ledger and the grant.
+_LEDGER_RE = re.compile(r"(?:^|/)\.git/(?:worktrees/[^/]+/)?agents-v0/[^/].*$", re.I)
 _LEDGER_HOLDER_RE = re.compile(r"(?:^|/)\.git(?:/worktrees(?:/[^/]+)?)?(?:/agents-v0)?$", re.I)
 _LEDGER_MENTION_RE = re.compile(r"gate-ledger|reopen-grant|\.git/(?:worktrees/[^/\s]+/)?agents-v0(?:/|(?![\w.-]))"
                                 r"|--git-path\s+['\"]?agents-v0(?![\w.-])"
                                 r"|--git-common-dir|--git-dir|--absolute-git-dir", re.I)  # follow-up: the git dir
-LEDGER_WRITE_MSG = ("{} is the gate ledger or the reopen grant (or a folder that holds them): only "
+LEDGER_WRITE_MSG = ("{} is the gate ledger, the reopen grant or another kit file under .git/agents-v0/ such as the "
+                    "untrusted-root marker (or a folder that holds them): only the kit's scripts write them; only "
                     "sh .agents-v0/scripts/gate-checks.sh writes the ledger, and only the person writes the grant, in "
                     "any mode. Never edit, cut, recreate, move or remove them; if a gate check says `ledger changed, "
                     "ask the user`, stop and show the user its output.")
@@ -700,8 +705,7 @@ def _ledger_match(full: str, rx: "re.Pattern") -> bool:
 
 
 def _is_ledger_path(p: str, base: Optional[str] = None) -> bool:
-    if not re.search(r"gate-ledger|reopen-grant", p, re.I):
-        return False
+    """p is a file under .git/agents-v0/ (or .git/worktrees/<n>/agents-v0/), in a project with docs/agents-v0."""
     full = _abs_norm(p, base)
     return bool(full) and _ledger_match(full, _LEDGER_RE)
 
@@ -844,7 +848,7 @@ def _find_hits_protected(parts: List[str]) -> Optional[str]:
             if not os.path.isdir(os.path.join(R, "docs", "agents-v0")):
                 continue
             ledger = _ledger_candidates(R)
-            for c in sorted(ledger, key=lambda x: not x.endswith(("gate-ledger", "reopen-grant"))) + _state_candidates(R):
+            for c in sorted(ledger, key=lambda x: not re.search(r"/agents-v0/.", x, re.I)) + _state_candidates(R):
                 cl = posixpath.join(R.replace(os.sep, "/"), c).lower()
                 if c in ledger and c.lower().endswith("agents-v0") and fl.startswith(cl + "/"):
                     return f"{r} (inside {c}; find {how})"
@@ -1069,7 +1073,8 @@ def _state_candidates(root: str) -> List[str]:
 
 
 def _ledger_candidates(root: str) -> List[str]:
-    """N3A: the ledger, the grant and the folders above them, when the project has docs/agents-v0."""
+    """N3A: the ledger, the grant, every other file now under an agents-v0 folder in the git dir (the untrusted-root
+    marker and later ones), and the folders above them, when the project has docs/agents-v0."""
     if not os.path.isdir(os.path.join(root, "docs", "agents-v0")):
         return []
     names = {"x"}
@@ -1079,8 +1084,14 @@ def _ledger_candidates(root: str) -> List[str]:
         pass
     out = [".git", ".git/agents-v0", ".git/worktrees"]
     for pre in [".git"] + [f".git/worktrees/{n}" for n in sorted(names)]:
-        out += [pre, f"{pre}/agents-v0", f"{pre}/agents-v0/gate-ledger", f"{pre}/agents-v0/reopen-grant"]
-    return out
+        out += [pre, f"{pre}/agents-v0", f"{pre}/agents-v0/gate-ledger", f"{pre}/agents-v0/reopen-grant",
+                f"{pre}/agents-v0/untrusted-root"]
+        top = os.path.join(root, *pre.split("/"), "agents-v0")
+        for d, subs, files in os.walk(top):
+            rel = posixpath.normpath(posixpath.join(pre, "agents-v0", os.path.relpath(d, top).replace(os.sep, "/")))
+            out += [f"{rel}/{x}" for x in sorted(subs + files)]
+    seen: set = set()
+    return [c for c in out if not (c in seen or seen.add(c))]
 
 
 def _expand_known_vars(t: str) -> str:
@@ -3316,7 +3327,8 @@ COMPOUND_MSG = ("the guard cannot follow this shell compound form ({}), so it ju
 _COMPOUND_DENY_RE = re.compile(
     r"\bgit\b[^\n]*?\b(?:push|restore|checkout|switch|stash|reset|clean|commit|commit-tree|update-ref|rm|mv|"
     r"filter-branch|filter-repo)\b|(?:^|[^\w.-])(?:gh|glab|rm|shred|unlink|truncate)(?=[\s;&|()<>`]|$)|"
-    r"docs/agents-v0|state\.json|agents-v0-onboard-commit-msg|gate-ledger|reopen-grant|\.git/hooks|\.cursor/|\.agents/|\.agents-v0/|"
+    r"docs/agents-v0|state\.json|agents-v0-onboard-commit-msg|gate-ledger|reopen-grant|untrusted-root|"
+    r"\.git/(?:worktrees/[^/\s]+/)?agents-v0/|\.git/hooks|\.cursor/|\.agents/|\.agents-v0/|"
     r"\.gitlab-ci\.yml|\.github/workflows", re.I)
 
 

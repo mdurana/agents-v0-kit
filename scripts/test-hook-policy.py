@@ -1261,6 +1261,25 @@ N3A_SWAP_ALLOW = [
     "cp -r /tmp/d src/agents-v0", "mv /tmp/d notes/agents-v0", "rsync -a .git/agents-v0/ /tmp/backup/",
     "ls -la .git/agents-v0", "cp /tmp/f .git/info/exclude",
 ]
+# Marker (Sasuke; Jiraiya, Kakashi on 13585735): every file under .git/agents-v0/ (and .git/worktrees/<n>/agents-v0/)
+#   is protected like the ledger, not only gate-ledger and reopen-grant: the untrusted-root marker that
+#   bootstrap-greenfield.sh writes, and any file name added later (some-new-file proves it is not a name list).
+MK = ".git/agents-v0/untrusted-root"
+MK_BLOCK = [
+    "mv {M} /tmp/x", "rm {M}", "rm -f {M}", "cp /dev/null {M}", "> {M}", ": > {M}", "printf x >> {M}",
+    "truncate -s0 {M}", "sed -i 1d {M}", "unlink {M}", "ln -sf /tmp/x {M}", "mv {M} {M}.bak", "touch {M}",
+    "mv .git/agents-v0/some-new-file /tmp/x", "rm .git/agents-v0/some-new-file", "printf x > .git/agents-v0/some-new-file",
+    "cp /tmp/x .git/agents-v0/some-new-file", "rm .git/agents-v0/archive/old", "mv .git/worktrees/wt1/agents-v0/untrusted-root /tmp/x",
+    "rm -f .git/worktrees/wt1/agents-v0/untrusted-root", "> .git/worktrees/wt1/agents-v0/some-new-file",
+    "rm .GIT/Agents-V0/Untrusted-Root", "rm .GIT/worktrees/wt1/AGENTS-V0/UNTRUSTED-ROOT", "rm ./.git//agents-v0/untrusted-root",
+    "cd .git/agents-v0 && rm untrusted-root", "cd .git/agents-v0 && mv some-new-file /tmp/x",
+    "find .git -name untrusted-root -delete", "find .git/agents-v0 -name untrusted-root -exec rm {{}} +",
+    "( mv {M} /tmp/x )", "if true; then rm {M}; fi",
+]
+MK_ALLOW = [
+    "cat {M}", "cp {M} /tmp/x", "ls -la .git/agents-v0", "test -e {M}", "sha256sum {M}",
+    "printf x > /tmp/untrusted-root", "printf x > notes/agents-v0-untrusted-root.md",
+]
 N3B_BLOCK = [
     "find .git/agents-v0 -delete",
     "find .git -name gate-ledger -delete",
@@ -1347,7 +1366,7 @@ def n3a_cases(hp, tmp: str) -> list:
             return d
         os.makedirs(os.path.join(d, ".git", "agents-v0", "archive"))
         os.makedirs(os.path.join(d, ".git", "worktrees", "wt1", "agents-v0"))
-        for f in ("gate-ledger", "reopen-grant"):
+        for f in ("gate-ledger", "reopen-grant", "untrusted-root"):
             for sub in ("", os.path.join("worktrees", "wt1")):
                 with open(os.path.join(d, ".git", sub, "agents-v0", f), "w", encoding="utf-8") as fh:
                     fh.write("FAIL onboard x\n")
@@ -1399,7 +1418,20 @@ def n3a_cases(hp, tmp: str) -> list:
                ".git/worktrees/wt1/agents-v0/gate-ledger", ".git/agents-v0/x/../reopen-grant"):
         out.append(("edit tool", p_, inproc_path(hp, p_, active), "block"))
     out.append(("edit tool, no docs/agents-v0 (unchanged)", N3A_L, inproc_path(hp, N3A_L, plain), "allow"))
-    out.append(("edit tool, not the ledger", ".git/agents-v0/notes.txt", inproc_path(hp, ".git/agents-v0/notes.txt", active), "allow"))
+    # Marker (13585735): every file under .git/agents-v0/ is protected, so notes.txt there is now blocked too.
+    for p_ in (".git/agents-v0/notes.txt", MK, ".git/agents-v0/some-new-file", ".GIT/Agents-V0/Untrusted-Root",
+               ".git/worktrees/wt1/agents-v0/untrusted-root", ".git/agents-v0/archive/old"):
+        out.append(("edit tool, a file under .git/agents-v0", p_, inproc_path(hp, p_, active), "block"))
+    out.append(("edit tool, marker, no docs/agents-v0 (unchanged)", MK, inproc_path(hp, MK, plain), "allow"))
+    for c in MK_BLOCK:
+        add("marker / any file under agents-v0", c.format(M=MK), active, "block")
+    for c in ("mv {M} /tmp/x", "rm {M}", "> .git/agents-v0/some-new-file"):
+        add("marker, unattended", c.format(M=MK), active, "block", STATE_UNATTENDED_ENV)
+        add("marker, onboarding approved", c.format(M=MK), done, "block")
+        add("marker, no docs/agents-v0 (unchanged)", c.format(M=MK), plain, "allow")
+    add("marker, absolute path", f"mv {active}/{MK} /tmp/x", plain, "block")
+    for c in MK_ALLOW:
+        add("marker, read", c.format(M=MK), active, "allow")
     # N3B (Kakashi 2026-11-02 07:17, Jiraiya 07:18, Kakashi 07:18): find that deletes or replaces, hard links whose
     #   source is the ledger, and git init --separate-git-dir; denied whenever docs/agents-v0 exists.
     for c in N3B_BLOCK:
