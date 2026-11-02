@@ -2,7 +2,7 @@
 # guard-onboard.sh: the steps of /v0-onboard and onboard's own rules (onboard redo, Design: D2;
 # kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md, "The split"). Paths and prerequisites come from
 # .agents-v0/gate-rules (the `onboard` entry); every state write goes through guard-common.sh (gc_state_set),
-# never from this file. D2 builds `start` and `block`; `ready`, `commit` and `reopen` come with D3, D4 and later.
+# never from this file. D2 builds `start` and `block`, D3 builds `ready`; `commit` and `reopen` come with D4 and later.
 #
 # Run (main session, from anywhere in the repository):
 #   sh .agents-v0/scripts/guard-onboard.sh start
@@ -11,6 +11,10 @@
 #   sh .agents-v0/scripts/guard-onboard.sh block "<plain reason>" [--next "<next step>"]
 #        stop onboarding: sets the state to blocked and records the reason and the next step
 #        (the gate-rules default when --next is not given).
+#   sh .agents-v0/scripts/guard-onboard.sh ready
+#        (Design: D3; main session only, after discovery) runs the baseline audit with --record, which writes
+#        docs/agents-v0/discovery/baseline-audit.txt (a red baseline is recorded, not refused), runs the
+#        onboarding docs check, then sets the onboard state to awaiting_approval for Sensei's approve step.
 #
 # Output: `OK <step>: ...` then `Next: ...` (exit 0), or `REFUSED <step>: <reason>` (exit 1); usage errors exit 2.
 set -eu
@@ -90,8 +94,40 @@ go_block() {
   printf 'Next: %s\n' "$go_next"
 }
 
+go_ready() {
+  [ $# -eq 0 ] || go_usage
+  go_load ready
+  go_rule ready ready.requires; go_requires="$go_val"
+  for go_req in $go_requires; do
+    case "$go_req" in
+      in-progress)
+        go_cur="$(gc_state_get "$go_state" activeStatus)"
+        [ "$go_cur" = in_progress ] \
+          || gc_refuse ready "onboarding is not in progress (state: ${go_cur:-none}); run start first" ;;
+      *) gc_refuse ready "gate-rules names an unknown prerequisite '$go_req'; reinstall the kit (install.sh --update)" ;;
+    esac
+  done
+  go_rule ready ready.baseline; go_baseline="$go_val"
+  [ -f .agents-v0/scripts/audit-brownfield-baseline.sh ] \
+    || gc_refuse ready ".agents-v0/scripts/audit-brownfield-baseline.sh is missing; reinstall the kit (install.sh --update)"
+  # The audit's own exit (0 passed, 1 failed, 2 no build) is in the record; only a missing record refuses.
+  go_rc=0
+  sh .agents-v0/scripts/audit-brownfield-baseline.sh --record || go_rc=$?
+  { [ "$go_rc" -le 2 ] && [ -f "$go_baseline" ]; } \
+    || gc_refuse ready "the baseline audit did not write $go_baseline (exit $go_rc); fix it, then run ready again"
+  go_result="$(sed -n 's/^result: //p' "$go_baseline" | head -n 1)"
+  sh .agents-v0/scripts/check-onboarding-docs.sh \
+    || gc_refuse ready "the onboarding docs check failed; fix the docs it names, then run ready again"
+  go_rule ready ready.next; go_next="$go_val"
+  go_rule ready ready.status; go_status="$go_val"
+  gc_state_set "$go_state" "$go_feature" "$go_artifact" "activePhase=$go_phase" \
+    "activeStatus=$go_status" "blockedReason=" "nextStep=$go_next" || exit 1
+  gc_ok ready "onboard state is $(gc_state_get "$go_state" activeStatus) (baseline ${go_result:-unknown}, $go_baseline)"
+  printf 'Next: %s\n' "$go_next"
+}
+
 go_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"]\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"] | ready\n' >&2
   exit 2
 }
 
@@ -100,6 +136,7 @@ go_cmd="$1"; shift
 case "$go_cmd" in
   start) go_start "$@" ;;
   block) go_block "$@" ;;
-  -h|--help) sed -n '2,16p' "$GO_HERE/guard-onboard.sh" ;;
+  ready) go_ready "$@" ;;
+  -h|--help) sed -n '2,20p' "$GO_HERE/guard-onboard.sh" ;;
   *) go_usage ;;
 esac

@@ -4,7 +4,7 @@
 #
 # Format: one rule per line, `<command> <key> <value>`; the value is the rest of the line.
 # Lines starting with # and blank lines are ignored. A key appears once per command.
-# Paths are relative to the repository root. Only the onboard entry is filled for now (D2).
+# Paths are relative to the repository root. Only the onboard entry is filled for now (D2, D3).
 
 # --- onboard (/v0-onboard, guard-onboard.sh) -----------------------------------------------------
 onboard phase onboard
@@ -19,5 +19,11 @@ onboard start.next Run discovery and write the onboarding docs (report.md and mo
 # block: the status it sets, and the next step it records when the caller gives none.
 onboard block.status blocked
 onboard block.next Fix the blocker, then run /v0-onboard again; it resumes from the files on disk.
+# ready (Design: D3): main session only, after discovery. Runs the baseline audit with --record (a red baseline
+# is recorded, not refused), runs the onboarding docs check, then sets the status and the next step below.
+onboard ready.requires in-progress
+onboard ready.baseline docs/agents-v0/discovery/baseline-audit.txt
+onboard ready.status awaiting_approval
+onboard ready.next Sensei reviews the onboarding docs and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard
 # shown when onboard is already approved (start refuses)
 onboard approved.next /v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain
