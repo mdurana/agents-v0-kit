@@ -9,8 +9,10 @@
 # twice, with sh and with dash in place of /bin/sh (as test-hooks.sh ran them); group B runs the installed line
 # exactly as written (/bin/sh), once per case. Group A: the agy hook cases (moved from test-hooks.sh, same payloads and
 # verdicts). Group B: a smoke set for the gate ledger and the reopen grant through pre-shell.sh, both flavors.
-# TODO(untrusted-root): add the .git/agents-v0/untrusted-root marker smoke case here when Sasuke's
-# .git/agents-v0/ hook commit lands; today the hook allows mv/rm of that marker, so a case would fail.
+# Group C: the .git/agents-v0/untrusted-root marker (bootstrap-greenfield.sh; protected by hook-policy since
+# ae88c268): write, mv, rm, cp over and truncate are blocked through the Cursor and agy pre-shell.sh entries, an
+# edit of it through both pre-edit.sh entries; a read is allowed.
+# Bash as a second shell is deferred (see the commit of this line).
 # Offline, no agent; the commands are judged, never run. Temp folder: this run's own (tier1-harness.sh).
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
@@ -24,7 +26,7 @@ if t1_install "$P" --with-antigravity; then pass "install.sh --with-antigravity 
 # An onboarded project (commit plus an onboard-v tag), so the agy cases get the verdicts test-hooks.sh gave them;
 # with onboarding in progress the hook refuses every commit but the onboard gate commit (hook-policy.py, onboard-v).
 G "$P" add -A && G "$P" commit -qm onboarded && G "$P" tag onboard-v1 || fail "onboard the temp project"
-mkdir -p "$P/.git/agents-v0"; : > "$P/.git/agents-v0/gate-ledger"
+mkdir -p "$P/.git/agents-v0"; : > "$P/.git/agents-v0/gate-ledger"; printf 'root-sha\n' > "$P/.git/agents-v0/untrusted-root"
 # entry <installed hooks.json> <matcher or script>: the installed command line for that hook
 entry() {
   python3 -c '
@@ -43,10 +45,12 @@ else:
 CUR_SHELL="$(entry "$P/.cursor/hooks.json" pre-shell.sh)"
 AGY_SHELL="$(entry "$P/.agents/hooks.json" run_command)"
 AGY_EDIT="$(entry "$P/.agents/hooks.json" 'edit_file|write_file')"
+CUR_EDIT="$(entry "$P/.cursor/hooks.json" pre-edit.sh)"
 case "$CUR_SHELL" in *KIT_HOOK_FLAVOR=cursor*" .cursor/hooks/pre-shell.sh") pass "installed Cursor entry runs .cursor/hooks/pre-shell.sh" ;; *) fail "installed Cursor shell entry not found ($CUR_SHELL)" ;; esac
 case "$AGY_SHELL" in *KIT_HOOK_FLAVOR=antigravity*.agents/hooks/pre-shell.sh*) pass "installed agy entry runs .agents/hooks/pre-shell.sh" ;; *) fail "installed agy shell entry not found ($AGY_SHELL)" ;; esac
+case "$CUR_EDIT" in *KIT_HOOK_FLAVOR=cursor*" .cursor/hooks/pre-edit.sh") pass "installed Cursor edit entry runs .cursor/hooks/pre-edit.sh" ;; *) fail "installed Cursor edit entry not found ($CUR_EDIT)" ;; esac
 case "$AGY_EDIT" in *KIT_HOOK_FLAVOR=antigravity*.agents/hooks/pre-edit.sh*) pass "installed agy edit entry runs .agents/hooks/pre-edit.sh" ;; *) fail "installed agy edit entry not found ($AGY_EDIT)" ;; esac
-for h in .cursor/hooks/pre-shell.sh .agents/hooks/pre-shell.sh .agents/hooks/pre-edit.sh; do
+for h in .cursor/hooks/pre-shell.sh .cursor/hooks/pre-edit.sh .agents/hooks/pre-shell.sh .agents/hooks/pre-edit.sh; do
   cmp -s "$KIT/core/common/hooks/${h##*/}" "$P/$h" && pass "installed $h is the kit's wrapper" || fail "installed $h is the kit's wrapper"
 done
 [ -d "$P/docs/agents-v0" ] && pass "the install has docs/agents-v0 (the ledger rules apply)" || fail "the install has docs/agents-v0"
@@ -103,6 +107,22 @@ judge B7 "$CUR_SHELL" "$(cur_cmd "mv $R /tmp/x")" block "cursor move the reopen 
 judge B8 "$CUR_SHELL" "$(cur_cmd 'mv .git/agents-v0 /tmp/x')" block "cursor move the folder that holds them"
 judge B9 "$CUR_SHELL" "$(cur_cmd "cat $L")" allow "control: cursor read the gate ledger"
 judge B10 "$AGY_SHELL" "$(agy_cmd_cwd 'printf x > notes/gate-ledger.md')" allow "control: agy write a look-alike name"
-# TODO(untrusted-root): B11 cursor `mv .git/agents-v0/untrusted-root /tmp/x` block, when Sasuke's commit lands.
+
+# ---- Group C: the untrusted-root marker, through the installed pre-shell.sh and pre-edit.sh (Cursor and agy) ----
+U=.git/agents-v0/untrusted-root
+judge C1 "$CUR_SHELL" "$(cur_cmd "printf x > $U")" block "cursor write the untrusted-root marker"
+judge C2 "$AGY_SHELL" "$(agy_cmd_cwd "printf x > $U")" block "agy write the untrusted-root marker"
+judge C3 "$CUR_SHELL" "$(cur_cmd "mv $U /tmp/x")" block "cursor move the untrusted-root marker"
+judge C4 "$AGY_SHELL" "$(agy_cmd_cwd "mv $U /tmp/x")" block "agy move the untrusted-root marker"
+judge C5 "$CUR_SHELL" "$(cur_cmd "rm -f $U")" block "cursor remove the untrusted-root marker"
+judge C6 "$AGY_SHELL" "$(agy_cmd_cwd "rm -f $U")" block "agy remove the untrusted-root marker"
+judge C7 "$CUR_SHELL" "$(cur_cmd "cp README.md $U")" block "cursor copy over the untrusted-root marker"
+judge C8 "$AGY_SHELL" "$(agy_cmd_cwd "cp README.md $U")" block "agy copy over the untrusted-root marker"
+judge C9 "$CUR_SHELL" "$(cur_cmd ": > $U")" block "cursor truncate the untrusted-root marker"
+judge C10 "$AGY_SHELL" "$(agy_cmd_cwd "truncate -s 0 $U")" block "agy truncate the untrusted-root marker"
+judge C11 "$CUR_EDIT" "{\"tool_input\":{\"file_path\":\"$U\"}}" block "cursor edit the untrusted-root marker"
+judge C12 "$AGY_EDIT" "{\"toolCall\":{\"name\":\"write_file\",\"args\":{\"Path\":\"$U\"}}}" block "agy write_file the untrusted-root marker"
+judge C13 "$CUR_SHELL" "$(cur_cmd "cat $U")" allow "control: cursor read the untrusted-root marker"
+judge C14 "$AGY_SHELL" "$(agy_cmd_cwd "cat $U")" allow "control: agy read the untrusted-root marker"
 
 t1_done test-hooks-core
