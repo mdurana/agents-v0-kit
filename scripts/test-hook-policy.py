@@ -1337,6 +1337,35 @@ N3C_KEEP = [
     ("find . | xargs git add", "ask"),
     ("ls | xargs -P 4 make", "ask"),
 ]
+# Jiraiya review of 087bc0ff (Sasuke): busybox / toybox are judged as the applet they run (any mode, with or without
+#   docs/agents-v0); nested xargs and xargs find -delete are judged as what they run.
+BBX_BLOCK = [
+    "busybox rm .git/agents-v0/gate-ledger", "toybox rm .git/agents-v0/gate-ledger",
+    "busybox truncate -s0 docs/agents-v0/onboarding/state.json", "/bin/busybox rm .git/agents-v0/reopen-grant",
+    "/usr/bin/toybox rm .git/agents-v0/gate-ledger", "busybox -- rm .git/agents-v0/gate-ledger",
+    "env A=1 nice busybox rm .git/agents-v0/gate-ledger", "command busybox -- truncate -s0 docs/agents-v0/onboarding/state.json",
+    "sudo busybox rm x", "busybox sh -c 'rm .git/agents-v0/gate-ledger'", "busybox ash -c 'rm .git/agents-v0/gate-ledger'",
+    "toybox sh -c 'printf x > docs/agents-v0/onboarding/state.json'", "busybox mv .git/agents-v0/untrusted-root /tmp/x",
+    "busybox rm .git/agents-v0/untrusted-root", "toybox rm .git/agents-v0/untrusted-root",
+    "busybox rm .git/worktrees/wt1/agents-v0/untrusted-root", "busybox rm -f .git/agents-v0/untrusted-root",
+    "toybox mv .git/agents-v0/untrusted-root .git/agents-v0/untrusted-root.bak",
+    "busybox sed -i 1d docs/agents-v0/onboarding/state.json", "busybox dd if=/dev/zero of=.git/agents-v0/gate-ledger",
+    "busybox mv .git/agents-v0 /tmp/x", "busybox rm -rf src", "busybox git push", "busybox find .git -delete",
+    "find .git -exec busybox rm {} +", "( busybox rm .git/agents-v0/gate-ledger )",
+    "if true; then toybox rm .git/agents-v0/gate-ledger; fi",
+    "echo x | xargs busybox rm", "echo x | xargs toybox -- truncate -s0", "echo x | xargs xargs rm",
+    "echo x | xargs -n1 xargs -0 rm -f", "echo x | xargs parallel rm", "echo .git | xargs -I{} find {} -delete",
+    "echo .git | xargs -I{} find {} -exec rm {} +", "echo x | xargs busybox xargs rm",
+]
+BBX_KEEP = [
+    ("busybox ls", "allow"), ("busybox cat x", "allow"), ("toybox grep foo x", "allow"), ("busybox --list", "allow"),
+    ("busybox cat .git/agents-v0/gate-ledger", "allow"), ("busybox frobnicate x", "ask"), ("busybox wget http://x", "ask"),
+    ("echo x | xargs git rm", "ask"), ("echo x | xargs sh", "ask"), ("echo x | xargs busybox cat", "allow"),
+]
+BBX_PLAIN = [  # no docs/agents-v0: the applet is judged as run directly
+    ("busybox rm -rf src", "block"), ("rm -rf src", "block"), ("busybox git push", "block"), ("busybox sudo ls", "block"),
+    ("busybox rm x", "allow"), ("echo x | xargs busybox rm", "allow"), ("busybox ls", "allow"),
+]
 N3A_ALLOW = [
     "cat {L}", "cat {R}", "grep FAIL {L}", "wc -l {L}", "sha256sum {L}", "head -n 5 {L}", "tail -n 1 {L}",
     "git log -1", "git log --format=%B -1", "cp {L} /tmp/ledger-copy", "cat {L} > /tmp/x", "tail -n1 {L} | tee /tmp/x",
@@ -1450,6 +1479,15 @@ def n3a_cases(hp, tmp: str) -> list:
         add("N3C xargs keep", c, active, want)
     for c, want in (("find . | xargs rm -f", "allow"), ("find . | xargs rm -rf", "block")):
         add("N3C no docs/agents-v0 (as plain rm)", c, plain, want)
+    for c in BBX_BLOCK:
+        add("busybox/toybox or nested xargs deny", c, active, "block")
+    for c in BBX_BLOCK[:3] + ["echo x | xargs xargs rm"]:
+        add("busybox deny, onboarding approved", c, done, "block")
+        add("busybox deny, unattended", c, active, "block", STATE_UNATTENDED_ENV)
+    for c, want in BBX_KEEP:
+        add("busybox/toybox keep", c, active, want)
+    for c, want in BBX_PLAIN:
+        add("busybox, no docs/agents-v0 (as the applet run directly)", c, plain, want)
     return out
 
 

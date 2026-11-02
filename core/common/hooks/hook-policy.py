@@ -284,6 +284,27 @@ _SH_HEADER_KW_RE = re.compile(r"(for|select|case|function|in)(?=\s|$)")
 _SH_KEYWORDS: List[str] = []
 
 
+# Jiraiya review of 087bc0ff (Sasuke): busybox and toybox are multi-call binaries: `busybox rm x`, `toybox rm x`,
+#   `/bin/busybox -- rm x` run the rm applet, so every rule met them only as the program `busybox` and they got past
+#   all of them (`busybox rm .git/agents-v0/gate-ledger`, `busybox truncate -s0 .../state.json` were allowed). They are
+#   unwrapped like env / nohup / xargs here (any mode, with or without docs/agents-v0), so the applet and its
+#   arguments are judged as if run directly; `busybox sh -c '...'` / `busybox ash -c '...'` then go through the sh -c
+#   unwrap. An applet the rules do not know asks, as the same command run directly does. `busybox` alone or with
+#   only an option (--list, --help) is left as the program busybox. Also a wrapper inside xargs/parallel and find -exec.
+_MULTICALL = frozenset({"busybox", "toybox"})
+_MULTICALL_KNOWN = frozenset({
+    "rm", "mv", "cp", "ln", "link", "unlink", "dd", "tee", "truncate", "shred", "install", "rsync", "rmdir", "sed",
+    "awk", "find", "xargs", "tar", "unzip", "zip", "gzip", "gunzip", "patch", "sh", "ash", "hush", "bash", "cat",
+    "head", "tail", "grep", "egrep", "fgrep", "ls", "stat", "wc", "sha256sum", "sha1sum", "sha512sum", "md5sum",
+    "cksum", "echo", "printf", "true", "false", "test", "[", "basename", "dirname", "realpath", "readlink", "du",
+    "diff", "cmp", "sort", "uniq", "cut", "tr", "date", "pwd", "env", "sleep", "which", "id", "uname", "mkdir",
+    "touch", "chmod", "chown", "nice", "nohup", "timeout", "sudo", "su", "git", "less", "more", "file", "seq",
+    "expr", "yes", "whoami", "hostname", "df", "ps", "kill"})
+_MULTICALL_UNKNOWN: List[str] = []  # applets met this command that the rules do not know: at least ask
+MULTICALL_ASK_MSG = ("{} runs the applet `{}`, which the guard does not know; that needs your approval. Run the tool "
+                     "directly if it is installed.")
+
+
 def _expand_wrapper(seg: str, keywords: bool = True) -> List[str]:
     seg = _strip_env_prefix(seg)
     if keywords:
@@ -311,7 +332,7 @@ def _expand_wrapper(seg: str, keywords: bool = True) -> List[str]:
     if esc in ESCALATORS_ALL_MODES or esc in ESCALATORS_UNATTENDED:
         _ESCALATIONS.append(esc)
     bin0 = parts[0].split("/")[-1]
-    if bin0 in ("sh", "bash", "zsh", "dash", "ksh") and len(parts) >= 3:
+    if bin0 in ("sh", "bash", "zsh", "dash", "ksh", "ash", "hush", "mksh") and len(parts) >= 3:
         i = 1
         saw_c = False
         while i < len(parts) and parts[i].startswith("-"):
@@ -372,6 +393,12 @@ def _expand_wrapper(seg: str, keywords: bool = True) -> List[str]:
         return [seg]
     if bin0 == "eval" and len(parts) >= 2:
         return split_segments(" ".join(parts[1:]))
+    if bin0 in _MULTICALL and len(parts) >= 2:  # busybox / toybox: judged as the applet they run
+        i = 2 if parts[1] == "--" else 1
+        if i < len(parts) and not parts[i].startswith("-"):
+            if parts[i].split("/")[-1] not in _MULTICALL_KNOWN:
+                _MULTICALL_UNKNOWN.append(f"{bin0}\t{parts[i]}")
+            return split_segments(" ".join(parts[i:]))
     return [seg]
 
 
@@ -765,10 +792,11 @@ def _ledger_related(t: str) -> bool:
 #     ledger out of reach and leaves a fresh one.
 _FIND_KILL_PROGS = frozenset({"rm", "mv", "shred", "unlink", "truncate", "cp", "install", "ln", "link", "tee", "dd",
                               "sed", "rsync"})
-_FIND_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "mksh"})
+_FIND_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "mksh", "ash", "hush"})
 _FIND_SHELL_KILL_RE = re.compile(r"\b(?:rm|mv|shred|unlink|truncate|cp|install|ln|link|tee|dd|sed|rsync|perl|python3?"
                                  r"|ruby|node)\b|>", re.I)
-_FIND_WRAPPERS = frozenset({"env", "command", "exec", "nice", "nohup", "sudo", "doas", "timeout", "stdbuf", "xargs"})
+_FIND_WRAPPERS = frozenset({"env", "command", "exec", "nice", "nohup", "sudo", "doas", "timeout", "stdbuf", "xargs",
+                            "busybox", "toybox"})
 _FIND_FILTERS = {"-name": "name", "-iname": "name", "-path": "path", "-ipath": "path", "-wholename": "path",
                  "-iwholename": "path", "-regex": "regex", "-iregex": "regex", "-lname": "name", "-ilname": "name"}
 _FIND_WRITE_FILE = frozenset({"-fprint", "-fprint0", "-fprintf", "-fls"})
@@ -913,6 +941,9 @@ def _git_init_separate(parts: List[str]) -> Optional[str]:
 #   -d -E -a and long forms) and wrappers (env, command, nice, nohup, timeout, sudo, ...) are skipped; ( ), { }, $( ),
 #   if bodies, pipes and `<` are covered by the segment split. Without docs/agents-v0 nothing changes (xargs rm is
 #   judged as plain rm, as before).
+#   Jiraiya review of 087bc0ff: busybox / toybox are skipped like the wrappers (xargs busybox rm), a nested xargs or
+#   parallel is judged as the command it runs (xargs xargs rm), and find that deletes or replaces (-delete, -exec rm,
+#   -fprint) is blocked, its start paths coming from the input (echo .git | xargs -I{} find {} -delete).
 _XARGS_ARG_OPTS = frozenset({"-n", "-P", "-L", "-s", "-d", "-E", "-a", "-I", "--max-args", "--max-procs", "--max-lines",
                              "--delimiter", "--eof", "--max-chars", "--arg-file", "--process-slot-var"})
 _PARALLEL_ARG_OPTS = frozenset({"-j", "--jobs", "-a", "--arg-file", "-n", "-N", "-d", "--delimiter", "-E", "-I", "-S",
@@ -921,7 +952,7 @@ _PARALLEL_ARG_OPTS = frozenset({"-j", "--jobs", "-a", "--arg-file", "-n", "-N", 
                                 "--max-lines", "--max-replace-args", "--basefile", "--tag-string"})
 _XARGS_WRITERS = frozenset({"rm", "mv", "shred", "unlink", "truncate", "cp", "dd", "tee", "ln", "link", "install",
                             "rsync", "rmdir", "sponge"})
-_XARGS_SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh", "mksh"})
+_XARGS_SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh", "mksh", "ash", "hush"})
 _XARGS_READERS = frozenset({"grep", "egrep", "fgrep", "rg", "cat", "head", "tail", "wc", "ls", "sha256sum", "sha1sum",
                             "sha512sum", "md5sum", "cksum", "stat", "file", "echo", "printf", "basename", "dirname",
                             "realpath", "readlink", "du", "diff", "cmp", "true"})
@@ -929,7 +960,7 @@ _XARGS_WRAP_ARG = {"env": ("-u", "--unset", "-C", "--chdir"), "nice": ("-n", "--
                    "sudo": ("-u", "-g", "-C", "-D", "-R", "-T"), "doas": ("-u",), "timeout": ("-k", "-s",
                    "--kill-after", "--signal"), "ionice": ("-c", "-n", "-p"), "stdbuf": ("-i", "-o", "-e")}
 _XARGS_WRAPPERS = frozenset({"env", "command", "nice", "nohup", "timeout", "sudo", "doas", "stdbuf", "exec", "time",
-                             "setsid", "ionice", "builtin"})
+                             "setsid", "ionice", "builtin", "busybox", "toybox"})
 XARGS_BLOCK_MSG = ("{} runs `{}` on paths it reads from its input, which the hook cannot check: while docs/agents-v0 "
                    "exists (the gate ledger, the reopen grant and the state files are protected) a command that deletes "
                    "or writes files is never run through xargs or parallel. Name the files on the command line instead.")
@@ -992,10 +1023,16 @@ def _xargs_verdict(cmd: str) -> Optional[Tuple[str, str]]:
             continue
         b0 = parts[0].lstrip("\\").split("/")[-1]
         inner = _xargs_inner(parts)
+        for _ in range(8):  # Jiraiya review of 087bc0ff: nested `xargs xargs rm` / `xargs parallel rm` run the inner one
+            if not inner or inner[0].lstrip("\\").split("/")[-1] not in ("xargs", "parallel"):
+                break
+            inner = _xargs_inner(inner)
         if not inner:
             continue  # bare xargs runs echo
         prog = inner[0].lstrip("\\").split("/")[-1].lower()
         shown = " ".join(inner[:3])
+        if prog == "find" and (_find_destructive(inner) or any(a in _FIND_WRITE_FILE for a in inner)):
+            return "block", XARGS_BLOCK_MSG.format(b0, shown)  # `xargs -I{} find {} -delete`: start paths unseen
         writes = prog in _XARGS_WRITERS or (
             prog in ("sed", "perl") and any(re.match(r"-[A-Za-z]*i|--in-place", a) for a in inner[1:])) or (
             prog in _XARGS_SHELLS and any(re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", a) for a in inner[1:])) or (
@@ -3037,7 +3074,7 @@ ONB_COMMIT_MSG = ("onboarding is in progress ({}): the only commit allowed is th
 _ONB_MSG_TXT_RE = re.compile(r"^(?:\.git|/\S*/\.git)(?:/worktrees/[^/]+)?/agents-v0-onboard-commit-msg\.txt$")
 _ONB_MSG_GITPATH_RE = re.compile(r"^\$\(\s*git\s+rev-parse\s+--git-path\s+agents-v0-onboard-commit-msg\.txt\s*\)$")
 _ONB_WRAPPERS = frozenset({"env", "command", "nohup", "time", "nice", "stdbuf", "exec", "builtin", "setsid", "ionice",
-                           "timeout", "xargs", "eval", "sudo", "doas", "run0", "pkexec"})
+                           "timeout", "xargs", "eval", "sudo", "doas", "run0", "pkexec", "busybox", "toybox"})
 
 
 def _onb_ops_split(cmd: str) -> List[Tuple[str, str, bool]]:
@@ -3379,6 +3416,8 @@ def _compound_unparsed(kws: List[str], cmd: str) -> Optional[str]:
 def classify_command(cmd: str) -> Tuple[Action, str]:
     kws = _sh_keywords(cmd)
     action, msg = _classify_command_core(cmd)
+    if action == "allow" and _MULTICALL_UNKNOWN:  # Jiraiya review of 087bc0ff: an unknown busybox applet asks
+        return "ask", MULTICALL_ASK_MSG.format(*_MULTICALL_UNKNOWN[0].split("\t", 1))
     why = _compound_unparsed(kws, cmd) if kws else None
     if why and action != "block":
         tok = _COMPOUND_DENY_RE.search(cmd)
@@ -3394,6 +3433,7 @@ def _classify_command_core(cmd: str) -> Tuple[Action, str]:
     _SHELL_VARS.clear()
     _CMD_TEXT[0] = cmd
     del _ESCALATIONS[:]
+    del _MULTICALL_UNKNOWN[:]
     if GUARD_OVERRIDE_RE.search(cmd):
         return "block", GUARD_OVERRIDE_MSG
     if TEST_OVERRIDES_RE.search(cmd):
