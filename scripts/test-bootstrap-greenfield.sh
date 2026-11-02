@@ -105,6 +105,25 @@ check "H7 hook: no marker under .git/agents-v0-bootstrap/" "$(ls "$t/.git/agents
 check "H7 hook: the gate ledger is still an empty regular file" "$([ -f "$t/.git/agents-v0/gate-ledger" ] && [ ! -s "$t/.git/agents-v0/gate-ledger" ] && echo empty)" empty
 expect_out "H7 hook: the refusal names the marker" 'marked it in .*\.git/agents-v0/untrusted-root'
 check "H7: a successful bootstrap writes no untrusted-root marker" "$([ -e "$tmp/green/.git/agents-v0/untrusted-root" ] && echo present || echo absent)" absent
+# The marker cannot be written (Jiraiya review of 13585735): the hook stages sneaky.txt and makes
+# .git/agents-v0 read-only after the ledger is there. The refusal must not claim a marker: no "marked it in",
+# a plain "NO marker was written", still non-zero and no success line. As root, chmod does not stop a write,
+# so the case is skipped with a note.
+if [ "$(id -u)" = 0 ]; then
+  printf 'skip: the read-only .git/agents-v0 case (running as root, chmod does not stop the write)\n'
+else
+  t="$tmp/hook-ro"; newrepo "$t"; mkdir -p "$tmp/hooks-ro"
+  printf '#!/bin/sh\nprintf "aws_access_key_id = %%s\\n" "%s" > sneaky.txt\ngit add sneaky.txt\nchmod a-w "$(git rev-parse --git-common-dir)/agents-v0"\n' "$fake_key" > "$tmp/hooks-ro/pre-commit"
+  chmod +x "$tmp/hooks-ro/pre-commit"
+  git -C "$t" config core.hooksPath "$tmp/hooks-ro"
+  if boot "$t"; then fail "H7 read-only marker folder: refused (exit 0)"; else pass "H7 read-only marker folder: refused"; fi
+  chmod u+w "$t/.git/agents-v0" 2>/dev/null || true
+  [ ! -e "$t/.git/agents-v0/untrusted-root" ] && pass "H7 read-only marker folder: no marker file" || fail "H7 read-only marker folder: no marker file"
+  if grep -q 'marked it in' "$tmp/out.txt"; then fail "H7 read-only marker folder: never says 'marked it in'"; sed 's/^/    /' "$tmp/out.txt" >&2; else pass "H7 read-only marker folder: never says 'marked it in'"; fi
+  expect_out "H7 read-only marker folder: says NO marker was written and not to onboard" 'NO marker was written.*do not onboard this repo'
+  expect_out "H7 read-only marker folder: still REFUSED" 'REFUSED bootstrap-greenfield: .*commit hooks changed the tree'
+  if grep -Eq 'Greenfield bootstrap complete|Greenfield root commit [0-9a-f]|OK greenfield_record_ok' "$tmp/out.txt"; then fail "H7 read-only marker folder: no success line"; else pass "H7 read-only marker folder: no success line"; fi
+fi
 # A leftover marker in an unborn repo is refused before anything is written.
 d="$tmp/marker"; newrepo "$d"; mkdir -p "$d/.git/agents-v0"; printf 'rootCommit=x\n' > "$d/.git/agents-v0/untrusted-root"
 refused "an untrusted-root marker in an unborn repo" "$d"

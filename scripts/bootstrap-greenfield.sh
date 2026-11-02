@@ -520,23 +520,47 @@ GF_RECORD=".agents-v0/greenfield-record.json"
 # folder the hooks protect, beside the gate ledger). The folder is created only if missing; the marker is
 # written with noclobber, so an existing marker and every other file there are left as they are.
 mark_untrusted() {
+  # Returns 0 only when the marker exists and names this root commit. MARK_TEXT is what the refusal says:
+  # "marked" only after reading the file back; otherwise that NO marker was written, and why.
+  m_root="$(git -C "$TARGET_ABS" rev-parse HEAD 2>/dev/null || echo unknown)"
   m_dir="$(git -C "$TARGET_ABS" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/agents-v0"
   UNTRUSTED_MARKER="$m_dir/untrusted-root"
-  [ -d "$m_dir" ] || mkdir -p "$m_dir" 2>/dev/null || { printf 'error: cannot create %s; the untrusted-root marker was not written\n' "$m_dir" >&2; return 0; }
+  m_why=""
   if [ -e "$UNTRUSTED_MARKER" ] || [ -L "$UNTRUSTED_MARKER" ]; then
-    printf 'note: %s already exists; left as it is\n' "$UNTRUSTED_MARKER" >&2; return 0
+    m_new=0
+  else
+    m_new=1
+    if [ ! -d "$m_dir" ] && ! mkdir -p "$m_dir" 2>/dev/null; then
+      m_why="cannot create $m_dir"
+    elif ! ( set -C; printf 'rootCommit=%s\nreason=%s\nmarkedAt=%s\n' "$m_root" "$1" \
+        "$(date '+%Y-%m-%dT%H:%M:%S%z' | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')" > "$UNTRUSTED_MARKER" ) 2>/dev/null; then
+      m_why="cannot write $UNTRUSTED_MARKER (is $m_dir writable?)"
+    fi
   fi
-  ( set -C; printf 'rootCommit=%s\nreason=%s\nmarkedAt=%s\n' "$(git -C "$TARGET_ABS" rev-parse HEAD 2>/dev/null || echo unknown)" "$1" \
-      "$(date '+%Y-%m-%dT%H:%M:%S%z' | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')" > "$UNTRUSTED_MARKER" ) 2>/dev/null \
-    || printf 'error: cannot write %s\n' "$UNTRUSTED_MARKER" >&2
+  if [ -z "$m_why" ] && [ -f "$UNTRUSTED_MARKER" ] && [ ! -L "$UNTRUSTED_MARKER" ] \
+     && [ "$(sed -n 's/^rootCommit=//p' "$UNTRUSTED_MARKER" 2>/dev/null | head -n 1)" = "$m_root" ]; then
+    if [ "$m_new" = 1 ]; then
+      MARK_TEXT="bootstrap marked it in $UNTRUSTED_MARKER"
+    else
+      MARK_TEXT="it was already marked in $UNTRUSTED_MARKER (that file was left as it is)"
+    fi
+    return 0
+  fi
+  if [ -z "$m_why" ]; then
+    if [ "$m_new" = 1 ]; then m_why="$UNTRUSTED_MARKER does not read back with rootCommit=$m_root"
+    else m_why="$UNTRUSTED_MARKER already exists but does not name this root commit; it was left as it is"; fi
+  fi
+  MARK_TEXT="NO marker was written for this root commit ($m_why), so nothing in the repo records that it is not trusted: do not onboard this repo, the root commit is still not trusted"
+  printf 'error: no untrusted-root marker was written: %s\n' "$m_why" >&2
+  return 1
 }
 stop_commit() {
   printf 'error: %s\n' "$1" >&2
   # Nothing stays staged in a repo with no commit (the record and the kit files stay in the work tree).
   git -C "$TARGET_ABS" rev-parse -q --verify HEAD >/dev/null 2>&1 || git -C "$TARGET_ABS" read-tree --empty 2>/dev/null || true
   if git -C "$TARGET_ABS" rev-parse -q --verify HEAD >/dev/null 2>&1; then
-    mark_untrusted "post-commit check failed: $(printf '%s' "$1" | tr '\n' ' ' | cut -c1-300)"
-    printf 'The kit is installed in %s and a root commit exists, but it failed the check above: it is not a trusted greenfield root commit (marked in %s). Do not build on it; start again in a new empty repo (git init) and rerun.\n' "$TARGET_ABS" "$UNTRUSTED_MARKER" >&2
+    mark_untrusted "post-commit check failed: $(printf '%s' "$1" | tr '\n' ' ' | cut -c1-300)" || true
+    printf 'The kit is installed in %s and a root commit exists, but it failed the check above: it is not a trusted greenfield root commit; %s. Do not build on it; start again in a new empty repo (git init) and rerun.\n' "$TARGET_ABS" "$MARK_TEXT" >&2
   else
     printf 'The kit is installed in %s, but the greenfield root commit was not completed. Fix the cause; to start again, use a new empty repo (git init) and rerun.\n' "$TARGET_ABS" >&2
   fi
@@ -545,9 +569,9 @@ stop_commit() {
 # A commit hook (pre-commit, prepare-commit-msg, commit-msg) can stage or change files after the secret scan:
 # the committed tree must be the tree that was scanned. Bootstrap never rewrites history or deletes the commit.
 refuse_hook_tree() {
-  mark_untrusted "commit hooks changed the tree: scanned $2, committed $3; paths: $4"
+  mark_untrusted "commit hooks changed the tree: scanned $2, committed $3; paths: $4" || true
   printf 'REFUSED bootstrap-greenfield: the commit hooks changed the tree of the root commit %s: git committed tree %s, but the secret scan and the staged-path check read tree %s. Paths the hooks added, changed or removed: %s\n' "$1" "$3" "$2" "$4" >&2
-  printf 'The root commit %s is not trusted: it holds content the secret scan never read and is not the kit plus the greenfield record (H7). greenfield_record_ok cannot see this, so do not rely on it for this repo; bootstrap marked it in %s. Bootstrap left the commit in place (it never rewrites history) and stopped: do not push or onboard this repo. Move this repo aside, create a new empty repo (git init), turn off for it the hooks that stage files at commit time (core.hooksPath, .git/hooks/pre-commit, prepare-commit-msg, commit-msg), then rerun bootstrap.\n' "$1" "$UNTRUSTED_MARKER" >&2
+  printf 'The root commit %s is not trusted: it holds content the secret scan never read and is not the kit plus the greenfield record (H7). greenfield_record_ok cannot see this, so do not rely on it for this repo; %s. Bootstrap left the commit in place (it never rewrites history) and stopped: do not push or onboard this repo. Move this repo aside, create a new empty repo (git init), turn off for it the hooks that stage files at commit time (core.hooksPath, .git/hooks/pre-commit, prepare-commit-msg, commit-msg), then rerun bootstrap.\n' "$1" "$MARK_TEXT" >&2
   exit 1
 }
 kit_sha_of() {
