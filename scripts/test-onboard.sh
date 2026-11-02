@@ -371,6 +371,9 @@ onboard_normal_path() (
   mkdir -p "$p" && git -C "$p" init -q -b main && printf 'x\n' > "$p/README.md" && git -C "$p" add README.md && git -C "$p" commit -q -m init \
     || { echo "setup: fixture repo"; exit 1; }
   KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --test-overrides "$p" >"$tmp/np-install.log" 2>&1 || { echo "setup: install --test-overrides"; tail -20 "$tmp/np-install.log"; exit 1; }
+  # Design: DA: a fresh install ships .cursor/cli.json with an empty allow, so supervised cursor-agent asks before every command.
+  python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["permissions"]["allow"] == [] else 1)' "$p/.cursor/cli.json" \
+    || { echo "fresh install: .cursor/cli.json allow list is not empty (supervised runs would not ask)"; exit 1; }
   git -C "$p" add -A && git -C "$p" commit -q -m "install agents-v0" || { echo "setup: commit the install"; exit 1; }
   (cd "$p" && sh "$G/guard-onboard.sh" start) || { echo "start failed"; exit 1; }
   head="$(git -C "$p" rev-parse HEAD)"
@@ -409,7 +412,7 @@ PY2
   [ -z "$(git -C "$p" status --porcelain --untracked-files=all | grep -v '\.lock$')" ] || { echo "tree not clean after commit"; git -C "$p" status --porcelain; exit 1; }
 )
 if np_out="$(onboard_normal_path 2>&1)"; then
-  pass "onboard normal path: start, ready, approve, commit make one commit tagged onboard-v1, tree clean"
+  pass "onboard normal path: fresh install has an empty cli.json allow; start, ready, approve, commit make one commit tagged onboard-v1, tree clean"
 else
   fail "onboard normal path: start, ready, approve, commit"; printf '%s\n' "$np_out" | tail -20 | sed 's/^/    /' >&2
 fi

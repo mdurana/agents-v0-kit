@@ -225,7 +225,8 @@ PY
 [ -f core/common/adapters/cursor/hooks.json ] || err "cursor hooks.json missing"
 [ -f core/common/adapters/cursor/cli.json ] || err "cursor cli.json missing"
 [ -f core/common/adapters/antigravity/hooks.json ] || err "antigravity hooks.json missing"
-grep -Fq '"Shell(*)"' core/common/adapters/cursor/cli.json || err "cursor cli.json must allow Shell(*) so pre-shell.sh governs CLI shell execution"
+# Design: DA: supervised Cursor CLI must ask before every command, so the shipped cli.json allows nothing (pre-shell.sh still sees each one).
+python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["permissions"]["allow"] == [] else 1)' core/common/adapters/cursor/cli.json || err "cursor cli.json must ship an empty permissions.allow (no Shell(*)) so supervised runs ask before every command"
 grep -Fq '\.cursor/cli\.json' core/common/hooks/hook-policy.py || err "hook-policy must protect .cursor/cli.json"
 grep -Fq '\.agents/hooks\.json' core/common/hooks/hook-policy.py || err "hook-policy must protect .agents/hooks.json"
 grep -Fq 'pre-shell.sh' core/common/adapters/cursor/hooks.json || err "cursor hooks.json does not wire pre-shell"
