@@ -308,9 +308,22 @@ if command -v shellcheck >/dev/null 2>&1; then
   shellcheck -S error core/common/hooks/*.sh core/*/hooks/*.sh templates/.agents-v0/scripts/*.sh scripts/*.sh || err "shellcheck -S error failed"
 fi
 [ -f core/common/hooks/session-start.sh ] || err "session-start.sh missing"
+# Tier 1 limit C (Sensei, 2026-11-02 08:44 Manila): "Tier 1 limit C stands: keep 600s, keep the hook-policy,
+# state guard and agy hook cases in tier 1, move the rest of test-hooks.sh to tier 2". Tier 1 runs the agy hook
+# cases and the ledger/grant smoke set (test-hooks-core.sh, through the installed pre-shell.sh / pre-edit.sh
+# entries) and test-hook-policy.py; the rest of test-hooks.sh runs in tier 2 (scripts/tier2.sh), never here.
 [ -f scripts/test-hooks.sh ] || err "scripts/test-hooks.sh missing"
+[ -f scripts/test-hooks-core.sh ] || err "scripts/test-hooks-core.sh missing"
 [ -f scripts/test-hook-policy.py ] || err "scripts/test-hook-policy.py missing"
-sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
+[ -f scripts/tier2.sh ] || err "scripts/tier2.sh missing (tier 2 runner)"
+grep -Eq '^T2_SUITES=.*scripts/test-hooks\.sh' scripts/tier2.sh || err "scripts/tier2.sh must list scripts/test-hooks.sh in T2_SUITES (tier 1 limit C)"
+for t2_ in $(sed -n 's/^T2_SUITES="\(.*\)"$/\1/p' scripts/tier2.sh); do
+  [ -f "$t2_" ] || err "tier 2 suite $t2_ (scripts/tier2.sh T2_SUITES) missing"
+done
+! grep -Eq '^[^#]*sh scripts/test-hooks\.sh' scripts/validate-kit.sh || err "validate-kit.sh must not run scripts/test-hooks.sh (tier 2, scripts/tier2.sh)"
+! grep -Eq '^[^#]*test-hook-policy\.py' scripts/test-hooks.sh || err "scripts/test-hooks.sh must not run test-hook-policy.py (tier 1 runs it, once)"
+sh scripts/test-hooks-core.sh || err "scripts/test-hooks-core.sh failed"
+python3 scripts/test-hook-policy.py || err "scripts/test-hook-policy.py failed"
 # SOC-4/SOC-9: the shared staged-content secret scan (secret_scan.py, its allow-list, check-lessons parity).
 [ -f scripts/test-secret-scan.py ] || err "scripts/test-secret-scan.py missing"
 python3 scripts/test-secret-scan.py || err "scripts/test-secret-scan.py failed"

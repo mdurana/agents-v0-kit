@@ -7,13 +7,13 @@
 # core/common/hooks/hook-policy.py), and test-delivery-lifecycle.sh (through test-ci-checks.sh).
 # Cheap by design: static checks that each such runner turns bytecode off, plus one live run of
 # test-ci-checks.sh in a clean detached clone (git clone --no-checkout, checkout --detach). test-hooks.sh is
-# not run live (about 5 minutes). Tier 1: offline, temp folders only.
+# not run live (about 5 minutes; tier 2 since tier 1 limit C). Tier 1: offline, temp folders only.
 set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$KIT/scripts/lib/tier1-harness.sh"
 
 # 1. Shell runners: the export is the line straight after `set -eu`.
-for r in scripts/test-ci-checks.sh scripts/test-hooks.sh; do
+for r in scripts/test-ci-checks.sh scripts/test-hooks.sh scripts/test-hooks-core.sh; do
   has "$r exports PYTHONDONTWRITEBYTECODE=1" "$KIT/$r" "export PYTHONDONTWRITEBYTECODE=1"
   after="$(sed -n '/^set -eu$/{n;p;q;}' "$KIT/$r")"
   case "$after" in

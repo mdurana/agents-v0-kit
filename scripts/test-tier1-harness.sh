@@ -3,7 +3,7 @@
 # (onboard fix, step 0). Offline, no agent. Checks the AGENTS_V0_* guard (on source and in tier1.sh), the
 # install-into-a-temp-repo fixture and HASH-OK, the byte-identical snapshot (used by E37 and E38: work-tree
 # files and modes, untracked files, symlinks, staged entries, refs, .git/agents-v0), the time limit, a
-# manual stop and the report line, and that cleanup removes only this run's own temp folder.
+# manual stop and the report line, the tier2.sh runner (4b), and that cleanup removes only this run's own temp folder.
 # Run by validate-kit.sh.
 set -eu
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -96,6 +96,23 @@ has "the PyYAML refusal names the python3 it checked" "$T1_TMP/o.txt" "$nopy/pyt
 expect_fail "tier1.sh refuses --time-limit 0" "$T1_TMP" sh "$T" --time-limit 0 -- true
 expect_fail "tier1.sh refuses a non-number limit" "$T1_TMP" sh "$T" --time-limit 5m -- true
 expect_fail "tier1.sh refuses --time-limit with no value" "$T1_TMP" sh "$T" --time-limit
+
+# 4b. tier2.sh (tier 1 limit C, Sensei 2026-11-02 08:44): the real list holds test-hooks.sh, and the runner
+# passes, fails naming the suite, and refuses the test switches. Run on a copy of tier2.sh in a fake kit made in
+# this run's own temp folder, with a stub scripts/test-hooks.sh (the real one is tier 2, not run here).
+has "tier2.sh lists scripts/test-hooks.sh" "$KIT/scripts/tier2.sh" 'T2_SUITES="scripts/test-hooks.sh"'
+F2="$T1_TMP/kit2"; mkdir -p "$F2/scripts/lib"
+cp "$KIT/scripts/tier2.sh" "$F2/scripts/tier2.sh"; cp "$KIT/scripts/lib/tier1-vars.sh" "$F2/scripts/lib/tier1-vars.sh"
+printf 'echo stub ok\nexit 0\n' > "$F2/scripts/test-hooks.sh"
+if sh "$F2/scripts/tier2.sh" --report "$T1_TMP/rep2" > "$T1_TMP/o2.txt" 2>&1; then has "tier2.sh PASS report" "$T1_TMP/rep2" "tier2 PASS "; else fail "tier2.sh passes when its suites pass"; fi
+printf 'echo stub broken\nexit 3\n' > "$F2/scripts/test-hooks.sh"
+set +e; sh "$F2/scripts/tier2.sh" --report "$T1_TMP/rep2" > "$T1_TMP/o2.txt" 2>&1; rc=$?; set -e
+[ "$rc" = 1 ] && pass "tier2.sh exits 1 when a suite fails" || fail "tier2.sh exits 1 when a suite fails (got $rc)"
+has "tier2.sh names the failing suite and its exit" "$T1_TMP/o2.txt" "tier2: FAIL: scripts/test-hooks.sh (exit 3)"
+has "tier2.sh FAIL report" "$T1_TMP/rep2" "tier2 FAIL "
+set +e; env AGENTS_V0_NOW= sh "$F2/scripts/tier2.sh" > "$T1_TMP/o2.txt" 2>&1; rc=$?; set -e
+[ "$rc" = 2 ] && pass "tier2.sh refuses a test switch (exit 2)" || fail "tier2.sh refuses a test switch (exit 2, got $rc)"
+has "tier2.sh names the switch" "$T1_TMP/o2.txt" "tier2: refusing to run: AGENTS_V0_NOW"
 
 # 5. Cleanup removes only its own folder.
 keep="$(mktemp -d "${TMPDIR:-/tmp}/kit-tier1-keep.XXXXXX")"

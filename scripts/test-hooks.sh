@@ -1,7 +1,9 @@
 #!/bin/sh
-# test-hooks.sh — end-to-end tests for the hook wrappers (pre-shell, pre-edit)
-# under sh and dash, plus hook-policy.py unit tests. Runs in a scratch directory so
-# audit logs never land in the kit repo.
+# test-hooks.sh — TIER 2 (scripts/tier2.sh): end-to-end tests for the hook wrappers (pre-shell, pre-edit)
+# under sh and dash. Runs in a scratch directory so audit logs never land in the kit repo.
+# Tier 1 limit C (Sensei, 08:44 Manila 2026-11-02): the agy hook cases and the gate ledger / reopen grant smoke
+# cases run in tier 1 from scripts/test-hooks-core.sh, and hook-policy.py's unit tests (test-hook-policy.py) run in
+# tier 1 from validate-kit.sh; everything left here runs in tier 2.
 set -eu
 export PYTHONDONTWRITEBYTECODE=1  # run alone, still leave no __pycache__ in templates/ or core/ (test-no-bytecode.sh)
 
@@ -63,40 +65,17 @@ shell_case 'dotnet nuget push pkg.nupkg' ask
 shell_case 'poetry publish' ask
 shell_case 'ls' allow
 
-agy_shell_case 'git push origin main --force' block
-agy_shell_case 'git commit -m x' ask
-agy_shell_case 'echo x > .agents/hooks.json' block
-agy_shell_case 'ls' allow
-
-# Unattended allowlist mode (AGY_ALLOW_TOOLS): '-' blocks ask-level commands; matching Shell(...) allows them.
-for SH in sh "$DASH"; do
-  set +e
-  out_deny="$(printf '%s' '{"toolCall":{"name":"run_command","args":{"CommandLine":"git commit -m x"}}}' | AGY_ALLOW_TOOLS="-" KIT_HOOK_FLAVOR=antigravity "$SH" "$HOOKS/pre-shell.sh" 2>&1)"
-  rc_deny=$?
-  out_allow="$(printf '%s' '{"toolCall":{"name":"run_command","args":{"CommandLine":"git commit -m x"}}}' | AGY_ALLOW_TOOLS="Shell(git:commit*)" KIT_HOOK_FLAVOR=antigravity "$SH" "$HOOKS/pre-shell.sh" 2>&1)"
-  rc_allow=$?
-  set -e
-  [ "$rc_deny" = "2" ] || err "$SH pre-shell.sh (AGY_ALLOW_TOOLS=-): expected rc=2 deny for git commit, got rc=$rc_deny ($out_deny)"
-  { [ "$rc_allow" = "0" ] && printf '%s' "$out_allow" | grep -Fq '"decision": "allow"'; } \
-    || err "$SH pre-shell.sh (AGY_ALLOW_TOOLS=Shell(git:commit*)): expected allow for git commit, got rc=$rc_allow ($out_allow)"
-done
-
+# Moved to scripts/test-hooks-core.sh (tier 1, option C): the antigravity agy_shell_case cases, the AGY_ALLOW_TOOLS
+# unattended deny/allow pair, the antigravity pre-edit cases and the antigravity decision allow JSON check.
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":".cursor/hooks.json"}}' block "edit .cursor/hooks.json"
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":"docs/agents-v0/requirements/f.md"}}' allow "cursor edit requirements (ask not enforced)"
 run_hook pre-edit.sh cursor '{"tool_input":{"file_path":"src/Main.java"}}' allow "edit src"
 
-run_hook pre-edit.sh antigravity '{"toolCall":{"name":"edit_file","args":{"Path":".agents/hooks.json"}}}' block "antigravity edit .agents/hooks.json"
-run_hook pre-edit.sh antigravity '{"toolCall":{"name":"write_file","args":{"Path":".agents/skills/v0-build/SKILL.md"}}}' block "antigravity write .agents/skills"
-run_hook pre-edit.sh antigravity '{"toolCall":{"name":"edit_file","args":{"Path":"src/Main.java"}}}' allow "antigravity edit src"
-
-# Cursor and Antigravity permission hooks must emit explicit allow JSON (failClosed).
+# The Cursor permission hook must emit explicit allow JSON (failClosed); the Antigravity half is in test-hooks-core.sh.
 for SH in sh "$DASH"; do
   out="$(printf '%s' '{"tool_input":{"file_path":"src/Main.java"}}' | KIT_HOOK_FLAVOR=cursor "$SH" "$HOOKS/pre-edit.sh" 2>&1)" || true
   printf '%s' "$out" | grep -Fq '"permission": "allow"' \
     || err "$SH pre-edit.sh (cursor): missing permission allow JSON"
-  out_agy="$(printf '%s' '{"toolCall":{"name":"edit_file","args":{"Path":"src/Main.java"}}}' | KIT_HOOK_FLAVOR=antigravity "$SH" "$HOOKS/pre-edit.sh" 2>&1)" || true
-  printf '%s' "$out_agy" | grep -Fq '"decision": "allow"' \
-    || err "$SH pre-edit.sh (antigravity): missing decision allow JSON"
 done
 
 # MEM-13: lessons memory edits are denied in a story worktree (feature/*, maintain/*) for both flavors,
@@ -508,7 +487,7 @@ else
   printf 'test-hooks: JN-12 repro skipped (no root-owned #!/usr/bin/env python3 script found)\n'
 fi
 
-python3 "$KIT/scripts/test-hook-policy.py" || fail=1
+# test-hook-policy.py runs in tier 1 on its own (validate-kit.sh), not from here.
 
 if [ "$fail" -eq 1 ]; then
   printf 'test-hooks: FAILED\n' >&2
