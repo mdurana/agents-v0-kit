@@ -16,7 +16,6 @@ export PATH
 
 payload="$(cat || true)"
 cmd="$(hook_extract_command "$payload")"
-[ -n "$cmd" ] || cmd="$(printf '%s' "$payload" | tr -d '\n')"
 
 block() {
   hook_audit_log "shell" "$cmd" "block" "$1"
@@ -24,6 +23,15 @@ block() {
   HOOK_DENY_MSG="$1" hook_py -c 'import json,os; m=os.environ.get("HOOK_DENY_MSG",""); print(json.dumps({"permission":"deny","decision":"deny","reason":m,"user_message":m,"agent_message":"BLOCKED by kit policy: "+m}))' 2>/dev/null || true
   exit 2
 }
+
+# Fail-closed input (Jiraiya, Iruka; Sasuke): no command to judge is a refusal, not an allow. Empty or blank stdin,
+#   text that is not JSON, JSON that is not an object ({} [] null "ls" 42), and an object whose "command" (Cursor
+#   beforeShellExecution) is missing, empty, blank or not a string all stop here. The raw stdin is no longer judged
+#   as a command line: a non-JSON payload used to reach the policy as the command text and could be allowed.
+case "$cmd" in
+  *[![:space:]]*) ;;
+  *) cmd=""; block "the shell hook got no command to judge (stdin empty, not JSON, or no \"command\" string); refusing (fail-closed)." ;;
+esac
 
 # MEM-13: the command's working directory (Cursor "cwd", Antigravity "Cwd"), so hook-policy.py can
 # tell whether a write to docs/agents-v0/lessons.md happens in a story worktree.

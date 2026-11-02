@@ -266,6 +266,56 @@ judge cursor-shell block "N3C: xargs rm on the ledger" "echo $L | xargs rm"
 judge cursor-shell block "N3C: xargs sh -c with a redirect" "printf '%s\\n' $G | xargs -I{} sh -c ': > {}'"
 judge cursor-shell allow "N3C: xargs grep stays allowed" "find . -name '*.md' | xargs grep -l x"
 
+# Fail-closed input (Jiraiya, Iruka; Sasuke): Cursor's beforeShellExecution entry refuses (rc 2, a BLOCK: line and a
+#   deny verdict) when stdin has no command to judge: empty, blank, not JSON, not an object, or no string "command".
+#   Run through the Cursor hooks.json entry under dash (its /bin/sh here) and again with bash in its place.
+raw_judge() {  # <shell> <want block|allow> <label> <raw stdin>
+  sh_="$1"; want="$2"; label="$3"; raw="$4"
+  n=$((n + 1))
+  case "$CUR_SHELL" in *" /bin/sh "*) ;; *) err "raw input: Cursor entry has no /bin/sh to swap ($CUR_SHELL)"; return ;; esac
+  line="$(printf '%s' "$CUR_SHELL" | sed "s# /bin/sh # $sh_ #")"
+  set +e
+  ro="$(cd "$P" && printf '%s' "$raw" | /bin/sh -c "$line" 2>"$scratch/raw.err")"
+  rc=$?
+  set -e
+  re="$(cat "$scratch/raw.err")"
+  case "$want" in
+    block) { [ "$rc" = 2 ] && printf '%s' "$re" | grep -q '^BLOCK: ' \
+               && printf '%s' "$ro" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if d.get("permission")=="deny" else 1)'; } \
+             || err "raw input ($sh_) $label: expected rc=2, a BLOCK: line and a deny verdict, got rc=$rc (out: $ro; err: $re)" ;;
+    allow) { [ "$rc" = 0 ] && printf '%s' "$ro" | grep -q '"permission": "allow"' && ! printf '%s%s' "$ro" "$re" | grep -Eq 'BLOCK:|"(deny|ask)"'; } \
+             || err "raw input ($sh_) $label: expected allow (rc=0), got rc=$rc (out: $ro; err: $re)" ;;
+  esac
+}
+NL='
+'
+for sh_ in dash bash; do
+  command -v "$sh_" >/dev/null 2>&1 || { err "raw input: $sh_ not found"; continue; }
+  raw_judge "$sh_" block "empty stdin" ""
+  raw_judge "$sh_" block "a newline only" "$NL"
+  raw_judge "$sh_" block "blanks and a tab" "   	 "
+  raw_judge "$sh_" block "not JSON" "not json"
+  raw_judge "$sh_" block "a bare command, not JSON" "ls"
+  raw_judge "$sh_" block "truncated JSON" '{"command":"ls"'
+  raw_judge "$sh_" block "{}" '{}'
+  raw_judge "$sh_" block "[]" '[]'
+  raw_judge "$sh_" block "null" 'null'
+  raw_judge "$sh_" block "a JSON string" '"ls"'
+  raw_judge "$sh_" block "a JSON number" '42'
+  raw_judge "$sh_" block "object without command (cwd only)" "{\"cwd\":\"$P\"}"
+  raw_judge "$sh_" block "object without command (Cursor metadata)" '{"hook_event_name":"beforeShellExecution","conversation_id":"c1","generation_id":"g1","workspace_roots":["/tmp"]}'
+  raw_judge "$sh_" block "command empty" "{\"command\":\"\",\"cwd\":\"$P\"}"
+  raw_judge "$sh_" block "command blank" "{\"command\":\"   \",\"cwd\":\"$P\"}"
+  raw_judge "$sh_" block "command null" '{"command":null}'
+  raw_judge "$sh_" block "command a number" '{"command":42}'
+  raw_judge "$sh_" block "command a list" '{"command":["rm","-rf","src"]}'
+  raw_judge "$sh_" block "command an object" '{"command":{"line":"ls"}}'
+  raw_judge "$sh_" block "command false" '{"command":false}'
+  raw_judge "$sh_" allow "git status" "{\"command\":\"git status\",\"cwd\":\"$P\",\"hook_event_name\":\"beforeShellExecution\"}"
+  raw_judge "$sh_" allow "ls" "{\"command\":\"ls\",\"cwd\":\"$P\"}"
+  raw_judge "$sh_" allow "read the gate ledger" "{\"command\":\"cat $L\",\"cwd\":\"$P\"}"
+done
+
 if [ "$fail" = 0 ]; then printf 'test-state-json-guard: OK (%s cases)\n' "$n"; exit 0; fi
 printf 'test-state-json-guard: FAILED\n' >&2
 exit 1
