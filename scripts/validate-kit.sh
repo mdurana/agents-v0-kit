@@ -320,7 +320,10 @@ grep -Eq '^T2_SUITES=.*scripts/test-hooks\.sh' scripts/tier2.sh || err "scripts/
 for t2_ in $(sed -n 's/^T2_SUITES="\(.*\)"$/\1/p' scripts/tier2.sh); do
   [ -f "$t2_" ] || err "tier 2 suite $t2_ (scripts/tier2.sh T2_SUITES) missing"
 done
-! grep -Eq '^[^#]*sh scripts/test-hooks\.sh' scripts/validate-kit.sh || err "validate-kit.sh must not run scripts/test-hooks.sh (tier 2, scripts/tier2.sh)"
+# Any invocation form: sh/dash/bash scripts/test-hooks.sh, "$KIT"/scripts/test-hooks.sh, ./scripts/test-hooks.sh,
+# . scripts/test-hooks.sh; a [ -f ] existence test, quoted messages and test-hooks-core.sh do not match.
+! grep -Eq '^([^#"]*[;&|(][[:space:]]*|[[:space:]]*|[^#"]*[[:space:]](then|do|else)[[:space:]]+)((sh|dash|bash|\.|source|exec|env|command)[[:space:]]+)?("?\$\{?KIT\}?"?/|\./)?scripts/test-hooks\.sh([[:space:];|&)"]|$)' scripts/validate-kit.sh \
+  || err "validate-kit.sh must not run scripts/test-hooks.sh (tier 2, scripts/tier2.sh)"
 ! grep -Eq '^[^#]*test-hook-policy\.py' scripts/test-hooks.sh || err "scripts/test-hooks.sh must not run test-hook-policy.py (tier 1 runs it, once)"
 sh scripts/test-hooks-core.sh || err "scripts/test-hooks-core.sh failed"
 python3 scripts/test-hook-policy.py || err "scripts/test-hook-policy.py failed"

@@ -12,7 +12,8 @@
 # Group C: the .git/agents-v0/untrusted-root marker (bootstrap-greenfield.sh; protected by hook-policy since
 # ae88c268): write, mv, rm, cp over and truncate are blocked through the Cursor and agy pre-shell.sh entries, an
 # edit of it through both pre-edit.sh entries; a read is allowed.
-# Bash as a second shell is deferred (see the commit of this line).
+# A block must be rc 2 AND the hook's own "BLOCK:" reason (Jiraiya should-fix 2), so a wrapper that only falls
+# back to exit 2 without a verdict cannot pass. Bash as a second shell is deferred (see the commit of this line).
 # Offline, no agent; the commands are judged, never run. Temp folder: this run's own (tier1-harness.sh).
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
@@ -55,7 +56,9 @@ for h in .cursor/hooks/pre-shell.sh .cursor/hooks/pre-edit.sh .agents/hooks/pre-
 done
 [ -d "$P/docs/agents-v0" ] && pass "the install has docs/agents-v0 (the ledger rules apply)" || fail "the install has docs/agents-v0"
 
-# judge <id> <entry> <payload> <want block|ask|allow|allow-json:<text>> <label> [VAR=value ...]
+# judge <id> <entry> <payload> <want block|deny:<text>|ask|allow|allow-json:<text>> <label> [VAR=value ...]
+# block = rc 2 and the hook's "BLOCK:" reason; deny:<text> = rc 2 and that reason text from the hook (the
+# unattended deny of an ask-level command prints "ASK: ..." with a deny decision, not "BLOCK:").
 # Runs the entry once per shell in $J_SHELLS, with that shell in place of /bin/sh.
 judge() {
   j_id="$1"; j_cmd="$2"; j_pay="$3"; j_want="$4"; j_lbl="$5"; shift 5
@@ -66,7 +69,10 @@ judge() {
     set -e
     j_tag="$j_id ${j_sh##*/}: $j_lbl"
     case "$j_want" in
-      block) [ "$j_rc" = 2 ] && pass "$j_tag" || fail "$j_tag: expected block (rc=2), got rc=$j_rc ($j_out)" ;;
+      block) { [ "$j_rc" = 2 ] && printf '%s' "$j_out" | grep -Fq 'BLOCK:'; } \
+             && pass "$j_tag" || fail "$j_tag: expected block (rc=2 and the hook's BLOCK: reason), got rc=$j_rc ($j_out)" ;;
+      deny:*) { [ "$j_rc" = 2 ] && printf '%s' "$j_out" | grep -Fq "${j_want#deny:}"; } \
+             && pass "$j_tag" || fail "$j_tag: expected rc=2 with the hook's reason ${j_want#deny:}, got rc=$j_rc ($j_out)" ;;
       ask) { [ "$j_rc" = 0 ] && printf '%s' "$j_out" | grep -Eq '"(permission|permissionDecision|decision)": "ask"'; } \
              && pass "$j_tag" || fail "$j_tag: expected ask, got rc=$j_rc ($j_out)" ;;
       allow) { [ "$j_rc" = 0 ] && ! printf '%s' "$j_out" | grep -Eq 'BLOCK:|"ask"|"deny"'; } \
@@ -87,7 +93,7 @@ judge A1 "$AGY_SHELL" "$(agy_cmd 'git push origin main --force')" block "agy git
 judge A2 "$AGY_SHELL" "$(agy_cmd 'git commit -m x')" ask "agy git commit"
 judge A3 "$AGY_SHELL" "$(agy_cmd 'echo x > .agents/hooks.json')" block "agy write .agents/hooks.json"
 judge A4 "$AGY_SHELL" "$(agy_cmd 'ls')" allow "agy ls"
-judge A5 "$AGY_SHELL" "$(agy_cmd 'git commit -m x')" block "agy unattended AGY_ALLOW_TOOLS=- denies git commit" AGY_ALLOW_TOOLS=-
+judge A5 "$AGY_SHELL" "$(agy_cmd 'git commit -m x')" 'deny:Unattended mode denied ask-level command (allow=-)' "agy unattended AGY_ALLOW_TOOLS=- denies git commit" AGY_ALLOW_TOOLS=-
 judge A6 "$AGY_SHELL" "$(agy_cmd 'git commit -m x')" 'allow-json:"decision": "allow"' "agy unattended Shell(git:commit*) allows git commit" 'AGY_ALLOW_TOOLS=Shell(git:commit*)'
 judge A7 "$AGY_EDIT" '{"toolCall":{"name":"edit_file","args":{"Path":".agents/hooks.json"}}}' block "agy edit .agents/hooks.json"
 judge A8 "$AGY_EDIT" '{"toolCall":{"name":"write_file","args":{"Path":".agents/skills/v0-build/SKILL.md"}}}' block "agy write .agents/skills"
