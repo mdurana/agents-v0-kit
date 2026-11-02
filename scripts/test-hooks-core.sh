@@ -13,14 +13,19 @@
 # ae88c268): write, mv, rm, cp over and truncate are blocked through the Cursor and agy pre-shell.sh entries, an
 # edit of it through both pre-edit.sh entries; a read is allowed.
 # A block must be rc 2 AND the hook's own "BLOCK:" reason (Jiraiya should-fix 2), so a wrapper that only falls
-# back to exit 2 without a verdict cannot pass. Bash as a second shell is deferred (see the commit of this line).
+# back to exit 2 without a verdict cannot pass.
+# Bash (Jiraiya should-fix 1; /bin/sh is dash on some hosts, so sh and dash can be dash twice): every Cursor-entry
+# case (KIT_HOOK_FLAVOR=cursor) also runs with bash in place of /bin/sh. The agy-entry cases stay sh/dash only:
+# bash for agy waits for the later agy package (the entry's "&& ... || (cd .. && ...)" fallback runs after a block;
+# under bash it exits 127, and with a parent install a block turns into allow; Sensei 09:37: agy out of this fix).
 # Offline, no agent; the commands are judged, never run. Temp folder: this run's own (tier1-harness.sh).
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$KIT/scripts/lib/tier1-harness.sh"
 command -v python3 >/dev/null 2>&1 || { fail "python3 not found"; t1_done test-hooks-core; }
-SH1="$(command -v sh)"; SH2="$(command -v dash 2>/dev/null || command -v sh)"
+SH1="$(command -v sh)"; SH2="$(command -v dash 2>/dev/null || command -v sh)"; SH3="$(command -v bash 2>/dev/null || :)"
+J_BASH_N=0
 
 P="$(t1_repo proj)"
 if t1_install "$P" --with-antigravity; then pass "install.sh --with-antigravity into an empty temp repo"; else fail "install.sh --with-antigravity into an empty temp repo"; t1_done test-hooks-core; fi
@@ -59,10 +64,15 @@ done
 # judge <id> <entry> <payload> <want block|deny:<text>|ask|allow|allow-json:<text>> <label> [VAR=value ...]
 # block = rc 2 and the hook's "BLOCK:" reason; deny:<text> = rc 2 and that reason text from the hook (the
 # unattended deny of an ask-level command prints "ASK: ..." with a deny decision, not "BLOCK:").
-# Runs the entry once per shell in $J_SHELLS, with that shell in place of /bin/sh.
+# Runs the entry once per shell in $J_SHELLS, with that shell in place of /bin/sh; a Cursor entry also with bash.
 judge() {
   j_id="$1"; j_cmd="$2"; j_pay="$3"; j_want="$4"; j_lbl="$5"; shift 5
-  for j_sh in $J_SHELLS; do
+  j_shells="$J_SHELLS"
+  case "$j_cmd" in
+    *KIT_HOOK_FLAVOR=cursor*) [ -z "$SH3" ] || { j_shells="$j_shells $SH3"; J_BASH_N=$((J_BASH_N + 1)); } ;;
+    *) ;;  # agy entry: sh/dash only until the agy package fixes the || (cd .. && ...) fallback
+  esac
+  for j_sh in $j_shells; do
     j_line="$(printf '%s' "$j_cmd" | sed "s#/bin/sh#$j_sh#g")"
     set +e
     j_out="$(cd "$P" && printf '%s' "$j_pay" | env "$@" "$j_sh" -c "$j_line" 2>&1)"; j_rc=$?
@@ -130,5 +140,9 @@ judge C11 "$CUR_EDIT" "{\"tool_input\":{\"file_path\":\"$U\"}}" block "cursor ed
 judge C12 "$AGY_EDIT" "{\"toolCall\":{\"name\":\"write_file\",\"args\":{\"Path\":\"$U\"}}}" block "agy write_file the untrusted-root marker"
 judge C13 "$CUR_SHELL" "$(cur_cmd "cat $U")" allow "control: cursor read the untrusted-root marker"
 judge C14 "$AGY_SHELL" "$(agy_cmd_cwd "cat $U")" allow "control: agy read the untrusted-root marker"
+
+if [ -z "$SH3" ]; then printf 'test-hooks-core: NOTE: bash not found; the Cursor-entry cases ran without bash\n'
+elif [ "$J_BASH_N" -gt 0 ]; then pass "bash ran all $J_BASH_N Cursor-entry cases (the agy-entry cases stay sh/dash only)"
+else fail "bash ran no Cursor-entry case"; fi
 
 t1_done test-hooks-core
