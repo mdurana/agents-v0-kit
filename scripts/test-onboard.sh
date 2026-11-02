@@ -1,7 +1,8 @@
 #!/bin/sh
 # test-onboard.sh — behavior tests for the /v0-onboard scripts on a fixture repo (no network).
 # Covers: discover-codebase.sh, generate-repo-map.sh, collect-dependency-graphs.sh,
-# check-onboarding-docs.sh, sync-feature-state.sh (onboarding). Run by validate-kit.sh. Needs python3.
+# check-onboarding-docs.sh, sync-feature-state.sh (onboarding), and the guard's normal path start -> ready ->
+# approve -> commit (onboard redo, Design: D6). Run by validate-kit.sh. Needs python3.
 set -eu
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -358,6 +359,60 @@ esac
 EOF
 chmod +x "$b/bin/dotnet"
 expect_pass "audit-brownfield-baseline: passes when dotnet test runs real tests" "$b" env PATH="$b/bin:$PATH" sh .agents-v0/scripts/audit-brownfield-baseline.sh
+
+# --- normal path through the guard: start -> ready -> approve -> commit (onboard redo, Design: D6) ---------------
+# Same helpers as test-guard-commit.sh: a kit test copy (install.sh --test-overrides) so AGENTS_V0_APPROVALS_DIR sends
+# Sensei's approval record to a temp folder, and his approve words typed on a pseudo-terminal. Normal path only.
+onboard_normal_path() (
+  for v in $(env | sed -n 's/^\(GIT_[A-Za-z_]*\)=.*/\1/p'); do unset "$v"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+  export AGENTS_V0_APPROVALS_DIR="$tmp/np-approvals"
+  p="$tmp/np"; G="$p/.agents-v0/scripts"
+  mkdir -p "$p" && git -C "$p" init -q -b main && printf 'x\n' > "$p/README.md" && git -C "$p" add README.md && git -C "$p" commit -q -m init \
+    || { echo "setup: fixture repo"; exit 1; }
+  KIT_VALIDATING=1 sh "$KIT/scripts/install.sh" --test-overrides "$p" >"$tmp/np-install.log" 2>&1 || { echo "setup: install --test-overrides"; tail -20 "$tmp/np-install.log"; exit 1; }
+  git -C "$p" add -A && git -C "$p" commit -q -m "install agents-v0" || { echo "setup: commit the install"; exit 1; }
+  (cd "$p" && sh "$G/guard-onboard.sh" start) || { echo "start failed"; exit 1; }
+  head="$(git -C "$p" rev-parse HEAD)"
+  printf '# Onboarding report\n\ncommit: %s\n\nThe app entry point is `README.md:1`.\n' "$head" > "$p/docs/agents-v0/onboarding/report.md"
+  for d in architecture.md network.md; do
+    [ ! -f "$p/docs/agents-v0/$d" ] || printf '# %s\n\nOne module, no network calls (`README.md:1`).\n' "$d" > "$p/docs/agents-v0/$d"
+  done
+  (cd "$p" && sh "$G/guard-onboard.sh" ready) || { echo "ready failed"; exit 1; }
+  python3 - "$p" "$G/guard-common.sh" "Approved, the onboarding docs are right - Sensei" <<'PY2' || { echo "approve failed"; exit 1; }
+import os, pty, sys, time
+proj, script, words = sys.argv[1:4]
+pid, fd = pty.fork()
+if pid == 0:
+    os.chdir(proj)
+    os.execvp("sh", ["sh", script, "approve", "onboard"])
+buf, sent, end = b"", False, time.time() + 60
+while time.time() < end:
+    try:
+        chunk = os.read(fd, 4096)
+    except OSError:
+        break
+    if not chunk:
+        break
+    buf += chunk
+    if not sent and b"Type your approval words" in buf:
+        os.write(fd, words.encode() + b"\r")
+        sent = True
+_, status = os.waitpid(pid, 0)
+sys.stdout.write(buf.decode(errors="replace"))
+sys.exit(os.waitstatus_to_exitcode(status))
+PY2
+  (cd "$p" && sh "$G/guard-onboard.sh" commit) || { echo "commit failed"; exit 1; }
+  [ "$(git -C "$p" rev-parse HEAD~1)" = "$head" ] || { echo "not exactly one new commit"; exit 1; }
+  [ "$(git -C "$p" rev-parse onboard-v1^{commit})" = "$(git -C "$p" rev-parse HEAD)" ] && [ "$(git -C "$p" cat-file -t onboard-v1)" = tag ] \
+    || { echo "no annotated onboard-v1 tag on the commit"; exit 1; }
+  [ -z "$(git -C "$p" status --porcelain --untracked-files=all | grep -v '\.lock$')" ] || { echo "tree not clean after commit"; git -C "$p" status --porcelain; exit 1; }
+)
+if np_out="$(onboard_normal_path 2>&1)"; then
+  pass "onboard normal path: start, ready, approve, commit make one commit tagged onboard-v1, tree clean"
+else
+  fail "onboard normal path: start, ready, approve, commit"; printf '%s\n' "$np_out" | tail -20 | sed 's/^/    /' >&2
+fi
 
 if [ "$status" -ne 0 ]; then
   echo "test-onboard: FAILED" >&2

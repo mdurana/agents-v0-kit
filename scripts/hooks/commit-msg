@@ -1,0 +1,23 @@
+#!/bin/sh
+# commit-msg hook for kit development on the onboard redo line (onboard redo, Design: D6;
+# kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md, "Each commit names exactly one line").
+# The design calls this "the Design: line check in pre-commit": git gives a pre-commit hook no message, so the check
+# runs at the commit-msg stage. On a branch named onboard-redo-*, the message must carry exactly one line starting
+# with `Design:`, and that line is `Design: D<n>` or `Design: DA`. Other branches pass untouched.
+# This hook is for the kit repository itself; install.sh never copies it into a project.
+# Activate (kit developers, by hand):  git config core.hooksPath scripts/hooks
+# Tier 1 (scripts/validate-kit.sh) runs the same check on the commits 36b86cfe..HEAD.
+# Run by hand: sh scripts/hooks/commit-msg <message-file>
+set -eu
+msg="${1:?usage: commit-msg <message-file>}"
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+case "$branch" in
+  onboard-redo-*) ;;
+  *) exit 0 ;;
+esac
+all="$(grep -c '^Design:' "$msg" || true)"
+good="$(grep -Ec '^Design: (D[0-9]+|DA)$' "$msg" || true)"
+if [ "$all" != 1 ] || [ "$good" != 1 ]; then
+  printf 'commit-msg: a commit on %s needs exactly one line `Design: D<n>` (or `Design: DA`); found %s Design: line(s), %s well-formed.\n' "$branch" "$all" "$good" >&2
+  exit 1
+fi

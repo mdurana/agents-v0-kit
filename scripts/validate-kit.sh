@@ -314,6 +314,31 @@ sh scripts/test-hooks.sh || err "scripts/test-hooks.sh failed"
 sh scripts/test-ci-checks.sh || err "scripts/test-ci-checks.sh failed"
 [ -f scripts/test-onboard.sh ] || err "scripts/test-onboard.sh missing"
 sh scripts/test-onboard.sh || err "scripts/test-onboard.sh failed"
+# Onboard redo, Design: D6. Drift check A: the /v0-onboard step block matches `guard-onboard.sh steps` byte for byte.
+sh scripts/generate-onboard-steps.sh --check >/dev/null || err "core/common/commands/v0-onboard.md step block drifted from guard-onboard.sh steps (run sh scripts/generate-onboard-steps.sh)"
+[ -f scripts/test-onboard-steps.sh ] || err "scripts/test-onboard-steps.sh missing"
+sh scripts/test-onboard-steps.sh >/dev/null || err "scripts/test-onboard-steps.sh failed"
+# Drift check B: the /v0-onboard prose names no internal script; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh audit-brownfield-baseline.sh check-onboarding-docs.sh check-gate-commit.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-onboard.md; then
+    err "core/common/commands/v0-onboard.md names the internal '$internal' (the guard runs it; keep the prose to guard-onboard.sh steps)"
+  fi
+done
+# Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
+# Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
+[ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"
+redo_base=36b86cfe
+if git rev-parse --git-dir >/dev/null 2>&1 && git cat-file -e "$redo_base^{commit}" 2>/dev/null \
+  && git merge-base --is-ancestor "$redo_base" HEAD 2>/dev/null; then
+  for c in $(git rev-list --no-merges "$redo_base..HEAD"); do
+    dl_all="$(git log -1 --format=%B "$c" | grep -c '^Design:' || true)"
+    dl_good="$(git log -1 --format=%B "$c" | grep -Ec '^Design: (D[0-9]+|DA)$' || true)"
+    [ "$dl_all" = 1 ] && [ "$dl_good" = 1 ] || err "commit $(git rev-parse --short "$c") needs exactly one line 'Design: D<n>' (or DA); found $dl_all, $dl_good well-formed"
+  done
+else
+  printf 'SKIP: Design: line check (redo base %s is not in this history)\n' "$redo_base"
+fi
 [ -f scripts/test-maintain.sh ] || err "scripts/test-maintain.sh missing"
 [ -f scripts/test-clock.sh ] || err "scripts/test-clock.sh missing (kitfix-20261031-single-clock)"
 sh scripts/test-clock.sh || err "scripts/test-clock.sh failed"
