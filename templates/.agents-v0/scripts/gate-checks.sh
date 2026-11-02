@@ -33,6 +33,9 @@ RULE_KEYS="onboard_gate_docs prereq_approved_phases onboard_commit_paths docs_ch
 # and reopen"). Nothing in the kit writes the grant; only the person does, in their own terminal.
 LEDGER_REL="agents-v0/gate-ledger"
 GRANT_REL="agents-v0/reopen-grant"
+# bootstrap-greenfield.sh writes this marker (rootCommit=, reason=, markedAt= lines) beside the ledger when a root
+# commit exists but failed a check; greenfield_record_ok refuses while it exists (round 18).
+UNTRUSTED_REL="agents-v0/untrusted-root"
 # Every gate commit carries this trailer (N3A): Agents-V0-Ledger: lines=<n> sha256=<hash of the first n lines>.
 LEDGER_TRAILER="Agents-V0-Ledger"
 
@@ -723,10 +726,23 @@ gate_committed() {
 # prerequisite here. Brownfield signal (any one): the onboarding state, the onboarding report, or the baseline-audit
 # record (discovery/baseline-audit.txt, JO-15a). With none of them the repo is treated as not brownfield and the
 # check passes.
+# Greenfield record (round 18): gf_gate runs greenfield_record_ok first; REFUSED stops here, OK and NONE go on.
 # TODO(gap 9 / N2A, 5A): the content-rule fallback (a brownfield repo where onboard was skipped and no record was
-#   written) is not built, and prereq_approved does not call greenfield_record_ok yet (built in round 15); until
-#   then a repo with no record passes.
+#   written) is not built; until then a repo with no record passes.
 PA_AUDIT="docs/agents-v0/discovery/baseline-audit.txt"
+# gf_gate <check> <what stops>: run greenfield_record_ok (round 18). OK (0, a valid greenfield record) and NONE
+# (4, no record: the content rule decides) return and the caller goes on as before; REFUSED (1: a changed record,
+# the untrusted-root marker, or the ledger) refuses as <check>; anything else is an error (exit 2). The ledger
+# check runs first as <check>, so a changed ledger reads as before ("REFUSED <check>: ledger changed, ...").
+gf_gate() {
+  ledger_guard "$1"
+  gg_rc=0; gg_out="$(greenfield_record_ok 2>&1)" || gg_rc=$?
+  case "$gg_rc" in
+    0|4) return 0 ;;
+    1) refuse "$1" "$2: the greenfield record check refused (gate-checks.sh greenfield_record_ok: ${gg_out#REFUSED greenfield_record_ok: }). Stop and show the user this output" ;;
+    *) die "$1: the greenfield record check could not run: ${gg_out:-no output}" ;;
+  esac
+}
 prereq_approved() {
   need_phase prereq_approved "${1:-}"
   pa_phases="$(rule prereq_approved_phases)" || exit 2
@@ -736,6 +752,7 @@ prereq_approved() {
   esac
   to_root
   pa_need="$1 needs onboard approved and committed first"
+  gf_gate prereq_approved "$1 cannot start"
   if [ ! -e "$ONB_STATE" ] && [ ! -e "$ONB_REPORT" ] && [ ! -e "$PA_AUDIT" ]; then
     ok prereq_approved "no brownfield record ($ONB_STATE, $ONB_REPORT, $PA_AUDIT), so $1 needs no onboard approval (brownfield only)"
   fi
@@ -770,6 +787,7 @@ prereq_approved() {
 no_restart_without_reopen() {
   to_root
   ledger_guard no_restart_without_reopen
+  gf_gate no_restart_without_reopen "onboard changes no state"
   nr_rule="no state change on an onboard report awaiting review or approved without a granted --reopen onboard"
   if [ ! -f "$ONB_STATE" ]; then
     nr_trace=""
@@ -968,12 +986,20 @@ reopen_grant_ok() {
 # "kitSha": "<7-40 hex>[-dirty]" or "unknown"} (no hash field: the commit that holds it is the proof).
 #   OK       exit 0  a valid record: greenfield, onboard stops and suggests /v0-intake
 #   NONE     exit 4  no record anywhere, or two or more root commits (E31): the content rule decides
-#   REFUSED  exit 1  any other record: "record changed, ask the user"
+#   REFUSED  exit 1  any other record: "record changed, ask the user"; or the untrusted-root marker exists
+#                    (<git common dir>/agents-v0/untrusted-root, written by bootstrap-greenfield.sh)
+# Root commits are counted over every ref (git rev-list --all), so an orphan branch's root is a second root.
+# prereq_approved and no_restart_without_reopen (every onboard state change) call it through gf_gate.
 # The ledger check runs first (ledger_guard), so the root commit's trailer must be lines=0 and the empty hash.
 GF_RECORD=".agents-v0/greenfield-record.json"
 greenfield_record_ok() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || none greenfield_record_ok "not a git work tree, so there is no greenfield record"
   to_root
+  gf_mark="$(git_common_dir)/$UNTRUSTED_REL"
+  if [ -e "$gf_mark" ] || [ -L "$gf_mark" ]; then
+    gf_mroot="$(sed -n 's/^rootCommit=//p' "$gf_mark" 2>/dev/null | head -n 1 | grep -E '^[0-9a-f]{7,64}$' || :)"
+    refuse greenfield_record_ok "the untrusted-root marker $gf_mark exists: bootstrap-greenfield.sh marked ${gf_mroot:+the root commit $gf_mroot of }this repo as not trusted, so the root commit is not trusted and no greenfield record counts here. Stop and show the user: do not onboard or push this repo. Follow bootstrap's recovery steps: move this repo aside, create a new empty repo (git init), then rerun bootstrap"
+  fi
   ledger_guard greenfield_record_ok
   gf_rc=0; gf_out="$(python3 - "$GF_RECORD" <<'PYGF'
 import datetime, json, os, re, subprocess, sys
@@ -999,12 +1025,14 @@ if not adds:
     if git("ls-files", "--error-unmatch", "--", rec).returncode == 0:
         changed("is staged but not committed")
     done(4, "no greenfield record (%s): the content rule decides" % rec)
-r = git("rev-list", "--max-parents=0", "HEAD")
+# every root commit in the repo, not only HEAD's (round 18, Iruka T3): an orphan branch in a repo that already
+# has commits makes a second root, and a record there must not read as greenfield
+r = git("rev-list", "--max-parents=0", "--all", "HEAD")
 roots = r.stdout.decode().split()
 if r.returncode != 0 or not roots:
     done(1, "git could not list the root commits")
 if len(roots) != 1:
-    done(4, "HEAD has %d root commits (unrelated history was merged, E31), so the greenfield record is not valid: the content rule decides" % len(roots))
+    done(4, "the repo has %d root commits (git rev-list --all: unrelated history was merged or another branch has its own root, E31), so the greenfield record is not valid: the content rule decides" % len(roots))
 root = roots[0]
 if adds[-1] != root:
     changed("was added by commit %s, not by the root commit %s" % (adds[-1][:12], root[:12]))
@@ -1036,7 +1064,7 @@ if not isinstance(d, dict) or sorted(d) != ["bootstrapAt", "kind", "kitSha"]:
     changed("must hold exactly the keys kind, bootstrapAt and kitSha")
 if d["kind"] != "greenfield":
     changed("kind is not \"greenfield\"")
-ok_at = isinstance(d["bootstrapAt"], str) and re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$", d["bootstrapAt"])
+ok_at = isinstance(d["bootstrapAt"], str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}", d["bootstrapAt"])
 if ok_at:
     try:
         datetime.datetime.fromisoformat(d["bootstrapAt"])
@@ -1044,7 +1072,7 @@ if ok_at:
         ok_at = None
 if not ok_at:
     changed("bootstrapAt is not a time like 2026-11-02T08:00:00+08:00")
-if not (isinstance(d["kitSha"], str) and re.match(r"^(unknown|[0-9a-f]{7,40}(-dirty)?)$", d["kitSha"])):
+if not (isinstance(d["kitSha"], str) and re.fullmatch(r"unknown|[0-9a-f]{7,40}(-dirty)?", d["kitSha"])):
     changed("kitSha is not a kit commit (7-40 hex, optional -dirty) or unknown")
 done(0, "greenfield: %s was added by the only root commit %s and is unchanged (bootstrapAt %s, kit %s); onboard stops, writes nothing and suggests /v0-intake" % (rec, root[:12], d["bootstrapAt"], d["kitSha"]))
 PYGF
@@ -1058,10 +1086,12 @@ PYGF
 }
 # greenfield_trailer (for bootstrap-greenfield.sh, N9A): before the greenfield root commit, create the empty ledger
 # and print the trailer that commit's message must end with: Agents-V0-Ledger: lines=0 sha256=<empty hash>. Refuses
-# (exit 1) unless HEAD is unborn, no onboard-v<n> tag exists and the ledger is absent or empty.
+# (exit 1) unless HEAD is unborn, no ref holds a commit, no onboard-v<n> tag exists and the ledger is absent or empty.
 greenfield_trailer() {
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse greenfield_trailer "not a git work tree"
   git rev-parse -q --verify 'HEAD^{commit}' >/dev/null 2>&1 && refuse greenfield_trailer "HEAD already has a commit; the greenfield record belongs in the root commit only"
+  # round 18 (Iruka T3): an orphan branch has an unborn HEAD too; any commit on any ref means this is not a new repo
+  [ -z "$(git rev-list -n 1 --all 2>/dev/null)" ] || refuse greenfield_trailer "the repo already has commits (git rev-list --all), for example on another branch; the greenfield root commit belongs in a new, empty repo only"
   [ -z "$(git tag -l 'onboard-v*')" ] || refuse greenfield_trailer "an onboard-v<n> tag exists; this is not a new repo"
   gt_l="$(ledger_path)" || exit 2
   if [ -e "$gt_l" ] || [ -L "$gt_l" ]; then

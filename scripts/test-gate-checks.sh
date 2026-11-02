@@ -7,8 +7,9 @@
 # helper cases, DG-n cases for `check-onboarding-docs.sh --gate` (JO-3/JO-4), PA-n (JO-9 prereq_approved) and
 # NR-n (JO-10 no_restart_without_reopen: N8 N19 N28 N29 N30 E9), SS-n (JO-8 follow-up: staged path names,
 # Iruka probe 8), LT-n and N80-N84 (N3A ledger integrity: the Agents-V0-Ledger trailer, ledger_ok, ledger_mark,
-# ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal) and LZ-n (round 18:
-# onboard-v<n> tags with a leading zero).
+# ledger_turn_ok), FC-n (round 17: the fresh-clone hint on the missing-ledger refusal) LZ-n (round 18:
+# onboard-v<n> tags with a leading zero) and GW-n (round 18: greenfield_record_ok wired into prereq_approved and
+# onboard; orphan roots, whole-value fields, the untrusted-root marker).
 # Kit-only file: it is not installed into projects.
 # shellcheck disable=SC2016 # backticks in the fixture docs are literal Markdown citations
 set -eu
@@ -805,7 +806,7 @@ expect_rc "GF-7 no record: NONE, the content rule decides" 4 "$gb" sh "$GC" gree
 out_has "GF-7 says why" "NONE greenfield_record_ok: no greenfield record"
 G "$gq" checkout -q -b gf-merged; G "$gq" fetch -q "$gb" main; G "$gq" merge -q --no-edit -X ours --allow-unrelated-histories FETCH_HEAD
 expect_rc "GF-8 two root commits (E31): NONE" 4 "$gq" sh "$GC" greenfield_record_ok
-out_has "GF-8 names the roots" "HEAD has 2 root commits"
+out_has "GF-8 names the roots" "the repo has 2 root commits"
 G "$gq" checkout -q main
 printf '%s\n' "$GFJ" > "$gb/$GFR"
 expect_rc "GF-9 an untracked copy is refused" 1 "$gb" sh "$GC" greenfield_record_ok
@@ -903,6 +904,88 @@ mv "$GFC_LED" "$T1_TMP/fc-gf-ledger.moved"
 expect_fail "FC-7 with the tag, the missing ledger is refused" "$gfc" sh "$GC" ledger_ok
 out_has "FC-7 with the tag, the hint says copy from the original checkout" "copies gate-ledger and, when it exists, reopen-grant from the original checkout"
 lacks "FC-7 with the tag, no create-empty hint" "$T1_TMP/out.txt" "creates the empty ledger"
+# GW-n (round 18, Kakashi; Iruka T3 and J7): greenfield_record_ok is wired into prereq_approved and into every
+# onboard state change (no_restart_without_reopen, which sync-feature-state.sh runs). OK and NONE go on as before;
+# REFUSED stops. Also: an orphan branch in a repo with commits no longer yields a trusted greenfield root, field
+# checks match the whole value (no trailing newline), and bootstrap's untrusted-root marker refuses.
+gw_mark_line() { printf 'rootCommit=%s\nreason=%s\nmarkedAt=%s\n' "$1" "post-commit check failed: the commit hooks changed the tree" "2026-11-02T08:38:00+08:00"; }
+# GW-1 OK: a valid record; prereq_approved and the onboard state change go on (no brownfield record: a new run)
+gf_root gw-ok "$gf_tr" "$GFJ"; gw="$T1_TMP/gw-ok"
+expect_rc "GW-1 setup: the record is valid (OK)" 0 "$gw" sh "$GC" greenfield_record_ok
+expect_pass "GW-1 prereq_approved goes on when the record is OK" "$gw" sh "$GC" prereq_approved intake
+out_has "GW-1 prereq_approved as before" "OK prereq_approved: no brownfield record"
+expect_pass "GW-1 no_restart_without_reopen goes on when the record is OK" "$gw" sh "$GC" no_restart_without_reopen
+out_has "GW-1 no_restart_without_reopen as before" "(no onboarding state and no earlier run: a new run)"
+mkdir -p "$gw/$(dirname "$REP")"; cp "$p2/$REP" "$gw/$REP"
+expect_pass "GW-1 the onboard state change (sync --status in_progress) goes on when the record is OK" "$gw" sh "$SFS" "$REP" --active-phase onboard --status in_progress
+if [ -f "$gw/$ST" ]; then pass "GW-1 the onboarding state was written"; else fail "GW-1 the onboarding state was written"; fi
+# GW-2 REFUSED: a record added after the root commit (gb, GF-9); both refuse and name the record check
+expect_rc "GW-2 setup: the record is REFUSED" 1 "$gb" sh "$GC" greenfield_record_ok
+expect_rc "GW-2 prereq_approved refuses when the record is REFUSED" 1 "$gb" sh "$GC" prereq_approved intake
+out_has "GW-2 prereq_approved names the record check" "REFUSED prereq_approved: intake cannot start: the greenfield record check refused (gate-checks.sh greenfield_record_ok: record changed, ask the user ($GFR was added by commit"
+out_has "GW-2 prereq_approved says stop" "Stop and show the user this output"
+expect_rc "GW-2 no_restart_without_reopen refuses when the record is REFUSED" 1 "$gb" sh "$GC" no_restart_without_reopen
+out_has "GW-2 no_restart_without_reopen names the record check" "REFUSED no_restart_without_reopen: onboard changes no state: the greenfield record check refused (gate-checks.sh greenfield_record_ok: record changed, ask the user"
+mkdir -p "$gb/$(dirname "$REP")"; cp "$p2/$REP" "$gb/$REP"
+expect_fail "GW-2 the onboard state change (sync --status in_progress) is refused" "$gb" sh "$SFS" "$REP" --active-phase onboard --status in_progress
+out_has "GW-2 the state change names the record check" "onboard changes no state: the greenfield record check refused"
+if [ -e "$gb/$ST" ]; then fail "GW-2 no onboarding state was written"; else pass "GW-2 no onboarding state was written"; fi
+printf ' \n' >> "$gw/$GFR"
+expect_rc "GW-2 an edited work-tree record: prereq_approved refuses" 1 "$gw" sh "$GC" prereq_approved intake
+out_has "GW-2 names the work-tree copy" "$GFR in the work tree differs"
+G "$gw" checkout -q -- "$GFR"
+# GW-3 NONE: no record; both behave exactly as before
+gn="$(t1_repo gw-none --commit)"; t1_install "$gn" || fail "install.sh into gw-none"
+G "$gn" add -A >/dev/null; G "$gn" commit -qm installed
+expect_rc "GW-3 setup: no record (NONE)" 4 "$gn" sh "$GC" greenfield_record_ok
+expect_pass "GW-3 prereq_approved is unchanged when there is no record" "$gn" sh "$GC" prereq_approved intake
+out_has "GW-3 prereq_approved as before" "OK prereq_approved: no brownfield record"
+expect_pass "GW-3 no_restart_without_reopen is unchanged when there is no record" "$gn" sh "$GC" no_restart_without_reopen
+out_has "GW-3 no_restart_without_reopen as before" "(no onboarding state and no earlier run: a new run)"
+# GW-4 (Iruka T3): an orphan branch in a repo that already has commits
+G "$gn" checkout -q --orphan gw-orphan
+expect_rc "GW-4 greenfield_trailer refuses an orphan branch in a repo with commits" 1 "$gn" sh "$GC" greenfield_trailer
+out_has "GW-4 says the repo already has commits" "REFUSED greenfield_trailer: the repo already has commits (git rev-list --all)"
+mkdir -p "$(fc_dir "$gn")"; [ -e "$(fc_dir "$gn")/gate-ledger" ] || : > "$(fc_dir "$gn")/gate-ledger"
+printf '%s\n' "$GFJ" > "$gn/$GFR"; G "$gn" add -A >/dev/null; G "$gn" commit -qm "bootstrap
+
+$gf_tr"
+expect_rc "GW-4 a root on an orphan branch holding the whole tree and the record is not greenfield (NONE)" 4 "$gn" sh "$GC" greenfield_record_ok
+out_has "GW-4 counts every root of the repo" "NONE greenfield_record_ok: the repo has 2 root commits (git rev-list --all"
+lacks "GW-4 never OK" "$T1_TMP/out.txt" "OK greenfield_record_ok"
+G "$gn" checkout -q main
+# GW-5 (Iruka J7): a field with a trailing newline is refused (the whole value must match)
+gf_root gw-j7 "$gf_tr" '{"kind": "greenfield", "bootstrapAt": "2026-11-02T08:00:00+08:00", "kitSha": "abcdef1\n"}'
+expect_rc "GW-5 kitSha 'abcdef1\\n' is refused" 1 "$T1_TMP/gw-j7" sh "$GC" greenfield_record_ok
+out_has "GW-5 names kitSha" "kitSha is not a kit commit (7-40 hex, optional -dirty) or unknown"
+gf_root gw-j7b "$gf_tr" '{"kind": "greenfield", "bootstrapAt": "2026-11-02T08:00:00+08:00\n", "kitSha": "unknown"}'
+expect_rc "GW-5 bootstrapAt with a trailing newline is refused" 1 "$T1_TMP/gw-j7b" sh "$GC" greenfield_record_ok
+out_has "GW-5 names bootstrapAt" "bootstrapAt is not a time like"
+gf_root gw-j7c "$gf_tr" '{"kind": "greenfield", "bootstrapAt": "2026-11-02T08:00:00+08:00", "kitSha": "abcdef1-dirty"}'
+expect_rc "GW-5 kitSha abcdef1-dirty still passes" 0 "$T1_TMP/gw-j7c" sh "$GC" greenfield_record_ok
+# GW-6: bootstrap's untrusted-root marker (Yamato's format: rootCommit=, reason=, markedAt=) refuses
+gm="$(fc_dir "$gw")/untrusted-root"; gw_root="$(git -C "$gw" rev-parse HEAD)"
+gw_mark_line "$gw_root" > "$gm"
+expect_rc "GW-6 the untrusted-root marker refuses a valid record" 1 "$gw" sh "$GC" greenfield_record_ok
+out_has "GW-6 names the marker path" "REFUSED greenfield_record_ok: the untrusted-root marker $gm exists"
+out_has "GW-6 names the marked root commit" "marked the root commit $gw_root of this repo as not trusted"
+out_has "GW-6 says the root commit is not trusted" "so the root commit is not trusted"
+out_has "GW-6 gives bootstrap's recovery steps" "move this repo aside, create a new empty repo (git init), then rerun bootstrap"
+expect_rc "GW-6 prereq_approved refuses while the marker exists" 1 "$gw" sh "$GC" prereq_approved intake
+out_has "GW-6 prereq_approved names the marker" "intake cannot start: the greenfield record check refused (gate-checks.sh greenfield_record_ok: the untrusted-root marker $gm exists"
+expect_rc "GW-6 no_restart_without_reopen refuses while the marker exists" 1 "$gw" sh "$GC" no_restart_without_reopen
+out_has "GW-6 no_restart_without_reopen names the marker" "the untrusted-root marker $gm exists"
+G "$gw" worktree add -q "$T1_TMP/gw-wt" -b gw-wt
+expect_rc "GW-6 a linked worktree reads the marker from the git common dir" 1 "$T1_TMP/gw-wt" sh "$GC" greenfield_record_ok
+out_has "GW-6 the worktree names the same marker" "the untrusted-root marker $gm exists"
+printf 'rootCommit=not-a-sha\nreason=x\n' > "$gm"
+expect_rc "GW-6 a marker naming no commit still refuses" 1 "$gw" sh "$GC" greenfield_record_ok
+lacks "GW-6 a malformed rootCommit is not echoed" "$T1_TMP/out.txt" "not-a-sha"
+gw_mark_line "$(git -C "$gn" rev-parse HEAD)" > "$(fc_dir "$gn")/untrusted-root"
+expect_rc "GW-6 the marker refuses in a repo with no record too" 1 "$gn" sh "$GC" greenfield_record_ok
+mv "$(fc_dir "$gn")/untrusted-root" "$T1_TMP/gw-none-marker.moved"
+mv "$gm" "$T1_TMP/gw-marker.moved"
+expect_rc "GW-6 with the marker moved away, the record is OK again" 0 "$gw" sh "$GC" greenfield_record_ok
 # LZ-n (round 18, Iruka review of 6255b114): an onboard-v<n> tag with a leading zero. git and python read
 # onboard-v011 as 11, but the shell's $(( )) reads 011 as octal 9 and stops on 08, so commit_chain printed the
 # wrong next tag (onboard-v10) or died. Every check now refuses such a tag and names it; onboard-v10 still works.

@@ -98,6 +98,7 @@ base="$(git -C "$r" rev-parse --short HEAD)"
 # ------------------------------------------------------------------------------- PR: prose parse (N22)
 ONB="$T1_TMP/steps-onboard.txt"; SKL="$T1_TMP/steps-skill.txt"; DOC="$T1_TMP/steps-documenter.txt"
 cat > "$ONB" <<'EOS'
+sh .agents-v0/scripts/gate-checks.sh greenfield_record_ok
 sh .agents-v0/scripts/sync-feature-state.sh --active-phase onboard --status in_progress docs/agents-v0/onboarding/report.md
 sh .agents-v0/scripts/audit-brownfield-baseline.sh
 sh .agents-v0/scripts/generate-repo-map.sh
@@ -195,13 +196,15 @@ done
 is_eq "TP-7 E21 --update leaves the edited adr template unchanged" "$(cat "$u/docs/agents-v0/adr/_template.md")" "# ADR template (edited by the team)"
 
 # --------------------------------------------------------------------------- FL: the flow, steps 1-7
+# Greenfield record (round 18): the first prose step exits 4 (NONE) in a brownfield repo, so the flow goes on
+is_eq "FL-0g the greenfield record step exits 4 (NONE) in a brownfield repo" "$(rc "$r" sh .agents-v0/scripts/gate-checks.sh greenfield_record_ok)" 4
 # Resume/step 1: report from the installed template, phase in_progress
 cp "$r/docs/agents-v0/onboarding/_report.template.md" "$r/$REP"
 expect_pass "FL-1 sync --status in_progress" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
 is_eq "FL-1 state is in_progress" "$(state_val "$r" activeStatus)" "in_progress"
 expect_pass "FL-10 E9 resume while in_progress is allowed without --reopen" "$r" sh "$SFS" --active-phase onboard --status in_progress "$REP"
 # Step 2: the discovery commands exactly as the prose gives them
-sed -n '2,6p' "$ONB" > "$T1_TMP/step2.txt"
+sed -n '3,7p' "$ONB" > "$T1_TMP/step2.txt"
 while IFS= read -r c; do
   set -f
   # shellcheck disable=SC2086 # split the step into words on purpose (no globbing: set -f)
