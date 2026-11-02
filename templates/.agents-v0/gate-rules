@@ -4,7 +4,7 @@
 #
 # Format: one rule per line, `<command> <key> <value>`; the value is the rest of the line.
 # Lines starting with # and blank lines are ignored. A key appears once per command.
-# Paths are relative to the repository root. Only the onboard entry is filled for now (D2, D3).
+# Paths are relative to the repository root. Only the onboard entry is filled for now (D2, D3, D4).
 
 # --- onboard (/v0-onboard, guard-onboard.sh) -----------------------------------------------------
 onboard phase onboard
@@ -25,5 +25,12 @@ onboard ready.requires in-progress
 onboard ready.baseline docs/agents-v0/discovery/baseline-audit.txt
 onboard ready.status awaiting_approval
 onboard ready.next Sensei reviews the onboarding docs and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard
-# shown when onboard is already approved (start refuses)
+# commit (Design: D4): main session only, after Sensei's approve. Needs onboard approved in the state AND his approval
+# record (gc_approval_ok). Stages these paths (those that exist or are tracked; *.lock never), refuses when the index
+# already holds another path, secret-scans the staged content, commits once and tags <commit.tag><n>. The pack paths
+# are the folders activate-stack-pack.sh writes (.cursor/rules/org, .cursor/skills).
+onboard commit.paths docs/agents-v0 README.md .cursor/rules/org .cursor/skills
+onboard commit.message onboarding: onboard approved
+onboard commit.tag onboard-v
+# shown when onboard is already approved (start refuses) and after commit
 onboard approved.next /v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain

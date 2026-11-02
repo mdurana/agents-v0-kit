@@ -2,7 +2,7 @@
 # guard-onboard.sh: the steps of /v0-onboard and onboard's own rules (onboard redo, Design: D2;
 # kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md, "The split"). Paths and prerequisites come from
 # .agents-v0/gate-rules (the `onboard` entry); every state write goes through guard-common.sh (gc_state_set),
-# never from this file. D2 builds `start` and `block`, D3 builds `ready`; `commit` and `reopen` come with D4 and later.
+# never from this file. D2 builds `start` and `block`, D3 `ready`, D4 `commit`; `reopen` comes later.
 #
 # Run (main session, from anywhere in the repository):
 #   sh .agents-v0/scripts/guard-onboard.sh start
@@ -15,6 +15,10 @@
 #        (Design: D3; main session only, after discovery) runs the baseline audit with --record, which writes
 #        docs/agents-v0/discovery/baseline-audit.txt (a red baseline is recorded, not refused), runs the
 #        onboarding docs check, then sets the onboard state to awaiting_approval for Sensei's approve step.
+#   sh .agents-v0/scripts/guard-onboard.sh commit
+#        (Design: D4; main session only, after Sensei ran approve in his own terminal) needs onboard approved in
+#        the state AND his approval record, then makes the one gate commit of the onboard paths (secret-scanned)
+#        and tags it onboard-v<n> (guard-common.sh gc_commit_tag).
 #
 # Output: `OK <step>: ...` then `Next: ...` (exit 0), or `REFUSED <step>: <reason>` (exit 1); usage errors exit 2.
 set -eu
@@ -126,8 +130,26 @@ go_ready() {
   printf 'Next: %s\n' "$go_next"
 }
 
+go_commit() {
+  [ $# -eq 0 ] || go_usage
+  go_load commit
+  # Both checks: the state says approved AND Sensei's record matches (approve writes the record before the state).
+  case " $(gc_state_get "$go_state" approvedPhases | tr -d '[]",') " in
+    *" $go_phase "*) ;;
+    *) gc_refuse commit "onboarding is not approved in $go_state; Sensei runs approve in his own terminal first" ;;
+  esac
+  go_ok_out="$(gc_approval_ok onboard)" || {
+    printf '%s\n' "$go_ok_out"
+    gc_refuse commit "no approval record from Sensei matches this onboarding; Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$go_ok_out"
+  gc_commit_tag onboard
+  go_rule commit approved.next
+  printf 'Next: %s\n' "$go_val"
+}
+
 go_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"] | ready\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"] | ready | commit\n' >&2
   exit 2
 }
 
@@ -137,6 +159,7 @@ case "$go_cmd" in
   start) go_start "$@" ;;
   block) go_block "$@" ;;
   ready) go_ready "$@" ;;
-  -h|--help) sed -n '2,20p' "$GO_HERE/guard-onboard.sh" ;;
+  commit) go_commit "$@" ;;
+  -h|--help) sed -n '2,24p' "$GO_HERE/guard-onboard.sh" ;;
   *) go_usage ;;
 esac

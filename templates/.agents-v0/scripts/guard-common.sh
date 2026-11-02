@@ -2,8 +2,8 @@
 # guard-common.sh: the shared guard of the onboard redo (design: kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md,
 # "The split"). It is meant to be the only writer of workflow state (state file, approval record, secret scan, commit and
 # tag, branch checks). D1 built the base and the secret scan; D2 adds the gate-rules reader and the state writer
-# (gc_rule, gc_state_get, gc_state_set). DA adds the approval record (approve, gc_approval_ok). The commit and tag
-# come with D4.
+# (gc_rule, gc_state_get, gc_state_set). DA adds the approval record (approve, gc_approval_ok). D4 adds the commit
+# and tag (gc_commit_tag, called by the guard scripts after their own approval checks).
 #
 # Run:
 #   sh .agents-v0/scripts/guard-common.sh scan-staged [--message-file FILE]
@@ -31,6 +31,7 @@
 #        <home>/.agents-v0-approvals (install.sh strips that override from installed copies).
 # Use as a library (other guard scripts): GC_HERE=<dir> GUARD_COMMON_LIB=1 . "<dir>/guard-common.sh", then call the gc_* functions.
 #   gc_approval_ok <command> (DA, for D4): OK when this repo's approval record for <command> matches the state's baseCommit.
+#   gc_commit_tag <command> (D4): stage <command>'s gate-rules commit.paths, scan, commit once, tag the next <tag><n>.
 #
 # Output: `OK <step>: <what passed>` (exit 0) or `REFUSED <step>: <reason>` (exit 1) on stdout; usage errors on
 # stderr (exit 2). The scanner's own lines (HIT, ALLOWED, SECRET-SCAN ...) pass through; it never prints a secret.
@@ -381,6 +382,52 @@ gc_scan_push() {
   printf '%s\n' "$gc_list" | python3 "$gc_py" --commits - --root "$(pwd)" || gc_rc=$?
   [ "$gc_rc" = 0 ] || gc_refuse scan-push "secret_scan.py exited $gc_rc (1: a hit, 2: it could not scan); the push is refused"
   gc_ok scan-push "the commits being pushed hold no secret"
+}
+
+# --- commit and tag (Design: D4) -----------------------------------------------------------------------------------
+# gc_commit_tag <command>: the gate commit. Stages the gate-rules `<command> commit.paths` that exist or are tracked
+# (git add --all, *.lock excluded), refuses when the index also holds a path outside them (nothing is unstaged), runs
+# the staged secret scan (gc_scan_staged), commits once with `<command> commit.message` (hooks run; never --amend),
+# and tags the next free `<command> commit.tag`<n> (annotated). Prints `OK commit: ...`, then a NOTE naming anything
+# still uncommitted. The caller checks the approval first.
+gc_commit_tag() {
+  [ $# -eq 1 ] || gc_die "gc_commit_tag: needs <command>"
+  gc_to_root commit
+  gc_ct_branch="$(gc_branch)" || gc_refuse commit "HEAD is detached; check out the integration branch first"
+  gc_ct_paths="$(gc_rule "$1" commit.paths)" || gc_refuse commit "gate-rules has no '$1 commit.paths' rule; reinstall the kit (install.sh --update)"
+  gc_ct_msg="$(gc_rule "$1" commit.message)" || gc_refuse commit "gate-rules has no '$1 commit.message' rule"
+  gc_ct_tag="$(gc_rule "$1" commit.tag)" || gc_refuse commit "gate-rules has no '$1 commit.tag' rule"
+  gc_ct_list=""
+  for gc_ct_p in $gc_ct_paths; do
+    if [ -e "$gc_ct_p" ] || [ -n "$(git ls-files -- "$gc_ct_p" 2>/dev/null)" ]; then gc_ct_list="$gc_ct_list $gc_ct_p"; fi
+  done
+  [ -n "$gc_ct_list" ] || gc_refuse commit "none of the $1 commit paths exists ($gc_ct_paths)"
+  gc_ct_out="$(gc_outside_paths "$gc_ct_paths")" || gc_refuse commit "the index already holds paths outside the $1 commit paths: $gc_ct_out; unstage them (git restore --staged <path>), then run commit again"
+  # shellcheck disable=SC2086
+  git add --all -- $gc_ct_list ':(exclude,glob)**/*.lock' || gc_refuse commit "git add of the $1 commit paths failed"
+  gc_scan_staged
+  gc_ct_n="$(git tag -l "${gc_ct_tag}*" | sed -n "s/^${gc_ct_tag}\([1-9][0-9]*\)\$/\1/p" | sort -n | tail -n 1)"
+  gc_ct_n=$(( ${gc_ct_n:-0} + 1 ))
+  git commit -q -m "$gc_ct_msg" || gc_refuse commit "git commit failed; the $1 files are still staged"
+  git tag -a "${gc_ct_tag}${gc_ct_n}" -m "$1 approved" || gc_refuse commit "committed, but tagging ${gc_ct_tag}${gc_ct_n} failed; tag it by hand"
+  gc_ok commit "$1 committed on $gc_ct_branch as $(git rev-parse --short HEAD), tagged ${gc_ct_tag}${gc_ct_n}"
+  gc_ct_left="$(git status --porcelain --untracked-files=all | grep -v '\.lock$' || :)"
+  [ -z "$gc_ct_left" ] || printf 'NOTE commit: still uncommitted (outside the %s commit paths):\n%s\n' "$1" "$gc_ct_left"
+  return 0
+}
+# gc_outside_paths <allowed paths>: return 1 and print the staged paths that are not an allowed path or under one.
+gc_outside_paths() {
+  python3 -c '
+import subprocess, sys
+allowed = sys.argv[1].split()
+out = subprocess.run(["git", "diff", "--cached", "--name-only", "-z", "--no-renames"], capture_output=True)
+if out.returncode != 0:
+    print("(git could not read the index)"); sys.exit(1)
+bad = [p for p in out.stdout.decode("utf-8", "replace").split("\0") if p
+       and not any(p == a or p.startswith(a.rstrip("/") + "/") for a in allowed)]
+if bad:
+    print(" ".join(bad)); sys.exit(1)
+' "$1"
 }
 
 gc_paths() {
