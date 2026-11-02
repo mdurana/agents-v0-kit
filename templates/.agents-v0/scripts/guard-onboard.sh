@@ -2,7 +2,7 @@
 # guard-onboard.sh: the steps of /v0-onboard and onboard's own rules (onboard redo, Design: D2;
 # kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md, "The split"). Paths and prerequisites come from
 # .agents-v0/gate-rules (the `onboard` entry); every state write goes through guard-common.sh (gc_state_set),
-# never from this file. D2 builds `start` and `block`, D3 `ready`, D4 `commit`; `reopen` comes later.
+# never from this file. D2 builds `start` and `block`, D3 `ready`, D4 `commit`, D5 `steps`; `reopen` comes later.
 #
 # Run (main session, from anywhere in the repository):
 #   sh .agents-v0/scripts/guard-onboard.sh start
@@ -19,6 +19,8 @@
 #        (Design: D4; main session only, after Sensei ran approve in his own terminal) needs onboard approved in
 #        the state AND his approval record, then makes the one gate commit of the onboard paths (secret-scanned)
 #        and tags it onboard-v<n> (guard-common.sh gc_commit_tag).
+#   sh .agents-v0/scripts/guard-onboard.sh steps
+#        (Design: D5) prints the /v0-onboard step list; the command prose carries it as a generated block.
 #
 # Output: `OK <step>: ...` then `Next: ...` (exit 0), or `REFUSED <step>: <reason>` (exit 1); usage errors exit 2.
 set -eu
@@ -148,8 +150,27 @@ go_commit() {
   printf 'Next: %s\n' "$go_val"
 }
 
+# go_steps (Design: D5): print the /v0-onboard step list. scripts/generate-onboard-steps.sh copies this output, byte for
+# byte, into the generated block of core/common/commands/v0-onboard.md. No git, no state: it only prints.
+go_steps() {
+  [ $# -eq 0 ] || go_usage
+  go_rule steps ready.next; go_ready_next="$go_val"
+  go_rule steps approved.next; go_approved_next="$go_val"
+  G='sh .agents-v0/scripts/guard-onboard.sh'
+  cat <<EOF_STEPS
+1. Run \`$G start\`. It begins or resumes onboarding and sets the state to \`in_progress\`. When it prints \`REFUSED\`, show its message and stop.
+2. Run the inventories: \`sh .agents-v0/scripts/generate-repo-map.sh\`, \`sh .agents-v0/scripts/collect-dependency-graphs.sh\` and \`sh .agents-v0/scripts/discover-codebase.sh\`. When the profile \`Pack\` cell is empty or a placeholder, run \`sh .agents-v0/scripts/activate-stack-pack.sh --detect\`: exit 2 keeps the existing pack (no \`--force\` unless the user confirms a replacement), exit 3 asks the user for the pack id.
+3. List the discovered modules. Ask the user which are in scope and which flows (up to three) need sequence diagrams. Do not guess.
+4. Launch the \`codebase-documenter\` subagent (skill: \`onboard-discovery\`) with the scope answers. It reads code and writes the onboarding docs; it runs no commands. For each \`docs/agents-v0/onboarding/<module>.helper-brief.md\` it writes, launch one \`explore-researcher\` from this session and pass its result back.
+5. On a blocker, run \`$G block "<plain reason>"\` and stop.
+6. When the documenter reports the docs done, run \`$G ready\`. It records the baseline audit, runs the onboarding docs check and sets the state to \`awaiting_approval\`. When it prints \`REFUSED\`, have the documenter fix what it names, then run \`ready\` again.
+7. Stop. Present the onboarding report, its open questions and the triage list. Next: $go_ready_next. Never run approve yourself.
+8. After the user says approve ran, run \`$G commit\`. It checks the approval, secret-scans and makes the one onboard commit with its \`onboard-v<n>\` tag. Then suggest: $go_approved_next.
+EOF_STEPS
+}
+
 go_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"] | ready | commit\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-onboard.sh start | block "<plain reason>" [--next "<next step>"] | ready | commit | steps\n' >&2
   exit 2
 }
 
@@ -160,6 +181,7 @@ case "$go_cmd" in
   block) go_block "$@" ;;
   ready) go_ready "$@" ;;
   commit) go_commit "$@" ;;
-  -h|--help) sed -n '2,24p' "$GO_HERE/guard-onboard.sh" ;;
+  steps) go_steps "$@" ;;
+  -h|--help) sed -n '2,26p' "$GO_HERE/guard-onboard.sh" ;;
   *) go_usage ;;
 esac
