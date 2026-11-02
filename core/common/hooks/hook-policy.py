@@ -98,6 +98,15 @@ SCRIPT_WRITE_HINT = re.compile(
 # kitfix-20261031-installed-no-overrides: the installed scripts carry no AGENTS_V0_* override code; only the
 # kit's own test suites install copies that keep it (install.sh --test-overrides). An agent must not.
 TEST_OVERRIDES_RE = re.compile(r"--test-overrides\b|\bstrip-test-overrides\.sh\b")
+# Design: DA (onboard redo): the approval record lives outside the repo in ~/.agents-v0-approvals/<repo id>/ and is
+#   written only by `guard-common.sh approve`, which Sensei runs himself in his own terminal. An agent never touches
+#   the folder (any form: ~, $HOME, ${HOME}, the expanded home path) and never runs approve.
+APPROVALS_DIR_RE = re.compile(r"\.?agents-v0-approvals\b")
+APPROVALS_DIR_MSG = ("the approval folder (~/.agents-v0-approvals) is Sensei's: only `guard-common.sh approve`, run by "
+                     "Sensei in his own terminal, writes it. An agent never reads, writes or lists it. Ask Sensei to approve.")
+APPROVE_RUN_RE = re.compile(r"\bguard-common(?:\.sh)?\b[^\n;&|]*\sapprove\b|\bgc_approve\b")
+APPROVE_RUN_MSG = ("`guard-common.sh approve` is Sensei's own step, run by him in his own terminal outside Cursor. "
+                   "An agent never runs it. Tell Sensei the work is ready for his approval and stop.")
 TEST_OVERRIDES_MSG = ("installing the kit with its test overrides (install.sh --test-overrides) is for the kit's own test "
                       "suites only; an agent never reinstalls or strips the kit scripts. Report the problem instead.")
 
@@ -2058,6 +2067,10 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
         return "block", GUARD_OVERRIDE_MSG
     if TEST_OVERRIDES_RE.search(cmd):
         return "block", TEST_OVERRIDES_MSG
+    if APPROVALS_DIR_RE.search(cmd):  # Design: DA
+        return "block", APPROVALS_DIR_MSG
+    if APPROVE_RUN_RE.search(cmd):  # Design: DA
+        return "block", APPROVE_RUN_MSG
     hp = _heredoc_writes_protected(cmd)
     if hp:
         return "block", f"Protected kit/CI path cannot be modified via shell: {hp}"
@@ -2240,6 +2253,8 @@ PROTECTED_PATH_PATTERNS = [
     # Design: D1 (gate-rules path fix): gate-rules lives at .agents-v0/gate-rules (D2); the old path stays covered.
     re.compile(r"(^|/)\.agents-v0/(scripts/)?gate-rules$"),
     re.compile(r"(^|/)\.agents-v0/secret-allowlist\.json$"),
+    # Design: DA: the approval folder outside the repo (~/.agents-v0-approvals/<repo id>/<command>.json).
+    re.compile(r"(^|/)\.agents-v0-approvals(/|$)"),
     re.compile(r"(^|/)\.git/hooks/"),
     re.compile(r"(^|/)\.gitlab-ci\.yml$"),
     re.compile(r"(^|/)\.gitlab/"),

@@ -691,6 +691,33 @@ SECRET_ALLOWLIST_SHELL_CASES = [
     ("cat .agents-v0/scripts/gate-rules", "allow"),
 ]
 
+# Design: DA (onboard redo): the approval folder outside the repo and the approve step are Sensei's. An agent
+#   cannot write the folder by the edit tool, touch it by any shell command (~, $HOME, ${HOME} or the expanded
+#   home path), or run `guard-common.sh approve`.
+_HOME = os.path.expanduser("~")
+DA_APPROVAL_PATH_CASES = [
+    (_HOME + "/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("~/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("/home/sensei/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    (_HOME + "/.agents-v0-approvals", "block"),
+    (_HOME + "/notes/approvals.json", "allow"),
+]
+DA_APPROVAL_SHELL_CASES = [
+    ("echo '{}' > ~/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("echo '{}' > $HOME/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("mkdir -p \"${HOME}/.agents-v0-approvals/portal-0123456789ab\"", "block"),
+    (f"cp /tmp/r.json {_HOME}/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("python3 -c \"open('/home/sensei/.agents-v0-approvals/p/onboard.json','w').write('{}')\"", "block"),
+    ("cat ~/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("ls -la ~/.agents-v0-approvals", "block"),
+    ("sh .agents-v0/scripts/guard-common.sh approve onboard", "block"),
+    ("bash ./.agents-v0/scripts/guard-common.sh approve onboard", "block"),
+    ("cd sub && sh ../.agents-v0/scripts/guard-common.sh approve onboard", "block"),
+    ("echo ok | sh .agents-v0/scripts/guard-common.sh approve onboard", "block"),
+    ("sh .agents-v0/scripts/guard-common.sh paths", "allow"),
+    ("sh .agents-v0/scripts/guard-onboard.sh start", "allow"),
+]
+
 
 def lessons_cases(r: dict) -> list:
     """(kind, arg, cwd, hook_cwd, want) — MEM-13 story-branch lessons rule."""
@@ -1275,6 +1302,10 @@ def main() -> int:
         check(path(p), want, f"N10/N46 guard file path {p}")
     for cmd, want in SECRET_ALLOWLIST_SHELL_CASES:
         check(shell(cmd), want, f"N10/N46 guard file shell `{cmd}`")
+    for p, want in DA_APPROVAL_PATH_CASES:
+        check(path(p), want, f"DA approval folder path {p}")
+    for cmd, want in DA_APPROVAL_SHELL_CASES:
+        check(shell(cmd), want, f"DA approval folder / approve shell `{cmd}`")
     extra = lessons_cases(repos)
     for kind, arg, cwd, hook_cwd, want in extra:
         got = path(arg, cwd) if kind == "path" else shell(arg, cwd, hook_cwd)
@@ -1322,7 +1353,7 @@ def main() -> int:
 
     total = (len(SHELL_CASES) + len(PATH_CASES) + 2 * len(REMOTE_WRITE_CASES) + 2 + 2 * len(REMOTE_WRITE_INPROC_CASES)
              + len(SECRET_ALLOWLIST_PATH_CASES)
-             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
+             + len(SECRET_ALLOWLIST_SHELL_CASES) + len(DA_APPROVAL_PATH_CASES) + len(DA_APPROVAL_SHELL_CASES) + len(extra) + len(kcases) + len(fcases) + len(gcases) + len(rcases)
              + len(hcases) + len(ncases) + len(jcases))
     if fail:
         print("test-hook-policy: FAILED", file=sys.stderr)

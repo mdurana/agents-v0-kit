@@ -2,7 +2,8 @@
 # guard-common.sh: the shared guard of the onboard redo (design: kit-eval/reviews/jiraiya-onboard-redo-design-20261102.md,
 # "The split"). It is meant to be the only writer of workflow state (state file, approval record, secret scan, commit and
 # tag, branch checks). D1 built the base and the secret scan; D2 adds the gate-rules reader and the state writer
-# (gc_rule, gc_state_get, gc_state_set). The commit and tag and the approval record come with later lines (D3, D4, DA).
+# (gc_rule, gc_state_get, gc_state_set). DA adds the approval record (approve, gc_approval_ok). The commit and tag
+# come with D4.
 #
 # Run:
 #   sh .agents-v0/scripts/guard-common.sh scan-staged [--message-file FILE]
@@ -12,8 +13,24 @@
 #   sh .agents-v0/scripts/guard-common.sh branch-check [<branch>]
 #        print the current branch; refuse a detached HEAD, or a branch other than <branch> when given.
 #   sh .agents-v0/scripts/guard-common.sh paths
-#        print the repository root, the git common dir and the onboarding state file path.
+#        print the repository root, the git common dir, the onboarding state file path and the approval folder.
+#   sh .agents-v0/scripts/guard-common.sh approve <command>          (Design: DA; Sensei only, in his own terminal)
+#        Sensei approves <command> (onboard) himself, in his own terminal outside Cursor. It needs the command's
+#        state at awaiting_approval, shows the repo, HEAD and baseCommit, and reads the approver's words from the
+#        terminal (/dev/tty; there is no flag for them). It writes the approval record, then marks the phase
+#        approved in the state (approvedPhases, lastApprovedPhase, phaseDates, phaseTimes; active phase cleared).
+#        The Cursor hook denies an agent running it, and any agent write or shell command on the approval folder.
+#        Approval folder (outside the repo, keyed per repo):
+#          <home>/.agents-v0-approvals/<repo id>/<command>.json
+#        <home> is the user's home from the password database (not $HOME); <repo id> is
+#        <main checkout folder name>-<first 12 hex of sha256 of the absolute git common dir>, so every worktree of a
+#        repository shares one folder. Folder mode 700, record mode 600, written atomically under <record>.lock.
+#        Record (JSON): command, phase, repo (work tree root), repoId, gitCommonDir, head (HEAD when approved),
+#        baseCommit (the state's baseCommit it approves), approvedAt (local time with offset), approver (login
+#        name), words (exactly as typed). Kit test copies only: AGENTS_V0_APPROVALS_DIR replaces
+#        <home>/.agents-v0-approvals (install.sh strips that override from installed copies).
 # Use as a library (other guard scripts): GC_HERE=<dir> GUARD_COMMON_LIB=1 . "<dir>/guard-common.sh", then call the gc_* functions.
+#   gc_approval_ok <command> (DA, for D4): OK when this repo's approval record for <command> matches the state's baseCommit.
 #
 # Output: `OK <step>: <what passed>` (exit 0) or `REFUSED <step>: <reason>` (exit 1) on stdout; usage errors on
 # stderr (exit 2). The scanner's own lines (HIT, ALLOWED, SECRET-SCAN ...) pass through; it never prints a secret.
@@ -87,6 +104,8 @@ PY
 # the only writer of state"). Sets the given string keys (activePhase, activeStatus, blockedReason, nextStep) and
 # updatedAt, keeps every other key, and writes atomically under <state file>.lock (the lock sync-feature-state.sh
 # takes). A missing file is created with the keys sync-feature-state.sh writes, so stories-status.sh reads it.
+# approvePhase=<phase> (DA) marks <phase> approved the way sync-feature-state.sh --approve does: appended to
+# approvedPhases, lastApprovedPhase, phaseDates (today) and phaseTimes (now). An empty activeStatus clears it.
 # Not a CLI step on purpose: only guard scripts call it, after their own checks.
 gc_state_set() {
   [ $# -ge 4 ] || gc_die "gc_state_set: needs <state file> <feature> <artifact> <key>=<value>..."
@@ -94,8 +113,8 @@ gc_state_set() {
 import datetime, fcntl, json, os, subprocess, sys, tempfile
 
 out, feature, artifact = sys.argv[1], sys.argv[2], sys.argv[3]
-keys = {"activePhase", "activeStatus", "blockedReason", "nextStep"}
-statuses = {"in_progress", "awaiting_approval", "blocked"}
+keys = {"activePhase", "activeStatus", "blockedReason", "nextStep", "approvePhase"}
+statuses = {"in_progress", "awaiting_approval", "blocked", ""}
 sets = {}
 for pair in sys.argv[4:]:
     k, sep, v = pair.partition("=")
@@ -123,8 +142,16 @@ try:
                 "verifyPassed": False, "reopenCount": 0, "helperBriefHashes": [], "artifact": artifact,
                 "baseCommit": head, "updatedAt": "", "artifacts": {"primary": artifact},
                 "evidence": {"build": [], "verify": []}}
+    now = datetime.datetime.now().astimezone()
+    phase = sets.pop("approvePhase", "")
+    if phase:
+        approved = [p for p in (data.get("approvedPhases") or []) if p != phase] + [phase]
+        data["approvedPhases"] = approved
+        data["lastApprovedPhase"] = phase
+        data.setdefault("phaseDates", {})[phase] = now.date().isoformat()
+        data.setdefault("phaseTimes", {})[phase] = now.isoformat(timespec="seconds")
     data.update(sets)
-    data["updatedAt"] = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    data["updatedAt"] = now.isoformat(timespec="seconds")
     fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
@@ -135,6 +162,129 @@ try:
 finally:
     fcntl.flock(lock, fcntl.LOCK_UN)
     lock.close()
+PY
+}
+
+# --- approval record (Design: DA) --------------------------------------------------------------------------------
+# gc_approvals_root: the approval folder root (see the header). Real home from the password database, so a changed
+# $HOME does not move it.
+gc_approvals_root() {
+  gc_ar=""
+  # >>> kit-test-override (Design: DA; install.sh removes this block; kit test copies only)
+  gc_ar="${AGENTS_V0_APPROVALS_DIR:-}"
+  # <<< kit-test-override
+  [ -n "$gc_ar" ] || gc_ar="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')/.agents-v0-approvals"
+  printf '%s\n' "$gc_ar"
+}
+# gc_repo_id: <main checkout folder name>-<sha256(absolute git common dir)[:12]>.
+gc_repo_id() {
+  gc_ri_cd="$(gc_common_dir)" || return 1
+  python3 - "$(cd "$gc_ri_cd" && pwd -P)" <<'PY'
+import hashlib, os, re, sys
+cd = sys.argv[1]
+name = os.path.basename(os.path.dirname(cd)) if os.path.basename(cd) == ".git" else os.path.basename(cd)
+name = re.sub(r"[^A-Za-z0-9._-]", "_", name) or "repo"
+print(f"{name}-{hashlib.sha256(cd.encode()).hexdigest()[:12]}")
+PY
+}
+# gc_approval_file <command>: the record path for this repository and <command>.
+gc_approval_file() {
+  gc_af_root="$(gc_approvals_root)" && gc_af_id="$(gc_repo_id)" || return 1
+  printf '%s/%s/%s.json\n' "$gc_af_root" "$gc_af_id" "$1"
+}
+
+# approve <command>: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
+gc_approve() {
+  [ $# -eq 1 ] || gc_usage
+  gc_to_root approve
+  gc_a_cmd="$1"
+  gc_a_state="$(gc_rule "$gc_a_cmd" state)" || gc_refuse approve "gate-rules has no '$gc_a_cmd state' rule; nothing to approve"
+  gc_a_phase="$(gc_rule "$gc_a_cmd" phase)" || gc_refuse approve "gate-rules has no '$gc_a_cmd phase' rule"
+  gc_a_feature="$(gc_rule "$gc_a_cmd" feature)" || gc_refuse approve "gate-rules has no '$gc_a_cmd feature' rule"
+  gc_a_artifact="$(gc_rule "$gc_a_cmd" artifact)" || gc_refuse approve "gate-rules has no '$gc_a_cmd artifact' rule"
+  [ -f "$gc_a_state" ] || gc_refuse approve "no $gc_a_cmd state yet ($gc_a_state); nothing to approve"
+  gc_a_status="$(gc_state_get "$gc_a_state" activeStatus)"
+  [ "$gc_a_status" = awaiting_approval ] \
+    || gc_refuse approve "$gc_a_cmd is not awaiting approval (state: ${gc_a_status:-none}); nothing to approve"
+  gc_a_base="$(gc_state_get "$gc_a_state" baseCommit)"
+  [ -n "$gc_a_base" ] || gc_refuse approve "the $gc_a_cmd state has no baseCommit"
+  gc_a_head="$(git rev-parse -q --verify HEAD)" || gc_refuse approve "this repository has no commit yet"
+  gc_a_id="$(gc_repo_id)" || gc_refuse approve "cannot compute the repo id"
+  gc_a_file="$(gc_approval_file "$gc_a_cmd")" || gc_refuse approve "cannot find the approval folder"
+  if ! ( : </dev/tty ) 2>/dev/null; then
+    gc_refuse approve "approve reads your words from your own terminal; run it there, outside Cursor (no terminal found)"
+  fi
+  {
+    printf 'Approve %s in %s\n' "$gc_a_cmd" "$(pwd)"
+    printf '  HEAD:       %s\n  baseCommit: %s\n  record:     %s\n' "$gc_a_head" "$gc_a_base" "$gc_a_file"
+    printf 'Type your approval words, then Enter (an empty line approves nothing): '
+  } >/dev/tty
+  gc_a_words=""
+  IFS= read -r gc_a_words </dev/tty || :
+  [ -n "$(printf '%s' "$gc_a_words" | tr -d '[:space:]')" ] || gc_refuse approve "no approval words typed; nothing approved"
+  python3 - "$gc_a_file" "$gc_a_cmd" "$gc_a_phase" "$(pwd)" "$gc_a_id" "$(gc_common_dir)" "$gc_a_head" \
+    "$gc_a_base" "$gc_a_words" <<'PY'
+import datetime, fcntl, json, os, pwd, sys, tempfile
+out, command, phase, repo, repo_id, common, head, base, words = sys.argv[1:10]
+os.umask(0o077)
+os.makedirs(os.path.dirname(out), mode=0o700, exist_ok=True)
+record = {"command": command, "phase": phase, "repo": repo, "repoId": repo_id, "gitCommonDir": common,
+          "head": head, "baseCommit": base,
+          "approvedAt": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+          "approver": pwd.getpwuid(os.getuid()).pw_name, "words": words}
+lock = open(out + ".lock", "w", encoding="utf-8")
+fcntl.flock(lock, fcntl.LOCK_EX)
+try:
+    fd, tmp = tempfile.mkstemp(prefix=".record.", suffix=".tmp", dir=os.path.dirname(out))
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(record, fh, indent=2)
+        fh.write("\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, out)
+finally:
+    fcntl.flock(lock, fcntl.LOCK_UN)
+    lock.close()
+PY
+  gc_state_set "$gc_a_state" "$gc_a_feature" "$gc_a_artifact" "approvePhase=$gc_a_phase" \
+    "activePhase=" "activeStatus=" "blockedReason=" "nextStep=" || exit 1
+  gc_ok approve "$gc_a_cmd approved at baseCommit $gc_a_base"
+  printf 'Record: %s\n' "$gc_a_file"
+}
+
+# gc_approval_ok <command>: library check for D4. Prints `OK approval: ...` and returns 0 only when this repository's
+# record for <command> exists, names this command and repository, and its baseCommit equals the state's baseCommit;
+# else prints `REFUSED approval: <reason>` and returns 1 (it never exits the caller).
+gc_approval_ok() {
+  [ $# -eq 1 ] || { printf 'REFUSED approval: usage gc_approval_ok <command>\n'; return 1; }
+  gc_ok_root="$(gc_root)" || { printf 'REFUSED approval: not inside a git work tree\n'; return 1; }
+  gc_ok_state="$(gc_rule "$1" state)" || { printf "REFUSED approval: gate-rules has no '%s state' rule\n" "$1"; return 1; }
+  gc_ok_id="$(cd "$gc_ok_root" && gc_repo_id)" || { printf 'REFUSED approval: cannot compute the repo id\n'; return 1; }
+  gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$1")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
+  python3 - "$gc_ok_file" "$1" "$gc_ok_id" "$gc_ok_root/$gc_ok_state" <<'PY'
+import json, sys
+rec_path, command, repo_id, state_path = sys.argv[1:5]
+def refuse(why):
+    print(f"REFUSED approval: {why}")
+    raise SystemExit(1)
+try:
+    base = (json.load(open(state_path, encoding="utf-8")).get("baseCommit") or "").strip()
+except (OSError, ValueError) as exc:
+    refuse(f"cannot read the {command} state ({exc})")
+if not base:
+    refuse(f"the {command} state has no baseCommit")
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+except FileNotFoundError:
+    refuse(f"no approval record for {command} ({rec_path}); Sensei runs approve in his own terminal")
+except (OSError, ValueError) as exc:
+    refuse(f"cannot read the approval record {rec_path} ({exc})")
+if not isinstance(rec, dict) or rec.get("command") != command or rec.get("repoId") != repo_id:
+    refuse(f"the approval record {rec_path} is for another command or repository")
+if rec.get("baseCommit") != base:
+    refuse(f"the approval record approves baseCommit {rec.get('baseCommit')}, but the state's baseCommit is {base}; "
+           "Sensei approves again")
+print(f"OK approval: {command} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
 PY
 }
 
@@ -238,10 +388,11 @@ gc_paths() {
   printf 'root=%s\n' "$(pwd)"
   printf 'git_common_dir=%s\n' "$(gc_common_dir)"
   printf 'onboarding_state=%s\n' "$(gc_state_file onboarding)"
+  printf 'approvals=%s\n' "$(gc_approvals_root)/$(gc_repo_id)"
 }
 
 gc_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-common.sh scan-staged [--message-file FILE] | scan-push [<remote>] | branch-check [<branch>] | paths\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-common.sh scan-staged [--message-file FILE] | scan-push [<remote>] | branch-check [<branch>] | paths | approve <command>\n' >&2
   exit 2
 }
 
@@ -253,7 +404,8 @@ gc_main() {
     scan-push) [ $# -le 1 ] || gc_usage; gc_scan_push "$@" ;;
     branch-check) [ $# -le 1 ] || gc_usage; gc_branch_check "$@" ;;
     paths) [ $# -eq 0 ] || gc_usage; gc_paths ;;
-    -h|--help) sed -n '2,20p' "$GC_HERE/guard-common.sh"; exit 0 ;;
+    approve) gc_approve "$@" ;;
+    -h|--help) sed -n '2,38p' "$GC_HERE/guard-common.sh"; exit 0 ;;
     *) gc_usage ;;
   esac
 }
