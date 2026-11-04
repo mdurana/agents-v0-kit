@@ -504,7 +504,20 @@ PY
 }
 
 gr_steps() {
-  gc_refuse steps "steps not yet implemented (scheduled in DR6)"
+  [ $# -eq 0 ] || gr_usage
+  gr_rule steps ready.next; gr_ready_next="$gr_val"
+  gr_rule steps approved.next; gr_approved_next="$gr_val"
+  G='sh .agents-v0/scripts/guard-roadmap.sh'
+  cat <<EOF_STEPS
+1. Run \`$G check <discovery-path>\`. It verifies entry prerequisites, confirms the discovery file exists, checks onboard approval on brownfield codebases, and checks that roadmap is not already approved. When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G validate <discovery-path>\` (or with \`--refresh\` on revision). It checks the six mandatory sections (Problem, Success metric, Options, Chosen option, In scope, Out of scope) and rejects placeholders. When it prints \`REFUSED\`, have the user complete the discovery document, then validate again.
+3. Run \`$G start <discovery-path>\`. It seeds \`docs/agents-v0/roadmap/<program>.md\` from \`_template.md\` if absent and sets state to \`in_progress\`.
+4. Launch the \`roadmap-planner\` subagent (skill: \`program-roadmap\`) with the discovery path. It reads the discovery document and drafts \`docs/agents-v0/roadmap/<program>.md\` with Now, Next, and Later horizons; it runs no shell commands and leaves the Delivery approvals table empty.
+5. On a blocker, run \`$G block "<plain reason>"\` and stop.
+6. When the planner reports the roadmap done, run \`$G ready <discovery-path>\`. It verifies section completeness and item rules, writes \`docs/agents-v0/roadmap/<program>.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, have the planner fix what it names, then run \`ready\` again.
+7. Stop. Present the roadmap sequence and its phase result to Sensei. Next: $gr_ready_next. Never run approve yourself; the agent cannot approve this gate.
+8. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, appends the verified Approved row to Delivery approvals, stages roadmap files, secret-scans, makes the single gate commit, and tags \`roadmap-v<n>\`. Then suggest: $gr_approved_next.
+EOF_STEPS
 }
 
 gr_usage() {
