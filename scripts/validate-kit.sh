@@ -326,6 +326,19 @@ for internal in sync-feature-state.sh audit-brownfield-baseline.sh check-onboard
     err "core/common/commands/v0-onboard.md names the internal '$internal' (the guard runs it; keep the prose to guard-onboard.sh steps)"
   fi
 done
+# Roadmap redo, Design: DR8. Drift check A: the /v0-roadmap step block matches `guard-roadmap.sh steps` byte for byte.
+sh scripts/generate-roadmap-steps.sh --check >/dev/null || err "core/common/commands/v0-roadmap.md step block drifted from guard-roadmap.sh steps (run sh scripts/generate-roadmap-steps.sh)"
+[ -f scripts/test-roadmap-steps.sh ] || err "scripts/test-roadmap-steps.sh missing"
+sh scripts/test-roadmap-steps.sh >/dev/null || err "scripts/test-roadmap-steps.sh failed"
+[ -f scripts/test-guard-roadmap.sh ] || err "scripts/test-guard-roadmap.sh missing"
+sh scripts/test-guard-roadmap.sh >/dev/null || err "scripts/test-guard-roadmap.sh failed"
+# Drift check B: the /v0-roadmap prose names no internal script; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-roadmap.md; then
+    err "core/common/commands/v0-roadmap.md names the internal '$internal' (the guard runs it; keep the prose to guard-roadmap.sh steps)"
+  fi
+done
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
 [ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"
