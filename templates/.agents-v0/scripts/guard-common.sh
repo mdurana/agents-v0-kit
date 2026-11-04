@@ -153,6 +153,11 @@ try:
         data.setdefault("phaseTimes", {})[phase] = now.isoformat(timespec="seconds")
     data.update(sets)
     data["updatedAt"] = now.isoformat(timespec="seconds")
+    if artifact:
+        data["artifact"] = artifact
+        data.setdefault("artifacts", {})["primary"] = artifact
+        if sets.get("activePhase") == "roadmap" or phase == "roadmap":
+            data["artifacts"]["roadmap"] = artifact
     fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
