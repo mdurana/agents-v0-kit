@@ -34,3 +34,28 @@ onboard commit.message onboarding: onboard approved
 onboard commit.tag onboard-v
 # shown when onboard is already approved (start refuses) and after commit
 onboard approved.next /v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain
+
+# --- roadmap (/v0-roadmap, guard-roadmap.sh) -----------------------------------------------------
+roadmap phase roadmap
+roadmap feature program
+roadmap state docs/agents-v0/program.state.json
+roadmap artifact docs/agents-v0/roadmap
+roadmap template docs/agents-v0/roadmap/_template.md
+# check & start: prerequisites
+roadmap check.requires git-work-tree kit-installed onboard-if-brownfield not-approved
+roadmap start.requires git-work-tree kit-installed onboard-if-brownfield not-awaiting-approval
+roadmap start.status in_progress
+roadmap start.next Launch the roadmap-planner subagent to draft the roadmap (docs/agents-v0/roadmap/<program>.md).
+# block: status and next step
+roadmap block.status blocked
+roadmap block.next Fix the blocker, then run /v0-roadmap <discovery-path> again; it resumes from the files on disk.
+# ready: verifies roadmap completeness and sets awaiting_approval
+roadmap ready.requires in-progress
+roadmap ready.status awaiting_approval
+roadmap ready.next Sensei reviews the roadmap and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap
+# commit: checks approval record, stages roadmap files and state, secret-scans, commits and tags
+roadmap commit.paths docs/agents-v0/roadmap docs/agents-v0/program.state.json
+roadmap commit.message program: roadmap approved
+roadmap commit.tag roadmap-v
+roadmap approved.next /v0-architecture
+
