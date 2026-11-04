@@ -414,7 +414,8 @@ gc_commit_tag() {
   [ -n "$gc_ct_list" ] || gc_refuse commit "none of the $1 commit paths exists ($gc_ct_paths)"
   gc_ct_out="$(gc_outside_paths "$gc_ct_paths")" || gc_refuse commit "the index already holds paths outside the $1 commit paths: $gc_ct_out; unstage them (git restore --staged <path>), then run commit again"
   # shellcheck disable=SC2086
-  git add --all -- $gc_ct_list ':(exclude,glob)**/*.lock' || gc_refuse commit "git add of the $1 commit paths failed"
+  git add --all -- $gc_ct_list || gc_refuse commit "git add of the $1 commit paths failed"
+  git reset -q -- '*.lock' '**/*.lock' 2>/dev/null || true
   gc_scan_staged
   gc_ct_n="$(git tag -l "${gc_ct_tag}*" | sed -n "s/^${gc_ct_tag}\([1-9][0-9]*\)\$/\1/p" | sort -n | tail -n 1)"
   gc_ct_n=$(( ${gc_ct_n:-0} + 1 ))

@@ -125,6 +125,8 @@ def load(text):
 def commit_cmd(ph):
     if kind == "onboarding":  # Design: D4: the onboard guard stages, scans, commits and tags; never git add -A
         return "sh .agents-v0/scripts/guard-onboard.sh commit"
+    if ph == "roadmap":  # Roadmap redo DR5: guard stages, scans, commits and tags
+        return "sh .agents-v0/scripts/guard-roadmap.sh commit"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 if mode == "message":
@@ -142,7 +144,10 @@ if mode == "message":
     elif kind == "onboarding":
         print(commit_cmd(phase))
     elif kind == "program":
-        print(commit_cmd(phase) + f" && git tag -a {phase}-v<n> -m \"{phase} approved\"   (n = 1, or the next free number for a revision)")
+        if phase == "roadmap":
+            print("sh .agents-v0/scripts/guard-roadmap.sh commit")
+        else:
+            print(commit_cmd(phase) + f" && git tag -a {phase}-v<n> -m \"{phase} approved\"   (n = 1, or the next free number for a revision)")
     else:
         print(commit_cmd(phase))
     sys.exit(0)

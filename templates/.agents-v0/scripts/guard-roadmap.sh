@@ -432,7 +432,75 @@ PY
 }
 
 gr_commit() {
-  gc_refuse commit "commit not yet implemented (scheduled in DR5)"
+  [ $# -eq 0 ] || gr_usage
+  gr_load commit
+
+  # 1. Check state approved and Sensei approval record matches (DR5, F1)
+  case " $(gc_state_get "$gr_state" approvedPhases | tr -d '[]",') " in
+    *" $gr_phase "*) ;;
+    *) gc_refuse commit "roadmap is not approved in $gr_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  gr_ok_out="$(gc_approval_ok roadmap)" || {
+    printf '%s\n' "$gr_ok_out"
+    gc_refuse commit "no approval record from Sensei matches this roadmap; Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$gr_ok_out"
+
+  # 2. Append Delivery approvals row to roadmap/<program>.md from verified record (T5)
+  gr_art="$(gc_state_get "$gr_state" artifact 2>/dev/null || true)"
+  [ -n "$gr_art" ] && [ -f "$gr_art" ] || {
+    gr_disc="$(find docs/product -type f -name "*discovery.md" 2>/dev/null | head -n 1 || true)"
+    [ -n "$gr_disc" ] && gr_art="$(gr_artifact "$gr_disc")"
+  }
+  [ -f "$gr_art" ] || gc_refuse commit "roadmap artifact '$gr_art' not found"
+
+  gr_rec_file="$(gc_approval_file roadmap)"
+  python3 - "$gr_art" "$gr_rec_file" <<'PY'
+import json, os, re, sys
+art_path, rec_path = sys.argv[1:3]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+with open(art_path, "r", encoding="utf-8") as f:
+    text = f.read()
+
+# Check if roadmap row already exists in Delivery approvals
+if not re.search(r"\|\s*roadmap\s*\|", text):
+    hm = re.search(r"Discovery:\s*([^\s]+)", text)
+    disc = hm.group(1) if hm else ""
+    artifacts_cell = f"{art_path}, {disc}" if disc else art_path
+    row = f"| roadmap | {artifacts_cell} | {approver} | Approved | {approved_at} |\n"
+    if "## Delivery approvals" in text:
+        lines = text.splitlines(keepends=True)
+        out_lines = []
+        appended = False
+        in_approvals = False
+        for line in lines:
+            out_lines.append(line)
+            if "## Delivery approvals" in line:
+                in_approvals = True
+            elif in_approvals and line.startswith("|") and "---" in line and not appended:
+                out_lines.append(row)
+                appended = True
+        if not appended:
+            out_lines.append(row)
+        with open(art_path, "w", encoding="utf-8") as f:
+            f.writelines(out_lines)
+    else:
+        with open(art_path, "a", encoding="utf-8") as f:
+            f.write(f"\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n{row}")
+PY
+
+  # 3. Stage roadmap commit paths, secret scan, commit, and tag (F2, DR5)
+  gc_commit_tag roadmap
+  gr_rule commit approved.next
+  printf 'Next: %s\n' "$gr_val"
 }
 
 gr_steps() {
