@@ -109,7 +109,119 @@ gr_check() {
 }
 
 gr_validate() {
-  gc_refuse validate "validate not yet implemented (scheduled in DR2)"
+  [ $# -ge 1 ] && [ -n "$1" ] || gc_refuse validate "no discovery path given; run /v0-roadmap <discovery-path>"
+  gr_disc="$1"; shift
+  gr_refresh=0
+  for arg in "$@"; do
+    case "$arg" in
+      --refresh) gr_refresh=1 ;;
+      *) gr_usage ;;
+    esac
+  done
+  gr_load validate
+  [ -f "$gr_disc" ] || gc_refuse validate "discovery file '$gr_disc' does not exist; check the path"
+
+  gr_rule validate validate.sections; gr_sections="$gr_val"
+  gr_art="$(gr_artifact "$gr_disc")"
+
+  # Run Python validator for section completeness, placeholder checks, and hash comparison (DR2, F3, F5)
+  gr_val_out="$(python3 - "$gr_disc" "$gr_sections" "$gr_art" "$gr_refresh" <<'PY'
+import hashlib, os, re, sys
+
+disc_path, sec_csv, art_path, refresh_str = sys.argv[1:5]
+is_refresh = refresh_str == "1"
+required_sections = [s.strip() for s in sec_csv.split(",") if s.strip()]
+
+try:
+    with open(disc_path, "r", encoding="utf-8") as f:
+        content = f.read()
+except Exception as exc:
+    print(f"REFUSED validate: cannot read discovery file {disc_path}: {exc}")
+    sys.exit(1)
+
+# 1. Compute current sha256
+cur_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+# 2. Parse sections
+found_sections = {}
+current_sec = None
+current_lines = []
+
+for line in content.splitlines():
+    m = re.match(r"^#{1,3}\s+(.+)$", line)
+    if m:
+        title = m.group(1).strip()
+        if current_sec:
+            found_sections[current_sec] = "\n".join(current_lines).strip()
+        current_sec = title
+        current_lines = []
+    elif current_sec:
+        current_lines.append(line)
+if current_sec:
+    found_sections[current_sec] = "\n".join(current_lines).strip()
+
+# Check missing or empty sections
+missing = []
+for req in required_sections:
+    matched = None
+    for k in found_sections:
+        if k.strip().lower() == req.lower():
+            matched = k
+            break
+    if not matched or not found_sections[matched]:
+        missing.append(req)
+
+if missing:
+    print(f"REFUSED validate: missing or empty section(s) in {disc_path}: {', '.join(missing)}")
+    sys.exit(1)
+
+# Check placeholders
+placeholder_patterns = [
+    (r"<[^>\n]+>", "angle-bracket placeholder"),
+    (r"\[[^\]\n]+\](?!\()", "bracket placeholder"),
+    (r"\b(TBD|TODO|FIXME|XXX|XX)\b", "keyword placeholder"),
+    (r"_{2,}", "blank line placeholder"),
+    (r"\?{2,}", "question mark placeholder"),
+]
+
+for pat, desc in placeholder_patterns:
+    for req in required_sections:
+        matched_title = next((k for k in found_sections if k.strip().lower() == req.lower()), req)
+        text = found_sections.get(matched_title, "")
+        m = re.search(pat, text)
+        if m:
+            print(f"REFUSED validate: unresolved {desc} {m.group(0)!r} in section '{req}'")
+            sys.exit(1)
+
+# 3. Hash integrity check on resume (F5)
+if os.path.isfile(art_path):
+    try:
+        with open(art_path, "r", encoding="utf-8") as af:
+            art_text = af.read()
+        hm = re.search(r"sha256:\s*([0-9a-fA-F]{64})", art_text)
+        if hm:
+            recorded_hash = hm.group(1).lower()
+            if recorded_hash != cur_hash and not is_refresh:
+                print(f"REFUSED validate: discovery file has changed (current sha256: {cur_hash[:8]} vs recorded {recorded_hash[:8]}); pass --refresh to update roadmap")
+                sys.exit(1)
+    except Exception:
+        pass
+
+print(f"OK validate: discovery document '{disc_path}' is complete and valid (sha256: {cur_hash})")
+PY
+)" || {
+    if [ -f "$gr_art" ] && [ -f "$gr_state" ]; then
+      gr_fail_reason="$(printf '%s' "$gr_val_out" | sed 's/^REFUSED validate: //')"
+      gc_state_set "$gr_state" "$gr_feature" "$gr_art" "activePhase=$gr_phase" \
+        "activeStatus=blocked" "blockedReason=$gr_fail_reason" \
+        "nextStep=Fix $disc_path, then run /v0-roadmap $disc_path" 2>/dev/null || true
+    fi
+    printf '%s\n' "$gr_val_out"
+    exit 1
+  }
+
+  printf '%s\n' "$gr_val_out"
+  printf 'Next: Run sh .agents-v0/scripts/guard-roadmap.sh start %s\n' "$gr_disc"
 }
 
 gr_start() {

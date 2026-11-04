@@ -43,6 +43,7 @@ roadmap artifact docs/agents-v0/roadmap
 roadmap template docs/agents-v0/roadmap/_template.md
 # check & start: prerequisites
 roadmap check.requires git-work-tree kit-installed onboard-if-brownfield not-approved
+roadmap validate.sections Problem,Success metric,Options,Chosen option,In scope,Out of scope
 roadmap start.requires git-work-tree kit-installed onboard-if-brownfield not-awaiting-approval
 roadmap start.status in_progress
 roadmap start.next Launch the roadmap-planner subagent to draft the roadmap (docs/agents-v0/roadmap/<program>.md).
