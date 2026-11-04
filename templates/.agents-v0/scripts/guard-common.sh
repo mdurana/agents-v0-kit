@@ -208,6 +208,11 @@ gc_approve() {
   gc_a_phase="$(gc_rule "$gc_a_cmd" phase)" || gc_refuse approve "gate-rules has no '$gc_a_cmd phase' rule"
   gc_a_feature="$(gc_rule "$gc_a_cmd" feature)" || gc_refuse approve "gate-rules has no '$gc_a_cmd feature' rule"
   gc_a_artifact="$(gc_rule "$gc_a_cmd" artifact)" || gc_refuse approve "gate-rules has no '$gc_a_cmd artifact' rule"
+  # If the state file already records an exact artifact (e.g. dynamic roadmap/<program>.md), preserve it (T2)
+  if [ -f "$gc_a_state" ]; then
+    gc_existing_art="$(gc_state_get "$gc_a_state" artifact 2>/dev/null || true)"
+    [ -n "$gc_existing_art" ] && [ "$gc_existing_art" != "docs/agents-v0/roadmap" ] && gc_a_artifact="$gc_existing_art"
+  fi
   [ -f "$gc_a_state" ] || gc_refuse approve "no $gc_a_cmd state yet ($gc_a_state); nothing to approve"
   gc_a_status="$(gc_state_get "$gc_a_state" activeStatus)"
   [ "$gc_a_status" = awaiting_approval ] \
