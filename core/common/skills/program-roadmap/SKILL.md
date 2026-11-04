@@ -5,20 +5,16 @@ description: Roadmap playbook. Turn one discovery file, at a path the user names
 
 # program-roadmap
 
-Roadmap playbook for the `program-planner` agent (`workflow-orchestration.mdc` Phase Gates Summary).
+Roadmap playbook for the `roadmap-planner` agent (`workflow-orchestration.mdc` Phase Gates Summary).
 
 ## Steps
 1. Take the discovery path from the user. Refuse to guess a file. Refuse a path that is absolute, contains `..`, or points outside the repository.
-2. Validate the discovery document at `<discovery-path>` before a roadmap file is created or `in_progress` is set. Read that file and nothing else about the problem. Required headings: Problem, Success metric, Options, Chosen option, In scope, Out of scope. Stop and name the first heading whose body is missing, empty, or still a placeholder (`<...>`, `[...]`, `TBD`, `TODO`, `FIXME`, `XX`/`XXX`, `__`, `???`). If `docs/agents-v0/roadmap/<program>.md` already exists, the main session runs `sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status blocked --reason "<that heading>" docs/agents-v0/roadmap/<program>.md` and stops.
+2. The discovery document at `<discovery-path>` was pre-validated by `guard-roadmap.sh validate` before this agent was launched. Read that file and nothing else about the problem. Required headings: Problem, Success metric, Options, Chosen option, In scope, Out of scope. Stop and report if any heading body is missing, empty, or still a placeholder (`<...>`, `[...]`, `TBD`, `TODO`, `FIXME`, `XX`/`XXX`, `__`, `???`).
 3. Every In scope leaf item must belong entirely to one horizon. When an In scope parent bullet groups nested sub-bullets, either keep the nested block together in one horizon or place each leaf sub-item in its respective horizon. If a single leaf item bundles work intended for multiple delivery phases, stop and ask the user to split the item into sub-items in the discovery document. Do not invent derivative themes or split a leaf item across horizons.
-4. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave and its sha256 checksum (`Discovery: <path> (sha256: <hash>)`). Copy Problem, Success metric, Chosen option, and Out of scope as facts. Leave the `Delivery approvals` table without an `Approved` row until the user approves in step 7. When the discovery file has a line `Stack preference:`, copy that line onto the roadmap as written. Do not activate a pack from it.
+4. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave and its sha256 checksum (`Discovery: <path> (sha256: <hash>)`). Copy Problem, Success metric, Chosen option, and Out of scope as facts. Leave the `Delivery approvals` table without an `Approved` row. When the discovery file has a line `Stack preference:`, copy that line onto the roadmap as written. Do not activate a pack from it.
 5. Place each In scope item in exactly one of Now, Next, or Later. The item text is copied verbatim. Do not invent a theme. Do not move an Out of scope item into a horizon.
-6. Verify the roadmap content gate before asking for approval: every required heading is filled, `Discovery:` has the sha256 checksum, and every In scope item belongs to one horizon.
-7. Write `docs/agents-v0/roadmap/<program>.phase-result.md` and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase roadmap --status awaiting_approval docs/agents-v0/roadmap/<program>.md`. Present the sequence and wait for explicit approval. Then append the `roadmap` row and record the approval with `sh .agents-v0/scripts/sync-feature-state.sh --approve roadmap docs/agents-v0/roadmap/<program>.md`:
-
-   | Phase | Artifacts | Approver | Decision | Date |
-   |-------|-----------|----------|----------|------|
-   | roadmap | docs/agents-v0/roadmap/<program>.md, <discovery path> | <name> | Approved | <date> |
+6. Verify the roadmap content gate before reporting done: every required heading is filled, `Discovery:` has the sha256 checksum, and every In scope item belongs to one horizon.
+7. Return completion to the main session. The main session runs `sh .agents-v0/scripts/guard-roadmap.sh ready <discovery-path>` to write `phase-result.md` and set `awaiting_approval`. Do not run shell commands or attempt self-approval. Sensei approves externally in his own terminal outside Cursor via `sh .agents-v0/scripts/guard-common.sh approve roadmap`.
 
 8. Do not write milestone stories, acceptance criteria, or an ARC record in this skill. `/v0-architecture` writes the ARC record. `/v0-plan` writes the stories. `/v0-intake` writes the Gherkin. `/v0-design` writes the feature contract.
 

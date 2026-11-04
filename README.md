@@ -17,7 +17,7 @@ Different features may proceed in one checkout only while each writes its own `d
 | `core/common/`         | Lifecycle shared by every pack: commands, agents, rules, skills, hooks, Cursor adapter                            |
 | `core/<id>/` and `core/ui/<id>/` | Example pack manifests, agents, rules, skills, hooks, and starters. A project pack lives in the target at `.agents-v0/packs/<id>/` |
 | `core/common/commands/v0-*.md` | 16 entry points (`/v0-roadmap` … `/v0-deck`) |
-| `core/common/agents/`  | Shared subagents. `backend-engineer` and `bff-engineer` live in the pack. 19 subagents in all |
+| `core/common/agents/`  | Shared subagents. `backend-engineer` and `bff-engineer` live in the pack. 20 subagents in all |
 | `core/common/skills/` plus each pack's `skills/` | 40 playbooks |
 | `templates/`           | Project starters: GitLab CI, docs, Maven/OpenAPI/Docker snippets, `.cursorignore`; P0 app archive under `templates/app/` |
 | `templates/docs/agents-v0/` | Kit reference docs (map, user guide, compliance, model routing); installed to `docs/agents-v0/` in target repos |
