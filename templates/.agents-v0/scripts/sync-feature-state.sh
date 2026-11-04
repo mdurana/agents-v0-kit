@@ -125,6 +125,19 @@ case "$art" in
     ;;
 esac
 
+# Architecture prerequisite gate (F8, T6): cannot enter architecture unless Sensei's external roadmap approval record exists
+if [ "$set_active" = 1 ] && [ "$active_phase" = architecture ] && [ "$active_status" != blocked ]; then
+  guard_common="$(dirname "$0")/guard-common.sh"
+  if [ -f "$guard_common" ]; then
+    GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+    if ! ok_msg="$(gc_approval_ok roadmap)"; then
+      printf 'FAIL: architecture requires approved roadmap record: %s\n' "$ok_msg" >&2
+      printf '  Complete /v0-roadmap and ensure Sensei approves via guard-common.sh approve roadmap before starting architecture.\n' >&2
+      exit 1
+    fi
+  fi
+fi
+
 # Release approval only on the integration branch (kitfix-20261029-step4-p1e). Release is recorded in the
 # integration checkout after the merge (v0-local-release step 6, local-release step 8;
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
