@@ -112,6 +112,46 @@ ga_check() {
   printf 'Next: Start architecture with: sh .agents-v0/scripts/guard-architecture.sh start\n'
 }
 
+ga_start() {
+  [ $# -eq 0 ] || ga_usage
+  ga_load start
+  ga_rule start start.requires; ga_requires="$ga_val"
+  ga_check_prereqs start "$ga_requires"
+
+  mkdir -p docs/agents-v0/adr docs/agents-v0/design/system/components docs/agents-v0/diagrams/sequences
+  if [ ! -f "$ga_artifact" ]; then
+    printf '# Architecture\n\n## C4 Context\n\n## C4 Container\n\n## Data flow\n\n## Data models\n\n### Conceptual\n\n### Logical\n\n### Physical\n\n## State machine\n\n## Failure domains and degradation\n\n## MVP and future state\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n' > "$ga_artifact"
+  fi
+  if [ ! -f docs/agents-v0/network.md ]; then
+    printf '# Network & Topology\n\n## Target topology\n' > docs/agents-v0/network.md
+  fi
+
+  ga_rule start start.next; ga_next="$ga_val"
+  ga_rule start start.status; ga_status="$ga_val"
+
+  gc_state_set "$ga_state" "$ga_feature" "$ga_artifact" "activePhase=$ga_phase" \
+    "activeStatus=$ga_status" "blockedReason=" "nextStep=$ga_next" || exit 1
+  gc_ok start "architecture state is $(gc_state_get "$ga_state" activeStatus) ($ga_state)"
+  printf 'Next: %s\n' "$ga_next"
+}
+
+ga_block() {
+  [ $# -ge 1 ] && [ -n "$1" ] || ga_usage
+  ga_reason="$1"; shift
+  ga_next=""
+  if [ $# -gt 0 ]; then
+    [ $# -eq 2 ] && [ "$1" = --next ] && [ -n "$2" ] || ga_usage
+    ga_next="$2"
+  fi
+  ga_load block
+  if [ -z "$ga_next" ]; then ga_rule block block.next; ga_next="$ga_val"; fi
+  ga_rule block block.status; ga_status="$ga_val"
+  gc_state_set "$ga_state" "$ga_feature" "$ga_artifact" "activePhase=$ga_phase" \
+    "activeStatus=$ga_status" "blockedReason=$ga_reason" "nextStep=$ga_next" || exit 1
+  gc_ok block "architecture state is $(gc_state_get "$ga_state" activeStatus): $ga_reason"
+  printf 'Next: %s\n' "$ga_next"
+}
+
 ga_usage() {
   printf 'usage: sh .agents-v0/scripts/guard-architecture.sh check | start | block "<plain reason>" [--next "<next step>"] | ready | commit | steps\n' >&2
   exit 2
@@ -121,6 +161,8 @@ ga_usage() {
 ga_cmd="$1"; shift
 case "$ga_cmd" in
   check) ga_check "$@" ;;
+  start) ga_start "$@" ;;
+  block) ga_block "$@" ;;
   -h|--help) sed -n '2,24p' "$GA_HERE/guard-architecture.sh" ;;
   *) ga_usage ;;
 esac

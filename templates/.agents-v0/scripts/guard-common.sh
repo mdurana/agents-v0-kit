@@ -158,6 +158,8 @@ try:
         data.setdefault("artifacts", {})["primary"] = artifact
         if sets.get("activePhase") == "roadmap" or phase == "roadmap":
             data["artifacts"]["roadmap"] = artifact
+        elif sets.get("activePhase") == "architecture" or phase == "architecture":
+            data["artifacts"]["architecture"] = artifact
     fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
