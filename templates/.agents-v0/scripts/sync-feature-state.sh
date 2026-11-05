@@ -143,21 +143,23 @@ fi
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
 # after the merge leaves that branch ahead of the integration branch.
 approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
-# Refuse --approve roadmap unless gc_approval_ok roadmap succeeds (F1, T4)
-if [ "$approve_lc" = roadmap ]; then
-  guard_common="$(dirname "$0")/guard-common.sh"
-  if [ -f "$guard_common" ]; then
-    GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-    if ! ok_msg="$(gc_approval_ok roadmap)"; then
-      printf 'FAIL: --approve roadmap refused without Sensei external approval record: %s\n' "$ok_msg" >&2
-      printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap\n' >&2
+# Refuse --approve roadmap or architecture unless gc_approval_ok succeeds (F1, FA1, T4)
+case "$approve_lc" in
+  roadmap|architecture)
+    guard_common="$(dirname "$0")/guard-common.sh"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      if ! ok_msg="$(gc_approval_ok "$approve_lc")"; then
+        printf 'FAIL: --approve %s refused without Sensei external approval record: %s\n' "$approve_lc" "$ok_msg" >&2
+        printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s\n' "$approve_lc" >&2
+        exit 1
+      fi
+    else
+      printf 'FAIL: --approve %s requires %s\n' "$approve_lc" "$guard_common" >&2
       exit 1
     fi
-  else
-    printf 'FAIL: --approve roadmap requires %s\n' "$guard_common" >&2
-    exit 1
-  fi
-fi
+    ;;
+esac
 if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
    && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   resolver="$(dirname "$0")/resolve-integration-branch.sh"

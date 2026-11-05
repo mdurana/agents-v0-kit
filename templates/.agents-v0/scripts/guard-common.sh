@@ -14,8 +14,8 @@
 #        print the current branch; refuse a detached HEAD, or a branch other than <branch> when given.
 #   sh .agents-v0/scripts/guard-common.sh paths
 #        print the repository root, the git common dir, the onboarding state file path and the approval folder.
-#   sh .agents-v0/scripts/guard-common.sh approve <command>          (Design: DA; Sensei only, in his own terminal)
-#        Sensei approves <command> (onboard) himself, in his own terminal outside Cursor. It needs the command's
+#   sh .agents-v0/scripts/guard-common.sh approve <command>          (Design: DA/DRA/DAA; Sensei only, in his own terminal)
+#        Sensei approves <command> (onboard, roadmap, architecture) himself, in his own terminal outside Cursor. It needs the command's
 #        state at awaiting_approval, shows the repo, HEAD and baseCommit, and reads the approver's words from the
 #        terminal (/dev/tty; there is no flag for them). It writes the approval record, then marks the phase
 #        approved in the state (approvedPhases, lastApprovedPhase, phaseDates, phaseTimes; active phase cleared).
@@ -210,12 +210,15 @@ gc_approve() {
   gc_a_phase="$(gc_rule "$gc_a_cmd" phase)" || gc_refuse approve "gate-rules has no '$gc_a_cmd phase' rule"
   gc_a_feature="$(gc_rule "$gc_a_cmd" feature)" || gc_refuse approve "gate-rules has no '$gc_a_cmd feature' rule"
   gc_a_artifact="$(gc_rule "$gc_a_cmd" artifact)" || gc_refuse approve "gate-rules has no '$gc_a_cmd artifact' rule"
-  # If the state file already records an exact artifact (e.g. dynamic roadmap/<program>.md), preserve it (T2)
-  if [ -f "$gc_a_state" ]; then
+  # If the state file already records an exact artifact for a directory rule (e.g. dynamic roadmap/<program>.md), preserve it (T2)
+  if [ "$gc_a_artifact" = "docs/agents-v0/roadmap" ] && [ -f "$gc_a_state" ]; then
     gc_existing_art="$(gc_state_get "$gc_a_state" artifact 2>/dev/null || true)"
     [ -n "$gc_existing_art" ] && [ "$gc_existing_art" != "docs/agents-v0/roadmap" ] && gc_a_artifact="$gc_existing_art"
   fi
   [ -f "$gc_a_state" ] || gc_refuse approve "no $gc_a_cmd state yet ($gc_a_state); nothing to approve"
+  gc_a_active_phase="$(gc_state_get "$gc_a_state" activePhase)"
+  [ -z "$gc_a_active_phase" ] || [ "$gc_a_active_phase" = "$gc_a_phase" ] \
+    || gc_refuse approve "$gc_a_cmd is not the active phase (activePhase: $gc_a_active_phase); nothing to approve"
   gc_a_status="$(gc_state_get "$gc_a_state" activeStatus)"
   [ "$gc_a_status" = awaiting_approval ] \
     || gc_refuse approve "$gc_a_cmd is not awaiting approval (state: ${gc_a_status:-none}); nothing to approve"
