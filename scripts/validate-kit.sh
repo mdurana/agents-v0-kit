@@ -342,6 +342,19 @@ for internal in sync-feature-state.sh check-gate-commit.sh \
     err "core/common/commands/v0-roadmap.md names the internal '$internal' (the guard runs it; keep the prose to guard-roadmap.sh steps)"
   fi
 done
+# Architecture redo, Design: DA8. Drift check A: the /v0-architecture step block matches `guard-architecture.sh steps` byte for byte.
+sh scripts/generate-architecture-steps.sh --check >/dev/null || err "core/common/commands/v0-architecture.md step block drifted from guard-architecture.sh steps (run sh scripts/generate-architecture-steps.sh)"
+[ -f scripts/test-architecture-steps.sh ] || err "scripts/test-architecture-steps.sh missing"
+sh scripts/test-architecture-steps.sh >/dev/null || err "scripts/test-architecture-steps.sh failed"
+[ -f scripts/test-guard-architecture.sh ] || err "scripts/test-guard-architecture.sh missing"
+sh scripts/test-guard-architecture.sh >/dev/null || err "scripts/test-guard-architecture.sh failed"
+# Drift check B: the /v0-architecture prose names no internal script; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-architecture.md; then
+    err "core/common/commands/v0-architecture.md names the internal '$internal' (the guard runs it; keep the prose to guard-architecture.sh steps)"
+  fi
+done
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
 [ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"
