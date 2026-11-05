@@ -161,9 +161,9 @@ fi
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
 # after the merge leaves that branch ahead of the integration branch.
 approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
-# Refuse --approve roadmap or architecture unless gc_approval_ok succeeds (F1, FA1, T4)
+# Refuse --approve roadmap, architecture, or plan unless gc_approval_ok succeeds (F1, FA1, FP1, T4)
 case "$approve_lc" in
-  roadmap|architecture)
+  roadmap|architecture|plan)
     guard_common="$(dirname "$0")/guard-common.sh"
     if [ -f "$guard_common" ]; then
       GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
