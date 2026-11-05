@@ -24,13 +24,8 @@ Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orche
 8. **ARC.** Fill `docs/agents-v0/design/system/arc-record.md`. Name the discovery file or the requirements artifact, and name the pattern ADR. Do not copy their text. Name the recommendation. Point `## Fitness functions` at `docs/agents-v0/design/system/nfr-slo.md` for the SLO targets, and fill the structural table (principle, check, threshold, on failure) with checks that exist or `planned: <milestone>`. Do not copy the SLO rows.
 9. Verify that all architecture pack files and sections are complete before launching the independent review.
 10. **Independent review.** The main session launches `design-reviewer` on the pack. It writes `docs/agents-v0/design/system/architecture-review.md`. Fix or disposition each open finding (`Resolved`, `Deferred`, or `Accepted` after the reviewer re-checks). Re-run until no finding is `Open` (max 3 review cycles, prompt-only, then escalate to the user).
-11. Write `docs/agents-v0/architecture.phase-result.md` and run `sh .agents-v0/scripts/sync-feature-state.sh --active-phase architecture --status awaiting_approval docs/agents-v0/architecture.md`. Stop for one explicit approval. Set the pattern ADR's Status to `Accepted` when it is still `Proposed`, record Deciders with the approver(s), update any `(Proposed)` ADR label in component plans, and update any narrative sentence in `architecture-review.md` that still calls the ADR `Proposed` to `Accepted`. Append the `architecture` row on `docs/agents-v0/architecture.md` first. Its Artifacts cell names every pack path, including `docs/agents-v0/design/system/arc-record.md` and `docs/agents-v0/design/system/architecture-review.md`. Then record the approval with `sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md`. Do not add an `arc` row. That row is only for a later story that amends the recommendation. After the row is `Approved`, run `sh .agents-v0/scripts/activate-stack-pack.sh <pack>` with the ADR's `Pack:` value. That fills still-placeholder stack and verify cells and installs that pack's rules and skills. Exit 2 means the profile already names another pack: stop and do not force it. Do not start `/v0-plan` until the profile `Pack` cell matches the ADR.
-
-   | Phase | Artifacts | Approver | Decision | Date |
-   |-------|-----------|----------|----------|------|
-   | architecture | docs/agents-v0/architecture.md, docs/agents-v0/design/system/arc-record.md, and the other pack paths | &lt;name&gt; | Approved | &lt;date&gt; |
-
-12. Do not write milestone stories. `/v0-plan` does that after the `architecture` row exists.
+11. **Hand off to the main session guard.** Do not run any shell commands, do not write `docs/agents-v0/architecture.phase-result.md`, and leave the `Delivery approvals` table empty. The main session runs the architecture guard `ready` step (which verifies pack completeness and zero `Open` findings, writes `architecture.phase-result.md`, and sets `awaiting_approval`), waits for Sensei's external approval in his own terminal, and then runs the guard `commit` step (which promotes the pattern ADR's Status from `Proposed` to `Accepted`, updates `(Proposed)` labels, appends the verified `architecture` row to `docs/agents-v0/architecture.md`, binds the stack pack into `docs/agents-v0/project-profile.md`, and commits and tags `architecture-v<n>`). Do not add an `arc` row; that row is only for a later story that amends the recommendation.
+12. Do not write milestone stories. `/v0-plan` does that after the `architecture` gate is committed.
 
 ## Governance after approval
 - A later story that changes the recommendation is a **material** change: supersede the pattern ADR and add an `arc` row (`contract-first-design` step 7b). A pattern library tweak or a threshold change is minor: update the pack in a docs-only change, no `arc` row.
@@ -39,12 +34,11 @@ Playbook for the `solution-architect` during `/v0-architecture` (`workflow-orche
 
 ## Rule-compliance checklist
 - [ ] C4 sections name no product technology.
-- [ ] The pattern ADR has two real options, a filled `Patterns considered` table, and `Pack:` set to the pack id. That id has a complete pack (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). An Accepted ADR was superseded, not rewritten, when the decision changed. `sh .agents-v0/scripts/activate-stack-pack.sh` has bound that pack after the `architecture` row was approved.
+- [ ] The pattern ADR has two real options, a filled `Patterns considered` table, Status `Proposed` (promoted to `Accepted` by the guard at commit), and `Pack:` set to the pack id. That id has a complete pack (`pack.json`, `rules/*.mdc`, `implement-service`, `implement-bff`, and a UI manifest when `ui` names an id). An Accepted ADR was superseded, not rewritten, when the decision changed.
 - [ ] Data flow reuses the C4 Container nodes. Data models, state machine, failure domains, and MVP and future state are written or `N/A: <reason>`.
 - [ ] `network.md` has a target topology diagram. As-is onboard text was kept.
 - [ ] The context map is the service map, and each context has a component plan or `N/A: <reason>`.
 - [ ] `ops-readiness.md` names an owner and an error budget policy. The ARC record has a structural fitness function row.
-- [ ] No feature OpenAPI draft and no story rows were written.
+- [ ] No feature OpenAPI draft, no story rows, and no `Delivery approvals` rows were written by the subagent.
 - [ ] `architecture-review.md` has no `Open` finding.
-- [ ] The `architecture` row names the ARC file and the review. No `arc` row was added.
 

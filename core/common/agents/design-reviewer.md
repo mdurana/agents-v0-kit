@@ -7,7 +7,6 @@ tools:
   - read
   - grep
   - glob
-  - shell
   - write
 ---
 
