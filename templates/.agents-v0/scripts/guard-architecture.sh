@@ -330,6 +330,147 @@ PY
   printf 'Next: %s\n' "$ga_next"
 }
 
+ga_commit() {
+  [ $# -eq 0 ] || ga_usage
+  ga_load commit
+
+  # 1. Check state approved and Sensei approval record matches (DA5, FA1)
+  case " $(gc_state_get "$ga_state" approvedPhases | tr -d '[]",') " in
+    *" $ga_phase "*) ;;
+    *) gc_refuse commit "architecture is not approved in $ga_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  ga_ok_out="$(gc_approval_ok architecture)" || {
+    printf '%s\n' "$ga_ok_out"
+    gc_refuse commit "no approval record from Sensei matches this architecture; Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$ga_ok_out"
+
+  [ -f "$ga_artifact" ] || gc_refuse commit "architecture artifact '$ga_artifact' not found"
+
+  # 2. Extract Pack: <id>, promote Pattern ADR to Accepted, update (Proposed) labels, and append Delivery approvals row (FA5)
+  ga_rec_file="$(gc_approval_file architecture)"
+  ga_pack_id="$(python3 - "$ga_artifact" "$ga_rec_file" <<'PY'
+import glob, json, os, re, sys
+
+arch_path, rec_path = sys.argv[1:3]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+adr_files = sorted(
+    f for f in glob.glob("docs/agents-v0/adr/*.md")
+    if not os.path.basename(f).startswith("_") and not os.path.basename(f).startswith("0000-")
+)
+pack_id = ""
+pattern_adr = ""
+for adr in adr_files:
+    txt = open(adr, "r", encoding="utf-8").read()
+    clean = re.sub(r"<!--.*?-->", "", txt, flags=re.DOTALL)
+    m = re.search(r"^\s*Pack:\s*([a-z][a-z0-9_-]*)\s*$", clean, re.M)
+    if m:
+        pack_id = m.group(1).strip()
+        pattern_adr = adr
+        # Promote Status: Proposed -> Accepted and set Deciders / Date
+        new_txt = re.sub(
+            r"^(\s*-\s*\*\*Status:\*\*)\s*Proposed\b.*$",
+            r"\1 Accepted",
+            txt,
+            flags=re.M | re.I,
+        )
+        new_txt = re.sub(
+            r"^(\s*-\s*\*\*Deciders:\*\*)\s*(?:<[^>]+>|TBD|TODO)?.*$",
+            f"\\1 {approver}",
+            new_txt,
+            flags=re.M | re.I,
+        )
+        if approved_at:
+            new_txt = re.sub(
+                r"^(\s*-\s*\*\*Date:\*\*)\s*(?:YYYY-MM-DD|<[^>]+>)\s*$",
+                f"\\1 {approved_at}",
+                new_txt,
+                flags=re.M | re.I,
+            )
+        if new_txt != txt:
+            with open(adr, "w", encoding="utf-8") as f:
+                f.write(new_txt)
+        break
+
+# Update (Proposed) labels in component plans and architecture-review.md
+for comp in glob.glob("docs/agents-v0/design/system/components/*.md") + ["docs/agents-v0/design/system/architecture-review.md"]:
+    if os.path.isfile(comp):
+        ctxt = open(comp, "r", encoding="utf-8").read()
+        cnew = ctxt.replace("(Proposed)", "(Accepted)")
+        if cnew != ctxt:
+            with open(comp, "w", encoding="utf-8") as f:
+                f.write(cnew)
+
+# Append architecture row to Delivery approvals in architecture.md
+text = open(arch_path, "r", encoding="utf-8").read()
+if not re.search(r"\|\s*architecture\s*\|", text, re.I):
+    pack_paths = [
+        arch_path,
+        "docs/agents-v0/network.md",
+    ]
+    if pattern_adr:
+        pack_paths.append(pattern_adr)
+    for sf in [
+        "docs/agents-v0/design/system/context-map.md",
+        "docs/agents-v0/design/system/nfr-slo.md",
+        "docs/agents-v0/design/system/threat-model.md",
+        "docs/agents-v0/design/system/ops-readiness.md",
+        "docs/agents-v0/design/system/arc-record.md",
+        "docs/agents-v0/design/system/architecture-review.md",
+    ]:
+        if os.path.isfile(sf):
+            pack_paths.append(sf)
+    artifacts_cell = ", ".join(pack_paths)
+    row = f"| architecture | {artifacts_cell} | {approver} | Approved | {approved_at} |\n"
+    if "## Delivery approvals" in text:
+        lines = text.splitlines(keepends=True)
+        out_lines = []
+        appended = False
+        in_approvals = False
+        for line in lines:
+            out_lines.append(line)
+            if "## Delivery approvals" in line:
+                in_approvals = True
+            elif in_approvals and line.startswith("|") and "---" in line and not appended:
+                out_lines.append(row)
+                appended = True
+        if not appended:
+            out_lines.append(row)
+        with open(arch_path, "w", encoding="utf-8") as f:
+            f.writelines(out_lines)
+    else:
+        with open(arch_path, "a", encoding="utf-8") as f:
+            f.write(f"\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n{row}")
+
+print(pack_id)
+PY
+)" || gc_refuse commit "failed to promote pattern ADR and record Delivery approvals row"
+
+  # 3. Bind stack pack via activate-stack-pack.sh if available and pack_id is present (T5)
+  if [ -n "$ga_pack_id" ] && [ -f .agents-v0/scripts/activate-stack-pack.sh ] && [ -f docs/agents-v0/project-profile.md ]; then
+    ga_act_rc=0
+    ga_act_out="$(sh .agents-v0/scripts/activate-stack-pack.sh "$ga_pack_id" 2>&1)" || ga_act_rc=$?
+    if [ "$ga_act_rc" = 2 ]; then
+      gc_refuse commit "activate-stack-pack.sh refused to replace existing Pack in docs/agents-v0/project-profile.md ($ga_act_out)"
+    elif [ "$ga_act_rc" != 0 ]; then
+      gc_refuse commit "activate-stack-pack.sh $ga_pack_id failed (exit $ga_act_rc): $ga_act_out"
+    fi
+  fi
+
+  # 4. Stage architecture commit paths, secret scan, commit, and tag (FA2, DA5)
+  gc_commit_tag architecture
+  ga_rule commit approved.next
+  printf 'Next: %s\n' "$ga_val"
+}
+
 ga_usage() {
   printf 'usage: sh .agents-v0/scripts/guard-architecture.sh check | start | block "<plain reason>" [--next "<next step>"] | ready | commit | steps\n' >&2
   exit 2
@@ -342,6 +483,7 @@ case "$ga_cmd" in
   start) ga_start "$@" ;;
   block) ga_block "$@" ;;
   ready) ga_ready "$@" ;;
+  commit) ga_commit "$@" ;;
   -h|--help) sed -n '2,24p' "$GA_HERE/guard-architecture.sh" ;;
   *) ga_usage ;;
 esac

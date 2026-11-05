@@ -127,6 +127,8 @@ def commit_cmd(ph):
         return "sh .agents-v0/scripts/guard-onboard.sh commit"
     if ph == "roadmap":  # Roadmap redo DR5: guard stages, scans, commits and tags
         return "sh .agents-v0/scripts/guard-roadmap.sh commit"
+    if ph == "architecture":  # Architecture redo DA5: guard stages, scans, commits and tags
+        return "sh .agents-v0/scripts/guard-architecture.sh commit"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 if mode == "message":
@@ -144,8 +146,8 @@ if mode == "message":
     elif kind == "onboarding":
         print(commit_cmd(phase))
     elif kind == "program":
-        if phase == "roadmap":
-            print("sh .agents-v0/scripts/guard-roadmap.sh commit")
+        if phase in ("roadmap", "architecture"):
+            print(commit_cmd(phase))
         else:
             print(commit_cmd(phase) + f" && git tag -a {phase}-v<n> -m \"{phase} approved\"   (n = 1, or the next free number for a revision)")
     else:
