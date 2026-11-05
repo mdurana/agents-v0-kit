@@ -82,3 +82,27 @@ architecture commit.paths docs/agents-v0/architecture.md docs/agents-v0/architec
 architecture commit.message program: architecture approved
 architecture commit.tag architecture-v
 architecture approved.next /v0-plan
+
+# --- plan (/v0-plan, guard-plan.sh) -------------------------------------------------------------
+plan phase plan
+plan feature program
+plan state docs/agents-v0/program.state.json
+plan artifact docs/agents-v0/milestones/plan.md
+# check & start: prerequisites
+plan check.requires git-work-tree kit-installed onboard-if-brownfield architecture-approved not-approved
+plan start.requires git-work-tree kit-installed onboard-if-brownfield architecture-approved not-awaiting-approval
+plan start.status in_progress
+plan start.next Launch the program-planner subagent (skill: program-planning) to author milestone manifests under docs/agents-v0/milestones/ and docs/agents-v0/milestones/plan.md.
+# block: status and next step
+plan block.status blocked
+plan block.next Fix the blocker, then run /v0-plan again; it resumes from the files on disk.
+# ready: verifies plan table, flowchart, and story manifests (sentence, surface, size 1-8, no cycles)
+plan ready.requires in-progress
+plan ready.status awaiting_approval
+plan ready.next Sensei reviews the plan manifests and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve plan
+# commit: checks approval record, appends Approved row to manifests, stages paths, secret-scans, commits and tags
+plan commit.paths docs/agents-v0/milestones docs/agents-v0/program.state.json
+plan commit.message program: plan approved
+plan commit.tag plan-v
+plan approved.next /v0-intake, or /v0-build when the first story is P0-A
+
