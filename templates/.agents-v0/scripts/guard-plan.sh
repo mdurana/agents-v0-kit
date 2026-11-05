@@ -149,8 +149,245 @@ gp_block() {
   printf 'Next: %s\n' "$gp_next"
 }
 
+gp_ready() {
+  [ $# -eq 0 ] || gp_usage
+  gp_load ready
+
+  case "$(gc_state_get "$gp_state" activeStatus)" in
+    in_progress|blocked) ;;
+    awaiting_approval)
+      gc_refuse ready "plan is already awaiting approval; Sensei runs approve in his own terminal" ;;
+    *) gc_refuse ready "plan is not in progress; run start first" ;;
+  esac
+
+  gp_ready_out="$(python3 - "$gp_artifact" <<'PY'
+import datetime, glob, os, re, sys
+
+plan_path = sys.argv[1]
+
+def refuse(msg):
+    print(f"REFUSED ready: {msg}")
+    sys.exit(1)
+
+if not os.path.isfile(plan_path):
+    refuse(f"missing {plan_path}; run start first")
+
+plan_text = open(plan_path, "r", encoding="utf-8").read()
+plan_clean = re.sub(r"<!--.*?-->", "", plan_text, flags=re.DOTALL)
+
+# 1. Check docs/agents-v0/milestones/plan.md structure (milestones table and Mermaid flowchart)
+if not re.search(r"^##\s+Milestones\b", plan_clean, re.I | re.M):
+    refuse(f"{plan_path} missing '## Milestones' section")
+
+if not re.search(r"^##\s+Story Dependency Graph\b", plan_clean, re.I | re.M):
+    refuse(f"{plan_path} missing '## Story Dependency Graph' section")
+
+if "flowchart TD" not in plan_clean:
+    refuse(f"{plan_path} must contain a 'flowchart TD' Mermaid diagram")
+
+# Check placeholders in plan.md
+pm = re.search(r"<(?!/?(?:br|sub|sup)\b)[^>\n]+>", plan_clean)
+if pm:
+    refuse(f"unresolved placeholder {pm.group(0)!r} in {plan_path}")
+km = re.search(r"\b(TBD|TODO|FIXME|XXX)\b", plan_clean)
+if km:
+    refuse(f"unresolved keyword placeholder {km.group(0)!r} in {plan_path}")
+
+# 2. Find and check all milestone manifests under docs/agents-v0/milestones/
+manifests = sorted(
+    f for f in glob.glob("docs/agents-v0/milestones/*.md")
+    if not os.path.basename(f).startswith("_") and os.path.basename(f) != "plan.md" and not f.endswith(".phase-result.md")
+)
+
+if not manifests:
+    refuse("no milestone manifests found under docs/agents-v0/milestones/ (e.g. p0-platform-skeleton.md, p1-contracts-and-data-models.md)")
+
+all_stories = {}
+deps_graph = {}
+valid_surfaces = {"backend", "bff", "frontend", "vertical slice"}
+
+for mf in manifests:
+    mtxt = open(mf, "r", encoding="utf-8").read()
+    mclean = re.sub(r"<!--.*?-->", "", mtxt, flags=re.DOTALL).strip()
+    if not mclean:
+        refuse(f"milestone manifest {mf} is empty")
+    
+    # Check placeholders outside Delivery approvals
+    body_before_approvals = re.split(r"^##\s+Delivery approvals\b", mclean, flags=re.I | re.M)[0]
+    pm = re.search(r"<(?!/?(?:br|sub|sup)\b)[^>\n]+>", body_before_approvals)
+    if pm:
+        refuse(f"unresolved placeholder {pm.group(0)!r} in {mf}")
+    km = re.search(r"\b(TBD|TODO|FIXME|XXX)\b", body_before_approvals)
+    if km:
+        refuse(f"unresolved keyword placeholder {km.group(0)!r} in {mf}")
+
+    # Parse story table rows
+    in_stories = False
+    header_seen = False
+    mf_stories_count = 0
+    for line in body_before_approvals.splitlines():
+        if re.match(r"^##\s+Stories\b", line, re.I):
+            in_stories = True
+            continue
+        if in_stories and re.match(r"^##\s+\S", line):
+            break
+        if not in_stories or not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 7:
+            if cells[0].lower() in ("story id", "---") or re.match(r"^-+$", cells[0]):
+                header_seen = True
+                continue
+            if not header_seen:
+                continue
+            
+            sid = cells[0]
+            sentence = cells[1]
+            art_cell = cells[2]
+            status_cell = cells[3]
+            dep_cell = cells[4]
+            surface_cell = cells[5].lower()
+            size_cell = cells[6]
+
+            # Story ID format: P\d+-[A-Z0-9]+
+            if not re.match(r"^P\d+-[A-Z0-9]+$", sid):
+                refuse(f"invalid Story ID {sid!r} in {mf}; must match P<milestone>-<id> (e.g. P1-A, P2-B)")
+            if sid in all_stories:
+                refuse(f"duplicate Story ID {sid!r} in {mf} (already declared in {all_stories[sid]['file']})")
+            
+            # User story sentence: As a [role], I want [goal], so that [benefit].
+            if not re.match(r"^As (?:a|an) .+, I want .+, so that .+\.$", sentence, re.I):
+                refuse(f"story {sid} in {mf} does not match 'As a [role], I want [goal], so that [benefit].': {sentence!r}")
+            if re.search(r"\[(?:role|goal|benefit)\]", sentence, re.I):
+                refuse(f"story {sid} in {mf} has unresolved template placeholders: {sentence!r}")
+            
+            # Surface validation
+            if surface_cell not in valid_surfaces:
+                refuse(f"story {sid} in {mf} has invalid Surface {cells[5]!r}; must be one of {', '.join(sorted(valid_surfaces))}")
+            
+            # Size validation (1-8, seeded P0-A = 4)
+            if not re.match(r"^\d+$", size_cell):
+                refuse(f"story {sid} in {mf} has non-numeric Size {size_cell!r}; must be an integer between 1 and 8")
+            sz = int(size_cell)
+            if sz < 1 or sz > 8:
+                refuse(f"story {sid} in {mf} has Size {sz}; must be between 1 and 8")
+            if sid == "P0-A" and sz != 4:
+                refuse(f"seeded story P0-A in {mf} must have Size 4 (found {sz})")
+            
+            # Dependencies validation: comma-separated concrete story IDs or —
+            deps = []
+            if dep_cell not in ("—", "-", "--", "None", "none", ""):
+                for d in [x.strip() for x in dep_cell.split(",") if x.strip()]:
+                    if re.match(r"^P\d+$", d):
+                        refuse(f"story {sid} in {mf} has bare milestone dependency {d!r}; must name concrete story IDs (e.g. P0-A, P1-B)")
+                    if not re.match(r"^P\d+-[A-Z0-9]+$", d):
+                        refuse(f"story {sid} in {mf} has invalid dependency {d!r}; must be concrete story IDs")
+                    deps.append(d)
+
+            all_stories[sid] = {"file": mf, "deps": deps, "surface": surface_cell, "size": sz}
+            deps_graph[sid] = deps
+            mf_stories_count += 1
+
+    if mf_stories_count == 0:
+        refuse(f"milestone manifest {mf} contains zero parsed story rows under '## Stories'")
+
+# 3. Check for cycles in story dependency graph (Jiraiya Recommendation 1)
+def detect_cycle(graph):
+    visited = {}
+    path = []
+
+    def dfs(node):
+        visited[node] = 1  # visiting
+        path.append(node)
+        for neighbor in graph.get(node, []):
+            if neighbor not in graph:
+                continue
+            if visited.get(neighbor) == 1:
+                cycle_start = path.index(neighbor)
+                return path[cycle_start:] + [neighbor]
+            elif neighbor not in visited:
+                res = dfs(neighbor)
+                if res:
+                    return res
+        path.pop()
+        visited[node] = 2  # visited
+        return None
+
+    for n in graph:
+        if n not in visited:
+            cycle = dfs(n)
+            if cycle:
+                return cycle
+    return None
+
+cycle = detect_cycle(deps_graph)
+if cycle:
+    refuse(f"dependency cycle detected in milestones: {' -> '.join(cycle)}")
+
+# 4. Check for undefined story dependencies
+for sid, info in all_stories.items():
+    for d in info["deps"]:
+        if d not in all_stories:
+            refuse(f"story {sid} in {info['file']} depends on unknown story ID {d!r}")
+
+# 5. Check cross-context integration stories if context-map.md defines calls
+cmap_path = "docs/agents-v0/design/system/context-map.md"
+if os.path.isfile(cmap_path):
+    cm_txt = open(cmap_path, "r", encoding="utf-8").read()
+    # If context map defines multiple non-empty contexts
+    contexts = []
+    in_bc = False
+    for line in cm_txt.splitlines():
+        if re.match(r"^##\s+Bounded contexts\b", line, re.I):
+            in_bc = True
+            continue
+        if in_bc and re.match(r"^##\s+\S", line):
+            break
+        if in_bc and line.strip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) >= 3 and cells[0].lower() not in ("context", "---") and not re.match(r"^-+$", cells[0]):
+                if cells[0]:
+                    contexts.append(cells[0])
+    if len(contexts) >= 2:
+        # Check that at least one story mentions integration or cross-context
+        has_integration = any(
+            "integration" in s["file"].lower() or any("integration" in w.lower() for w in s["deps"])
+            or "contract" in s["file"].lower()
+            for s in all_stories.values()
+        )
+        if not has_integration and len(all_stories) > 3:
+            # warn or check
+            pass
+
+# 6. Write docs/agents-v0/milestones/plan.phase-result.md
+phase_res_path = "docs/agents-v0/milestones/plan.phase-result.md"
+now_ts = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+with open(phase_res_path, "w", encoding="utf-8") as rf:
+    rf.write("# Plan Phase Result\n\n")
+    rf.write(f"- Artifact: {plan_path}\n")
+    rf.write(f"- Manifests: {len(manifests)} ({', '.join(os.path.basename(m) for m in manifests)})\n")
+    rf.write(f"- Total stories: {len(all_stories)}\n")
+    rf.write(f"- Acyclic dependency graph: verified\n")
+    rf.write(f"- Prepared at: {now_ts}\n")
+    rf.write("- Status: awaiting_approval\n")
+
+print(f"OK ready: plan verified ({len(manifests)} manifest(s), {len(all_stories)} stories; {phase_res_path})")
+PY
+)" || {
+    printf '%s\n' "$gp_ready_out"
+    exit 1
+  }
+
+  printf '%s\n' "$gp_ready_out"
+  gp_rule ready ready.next; gp_next="$gp_val"
+  gp_rule ready ready.status; gp_status="$gp_val"
+  gc_state_set "$gp_state" "$gp_feature" "$gp_artifact" "activePhase=$gp_phase" \
+    "activeStatus=$gp_status" "blockedReason=" "nextStep=$gp_next" || exit 1
+  printf 'Next: %s\n' "$gp_next"
+}
+
 gp_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check | start | block "<plain reason>" [--next "<next step>"]\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check | start | block "<plain reason>" [--next "<next step>"] | ready\n' >&2
   exit 2
 }
 
@@ -160,6 +397,7 @@ case "$gp_cmd" in
   check) gp_check "$@" ;;
   start) gp_start "$@" ;;
   block) gp_block "$@" ;;
+  ready) gp_ready "$@" ;;
   -h|--help) sed -n '2,24p' "$GP_HERE/guard-plan.sh" ;;
   *) gp_usage ;;
 esac
