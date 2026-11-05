@@ -152,6 +152,184 @@ ga_block() {
   printf 'Next: %s\n' "$ga_next"
 }
 
+ga_ready() {
+  [ $# -eq 0 ] || ga_usage
+  ga_load ready
+  ga_rule ready ready.requires; ga_requires="$ga_val"
+  for ga_req in $ga_requires; do
+    case "$ga_req" in
+      in-progress)
+        ga_cur="$(gc_state_get "$ga_state" activeStatus)"
+        [ "$ga_cur" = in_progress ] \
+          || gc_refuse ready "architecture is not in progress (state: ${ga_cur:-none}); run start first" ;;
+      *) gc_refuse ready "gate-rules names an unknown prerequisite '$ga_req'; reinstall the kit" ;;
+    esac
+  done
+
+  [ -f "$ga_artifact" ] || gc_refuse ready "architecture artifact '$ga_artifact' does not exist; run start first"
+
+  ga_ready_out="$(python3 - "$ga_artifact" <<'PY'
+import datetime, glob, os, re, sys
+
+arch_path = sys.argv[1]
+
+def refuse(msg):
+    print(f"REFUSED ready: {msg}")
+    sys.exit(1)
+
+if not os.path.isfile(arch_path):
+    refuse(f"missing {arch_path}")
+
+arch_text = open(arch_path, "r", encoding="utf-8").read()
+arch_clean = re.sub(r"<!--.*?-->", "", arch_text, flags=re.DOTALL)
+
+# 1. Check mandatory sections in architecture.md
+req_arch_sections = [
+    "C4 Context",
+    "C4 Container",
+    "Data flow",
+    "Data models",
+    "State machine",
+    "Failure domains and degradation",
+    "MVP and future state",
+]
+
+sections = {}
+cur_sec = None
+cur_lines = []
+for line in arch_clean.splitlines():
+    m = re.match(r"^##\s+(.+)$", line)
+    if m:
+        if cur_sec:
+            sections[cur_sec] = "\n".join(cur_lines).strip()
+        cur_sec = m.group(1).strip()
+        cur_lines = []
+    elif cur_sec:
+        cur_lines.append(line)
+if cur_sec:
+    sections[cur_sec] = "\n".join(cur_lines).strip()
+
+missing_sec = []
+for req in req_arch_sections:
+    matched = next((k for k in sections if k.lower() == req.lower()), None)
+    if not matched or not sections[matched]:
+        missing_sec.append(req)
+if missing_sec:
+    refuse(f"missing or empty section(s) in {arch_path}: {', '.join(missing_sec)}")
+
+if "placeholder[" in arch_clean:
+    refuse(f"unresolved diagram placeholder in {arch_path}")
+
+# 2. Check network.md
+net_path = "docs/agents-v0/network.md"
+if not os.path.isfile(net_path):
+    refuse(f"missing {net_path}")
+net_clean = re.sub(r"<!--.*?-->", "", open(net_path, "r", encoding="utf-8").read(), flags=re.DOTALL)
+if not re.search(r"^##\s+Target topology\b", net_clean, re.I | re.M):
+    refuse(f"{net_path} missing '## Target topology' section")
+
+# 3. Check Pattern ADR with Pack: <id>
+adr_files = sorted(
+    f for f in glob.glob("docs/agents-v0/adr/*.md")
+    if not os.path.basename(f).startswith("_") and not os.path.basename(f).startswith("0000-")
+)
+if not adr_files:
+    refuse("no pattern ADR found under docs/agents-v0/adr/ (expected docs/agents-v0/adr/<NN>-<slug>.md)")
+
+pack_id = None
+pattern_adr = None
+for adr in adr_files:
+    txt = re.sub(r"<!--.*?-->", "", open(adr, "r", encoding="utf-8").read(), flags=re.DOTALL)
+    m = re.search(r"^\s*Pack:\s*([a-z][a-z0-9_-]*)\s*$", txt, re.M)
+    if m:
+        pack_id = m.group(1).strip()
+        pattern_adr = adr
+        break
+
+if not pattern_adr or not pack_id:
+    refuse("no pattern ADR under docs/agents-v0/adr/ declares 'Pack: <id>'")
+
+# 4. Check required design/system files
+sys_files = [
+    "docs/agents-v0/design/system/context-map.md",
+    "docs/agents-v0/design/system/nfr-slo.md",
+    "docs/agents-v0/design/system/threat-model.md",
+    "docs/agents-v0/design/system/ops-readiness.md",
+    "docs/agents-v0/design/system/arc-record.md",
+]
+for sf in sys_files:
+    if not os.path.isfile(sf):
+        refuse(f"missing required architecture pack file {sf}")
+    stxt = re.sub(r"<!--.*?-->", "", open(sf, "r", encoding="utf-8").read(), flags=re.DOTALL).strip()
+    if not stxt:
+        refuse(f"architecture pack file {sf} is empty")
+    # Check for angle-bracket template placeholders outside Delivery approvals
+    body_before_approvals = re.split(r"^##\s+Delivery approvals\b", stxt, flags=re.I | re.M)[0]
+    pm = re.search(r"<(?!/?(?:br|sub|sup)\b)[^>\n]+>", body_before_approvals)
+    if pm:
+        refuse(f"unresolved placeholder {pm.group(0)!r} in {sf}")
+    km = re.search(r"\b(TBD|TODO|FIXME|XXX)\b", body_before_approvals)
+    if km:
+        refuse(f"unresolved keyword placeholder {km.group(0)!r} in {sf}")
+
+# Check placeholders in architecture.md target sections
+for req in req_arch_sections:
+    matched = next((k for k in sections if k.lower() == req.lower()), req)
+    sec_txt = sections.get(matched, "")
+    pm = re.search(r"<(?!/?(?:br|sub|sup)\b)[^>\n]+>", sec_txt)
+    if pm:
+        refuse(f"unresolved placeholder {pm.group(0)!r} in {arch_path} section '{req}'")
+    km = re.search(r"\b(TBD|TODO|FIXME|XXX)\b", sec_txt)
+    if km:
+        refuse(f"unresolved keyword placeholder {km.group(0)!r} in {arch_path} section '{req}'")
+
+# 5. Check architecture-review.md (FA3)
+rev_path = "docs/agents-v0/design/system/architecture-review.md"
+if not os.path.isfile(rev_path):
+    refuse(f"missing {rev_path}; launch design-reviewer on the architecture pack first")
+rev_text = open(rev_path, "r", encoding="utf-8").read()
+if not re.search(r"^\s*agent:\s*design-reviewer\b", rev_text, re.I | re.M):
+    refuse(f"{rev_path} must start with 'agent: design-reviewer'")
+
+open_findings = []
+for line in rev_text.splitlines():
+    if not line.strip().startswith("|"):
+        continue
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    if len(cells) >= 5 and cells[0].lower() not in ("#", "---") and not re.match(r"^-+$", cells[0]):
+        status_cell = cells[-1].lower()
+        if status_cell == "open":
+            open_findings.append(cells[0])
+
+if open_findings:
+    refuse(f"{rev_path} has {len(open_findings)} Open finding(s) ({', '.join(open_findings)}); resolve or disposition all findings before ready")
+
+# 6. Write docs/agents-v0/architecture.phase-result.md
+phase_res_path = "docs/agents-v0/architecture.phase-result.md"
+now_ts = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+with open(phase_res_path, "w", encoding="utf-8") as rf:
+    rf.write("# Architecture Phase Result\n\n")
+    rf.write(f"- Artifact: {arch_path}\n")
+    rf.write(f"- Pattern ADR: {pattern_adr} (Pack: {pack_id})\n")
+    rf.write(f"- Review: {rev_path} (0 Open findings)\n")
+    rf.write(f"- Prepared at: {now_ts}\n")
+    rf.write("- Status: awaiting_approval\n")
+
+print(f"OK ready: architecture pack verified (ADR: {pattern_adr}, Pack: {pack_id}, 0 Open findings; {phase_res_path})")
+PY
+)" || {
+    printf '%s\n' "$ga_ready_out"
+    exit 1
+  }
+
+  printf '%s\n' "$ga_ready_out"
+  ga_rule ready ready.next; ga_next="$ga_val"
+  ga_rule ready ready.status; ga_status="$ga_val"
+  gc_state_set "$ga_state" "$ga_feature" "$ga_artifact" "activePhase=$ga_phase" \
+    "activeStatus=$ga_status" "blockedReason=" "nextStep=$ga_next" || exit 1
+  printf 'Next: %s\n' "$ga_next"
+}
+
 ga_usage() {
   printf 'usage: sh .agents-v0/scripts/guard-architecture.sh check | start | block "<plain reason>" [--next "<next step>"] | ready | commit | steps\n' >&2
   exit 2
@@ -163,6 +341,7 @@ case "$ga_cmd" in
   check) ga_check "$@" ;;
   start) ga_start "$@" ;;
   block) ga_block "$@" ;;
+  ready) ga_ready "$@" ;;
   -h|--help) sed -n '2,24p' "$GA_HERE/guard-architecture.sh" ;;
   *) ga_usage ;;
 esac
