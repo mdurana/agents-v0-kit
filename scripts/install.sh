@@ -217,18 +217,21 @@ write_hook_python() {
   printf '%s\n' "$HOOK_PYTHON_PIN" > "$1/hook-python"
   chmod 644 "$1/hook-python"
 }
-# JN-2 (Jiraiya's N-1 review): the pin is per-machine state checked on this machine. A gate commit (git add -A) would
-#   otherwise stage it and send it to every clone, where a pin to an agent-writable path switches the hooks off. The
-#   template .gitignore lists both pins; an existing (brownfield) .gitignore gains the lines on install and --update.
+# JN-2 (Jiraiya's N-1 review) + V5-4B (Design: D8): per-machine hook pins, audit logs, lockfiles and Python bytecode
+#   must never be staged or left dirty after onboarding. The template .gitignore lists all of them; an existing
+#   (brownfield) .gitignore gains any missing lines on install and --update.
 ignore_hook_python() {
   gi="$1/.gitignore"
   ig_missing=""
-  for ig in .cursor/hooks/hook-python .agents/hooks/hook-python; do
+  for ig in .cursor/hooks/hook-python .agents/hooks/hook-python \
+    .cursor/hooks/audit.jsonl .agents/hooks/audit.jsonl \
+    docs/agents-v0/onboarding/state.json.lock 'docs/agents-v0/**/*.lock' \
+    __pycache__/; do
     [ -f "$gi" ] && grep -Fqx "$ig" "$gi" || ig_missing="$ig_missing $ig"
   done
   [ -n "$ig_missing" ] || return 0
   [ ! -s "$gi" ] || [ -z "$(tail -c 1 "$gi")" ] || printf '\n' >> "$gi"
-  printf '\n# --- Hook interpreter pin (per machine; never commit) ---\n' >> "$gi"
+  printf '\n# --- Hook interpreter pin & local runtime state (per machine; never commit) ---\n' >> "$gi"
   for ig in $ig_missing; do printf '%s\n' "$ig" >> "$gi"; done
   printf 'MIGRATED (project-owned file edited): .gitignore gained%s\n' "$ig_missing"
 }

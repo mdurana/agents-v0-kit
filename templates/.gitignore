@@ -59,6 +59,7 @@ build/
 !docs/agents-v0/build/**
 !docs/agents-v0/verify/
 !docs/agents-v0/verify/**
+docs/agents-v0/onboarding/state.json.lock
 docs/agents-v0/**/*.lock
 .svelte-kit/
 .output/

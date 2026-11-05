@@ -326,6 +326,9 @@ for internal in sync-feature-state.sh audit-brownfield-baseline.sh check-onboard
     err "core/common/commands/v0-onboard.md names the internal '$internal' (the guard runs it; keep the prose to guard-onboard.sh steps)"
   fi
 done
+# Onboard follow-up V5-4B, Design: D8. Ignore lines (__pycache__/, audit.jsonl, state.json.lock) + brownfield migration.
+[ -f scripts/test-onboard-ignore.sh ] || err "scripts/test-onboard-ignore.sh missing (V5-4B, Design: D8)"
+sh scripts/test-onboard-ignore.sh >/dev/null || err "scripts/test-onboard-ignore.sh failed"
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
 [ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"
