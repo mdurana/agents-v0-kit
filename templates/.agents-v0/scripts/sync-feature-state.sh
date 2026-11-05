@@ -138,6 +138,24 @@ if [ "$set_active" = 1 ] && [ "$active_phase" = architecture ] && [ "$active_sta
   fi
 fi
 
+# Plan prerequisite gate (FA8, DA7): cannot enter non-P0-A plan unless Sensei's external architecture approval record exists
+if [ "$set_active" = 1 ] && [ "$active_phase" = plan ] && [ "$active_status" != blocked ]; then
+  guard_common="$(dirname "$0")/guard-common.sh"
+  if [ -f "$guard_common" ]; then
+    GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+    plan_prog_phases="$(gc_state_get docs/agents-v0/program.state.json approvedPhases 2>/dev/null | tr -d '[]",' || true)"
+    case " $plan_prog_phases " in
+      *" roadmap "*|*" architecture "*)
+        if ! ok_msg="$(gc_approval_ok architecture)"; then
+          printf 'FAIL: plan requires approved architecture record: %s\n' "$ok_msg" >&2
+          printf '  Complete /v0-architecture and ensure Sensei approves via guard-common.sh approve architecture before starting plan.\n' >&2
+          exit 1
+        fi
+        ;;
+    esac
+  fi
+fi
+
 # Release approval only on the integration branch (kitfix-20261029-step4-p1e). Release is recorded in the
 # integration checkout after the merge (v0-local-release step 6, local-release step 8;
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
