@@ -112,8 +112,45 @@ gp_check() {
   printf 'Next: Start plan with: sh .agents-v0/scripts/guard-plan.sh start\n'
 }
 
+gp_start() {
+  [ $# -eq 0 ] || gp_usage
+  gp_load start
+  gp_rule start start.requires; gp_requires="$gp_val"
+  gp_check_prereqs start "$gp_requires"
+
+  mkdir -p docs/agents-v0/milestones
+  if [ ! -f "$gp_artifact" ]; then
+    printf '# Program Plan\n\n## Milestones\n\n| Milestone | Stories | What they cover |\n|---|---|---|\n\n## Story Dependency Graph\n\n```mermaid\nflowchart TD\n```\n' > "$gp_artifact"
+  fi
+
+  gp_rule start start.next; gp_next="$gp_val"
+  gp_rule start start.status; gp_status="$gp_val"
+
+  gc_state_set "$gp_state" "$gp_feature" "$gp_artifact" "activePhase=$gp_phase" \
+    "activeStatus=$gp_status" "blockedReason=" "nextStep=$gp_next" || exit 1
+  gc_ok start "plan state is $(gc_state_get "$gp_state" activeStatus) ($gp_state)"
+  printf 'Next: %s\n' "$gp_next"
+}
+
+gp_block() {
+  [ $# -ge 1 ] && [ -n "$1" ] || gp_usage
+  gp_reason="$1"; shift
+  gp_next=""
+  if [ $# -gt 0 ]; then
+    [ $# -eq 2 ] && [ "$1" = --next ] && [ -n "$2" ] || gp_usage
+    gp_next="$2"
+  fi
+  gp_load block
+  if [ -z "$gp_next" ]; then gp_rule block block.next; gp_next="$gp_val"; fi
+  gp_rule block block.status; gp_status="$gp_val"
+  gc_state_set "$gp_state" "$gp_feature" "$gp_artifact" "activePhase=$gp_phase" \
+    "activeStatus=$gp_status" "blockedReason=$gp_reason" "nextStep=$gp_next" || exit 1
+  gc_ok block "plan state is blocked: $gp_reason"
+  printf 'Next: %s\n' "$gp_next"
+}
+
 gp_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check | start | block "<plain reason>" [--next "<next step>"]\n' >&2
   exit 2
 }
 
@@ -121,6 +158,8 @@ gp_usage() {
 gp_cmd="$1"; shift
 case "$gp_cmd" in
   check) gp_check "$@" ;;
+  start) gp_start "$@" ;;
+  block) gp_block "$@" ;;
   -h|--help) sed -n '2,24p' "$GP_HERE/guard-plan.sh" ;;
   *) gp_usage ;;
 esac
