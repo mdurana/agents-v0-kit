@@ -16,8 +16,8 @@ case "$branch" in
   *) exit 0 ;;
 esac
 all="$(grep -c '^Design:' "$msg" || true)"
-good="$(grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA)$' "$msg" || true)"
+good="$(grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA|DA[0-9]+|DAA)$' "$msg" || true)"
 if [ "$all" != 1 ] || [ "$good" != 1 ]; then
-  printf 'commit-msg: a commit on %s needs exactly one line `Design: D<n>` (or `Design: DA`, `Design: DR<n>`, `Design: DRA`); found %s Design: line(s), %s well-formed.\n' "$branch" "$all" "$good" >&2
+  printf 'commit-msg: a commit on %s needs exactly one line `Design: D<n>` (or `Design: DA`, `Design: DR<n>`, `Design: DRA`, `Design: DA<n>`, `Design: DAA`); found %s Design: line(s), %s well-formed.\n' "$branch" "$all" "$good" >&2
   exit 1
 fi

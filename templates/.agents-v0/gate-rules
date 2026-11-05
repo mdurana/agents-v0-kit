@@ -60,3 +60,25 @@ roadmap commit.message program: roadmap approved
 roadmap commit.tag roadmap-v
 roadmap approved.next /v0-architecture
 
+# --- architecture (/v0-architecture, guard-architecture.sh) ---------------------------------------
+architecture phase architecture
+architecture feature program
+architecture state docs/agents-v0/program.state.json
+architecture artifact docs/agents-v0/architecture.md
+# check & start: prerequisites
+architecture check.requires git-work-tree kit-installed onboard-if-brownfield roadmap-approved not-approved
+architecture start.requires git-work-tree kit-installed onboard-if-brownfield roadmap-approved not-awaiting-approval
+architecture start.status in_progress
+architecture start.next Launch the solution-architect subagent (skill: program-architecture) to author the architecture pack, then launch design-reviewer to write docs/agents-v0/design/system/architecture-review.md.
+# block: status and next step
+architecture block.status blocked
+architecture block.next Fix the blocker, then run /v0-architecture again; it resumes from the files on disk.
+# ready: verifies architecture pack completeness and zero Open findings in architecture-review.md
+architecture ready.requires in-progress
+architecture ready.status awaiting_approval
+architecture ready.next Sensei reviews the architecture pack and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve architecture
+# commit: checks approval record, promotes ADR to Accepted, appends Approved row, runs activate-stack-pack.sh, stages paths, secret-scans, commits and tags
+architecture commit.paths docs/agents-v0/architecture.md docs/agents-v0/architecture.phase-result.md docs/agents-v0/network.md docs/agents-v0/adr docs/agents-v0/design/system docs/agents-v0/diagrams docs/agents-v0/project-profile.md docs/agents-v0/program.state.json .cursor/rules/org .cursor/skills .cursor/agents .agents/rules/org .agents/skills .agents/agents
+architecture commit.message program: architecture approved
+architecture commit.tag architecture-v
+architecture approved.next /v0-plan
