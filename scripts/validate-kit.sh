@@ -326,6 +326,9 @@ for internal in sync-feature-state.sh audit-brownfield-baseline.sh check-onboard
     err "core/common/commands/v0-onboard.md names the internal '$internal' (the guard runs it; keep the prose to guard-onboard.sh steps)"
   fi
 done
+# Onboard follow-up V5-4B, Design: D8. Ignore lines (__pycache__/, audit.jsonl, state.json.lock) + brownfield migration.
+[ -f scripts/test-onboard-ignore.sh ] || err "scripts/test-onboard-ignore.sh missing (V5-4B, Design: D8)"
+sh scripts/test-onboard-ignore.sh >/dev/null || err "scripts/test-onboard-ignore.sh failed"
 # Roadmap redo, Design: DR8. Drift check A: the /v0-roadmap step block matches `guard-roadmap.sh steps` byte for byte.
 sh scripts/generate-roadmap-steps.sh --check >/dev/null || err "core/common/commands/v0-roadmap.md step block drifted from guard-roadmap.sh steps (run sh scripts/generate-roadmap-steps.sh)"
 [ -f scripts/test-roadmap-steps.sh ] || err "scripts/test-roadmap-steps.sh missing"

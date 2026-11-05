@@ -6,6 +6,9 @@ Thumbs.db
 # Logs and local output
 *.log
 .cursor/hooks/audit.jsonl
+.agents/hooks/audit.jsonl
+docs/agents-v0/onboarding/state.json.lock
+docs/agents-v0/**/*.lock
 
 # Dependency/build trees (kit repo itself has none, but keep hygiene if scratch work appears)
 node_modules/

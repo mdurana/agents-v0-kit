@@ -17,6 +17,19 @@ On an Intel Mac, run `sh .agents-v0/scripts/host-tools-macports.sh` before the f
 
 Do **not** run `bootstrap-greenfield.sh --scaffold-app` on an existing codebase. That archive is for empty greenfield repos only; `/v0-onboard` records the tree as it is and does not move source onto `app/backend` / `app/frontend`.
 
+### Before `/v0-onboard`: set up Cursor and git
+
+Do these three steps once, before the first `/v0-onboard`:
+
+1. **Set Cursor's auto-run to "ask every time".** Do this first. Cursor then asks you before each command the agent runs, and the kit's command hook still checks each one. Together they make it hard for the agent to run the approve step itself, but they are not a full guarantee: a script the agent writes and then runs, or passwordless `sudo` for your user, could get past them. Read each command before you allow it.
+2. **Answer the workspace-trust prompt.** When Cursor (or `cursor-agent` in a terminal) opens the repo and asks whether you trust this folder, trust it only if it is your own repo. Cursor loads the project's hooks under `.cursor/` only in a trusted folder, so an untrusted folder runs with no kit hooks.
+3. **Set your git name and email in the repo** before `guard-onboard.sh commit` makes the onboard commit, so that commit has a real author:
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
+
 Then run `/v0-onboard` in chat (agent **`codebase-documenter`**, skill **`onboard-discovery`**). It documents the
 codebase as it is today, with every statement cited to code or marked `UNVERIFIED`, and stops for your approval before `/v0-roadmap`, `/v0-architecture`, `/v0-intake`, or `/v0-plan`.
 
