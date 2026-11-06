@@ -227,11 +227,174 @@ gi_check() {
 }
 
 gi_start() {
-  gc_refuse start "not yet implemented (DI2)"
+  gi_s_slug=""
+  gi_s_reopen=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reopen)
+        gi_s_reopen=1
+        shift
+        ;;
+      -*)
+        gi_usage
+        ;;
+      *)
+        [ -z "$gi_s_slug" ] || gi_usage
+        gi_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  gi_load start "$gi_s_slug"
+  gi_rule start start.requires "$gi_feature"; gi_requires="$gi_val"
+  gi_check_prereqs start "$gi_requires" "$gi_s_reopen"
+  if [ "$gi_s_reopen" != 1 ]; then
+    gi_check_prereqs start "not-approved" 0
+  fi
+
+  # Refuse unrelated dirty paths on the integration branch
+  gi_dirty="$(git status --porcelain 2>/dev/null | awk '{print $NF}' | grep -Ev "^docs/agents-v0/requirements/${gi_feature}(\\.|$)" || true)"
+  if [ -n "$gi_dirty" ]; then
+    gc_refuse start "working tree has uncommitted changes outside docs/agents-v0/requirements/${gi_feature}.*; commit or stash them first"
+  fi
+
+  mkdir -p docs/agents-v0/requirements
+  if [ ! -f "$gi_artifact" ]; then
+    cat > "$gi_artifact" <<EOF
+# Feature Requirements: $gi_feature
+
+As a <role>, I want <goal>, so that <benefit>.
+
+Surfaces: backend
+Vertical slice: no
+
+## Preconditions
+
+- <precondition>
+
+## Desk check
+
+Material: no
+- Reviewed existing endpoints and models.
+
+## Acceptance criteria
+
+### AC-1 — <scenario title>
+Kind: happy
+Given <precondition>
+When <action>
+Then <observable outcome>
+
+### AC-2 — <negative or edge scenario title>
+Kind: negative
+Given <invalid precondition or input>
+When <action>
+Then the request is rejected with status 400
+
+## Out of scope
+
+- <explicitly excluded item>
+
+## Non-functional requirements
+
+- Latency: p95 < 250ms
+- Availability: 99.9%
+
+## Applicable regulations
+
+- None
+
+## Security-review triggers
+
+- Auth / RBAC changes: no
+- Untrusted input / file upload: no
+- Sensitive data / PII: no
+- External network call: no
+- State-changing endpoint: yes
+
+## Open questions
+
+Open questions: none
+
+## Delivery approvals
+
+| Phase | Decision | Approver | Date |
+|---|---|---|---|
+EOF
+  fi
+
+  gi_rule start start.next "$gi_feature"; gi_next="$gi_val"
+  gi_rule start start.status "$gi_feature"; gi_status="$gi_val"
+
+  if [ "$gi_s_reopen" = 1 ] && [ -f "$gi_state" ]; then
+    python3 - "$gi_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+phases = [x for x in (d.get("approvedPhases") or []) if x != "intake"]
+d["approvedPhases"] = phases
+d["lastApprovedPhase"] = phases[-1] if phases else ""
+d["reopenCount"] = int(d.get("reopenCount") or 0) + 1
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_state_set "$gi_state" "$gi_feature" "$gi_artifact" "activePhase=$gi_phase" \
+    "activeStatus=$gi_status" "blockedReason=" "nextStep=$gi_next" || exit 1
+
+  gc_ok start "intake in_progress on $gi_artifact"
+  printf 'Next: %s\n' "$gi_next"
 }
 
 gi_block() {
-  gc_refuse block "not yet implemented (DI2)"
+  [ $# -ge 2 ] || gc_die "usage: $G block <feature> \"<plain reason>\""
+  gi_b_slug="$1"
+  shift
+  gi_reason="$*"
+  [ -n "$(printf '%s' "$gi_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+
+  gi_load block "$gi_b_slug"
+  gi_rule block block.status "$gi_feature"; gi_status="$gi_val"
+  gi_rule block block.next "$gi_feature"; gi_next="$gi_val"
+
+  [ -f "$gi_state" ] || gc_refuse block "intake for '$gi_feature' has not been started ($gi_state missing)"
+  [ "$(gc_state_get "$gi_state" activePhase)" = "$gi_phase" ] \
+    || gc_refuse block "activePhase for '$gi_feature' is '$(gc_state_get "$gi_state" activePhase)', not '$gi_phase'"
+
+  # Helper-brief deduplication (FI6): if <feature>.helper-brief.md exists, refuse identical repeat asks
+  gi_brief="docs/agents-v0/requirements/${gi_feature}.helper-brief.md"
+  if [ -f "$gi_brief" ]; then
+    if ! python3 - "$gi_state" "$gi_brief" <<'PY'
+import hashlib, json, re, sys
+state_p, brief_p = sys.argv[1:3]
+raw = open(brief_p, encoding="utf-8").read()
+norm = re.sub(r"\s+", " ", raw.strip().lower())
+digest = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+data = json.load(open(state_p, encoding="utf-8"))
+prev = data.get("lastHelperBriefHash") or ""
+if prev and prev == digest:
+    sys.exit(1)
+data["lastHelperBriefHash"] = digest
+with open(state_p, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+PY
+    then
+      gc_refuse block "duplicate helper brief in $gi_brief; do not re-ask the same helper question"
+    fi
+  fi
+
+  gc_state_set "$gi_state" "$gi_feature" "$gi_artifact" "activePhase=$gi_phase" \
+    "activeStatus=$gi_status" "blockedReason=$gi_reason" "nextStep=$gi_next" || exit 1
+
+  gc_ok block "intake for $gi_feature blocked ($gi_reason)"
+  printf 'Next: %s\n' "$gi_next"
 }
 
 gi_ready() {
