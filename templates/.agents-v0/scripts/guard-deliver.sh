@@ -617,8 +617,67 @@ gd_ready() {
     "$gd_active_phase" "$gd_active_phase" "$gd_feature" "$gd_feature"
 }
 
+# Design: DDL5 (/v0-deliver commit delegation with external approval verification and next-phase routing).
 gd_commit() {
-  gc_refuse commit "guard-deliver.sh commit is not implemented yet (Design: DDL5)"
+  gd_c_slug=""
+  gd_c_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        gd_c_maint=1
+        shift
+        ;;
+      -*)
+        gd_usage
+        ;;
+      *)
+        [ -z "$gd_c_slug" ] || gd_usage
+        gd_c_slug="$1"
+        shift
+        ;;
+    esac
+  done
+  [ -n "$gd_c_slug" ] || gc_refuse commit "missing <feature> slug; usage: $G commit <feature> [--maintain]"
+
+  gd_resolve_context commit "$gd_c_slug" "$gd_c_maint" "" 0
+  [ -f "$gd_state_full" ] || gc_refuse commit "deliver for '$gd_feature' has not been started ($gd_rel_state missing)"
+  [ -n "$gd_pending_commit_phase" ] \
+    || gc_refuse commit "no approved uncommitted gate found for '$gd_feature' (activePhase='${gd_active_phase:-none}', activeStatus='${gd_active_status:-none}', lastApprovedPhase='${gd_last_approved:-none}'); run $G ready $gd_feature and have Sensei approve first"
+
+  gd_c_phase="$gd_pending_commit_phase"
+  if [ "$gd_active_status" = "awaiting_approval" ] && [ "$gd_c_phase" != "local-release" ]; then
+    case " $(gc_state_get "$gd_state_full" approvedPhases 2>/dev/null | tr -d '[]",') " in
+      *" $gd_c_phase "*) ;;
+      *)
+        (cd "$gd_work_dir" && gc_state_set "$gd_rel_state" "$gd_feature" "$gd_rel_art" \
+          "approvePhase=$gd_c_phase" "activePhase=" "activeStatus=" "blockedReason=" "nextStep=") || exit 1
+        ;;
+    esac
+  fi
+
+  gd_c_args="$gd_feature"
+  if [ "$gd_is_maintain" = 1 ] && [ "$gd_c_phase" != "maintain" ]; then
+    gd_c_args="$gd_c_args --maintain"
+  fi
+
+  # shellcheck disable=SC2086
+  if ! gd_c_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-${gd_c_phase}.sh" commit $gd_c_args 2>&1)"; then
+    printf '%s\n' "$gd_c_out"
+    exit 1
+  fi
+  printf '%s\n' "$gd_c_out"
+
+  gd_m_flag=""
+  [ "$gd_is_maintain" != 1 ] || gd_m_flag=" --maintain"
+
+  if [ "$gd_c_phase" = "local-release" ]; then
+    gc_ok commit "deliver ($gd_feature) committed local-release; story delivery is COMPLETE"
+    printf 'Next: /v0-status\n'
+    return 0
+  fi
+
+  gc_ok commit "deliver ($gd_feature) committed phase '$gd_c_phase'; next phase is '$gd_target_phase'"
+  printf 'Next: %s start %s%s\n' "$G" "$gd_feature" "$gd_m_flag"
 }
 
 gd_steps() {
