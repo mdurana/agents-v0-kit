@@ -379,11 +379,363 @@ PY
   printf 'Next: %s\n' "$gd_next"
 }
 
+gd_ready() {
+  [ $# -eq 1 ] || gd_usage
+  gd_r_slug="$1"
+  gd_load ready "$gd_r_slug"
+  gd_rule ready ready.requires "$gd_feature"; gd_requires="$gd_val"
+  gd_check_prereqs ready "$gd_requires" 0
+
+  gd_brief="docs/agents-v0/design/${gd_feature}/helper-brief.md"
+  if [ -f "$gd_brief" ]; then
+    gc_refuse ready "unresolved helper brief '$gd_brief' is still on disk; resolve and remove it (or run $G block $gd_feature \"<reason>\")"
+  fi
+
+  # Reject any modification to the repo-wide OpenAPI catalog during Design (Jiraiya Rec 3)
+  gd_cat_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -E '^openapi/' || true)"
+  if [ -n "$gd_cat_dirty" ]; then
+    gc_refuse ready "repo-wide OpenAPI catalog ($gd_cat_dirty) was modified during Design; keep changes in docs/agents-v0/design/$gd_feature/openapi.yaml (Build merges the approved draft)"
+  fi
+
+  [ -f "$gd_artifact" ] || gc_refuse ready "design artifact '$gd_artifact' is missing"
+
+  gd_base="$(gc_state_get "$gd_state" baseCommit 2>/dev/null || git rev-parse HEAD)"
+
+  if ! gd_val_out="$(python3 - "$gd_req_art" "$gd_artifact" "$gd_result" "$gd_feature" "$gd_base" <<'PY'
+import glob, os, re, sys
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+req_path, design_path, res_path, slug, base_commit = sys.argv[1:6]
+req_txt = open(req_path, "r", encoding="utf-8").read()
+design_txt = open(design_path, "r", encoding="utf-8").read()
+
+def refuse(msg):
+    print(f"REFUSED ready: {msg}")
+    sys.exit(1)
+
+# 1. Unresolved TEMPLATE comments or placeholders in design.md
+if "<!-- TEMPLATE:" in design_txt:
+    refuse(f"{design_path} still contains unresolved '<!-- TEMPLATE:' lines; replace and delete them")
+
+clean_design = re.sub(r"<!--.*?-->", "", design_txt, flags=re.S)
+placeholders = re.findall(r"<(?:feature|reason|AC-\d+|operationId[^>]*|role|BOLA[^>]*|describe[^>]*|metrics[^>]*|feature flag[^>]*|TBD|TODO|[^>]{1,40})>|\[(?:TODO|TBD|FIXME)\]|\b(?:TODO|TBD|FIXME)\b", clean_design)
+real_ph = [p for p in placeholders if not re.match(r"^<\s*\d", p)]
+if real_ph:
+    refuse(f"{design_path} contains unresolved placeholders: {', '.join(sorted(set(real_ph))[:5])}")
+
+# 2. Mandatory sections in design.md
+required_sections = [
+    "Traceability",
+    "Data model",
+    "Authorization",
+    "Events",
+    "Failure modes",
+    "Observability",
+    "Rollout",
+]
+for sec in required_sections:
+    if not re.search(rf"^##\s+{re.escape(sec)}\b", clean_design, flags=re.M | re.I):
+        refuse(f"{design_path} is missing mandatory section '## {sec}'")
+
+def section_body(text, heading):
+    m = re.search(rf"^##\s+{re.escape(heading)}\b[^\n]*\n(.*?)(?=^##\s+|\Z)", text, flags=re.M | re.S | re.I)
+    return m.group(1).strip() if m else ""
+
+trace_sec = section_body(clean_design, "Traceability")
+auth_sec = section_body(clean_design, "Authorization")
+events_sec = section_body(clean_design, "Events")
+fail_sec = section_body(clean_design, "Failure modes")
+
+# 3. Parse requirements ACs, negative/edge ACs, surfaces, Material, security triggers
+clean_req = re.sub(r"<!--.*?-->", "", req_txt, flags=re.S)
+ac_matches = list(re.finditer(r"^###\s+AC-(\d+)\b[^\n]*$", clean_req, flags=re.M))
+req_acs = [int(m.group(1)) for m in ac_matches]
+neg_edge_acs = []
+for idx, m in enumerate(ac_matches):
+    start = m.end()
+    end = ac_matches[idx + 1].start() if idx + 1 < len(ac_matches) else len(clean_req)
+    next_h2 = re.search(r"^##\s+", clean_req[start:end], flags=re.M)
+    if next_h2:
+        end = start + next_h2.start()
+    blk = clean_req[start:end]
+    km = re.search(r"^Kind:\s*(happy|negative|edge)\s*$", blk, flags=re.M | re.I)
+    if km and km.group(1).lower() in ("negative", "edge"):
+        neg_edge_acs.append(f"AC-{m.group(1)}")
+
+# T1 & T3: Every AC-n from requirements must appear in Traceability, and no unknown AC-n in design.md
+missing_acs = [f"AC-{n}" for n in req_acs if not re.search(rf"\bAC-{n}(?!\d)", trace_sec)]
+if missing_acs:
+    refuse(f"{design_path} ## Traceability is missing requirements ACs: {', '.join(missing_acs)}")
+extra_acs = sorted(set(int(n) for n in re.findall(r"\bAC-(\d+)(?!\d)", clean_design)) - set(req_acs))
+if extra_acs:
+    refuse(f"{design_path} cites unknown AC ids not in {req_path}: {', '.join('AC-'+str(n) for n in extra_acs)}")
+
+# Failure modes must name every Kind: negative and Kind: edge AC
+missing_neg_fail = [ac for ac in neg_edge_acs if not re.search(rf"\b{re.escape(ac)}(?!\d)", fail_sec)]
+if missing_neg_fail:
+    refuse(f"{design_path} ## Failure modes must name every Kind: negative and Kind: edge AC (missing: {', '.join(missing_neg_fail)})")
+
+# 4. Material: yes check
+mat_m = re.search(r"^Material:\s*(yes|no)\b", clean_req, flags=re.M | re.I)
+is_material = bool(mat_m and mat_m.group(1).lower() == "yes")
+if is_material:
+    if "docs/agents-v0/design/system/arc-record.md" not in clean_design:
+        refuse(f"{req_path} has 'Material: yes', so {design_path} must cite 'docs/agents-v0/design/system/arc-record.md'")
+    if not os.path.isfile("docs/agents-v0/design/system/arc-record.md"):
+        refuse(f"{req_path} has 'Material: yes', but 'docs/agents-v0/design/system/arc-record.md' is missing on disk")
+
+# 5. OpenAPI contract validation
+openapi_path = f"docs/agents-v0/design/{slug}/openapi.yaml"
+has_openapi = os.path.isfile(openapi_path)
+no_http_api = bool(re.search(r"N/A:\s*no\s+/api/v1\s+operation", clean_design, flags=re.I))
+
+if has_openapi and no_http_api:
+    refuse(f"{openapi_path} exists on disk, so {design_path} must not say 'N/A: no /api/v1 operation'")
+if not has_openapi and not no_http_api:
+    refuse(f"neither {openapi_path} exists nor does {design_path} record 'N/A: no /api/v1 operation'")
+
+op_ids = []
+if has_openapi:
+    raw_oa = open(openapi_path, "r", encoding="utf-8").read()
+    if yaml is not None:
+        try:
+            oa = yaml.safe_load(raw_oa)
+        except Exception as exc:
+            refuse(f"{openapi_path} is not valid YAML: {exc}")
+    else:
+        oa = None
+    if not isinstance(oa, dict) or not str(oa.get("openapi", "")).startswith("3.0"):
+        refuse(f"{openapi_path} must declare 'openapi: 3.0.x'")
+    # Check no external $ref
+    for ref_m in re.finditer(r"\$ref:\s*['\"]?([^'\"\s#]+)", raw_oa):
+        ext_ref = ref_m.group(1)
+        if ext_ref:
+            refuse(f"{openapi_path} must be self-contained (external $ref '{ext_ref}' is forbidden)")
+    paths = oa.get("paths") or {}
+    if not isinstance(paths, dict) or not paths:
+        refuse(f"{openapi_path} must define at least one path under 'paths:'")
+    for p_key, p_item in paths.items():
+        if not str(p_key).startswith("/api/v1"):
+            refuse(f"{openapi_path} path '{p_key}' must start with '/api/v1'")
+        if not isinstance(p_item, dict):
+            continue
+        for method, op_obj in p_item.items():
+            m_low = str(method).lower()
+            if m_low not in ("get", "post", "put", "patch", "delete", "head", "options"):
+                continue
+            if not isinstance(op_obj, dict):
+                refuse(f"{openapi_path} {method.upper()} {p_key} is invalid")
+            op_id = op_obj.get("operationId")
+            if not op_id or not isinstance(op_id, str):
+                refuse(f"{openapi_path} {method.upper()} {p_key} is missing 'operationId'")
+            if op_id in op_ids:
+                refuse(f"{openapi_path} has duplicate operationId '{op_id}'")
+            op_ids.append(op_id)
+            # Check operationId in Authorization and Traceability
+            if not re.search(rf"\b{re.escape(op_id)}\b", auth_sec):
+                refuse(f"operationId '{op_id}' from {openapi_path} is missing in {design_path} ## Authorization")
+            if not re.search(rf"\b{re.escape(op_id)}\b", trace_sec):
+                refuse(f"operationId '{op_id}' from {openapi_path} is missing in {design_path} ## Traceability")
+            # For {id} path, verify Authorization row has non-empty BOLA resource rule
+            if "{" in str(p_key):
+                row_found = False
+                for line in auth_sec.splitlines():
+                    if line.strip().startswith("|") and re.search(rf"\b{re.escape(op_id)}\b", line):
+                        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                        if len(cells) >= 3 and cells[2] and cells[2] not in ("-", "—", "N/A", "none"):
+                            row_found = True
+                if not row_found:
+                    refuse(f"operationId '{op_id}' on parameterized path '{p_key}' requires a non-empty BOLA Resource rule in ## Authorization")
+            # For POST, require Idempotency-Key header parameter
+            if m_low == "post":
+                params = (op_obj.get("parameters") or []) + (p_item.get("parameters") or [])
+                has_idem = any(isinstance(pr, dict) and str(pr.get("name", "")).lower() == "idempotency-key" for pr in params)
+                if not has_idem and not re.search(r"Idempotency-Key", raw_oa, flags=re.I):
+                    refuse(f"{openapi_path} POST {p_key} ({op_id}) requires an 'Idempotency-Key' header parameter")
+            # For write methods (post/put/patch) with requestBody object schema, check additionalProperties: false
+            if m_low in ("post", "put", "patch") and "requestBody" in op_obj:
+                if "additionalProperties: false" not in raw_oa and "'additionalProperties': False" not in str(oa):
+                    refuse(f"{openapi_path} write operation {method.upper()} {p_key} ({op_id}) request-body schema must set 'additionalProperties: false' (VAPT F8)")
+
+# 6. Event contract validation
+asyncapi_path = f"docs/agents-v0/design/{slug}/asyncapi.yaml"
+events_dir = f"docs/agents-v0/design/{slug}/events"
+event_files = sorted(glob.glob(f"{events_dir}/*")) if os.path.isdir(events_dir) else []
+has_events = os.path.isfile(asyncapi_path) or bool(event_files)
+no_events = bool(re.search(r"N/A:\s*no\s+event\s+contract", events_sec, flags=re.I))
+
+if has_events and no_events:
+    refuse(f"event contract files exist for {slug}, so {design_path} ## Events must not say 'N/A: no event contract'")
+if not has_events and not no_events:
+    refuse(f"no event contract files exist for {slug}, so {design_path} ## Events must state 'N/A: no event contract'")
+for ef in event_files:
+    if os.path.isfile(ef):
+        eftxt = open(ef, encoding="utf-8").read()
+        if "eventVersion" not in eftxt:
+            refuse(f"event schema '{ef}' must include 'eventVersion'")
+
+# 7. UX spec & mockups validation
+surf_m = re.search(r"^Surfaces:\s*(.+)$", clean_req, flags=re.M | re.I)
+surfaces = [s.strip().lower() for s in re.split(r"[,|/]+", surf_m.group(1)) if s.strip()] if surf_m else ["backend"]
+ux_spec_path = f"docs/agents-v0/design/{slug}/ux-spec.md"
+mockups_dir = f"docs/agents-v0/design/{slug}/mockups"
+has_ux = os.path.isfile(ux_spec_path) or ("frontend" in surfaces)
+
+if has_ux:
+    if not os.path.isfile(ux_spec_path):
+        refuse(f"story includes frontend surface, so '{ux_spec_path}' is required")
+    ux_txt = open(ux_spec_path, "r", encoding="utf-8").read()
+    if not re.search(r"WCAG\s*2\.1\s*AA", ux_txt, flags=re.I):
+        refuse(f"{ux_spec_path} must specify WCAG 2.1 AA accessibility requirements")
+    for state_word in ("loading", "error", "empty", "success"):
+        if not re.search(rf"\b{state_word}\b", ux_txt, flags=re.I):
+            refuse(f"{ux_spec_path} state matrix must cover '{state_word}' state")
+    html_files = sorted(glob.glob(f"{mockups_dir}/*.html")) if os.path.isdir(mockups_dir) else []
+    if not html_files:
+        refuse(f"'{mockups_dir}/' must contain at least one static HTML mockup (*.html)")
+    mockup_components = set()
+    for hf in html_files:
+        htxt = open(hf, "r", encoding="utf-8").read()
+        if re.search(r"\bfetch\s*\(|\baxios\.|\bXMLHttpRequest\b", htxt):
+            refuse(f"mockup '{hf}' must be static HTML/CSS only (API calls like fetch/axios are forbidden)")
+        for cm in re.finditer(r'data-component=["\']([^"\']+)["\']', htxt):
+            mockup_components.add(cm.group(1).strip())
+    if not mockup_components:
+        refuse(f"mockups under '{mockups_dir}/' must mark interactive elements with data-component=\"<Component name>\"")
+    for comp in sorted(mockup_components):
+        if comp not in ux_txt:
+            refuse(f"mockup data-component '{comp}' has no matching entry in {ux_spec_path}")
+
+# 8. Evaluate Contract: None shortcut vs. Standard Design Gate (Jiraiya Rec 2)
+has_non_health_public = bool(re.search(r"permitAll|public\s+route|unauthenticated", auth_sec, flags=re.I) and not re.search(r"/(?:health|ready|live)\b", auth_sec))
+is_contract_none = (
+    no_http_api
+    and no_events
+    and not has_openapi
+    and not has_events
+    and not has_ux
+    and not is_material
+    and not has_non_health_public
+)
+
+adr_m = re.search(r"^ADR:\s*(.+)$", clean_design, flags=re.M | re.I)
+if not adr_m:
+    refuse(f"{design_path} is missing the 'ADR: <path or N/A: no product decision>' line")
+adr_val = adr_m.group(1).strip()
+
+if is_contract_none:
+    # Preserve existing ## Lessons block in phase-result if present
+    lessons_block = "## Lessons\n\n### design\n- none\n"
+    if os.path.isfile(res_path):
+        old_res = open(res_path, encoding="utf-8").read()
+        lm = re.search(r"(^##\s+Lessons\b.*)", old_res, flags=re.M | re.S)
+        if lm:
+            lessons_block = lm.group(1).rstrip() + "\n"
+    res_content = f"""# Phase Result: design ({slug})
+
+- phase: design
+- status: contract_none
+- guard_managed: true
+- feature: {slug}
+- artifact: {design_path}
+- base_commit: {base_commit}
+- contract: none
+- adr: {adr_val}
+
+{lessons_block}"""
+    with open(res_path, "w", encoding="utf-8") as fh:
+        fh.write(res_content)
+    print("MODE=contract_none")
+    sys.exit(0)
+
+# 9. Standard Design Gate: validate ADR and review.md
+if re.match(r"^N/A\b", adr_val, flags=re.I):
+    refuse(f"standard design gate requires a real ADR file on 'ADR: docs/agents-v0/adr/<NN>-<slug>.md' (got '{adr_val}')")
+adr_path = adr_val.split()[0].strip("`")
+if not os.path.isfile(adr_path):
+    refuse(f"ADR file '{adr_path}' cited in {design_path} does not exist on disk")
+adr_txt = open(adr_path, "r", encoding="utf-8").read()
+if not re.search(r"(?:\*\*)?Status(?:\*\*)?:\s*(Proposed|Accepted)\b", adr_txt, flags=re.I):
+    refuse(f"ADR '{adr_path}' must declare 'Status: Proposed' (or 'Accepted')")
+# Check at least 2 options/alternatives in ADR
+opt_count = len(re.findall(r"^(?:###\s+Option|[-*]\s+\*\*Option|\|\s*Option\s+\d)", adr_txt, flags=re.M | re.I))
+if opt_count < 2 and not re.search(r"##\s+Alternatives", adr_txt, flags=re.I):
+    refuse(f"ADR '{adr_path}' must compare at least two alternatives")
+
+review_path = f"docs/agents-v0/design/{slug}/review.md"
+if not os.path.isfile(review_path):
+    refuse(f"design review report '{review_path}' is missing; launch design-reviewer first")
+rev_txt = open(review_path, "r", encoding="utf-8").read()
+first_non_empty = next((l.strip() for l in rev_txt.splitlines() if l.strip()), "")
+if first_non_empty != "agent: design-reviewer":
+    refuse(f"{review_path} first line must be 'agent: design-reviewer'")
+
+open_criticals = 0
+for line in rev_txt.splitlines():
+    if line.strip().startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 5 and cells[1].lower() == "critical" and cells[4].lower() == "open":
+            open_criticals += 1
+if open_criticals > 0:
+    refuse(f"{review_path} has {open_criticals} Open Critical finding(s); resolve them and re-run design-reviewer before ready")
+
+lessons_block = "## Lessons\n\n### design\n- none\n"
+if os.path.isfile(res_path):
+    old_res = open(res_path, encoding="utf-8").read()
+    lm = re.search(r"(^##\s+Lessons\b.*)", old_res, flags=re.M | re.S)
+    if lm:
+        lessons_block = lm.group(1).rstrip() + "\n"
+
+res_content = f"""# Phase Result: design ({slug})
+
+- phase: design
+- status: awaiting_approval
+- guard_managed: true
+- feature: {slug}
+- artifact: {design_path}
+- base_commit: {base_commit}
+- adr: {adr_path}
+- review: {review_path}
+- operations: {len(op_ids)}
+
+{lessons_block}"""
+
+with open(res_path, "w", encoding="utf-8") as fh:
+    fh.write(res_content)
+
+print(f"MODE=standard operations={len(op_ids)} adr={adr_path}")
+PY
+)"; then
+    printf '%s\n' "$gd_val_out"
+    exit 1
+  fi
+
+  case "$gd_val_out" in
+    MODE=contract_none*)
+      gc_ok ready "design verified with Contract: None shortcut on $gd_artifact"
+      printf 'Next: Commit the Contract: None design artifact with: %s commit %s\n' "$G" "$gd_feature"
+      ;;
+    *)
+      gc_ok ready "design artifacts and review verified on $gd_artifact ($gd_val_out)"
+      gd_rule ready ready.next "$gd_feature"; gd_next="$gd_val"
+      gd_rule ready ready.status "$gd_feature"; gd_status="$gd_val"
+      gc_state_set "$gd_state" "$gd_feature" "$gd_req_art" "activePhase=$gd_phase" \
+        "activeStatus=$gd_status" "blockedReason=" "nextStep=$gd_next" || exit 1
+      printf 'Next: %s\n' "$gd_next"
+      ;;
+  esac
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gd_check "$@" ;;
   start) shift; gd_start "$@" ;;
   block) shift; gd_block "$@" ;;
+  ready) shift; gd_ready "$@" ;;
   *) gd_usage ;;
 esac
+
 
