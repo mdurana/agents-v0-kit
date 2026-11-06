@@ -396,6 +396,242 @@ PY
   printf 'Next: %s\n' "$gb_next"
 }
 
+# Design: DB3 (/v0-build ready TDD plan, attempt budget, failure brief, contract merge, test execution, and evidence validator).
+gb_ready() {
+  gb_r_slug="${1:-}"
+  [ $# -le 1 ] || gb_usage
+  gb_load ready "$gb_r_slug"
+  gb_rule ready ready.requires "$gb_feature"; gb_requires="$gb_val"
+  gb_check_prereqs ready "$gb_requires" 0
+
+  [ -f "$gb_artifact" ] || gc_refuse ready "build plan '$gb_artifact' does not exist"
+  [ -f "$gb_report" ] || gc_refuse ready "build report '$gb_report' does not exist"
+  [ -f "$gb_output" ] || gc_refuse ready "build output '$gb_output' does not exist"
+
+  # 1. Attempt budget check (< 8 failed attempts)
+  if [ -f "$GC_HERE/check-attempt-budget.sh" ]; then
+    if ! gb_ab_out="$(sh "$GC_HERE/check-attempt-budget.sh" "$gb_report" 2>&1)"; then
+      gc_refuse ready "attempt budget spent ($gb_ab_out); run $G block $gb_feature \"Attempt budget spent\" and stop"
+    fi
+  fi
+
+  # 2. Failure-brief check on 2nd red for same test
+  if [ -f "$GC_HERE/check-failure-brief.sh" ]; then
+    if ! gb_fb_out="$(sh "$GC_HERE/check-failure-brief.sh" "$gb_feature" 2>&1)"; then
+      gc_refuse ready "failure brief check failed ($gb_fb_out)"
+    fi
+  fi
+
+  # 3. Deterministic validation of 3rd consecutive red, plan.md, catalog merge, traceability, build-report.md, and build-output.txt
+  gb_val_err="$(GB_SLUG="$gb_feature" GB_REQ="$gb_req_art" GB_PLAN="$gb_artifact" GB_REPORT="$gb_report" GB_OUT="$gb_output" python3 - <<'PYVAL'
+import os, re, sys
+
+slug = os.environ["GB_SLUG"]
+req_p = os.environ["GB_REQ"]
+plan_p = os.environ["GB_PLAN"]
+rep_p = os.environ["GB_REPORT"]
+out_p = os.environ["GB_OUT"]
+
+req_raw = open(req_p, encoding="utf-8", errors="replace").read()
+clean_req = re.sub(r"<!--.*?-->", "", req_raw, flags=re.S)
+req_acs = sorted(set(int(n) for n in re.findall(r"^###\s+AC-(\d+)\b", clean_req, re.M)))
+req_ac_ids = [f"AC-{n}" for n in req_acs]
+
+plan_raw = open(plan_p, encoding="utf-8", errors="replace").read()
+clean_plan = re.sub(r"<!--.*?-->", "", plan_raw, flags=re.S)
+
+rep_raw = open(rep_p, encoding="utf-8", errors="replace").read()
+clean_rep = re.sub(r"<!--.*?-->", "", rep_raw, flags=re.S)
+
+out_raw = open(out_p, encoding="utf-8", errors="replace").read()
+
+# A. Check 3rd failure for the same test in build-report.md Attempt Cards
+counts = {}
+in_cards = False
+total_cards = 0
+for line in clean_rep.splitlines():
+    if not line.strip().startswith("|"):
+        in_cards = False
+        continue
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    if len(cells) < 4:
+        continue
+    low = [c.lower() for c in cells]
+    if low[0] == "command" and low[1] == "exit":
+        in_cards = True
+        continue
+    if not in_cards or set(line.replace("|", "").strip()) <= set("-: "):
+        continue
+    total_cards += 1
+    exit_code = cells[1]
+    if not exit_code.isdigit() or exit_code == "0":
+        continue
+    failing = cells[3] if len(cells) > 3 else ""
+    if not failing or failing in ("—", "-", "n/a", "N/A"):
+        failing = "(unnamed)"
+    counts[failing] = counts.get(failing, 0) + 1
+
+third_red = [f"{name} ({n} failed attempts)" for name, n in counts.items() if n >= 3]
+if third_red:
+    print(f"third failure cap exceeded in {rep_p} for test(s): {', '.join(third_red)}; run guard-build.sh block {slug} 'Third consecutive failure' and stop")
+    sys.exit(0)
+
+# B. Validate plan.md rows
+plan_rows = {}
+in_plan = False
+for line in clean_plan.splitlines():
+    if not line.strip().startswith("|"):
+        continue
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    if len(cells) < 3:
+        continue
+    low = [c.lower() for c in cells]
+    if low[0] == "ac" and low[1] == "status":
+        in_plan = True
+        continue
+    if not in_plan or set(line.replace("|", "").strip()) <= set("-: "):
+        continue
+    ac_cell = cells[0].strip("`* ")
+    status_cell = cells[1].strip("`* ").lower()
+    test_cell = cells[2].strip("`* ")
+    risk_cell = cells[3].strip("`* ").lower() if len(cells) > 3 else "standard"
+    plan_rows[ac_cell] = (status_cell, test_cell, risk_cell)
+
+missing_plan = [ac for ac in req_ac_ids if ac not in plan_rows]
+if missing_plan:
+    print(f"{plan_p} is missing row(s) for approved requirement ACs: {', '.join(missing_plan)}")
+    sys.exit(0)
+
+extra_plan = [ac for ac in plan_rows if ac not in req_ac_ids]
+if extra_plan:
+    print(f"{plan_p} contains unknown AC row(s) not in {req_p}: {', '.join(extra_plan)}")
+    sys.exit(0)
+
+for ac in req_ac_ids:
+    st, tst, rsk = plan_rows[ac]
+    if st != "done":
+        print(f"{plan_p} row for {ac} has Status '{st}' (every AC row must be 'done' before ready)")
+        sys.exit(0)
+    if not tst or tst.lower() in ("tbd", "todo", "none", "-", "—") or tst.startswith("<"):
+        print(f"{plan_p} row for {ac} must name a concrete test or '(no-red: <reason>)' (found '{tst}')")
+        sys.exit(0)
+    if rsk not in ("standard", "critical"):
+        print(f"{plan_p} row for {ac} has invalid Risk '{rsk}' (expected 'standard' or 'critical')")
+        sys.exit(0)
+
+# C. Validate OpenAPI catalog merge when docs/agents-v0/design/<feature>/openapi.yaml exists
+design_spec_p = f"docs/agents-v0/design/{slug}/openapi.yaml"
+if os.path.isfile(design_spec_p):
+    d_spec = open(design_spec_p, encoding="utf-8", errors="replace").read()
+    ops = []
+    in_paths = False
+    cur_path = None
+    for line in d_spec.splitlines():
+        if re.match(r"^paths:\s*$", line):
+            in_paths = True
+            continue
+        if in_paths and re.match(r"^\S", line):
+            in_paths = False
+        mp = re.match(r"^  (/[^:\s]*):\s*$", line) if in_paths else None
+        if mp:
+            cur_path = mp.group(1)
+            continue
+        mo = re.match(r"^\s+operationId:\s*['\"]?([A-Za-z0-9_]+)", line)
+        if mo and cur_path:
+            ops.append((mo.group(1), cur_path))
+    if ops:
+        cat_texts = []
+        if os.path.isdir("openapi"):
+            for f in sorted(os.listdir("openapi")):
+                if f.endswith((".yaml", ".yml")):
+                    cat_texts.append(open(os.path.join("openapi", f), encoding="utf-8", errors="replace").read())
+        merged_all = "\n".join(cat_texts)
+        if not merged_all.strip():
+            print(f"{design_spec_p} exists, but no repo catalog file was found under openapi/ (merge approved operations into openapi/api-v1.yaml or openapi/<service>-v1.yaml)")
+            sys.exit(0)
+        for op, pth in ops:
+            if not re.search(rf"\b{re.escape(op)}\b", merged_all) or pth not in merged_all:
+                print(f"operation '{op}' ({pth}) from {design_spec_p} is not merged into repo openapi/ catalog")
+                sys.exit(0)
+
+# D. Validate build-report.md has at least one Attempt Card, non-pending Final Verify Summary, and per-AC file:line citations
+if total_cards == 0:
+    print(f"{rep_p} has no attempt cards in '## Attempt Cards' table")
+    sys.exit(0)
+
+if re.search(r"Status:\s*pending\b", clean_rep, re.I):
+    print(f"{rep_p} still has 'Status: pending' in Final Verify Summary")
+    sys.exit(0)
+
+for ac in req_ac_ids:
+    ac_lines = [l for l in clean_rep.splitlines() if re.search(rf"\b{re.escape(ac)}(?!\d)", l)]
+    if not ac_lines or not any(re.search(r"[A-Za-z0-9_./-]+:[0-9]+", l) for l in ac_lines):
+        print(f"{rep_p} is missing a 'file:line' evidence citation for {ac}")
+        sys.exit(0)
+
+# E. Validate build-output.txt is non-empty
+if not out_raw.strip():
+    print(f"{out_p} is empty; record raw full-verify command output in {out_p}")
+    sys.exit(0)
+
+print("OK")
+PYVAL
+)"
+  if [ "$gb_val_err" != "OK" ]; then
+    gc_refuse ready "$gb_val_err"
+  fi
+
+  # 4. Traceability check T4 (endpoint has code under app/) & T5 (endpoint has test under app/)
+  if [ -f "$GC_HERE/check-traceability.sh" ]; then
+    gb_tr_out="$(AGENTS_V0_TRACE_MODE=fail sh "$GC_HERE/check-traceability.sh" build "$gb_req_art" --no-write 2>&1)" || {
+      gc_refuse ready "build traceability check (T4/T5) failed: $gb_tr_out"
+    }
+  fi
+
+  # 5. Secret scan on build-output.txt and build-report.md
+  if [ -f "$GC_HERE/secret_scan.py" ]; then
+    gb_sec_out="$(python3 "$GC_HERE/secret_scan.py" "$gb_report" "$gb_output" 2>&1)" || {
+      gc_refuse ready "secret scan failed on build evidence: $gb_sec_out"
+    }
+  fi
+
+  # 6. Verify check-tests-ran.sh (kitfix-20261031-tests-ran)
+  if [ -f "$GC_HERE/check-tests-ran.sh" ]; then
+    if ! gb_tr_ran="$(sh "$GC_HERE/check-tests-ran.sh" 2>&1)"; then
+      gc_refuse ready "check-tests-ran.sh failed: $gb_tr_ran"
+    fi
+  fi
+
+  # 7. Write/update <feature>.phase-result.md for build
+  GB_PR="$gb_result" GB_SLUG="$gb_feature" python3 - <<'PYPR'
+import os, re
+p = os.environ["GB_PR"]
+slug = os.environ["GB_SLUG"]
+lessons_block = "## Lessons\n\n### build\n- none\n"
+if os.path.isfile(p):
+    txt = open(p, encoding="utf-8").read()
+    m = re.search(r"(^##\s+Lessons\b.*)", txt, re.M | re.S)
+    if m:
+        lessons_block = m.group(1).strip() + "\n"
+        if "### build" not in lessons_block:
+            lessons_block += "\n### build\n- none\n"
+content = (
+    f"# Phase Result: {slug}\n\n"
+    f"phase: build\n"
+    f"status: awaiting_approval\n"
+    f"guard_managed: true\n\n"
+    f"{lessons_block}"
+)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(content)
+PYPR
+
+  sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status awaiting_approval "$gb_req_art" >/dev/null
+  gb_rule ready ready.next "$gb_feature"; gb_next="$gb_val"
+  gc_ok ready "build for $gb_feature verified and awaiting Sensei's approval"
+  printf 'Next: %s\n' "$gb_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gb_usage
 shift || true
@@ -404,5 +640,6 @@ case "$cmd" in
   check) gb_check "$@" ;;
   start) gb_start "$@" ;;
   block) gb_block "$@" ;;
+  ready) gb_ready "$@" ;;
   *) gb_usage ;;
 esac
