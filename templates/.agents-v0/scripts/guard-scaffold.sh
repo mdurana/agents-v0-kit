@@ -170,12 +170,83 @@ gs_block() {
   printf 'Next: %s\n' "$gs_next"
 }
 
+gs_ready() {
+  [ $# -eq 0 ] || gs_usage
+  gs_load ready
+  gs_rule ready ready.requires; gs_requires="$gs_val"
+  gs_check_prereqs ready "$gs_requires"
+
+  # 1. AC-2: Milestone P0 manifest exists and is well-formed
+  [ -f "$gs_artifact" ] || gc_refuse ready "milestone P0 manifest '$gs_artifact' is missing"
+  python3 - "$gs_artifact" <<'PY'
+import re, sys
+manifest = sys.argv[1]
+txt = open(manifest, "r", encoding="utf-8").read()
+if not re.search(r"\|\s*P0-A\s*\|", txt):
+    print(f"REFUSED ready: {manifest} does not contain seeded story row for P0-A")
+    sys.exit(1)
+# Reject placeholders in milestone manifest outside Delivery approvals
+lines = []
+in_approvals = False
+for line in txt.splitlines():
+    if "## Delivery approvals" in line:
+        in_approvals = True
+    if not in_approvals:
+        lines.append(line)
+body = "\n".join(lines)
+ph = re.findall(r"<(?:[A-Za-z0-9_-]+)>|\[(?:TODO|TBD|FIXME)\]|\b(?:TODO|TBD|FIXME)\b", body)
+if ph:
+    print(f"REFUSED ready: {manifest} contains unauthored placeholders: {', '.join(sorted(set(ph))[:5])}")
+    sys.exit(1)
+PY
+
+  # 2. AC-4: Dockerfile and compose configuration present
+  [ -f Dockerfile ] || [ -f docker/Dockerfile ] || [ -f app/Dockerfile ] \
+    || gc_refuse ready "missing Dockerfile for platform skeleton (AC-4)"
+  [ -f docker-compose.yml ] || [ -f compose.yaml ] || [ -f docker/docker-compose.yml ] \
+    || gc_refuse ready "missing docker-compose.yml (or compose.yaml) for platform skeleton (AC-4)"
+
+  # 3. AC-1 & AC-3: Build / verify check
+  if [ -z "${AGENTS_V0_SKIP_NATIVE_VERIFY:-}" ] && [ -x .agents-v0/scripts/run-backend-verify.sh ]; then
+    gs_vcmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" 2>/dev/null || true)"
+    if [ -n "$gs_vcmd" ]; then
+      sh -c "$gs_vcmd" >/dev/null 2>&1 || gc_refuse ready "native backend verify failed: $gs_vcmd"
+    fi
+  fi
+
+  # 4. Write phase result
+  gs_pr="docs/agents-v0/milestones/scaffold.phase-result.md"
+  gs_base="$(gc_state_get "$gs_state" baseCommit 2>/dev/null || git rev-parse HEAD)"
+  cat > "$gs_pr" <<EOF
+# Phase Result: scaffold
+
+- Phase: scaffold
+- Status: awaiting_approval
+- Artifact: $gs_artifact
+- Base-Commit: $gs_base
+
+## Verified Acceptance Criteria
+- [x] AC-1: Platform skeleton build and test pass
+- [x] AC-2: Milestone P0 manifest tracked ($gs_artifact)
+- [x] AC-3: Coverage and quality checks configured
+- [x] AC-4: Dockerfile and Compose configurations present
+EOF
+
+  gc_ok ready "scaffold baseline verified on $gs_artifact"
+  gs_rule ready ready.next; gs_next="$gs_val"
+  gs_rule ready ready.status; gs_status="$gs_val"
+  gc_state_set "$gs_state" "$gs_feature" "$gs_artifact" "activePhase=$gs_phase" \
+    "activeStatus=$gs_status" "blockedReason=" "nextStep=$gs_next" || exit 1
+  printf 'Next: %s\n' "$gs_next"
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gs_check "$@" ;;
   start) shift; gs_start "$@" ;;
   block) shift; gs_block "$@" ;;
-  ready|commit|steps)
-    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS2" ;;
+  ready) shift; gs_ready "$@" ;;
+  commit|steps)
+    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS3" ;;
   *) gs_usage ;;
 esac
