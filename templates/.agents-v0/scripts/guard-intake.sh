@@ -612,7 +612,128 @@ PY
 }
 
 gi_commit() {
-  gc_refuse commit "not yet implemented (DI5)"
+  [ $# -eq 1 ] || gi_usage
+  gi_cm_slug="$1"
+  gi_load commit "$gi_cm_slug"
+
+  # Support invoking commit from either the integration branch or an existing feature/<feature> worktree (Jiraiya Rec 2)
+  gi_wt_existing="$(git worktree list --porcelain | awk -v want="branch refs/heads/feature/${gi_feature}" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == want { print path; exit }
+  ')"
+  if [ ! -f "$gi_state" ] && [ -n "$gi_wt_existing" ] && [ -f "$gi_wt_existing/$gi_state" ]; then
+    cd "$gi_wt_existing"
+  fi
+
+  [ -f "$gi_state" ] || gc_refuse commit "no intake state for '$gi_feature' ($gi_state); run $G start $gi_feature and $G ready $gi_feature first"
+
+  case " $(gc_state_get "$gi_state" approvedPhases | tr -d '[]",') " in
+    *" $gi_phase "*) ;;
+    *) gc_refuse commit "intake is not approved in $gi_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  gi_ok_out="$(gc_approval_ok intake "$gi_feature")" || {
+    printf '%s\n' "$gi_ok_out"
+    gc_refuse commit "no approval record from Sensei matches intake ($gi_feature); Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$gi_ok_out"
+
+  [ -f "$gi_artifact" ] || gc_refuse commit "requirements artifact '$gi_artifact' not found"
+
+  # Update Delivery approvals table in <feature>.md and status in <feature>.phase-result.md
+  gi_rec_file="$(gc_approval_file intake "$gi_feature")"
+  gi_story_id="$(python3 - "$gi_artifact" "$gi_result" "$gi_rec_file" "$gi_feature" <<'PY'
+import glob, json, os, re, sys
+
+art_path, res_path, rec_path, slug = sys.argv[1:5]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+txt = open(art_path, "r", encoding="utf-8").read()
+row = f"| Intake | {art_path} | {approver} | Approved | {approved_at} |\n"
+if "## Delivery approvals" in txt:
+    if not re.search(r"\|\s*Intake\s*\|", txt, flags=re.I):
+        txt = txt.rstrip() + "\n" + row
+else:
+    txt = txt.rstrip() + "\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|---|---|---|---|---|\n" + row
+with open(art_path, "w", encoding="utf-8") as fh:
+    fh.write(txt)
+
+if os.path.isfile(res_path):
+    rtxt = open(res_path, "r", encoding="utf-8").read()
+    rtxt = re.sub(r"^(- status:\s*).*$", r"\g<1>approved", rtxt, flags=re.M)
+    with open(res_path, "w", encoding="utf-8") as fh:
+        fh.write(rtxt)
+
+# Resolve story ID from artifact or milestone manifest
+m = re.search(r"^\s*(?:\*\*)?Story(?:\*\*)?:\s*(?:\*\*)?`?([A-Z][A-Z0-9]*-[A-Z0-9]+)", txt, flags=re.M)
+if m:
+    print(m.group(1))
+    sys.exit(0)
+for mf in sorted(glob.glob("docs/agents-v0/milestones/*.md")):
+    for line in open(mf, encoding="utf-8"):
+        if f"requirements/{slug}.md" in line and line.strip().startswith("|"):
+            cell = line.strip().strip("|").split("|")[0].strip().strip("`* ")
+            if cell:
+                print(cell)
+                sys.exit(0)
+print(slug)
+PY
+)"
+
+  # Create or attach the feature/<feature> worktree if not already on feature/<feature>
+  gi_cur_br="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [ "$gi_cur_br" != "feature/$gi_feature" ]; then
+    gi_primary_root="$(pwd)"
+    sh "$GC_HERE/feature-worktree.sh" "$gi_feature" || gc_refuse commit "feature-worktree.sh failed for '$gi_feature'"
+    gi_wt="$(git worktree list --porcelain | awk -v want="branch refs/heads/feature/${gi_feature}" '
+      /^worktree / { path = substr($0, 10) }
+      $0 == want { print path; exit }
+    ')"
+    [ -n "$gi_wt" ] && [ -d "$gi_wt" ] || gc_refuse commit "could not locate worktree for feature/$gi_feature"
+    # If any intake file remained in primary (e.g. tracked on a reopened intake), copy it into the worktree
+    for gi_f in "$gi_artifact" "$gi_state" "$gi_result"; do
+      if [ -f "$gi_primary_root/$gi_f" ]; then
+        mkdir -p "$(dirname "$gi_wt/$gi_f")"
+        cp "$gi_primary_root/$gi_f" "$gi_wt/$gi_f"
+        if git -C "$gi_primary_root" ls-files --error-unmatch -- "$gi_f" >/dev/null 2>&1; then
+          git -C "$gi_primary_root" checkout -q -- "$gi_f" || true
+        else
+          rm -f "$gi_primary_root/$gi_f" "$gi_primary_root/${gi_f}.lock"
+        fi
+      fi
+    done
+    rm -f "$gi_primary_root/${gi_state}.lock"
+    cd "$gi_wt"
+  fi
+
+  gi_wt_br="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  [ "$gi_wt_br" = "feature/$gi_feature" ] \
+    || gc_refuse commit "expected branch 'feature/$gi_feature' in worktree $(pwd), found '${gi_wt_br:-detached}'"
+
+  gi_allowed="$gi_artifact $gi_state $gi_result"
+  if ! gi_bad_staged="$(gc_outside_paths "$gi_allowed")"; then
+    gc_refuse commit "the index in $(pwd) already holds paths outside intake ($gi_bad_staged); unstage them first"
+  fi
+
+  for gi_p in $gi_allowed; do
+    if [ -e "$gi_p" ] || git ls-files --error-unmatch -- "$gi_p" >/dev/null 2>&1; then
+      git add -- "$gi_p"
+    fi
+  done
+
+  gc_scan_staged
+  gi_msg="${gi_story_id}: intake approved"
+  git commit -q -m "$gi_msg" || gc_refuse commit "git commit failed in worktree $(pwd)"
+  gi_sha="$(git rev-parse --short HEAD)"
+  gc_ok commit "intake for $gi_feature committed on feature/$gi_feature in $(pwd) as $gi_sha (\"$gi_msg\")"
+  gi_rule commit approved.next "$gi_feature"; gi_approved_next="$gi_val"
+  printf 'Next: Open worktree %s and run %s\n' "$(pwd)" "$gi_approved_next"
 }
 
 gi_steps() {

@@ -133,6 +133,8 @@ def commit_cmd(ph):
         return "sh .agents-v0/scripts/guard-plan.sh commit"
     if ph == "scaffold":  # Scaffold redo DS5: guard stages, scans, commits and tags
         return "sh .agents-v0/scripts/guard-scaffold.sh commit"
+    if ph == "intake" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("baseCommit"):
+        return f"sh .agents-v0/scripts/guard-intake.sh commit {slug}"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 if mode == "message":
