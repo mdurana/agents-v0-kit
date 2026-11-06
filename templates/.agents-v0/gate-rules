@@ -104,5 +104,27 @@ plan ready.next Sensei reviews the plan manifests and runs, in his own terminal 
 plan commit.paths docs/agents-v0/milestones docs/agents-v0/program.state.json
 plan commit.message program: plan approved
 plan commit.tag plan-v
-plan approved.next /v0-intake, or /v0-build when the first story is P0-A
+plan approved.next /v0-scaffold
 
+# --- scaffold (/v0-scaffold, guard-scaffold.sh) -------------------------------------------------
+scaffold phase scaffold
+scaffold feature program
+scaffold state docs/agents-v0/program.state.json
+scaffold artifact docs/agents-v0/milestones/p0-platform-skeleton.md
+# check & start: prerequisites
+scaffold check.requires git-work-tree kit-installed greenfield-only plan-approved integration-branch not-approved
+scaffold start.requires git-work-tree kit-installed greenfield-only plan-approved integration-branch not-awaiting-approval
+scaffold start.status in_progress
+scaffold start.next Launch the platform-engineer subagent to configure application scaffold, Dockerfile, docker-compose.yml, and baseline verify.
+# block: status and next step
+scaffold block.status blocked
+scaffold block.next Fix the blocker, then run /v0-scaffold again; it resumes from the files on disk.
+# ready: verifies native pack verify passes, p0 milestone manifest exists, Dockerfile and Compose exist
+scaffold ready.requires in-progress
+scaffold ready.status awaiting_approval
+scaffold ready.next Sensei reviews the platform skeleton and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve scaffold
+# commit: checks approval record, updates p0-platform-skeleton.md status to released with Approved row, stages paths, secret-scans, commits and tags
+scaffold commit.paths app Dockerfile docker-compose.yml compose.yaml .dockerignore pom.xml build.gradle package.json pyproject.toml requirements.txt Cargo.toml go.mod docs/agents-v0/milestones docs/agents-v0/program.state.json
+scaffold commit.message scaffold: platform skeleton approved
+scaffold commit.tag scaffold-v
+scaffold approved.next /v0-intake
