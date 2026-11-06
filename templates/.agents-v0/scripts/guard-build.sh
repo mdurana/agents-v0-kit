@@ -772,6 +772,26 @@ PY
   printf 'Next: %s\n' "$gb_next"
 }
 
+# Design: DB6 (/v0-build generated step block).
+gb_steps() {
+  [ $# -eq 0 ] || gb_usage
+  gc_to_root steps
+  gb_rule steps ready.next "<feature>"; gb_r_next="$gb_val"
+  gb_rule steps approved.next "<feature>"; gb_a_next="$gb_val"
+  cat <<EOF
+1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree, checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies Sensei's external \`design\` approval (or \`Contract: None\`) and committed gate, runs \`sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/<feature>.md\`, and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start <feature> [--reopen]\`. It verifies a clean working tree on \`feature/<feature>\`, seeds \`docs/agents-v0/build/<feature>/plan.md\` (one row per approved \`AC-*\`) and \`docs/agents-v0/build/<feature>/build-report.md\` if absent, and sets \`docs/agents-v0/requirements/<feature>.state.json\` to \`in_progress\`.
+3. Read \`docs/agents-v0/lessons.md\` and execute the implementation loop in the main session with the shell-less Build subagents (\`backend-engineer\`, \`bff-engineer\`, \`frontend-engineer\`, \`debug-investigator\`):
+   - **Baseline & database runtime:** Unless the working tree is clean at the default branch tip, resolve and run the verify command via \`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"\` or \`"Frontend verify"\`. Before the first test that needs a database, run \`sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/<feature>.md\` (never use \`sudo\`, a package manager, or a Docker TCP socket).
+   - **Contract catalog merge & red-to-green TDD:** Merge \`docs/agents-v0/design/<feature>/openapi.yaml\` (when present) into the repo \`openapi/\` catalog. Launch the matching shell-less engineer subagent (\`backend-engineer\` for \`implement-service\`, \`bff-engineer\` for \`implement-bff\`, \`frontend-engineer\` for \`implement-frontend\`, using the \`plan\` model from \`.cursor/model-config.json\` for critical auth/upload/crypto/ledger/messaging units) to write the failing test first, run the profile's fast verify command in this main session, record the attempt card in \`docs/agents-v0/build/<feature>/build-report.md\`, implement the minimal code to pass, and mark the \`plan.md\` row \`done\` with the test name.
+   - **Bounded failure & full verify:** If the same test fails twice consecutively, have the engineer write \`docs/agents-v0/build/<feature>/failure-brief.md\` (\`helper: debug-investigator\`, \`outputs:\`, \`return:\`, \`ask:\`, failing test name, and \`file:line\`) and launch shell-less \`debug-investigator\` before attempt three. Once all \`plan.md\` rows are \`done\`, run the full native verify command once (and \`sh .agents-v0/scripts/check-tests-ran.sh\` after Maven verify), recording the summary and per-AC \`file:line\` citations in \`docs/agents-v0/build/<feature>/build-report.md\` and raw output in \`docs/agents-v0/build/<feature>/build-output.txt\`.
+4. If the baseline is broken, database runtime is unavailable, the attempt budget (8 failed attempts) is spent, a test fails 3 times consecutively, or a helper brief is needed, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper/failure briefs and records \`blocked\`) and stop.
+5. When all \`plan.md\` rows are \`done\` and full verify passes, run \`$G ready <feature>\`. It deterministically verifies the attempt budget, failure-brief rules (and no 3rd failure of the same test), \`plan.md\` row completeness, OpenAPI catalog merge, \`T4\`/\`T5\` code-and-test traceability under \`app/\`, \`build-report.md\` attempt cards and per-AC \`file:line\` citations, non-empty secret-free \`build-output.txt\`, and \`check-tests-ran.sh\`, then writes \`docs/agents-v0/requirements/<feature>.phase-result.md\` and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
+6. Stop. Present \`docs/agents-v0/build/<feature>/build-report.md\` and the \`file:line\` citations to Sensei and wait for explicit approval. Next: $gb_r_next. Never run approve yourself; the agent cannot approve this gate.
+7. After Sensei runs approve in his own terminal, run \`$G commit <feature>\`. It verifies Sensei's external approval record, appends the verified \`Build\` row (and \`Design\` row if \`Contract: None\`) to \`Delivery approvals\`, runs traceability checks, stages only the story's build, app, catalog, and state paths, scans staged content for secrets, and commits \`"<story>: build approved"\` on \`feature/<feature>\`. Then suggest: $gb_a_next.
+EOF
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gb_usage
 shift || true
@@ -782,5 +802,6 @@ case "$cmd" in
   block) gb_block "$@" ;;
   ready) gb_ready "$@" ;;
   commit) gb_commit "$@" ;;
+  steps) gb_steps "$@" ;;
   *) gb_usage ;;
 esac
