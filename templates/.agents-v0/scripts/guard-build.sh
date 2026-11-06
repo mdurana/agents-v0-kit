@@ -632,6 +632,146 @@ PYPR
   printf 'Next: %s\n' "$gb_next"
 }
 
+# Design: DB5 (/v0-build commit with Delivery approvals row, Contract: None backfill, traceability, safe staging, and secret scan).
+gb_commit() {
+  gb_m_slug="${1:-}"
+  [ $# -le 1 ] || gb_usage
+  gb_load commit "$gb_m_slug"
+  gb_rule commit approved.next "$gb_feature"; gb_next="$gb_val"
+
+  [ -f "$gb_state" ] || gc_refuse commit "state file '$gb_state' is missing"
+
+  # 1. Verify Sensei's external build approval record
+  case " $(gc_state_get "$gb_state" approvedPhases | tr -d '[]",') " in
+    *" $gb_phase "*) ;;
+    *) gc_refuse commit "build is not approved in '$gb_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature" ;;
+  esac
+  if ! gb_why="$(gc_approval_ok build "$gb_feature")"; then
+    gc_refuse commit "$gb_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature)"
+  fi
+
+  # 2. Refuse if index already has staged paths
+  gb_PreStaged="$(git diff --cached --name-only)"
+  [ -z "$gb_PreStaged" ] \
+    || gc_refuse commit "the git index already has staged files ($(printf '%s' "$gb_PreStaged" | tr '\n' ' ')); unstage them before running guard-build.sh commit"
+
+  # 3. Append/update Approved Build row (and Design Contract: None row if design was not in Delivery approvals) in requirements/<feature>.md
+  GB_REQ="$gb_req_art" GB_SLUG="$gb_feature" python3 - <<'PYROW'
+import datetime, os, re
+
+p = os.environ["GB_REQ"]
+slug = os.environ["GB_SLUG"]
+today = datetime.date.today().isoformat()
+txt = open(p, encoding="utf-8").read()
+lines = txt.splitlines()
+
+design_ev = f"`docs/agents-v0/design/{slug}/design.md`"
+if os.path.isfile(f"docs/agents-v0/design/{slug}/openapi.yaml"):
+    design_ev += f", `docs/agents-v0/design/{slug}/openapi.yaml`"
+if os.path.isfile(f"docs/agents-v0/design/{slug}/ux-spec.md"):
+    design_ev += f", `docs/agents-v0/design/{slug}/ux-spec.md`"
+if os.path.isfile(f"docs/agents-v0/design/{slug}/review.md"):
+    design_ev += f", `docs/agents-v0/design/{slug}/review.md`"
+
+build_ev = f"`docs/agents-v0/build/{slug}/plan.md`, `docs/agents-v0/build/{slug}/build-report.md`"
+design_row = f"| Design | {design_ev} | Sensei | Approved | {today} |"
+build_row = f"| Build | {build_ev} | Sensei | Approved | {today} |"
+
+out = []
+in_deliv = False
+has_design = False
+replaced_build = False
+for i, line in enumerate(lines):
+    if re.match(r"^##\s+Delivery approvals\b", line, re.I):
+        in_deliv = True
+        out.append(line)
+        continue
+    if in_deliv and re.match(r"^##\s+\S", line):
+        if not has_design:
+            out.append(design_row)
+            has_design = True
+        if not replaced_build:
+            out.append(build_row)
+            replaced_build = True
+        in_deliv = False
+    if in_deliv and line.strip().startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 5 and cells[0].lower() == "design":
+            has_design = True
+            if not re.match(r"^(approved|yes|pass)\b", cells[3], re.I):
+                out.append(design_row)
+                continue
+        if len(cells) >= 5 and cells[0].lower() == "build":
+            out.append(build_row)
+            replaced_build = True
+            continue
+    out.append(line)
+
+if in_deliv:
+    if not has_design:
+        out.append(design_row)
+    if not replaced_build:
+        out.append(build_row)
+
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write("\n".join(out) + "\n")
+PYROW
+
+  # 4. Update <feature>.phase-result.md to status: approved
+  if [ -f "$gb_result" ]; then
+    GB_PR="$gb_result" python3 - <<'PY'
+import os, re
+p = os.environ["GB_PR"]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"(?m)^status:\s*\S+", "status: approved", txt)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(txt)
+PY
+  fi
+
+  # 5. Sync feature state --approve build (runs check-traceability.sh build and indexes plan.md + build-report.md)
+  sh "$GC_HERE/sync-feature-state.sh" --approve build "$gb_req_art" >/dev/null
+
+  # 6. Resolve Story ID for commit message
+  gb_story_id="$(GB_REQ="$gb_req_art" GB_SLUG="$gb_feature" python3 - <<'PY'
+import os, re
+req_p = os.environ["GB_REQ"]
+slug = os.environ["GB_SLUG"]
+txt = open(req_p, encoding="utf-8").read()
+m = re.search(r"^\s*(?:\*\*)?Story(?:\*\*)?:\s*(?:\*\*)?`?([A-Z][A-Z0-9]*-[A-Z0-9]+)", txt, re.M)
+if m:
+    print(m.group(1))
+else:
+    print(slug)
+PY
+)"
+
+  # 7. Stage explicit build paths only (never git add -A, never *.lock)
+  gb_rule commit commit.paths "$gb_feature"; gb_paths="$gb_val"
+  for gb_p in $gb_paths; do
+    if [ -e "$gb_p" ] || git ls-files --error-unmatch "$gb_p" >/dev/null 2>&1; then
+      git add -- "$gb_p"
+    fi
+  done
+  for gb_lk in $(git diff --cached --name-only | grep '\.lock$' || true); do
+    git reset -q HEAD -- "$gb_lk" || true
+  done
+
+  gb_Staged="$(git diff --cached --name-only)"
+  [ -n "$gb_Staged" ] || gc_refuse commit "nothing staged to commit for '$gb_feature'"
+
+  # 8. Scan staged content for secrets
+  gc_scan_staged commit
+
+  # 9. Commit on feature/<feature>
+  gb_msg="${gb_story_id}: build approved"
+  git commit -q -m "$gb_msg"
+  gb_sha="$(git rev-parse --short HEAD)"
+
+  gc_ok commit "committed '$gb_msg' ($gb_sha) on feature/$gb_feature"
+  printf 'Next: %s\n' "$gb_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gb_usage
 shift || true
@@ -641,5 +781,6 @@ case "$cmd" in
   start) gb_start "$@" ;;
   block) gb_block "$@" ;;
   ready) gb_ready "$@" ;;
+  commit) gb_commit "$@" ;;
   *) gb_usage ;;
 esac
