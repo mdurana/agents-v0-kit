@@ -1,6 +1,6 @@
 # Agentic Workflow Guide
 
-You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, messages between systems, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
+You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply in your own terminal outside Cursor (`sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>` or `approve deliver <feature>`). A story with an API, messages between systems, screens, or a public route stops at each phase. The greenfield platform skeleton (`P0-A`) runs via `/v0-scaffold` on the integration branch and stops once for scaffold approval. A story with no contract (`Contract: None`) auto-commits Design and continues to Build. Engineers and the AI handle implementation, testing, and security checks.
 
 This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**, then **Scaffold**. Each story then runs **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
 
@@ -310,8 +310,8 @@ Make the portal better.
 ## What the AI will not do without you
 
 - **Commit or push** code to Git without your OK — the shell hook **asks** in Cursor; approve only when you intended that action (e.g. Release).  
-- **Self-approve delivery gates** in markdown — CI and CODEOWNERS expect a **human** reviewer on the merge request; say `Approved` in chat, then a person records it in the artifact and approves the merge request.  
-- **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop. The platform skeleton's one stop is Release. A story with no API, no messages between systems, no screens, and no public route has no Design stop. A green build does not approve itself.  
+- **Self-approve delivery gates** — the agent cannot run `guard-common.sh approve`; you run `sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>` (or `approve deliver <feature>`) in your own terminal outside Cursor.  
+- **Skip a gate that applies** on `/v0-deliver` — you approve each phase that has its own stop in your terminal. The platform skeleton (`P0-A`) runs via `/v0-scaffold` on the integration branch. A story with no API, no messages between systems, no screens, and no public route (`Contract: None`) auto-commits Design and continues to Build. A green build does not approve itself.  
 - **Start the next phase** while the current one is still waiting for your approval.  
 - **Overwrite another feature’s files** in the same checkout — it stops and names the files instead.  
 - **Store passwords or API keys** in chat — use your org’s secret vault; never paste production secrets.
@@ -342,11 +342,11 @@ Make the portal better.
 
 ```text
 1. Open Cursor chat in the project.
-2. New program: /v0-roadmap <path to the discovery file>, then /v0-architecture, then /v0-plan. One ticket: /v0-deliver or /v0-intake. One open story can omit the name. Name it when more than one is open. A new story or fix needs a new name.
+2. New program: /v0-roadmap <path to the discovery file>, then /v0-architecture, then /v0-plan, then /v0-scaffold (for P0-A). One ticket: /v0-deliver <feature> or /v0-intake <feature>.
 3. Answer questions when asked.
-4. At each gate that applies: read summary → Approved OR list changes. The platform skeleton asks once, at Release.
-5. If the chat stopped mid-phase: /v0-status <feature> → run the same phase command again.
-6. After go-live: /v0-maintain + describe the issue.
+4. At each gate that applies: review summary → run sh .agents-v0/scripts/guard-common.sh approve <phase> <feature> (or approve deliver <feature>) in your own terminal outside Cursor.
+5. If the chat stopped mid-phase: /v0-status <feature> → run /v0-deliver <feature> or the phase command again.
+6. After go-live: /v0-maintain <id> + describe the issue.
 ```
 
 For technical setup and model routing, see [README.md](../../README.md) at the repo root. The full map of commands, records, and checks is [agents-v0-kit.md](agents-v0-kit.md). Engineers: [greenfield-onboarding.md](greenfield-onboarding.md) (`--pack java --scaffold-app` for the Java archive), [brownfield-onboarding.md](brownfield-onboarding.md), [snippets/README.md](snippets/README.md).

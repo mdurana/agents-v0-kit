@@ -432,15 +432,15 @@ fi
 printf '\nGreenfield bootstrap complete.\n'
 if [ "$SCAFFOLD_APP" = 1 ] && [ -z "$CLI_PACK" ]; then
   printf 'No --pack was given. Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
-  printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
+  printf 'P0-A: prove AC-1–AC-4 with /v0-scaffold (scaffold-service verifies; does not reinvent the skeleton).\n'
 elif [ "$SCAFFOLD_APP" = 1 ] && [ "$CLI_PACK" = "java" ]; then
   printf 'Extracted the java example archive templates/app/p0-platform-skeleton.tar.gz.\n'
-  printf 'P0-A: prove AC-1–AC-4 with /v0-build (scaffold-service verifies; does not reinvent the skeleton).\n'
+  printf 'P0-A: prove AC-1–AC-4 with /v0-scaffold (scaffold-service verifies; does not reinvent the skeleton).\n'
 elif [ "$SCAFFOLD_APP" = 1 ]; then
-  printf 'P0-A: follow the %s scaffold-service skill. The Java archive was not extracted.\n' "$CLI_PACK"
+  printf 'P0-A: follow the %s scaffold-service skill via /v0-scaffold. The Java archive was not extracted.\n' "$CLI_PACK"
 else
-  printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with scaffold-service.\n'
+  printf 'Next: add --scaffold-app on bootstrap, or scaffold externally, then harden with /v0-scaffold.\n'
   printf '      wire the reports named in pack.json; Pack java uses maven/. See docker/README.md\n'
 fi
 printf '      run ./scripts/audit-brownfield-baseline.sh %s\n' "$TARGET_ABS"
-printf 'Then start P0-A with /v0-build or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md\n'
+printf 'Then run P0-A with /v0-scaffold, and start feature stories with /v0-intake or /v0-deliver. Guide: docs/agents-v0/greenfield-onboarding.md\n'

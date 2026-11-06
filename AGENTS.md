@@ -22,7 +22,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Local release (primary) | `/v0-local-release` | release-manager | local-release | Native stack verify + user-authorized local squash merge (`git merge --squash`; one commit per approved gate before it) + `release` in `<feature>.state.json` |
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` & `state.json`; routes to Verify |
 | Trivial fixes | `/v0-triage` | maintenance-engineer | doc-sync, dependency-upgrade | User-confirmed doc/version fix (`tier: "trivial"`); abbreviated Verify |
-| Deliver (one story) | `/v0-deliver` | orchestrator | — | Follows each phase command and stops at every gate that applies. P0-A starts at Build and stops once, at Release |
+| Deliver (one story) | `/v0-deliver` | orchestrator | — | Dispatches each phase command via `guard-deliver.sh` across worktrees, stopping at every human gate (`P0-A` runs via `/v0-scaffold`) |
 | Export (on request) | `/v0-export` | — | jira-export | `docs/agents-v0/backlog/tickets.csv` (documentation only, approves nothing) |
 | Briefing (on request) | `/v0-deck` | — | leadership-deck | `docs/agents-v0/presentations/<name>.md` (documentation only, approves nothing) |
 | Resume | `/v0-status` | orchestrator | — | Next phase from `<feature>.state.json` + on-disk evidence; all stories across worktrees via `.agents-v0/scripts/stories-status.sh` |

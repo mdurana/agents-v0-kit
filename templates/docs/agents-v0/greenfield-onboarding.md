@@ -95,12 +95,11 @@ API `:8080`, UI `:8081`, `postgres:15-alpine`. See `docker/README.md` for single
 
 ## 4. Run the gated workflow for the skeleton
 
-P0 is one story (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`): one branch and one merge request.
+P0 is the platform skeleton (`P0-A` in `docs/agents-v0/milestones/p0-platform-skeleton.md`) on the integration branch.
 
-1. `/v0-build`, or `/v0-deliver` for the story end-to-end. Do not run `/v0-intake` or `/v0-design`. Build copies the milestone story and AC-1 through AC-4 and writes `design.md` (`N/A: no /api/v1 operation`, Events `N/A: no event contract`). When `--scaffold-app` already extracted the template, prove AC-1–AC-4; do not recreate the skeleton. A missing module on this first skeleton story is the work only when no template was used. A module that already exists must verify clean before edits. A `/health`, `/ready`, or `/live` route with the pack public marker (Pack `java`: `@PreAuthorize("permitAll()")`) does not by itself require `design-reviewer`.
-2. `/v0-verify` then `/v0-local-release`. Do not stop for a separate approval at Build or Verify. The one approval is at `/v0-local-release` after the test report exists (or run `/v0-scaffold` on the integration branch).
-
-Record approvals in `<feature>.state.json` via `sh .agents-v0/scripts/sync-feature-state.sh <feature> --approve <phase>`.
+1. Run `/v0-scaffold` (`guard-scaffold.sh`) on the integration branch after `/v0-plan` is approved. When `--scaffold-app` already extracted the template, `platform-engineer` verifies AC-1–AC-4 (`Dockerfile`, `docker-compose.yml`, and native stack verify); it does not recreate the skeleton.
+2. When `guard-scaffold.sh ready` sets `awaiting_approval`, approve the platform skeleton in your own terminal outside Cursor (`sh .agents-v0/scripts/guard-common.sh approve scaffold`) and run `sh .agents-v0/scripts/guard-scaffold.sh commit`.
+3. Once `scaffold` is committed, run feature stories (`P1`–`P5`) via `/v0-deliver <feature>` (or phase by phase starting at `/v0-intake <feature>`). Each phase stops at its gate for external terminal approval (`sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>` or `sh .agents-v0/scripts/guard-common.sh approve deliver <feature>`).
 
 ## 5. Advance milestones
 
