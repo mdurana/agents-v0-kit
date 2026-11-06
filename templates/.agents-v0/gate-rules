@@ -199,3 +199,30 @@ build ready.next Sensei reviews docs/agents-v0/build/<feature>/build-report.md a
 build commit.paths app openapi docs/agents-v0/build/<feature> docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 build commit.message <story>: build approved
 build approved.next /v0-verify <feature>
+
+# --- verify (/v0-verify, guard-verify.sh) --------------------------------------------------------
+verify phase verify
+verify feature <feature>
+verify state docs/agents-v0/requirements/<feature>.state.json
+verify artifact docs/agents-v0/verify/<feature>/quality-gate.md
+verify vapt docs/agents-v0/verify/<feature>/vapt-checklist.md
+verify review docs/agents-v0/verify/<feature>/code-review.md
+verify output docs/agents-v0/verify/<feature>/verify-output.txt
+verify result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+verify check.requires git-work-tree kit-installed feature-branch pack-configured build-approved not-released not-approved
+verify start.requires git-work-tree kit-installed feature-branch pack-configured build-approved not-released not-awaiting-approval
+verify start.status in_progress
+verify start.next Run the native stack verify command and check-tests-ran.sh (recording output in docs/agents-v0/verify/<feature>/verify-output.txt), then launch test-engineer (quality-gate.md), security-reviewer (vapt-checklist.md), and code-reviewer (code-review.md).
+# block: status and next step
+verify block.status blocked
+verify block.next Resolve the blocker or helper brief, then run /v0-verify <feature> again; it resumes from the files on disk.
+# ready: verifies verify-output.txt, check-tests-ran.sh, quality-gate.md (coverage >=80% changed & module, 0 HIGH/CRIT CVEs), vapt-checklist.md (F4/F8/F9/F10), code-review.md, T6 traceability, and auto-bounces to build if any Open Critical finding exists
+verify ready.requires in-progress
+verify ready.status awaiting_approval
+verify ready.next Sensei reviews docs/agents-v0/verify/<feature>/ reports and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve verify <feature>
+# commit: verifies approval record, appends Approved Verify row, runs check-traceability.sh verify, stages verify paths, secret-scans, and commits "<story>: verify approved" on feature/<feature>
+verify commit.paths app docs/agents-v0/verify/<feature> docs/agents-v0/design/system/slo-evidence.md docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
+verify commit.message <story>: verify approved
+verify approved.next /v0-local-release <feature>
+
