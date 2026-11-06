@@ -161,7 +161,7 @@ fi
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
 # after the merge leaves that branch ahead of the integration branch.
 approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
-# Refuse --approve roadmap, architecture, plan, or scaffold unless gc_approval_ok succeeds (F1, FA1, FP1, FS1, DSA)
+# Refuse --approve roadmap, architecture, plan, scaffold, or guard-managed intake unless gc_approval_ok succeeds (F1, FA1, FP1, FS1, FI1, DSA, DIA)
 case "$approve_lc" in
   roadmap|architecture|plan|scaffold)
     guard_common="$(dirname "$0")/guard-common.sh"
@@ -175,6 +175,24 @@ case "$approve_lc" in
     else
       printf 'FAIL: --approve %s requires %s\n' "$approve_lc" "$guard_common" >&2
       exit 1
+    fi
+    ;;
+  intake)
+    guard_common="$(dirname "$0")/guard-common.sh"
+    intake_slug="$(basename "${req_file:-}" .md)"
+    intake_state="docs/agents-v0/requirements/${intake_slug}.state.json"
+    intake_pr="docs/agents-v0/requirements/${intake_slug}.phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      intake_base=""
+      [ -f "$intake_state" ] && intake_base="$(gc_state_get "$intake_state" baseCommit 2>/dev/null || true)"
+      if [ -n "$intake_base" ] || { [ -f "$intake_pr" ] && grep -Fq "guard_managed: true" "$intake_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok intake "$intake_slug")"; then
+          printf 'FAIL: --approve intake for %s refused without Sensei external approval record: %s\n' "$intake_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve intake %s\n' "$intake_slug" >&2
+          exit 1
+        fi
+      fi
     fi
     ;;
 esac

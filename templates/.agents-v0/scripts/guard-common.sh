@@ -199,21 +199,44 @@ name = re.sub(r"[^A-Za-z0-9._-]", "_", name) or "repo"
 print(f"{name}-{hashlib.sha256(cd.encode()).hexdigest()[:12]}")
 PY
 }
-# gc_approval_file <command>: the record path for this repository and <command>.
+# gc_approval_file <command> [<feature>]: the record path for this repository and <command> (and <feature> when story-scoped).
 gc_approval_file() {
   gc_af_root="$(gc_approvals_root)" && gc_af_id="$(gc_repo_id)" || return 1
-  printf '%s/%s/%s.json\n' "$gc_af_root" "$gc_af_id" "$1"
+  if [ -n "${2:-}" ]; then
+    printf '%s/%s/%s-%s.json\n' "$gc_af_root" "$gc_af_id" "$1" "$2"
+  else
+    printf '%s/%s/%s.json\n' "$gc_af_root" "$gc_af_id" "$1"
+  fi
 }
 
-# approve <command>: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
+gc_check_feature_slug() {
+  gc_cfs_step="$1"
+  gc_cfs_slug="$2"
+  case "$gc_cfs_slug" in
+    [a-z0-9]*) ;;
+    *) gc_refuse "$gc_cfs_step" "feature slug '$gc_cfs_slug' must start with a lowercase letter or digit" ;;
+  esac
+  case "$gc_cfs_slug" in
+    *[!a-z0-9-]*) gc_refuse "$gc_cfs_step" "feature slug '$gc_cfs_slug' may hold only lowercase letters, digits, and hyphens" ;;
+  esac
+}
+
+# approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
 gc_approve() {
-  [ $# -eq 1 ] || gc_usage
+  [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
   gc_to_root approve
   gc_a_cmd="$1"
-  gc_a_state="$(gc_rule "$gc_a_cmd" state)" || gc_refuse approve "gate-rules has no '$gc_a_cmd state' rule; nothing to approve"
-  gc_a_phase="$(gc_rule "$gc_a_cmd" phase)" || gc_refuse approve "gate-rules has no '$gc_a_cmd phase' rule"
-  gc_a_feature="$(gc_rule "$gc_a_cmd" feature)" || gc_refuse approve "gate-rules has no '$gc_a_cmd feature' rule"
-  gc_a_artifact="$(gc_rule "$gc_a_cmd" artifact)" || gc_refuse approve "gate-rules has no '$gc_a_cmd artifact' rule"
+  gc_a_slug="${2:-}"
+  if [ -n "$gc_a_slug" ]; then
+    gc_check_feature_slug approve "$gc_a_slug"
+  fi
+  gc_a_state="$(gc_rule "$gc_a_cmd" state "$gc_a_slug")" || gc_refuse approve "gate-rules has no '$gc_a_cmd state' rule; nothing to approve"
+  case "$gc_a_state" in
+    *"<feature>"*) gc_refuse approve "$gc_a_cmd requires a <feature> slug (usage: sh .agents-v0/scripts/guard-common.sh approve $gc_a_cmd <feature>)" ;;
+  esac
+  gc_a_phase="$(gc_rule "$gc_a_cmd" phase "$gc_a_slug")" || gc_refuse approve "gate-rules has no '$gc_a_cmd phase' rule"
+  gc_a_feature="$(gc_rule "$gc_a_cmd" feature "$gc_a_slug")" || gc_refuse approve "gate-rules has no '$gc_a_cmd feature' rule"
+  gc_a_artifact="$(gc_rule "$gc_a_cmd" artifact "$gc_a_slug")" || gc_refuse approve "gate-rules has no '$gc_a_cmd artifact' rule"
   # If the state file already records an exact artifact for a directory rule (e.g. dynamic roadmap/<program>.md), preserve it (T2)
   if [ "$gc_a_artifact" = "docs/agents-v0/roadmap" ] && [ -f "$gc_a_state" ]; then
     gc_existing_art="$(gc_state_get "$gc_a_state" artifact 2>/dev/null || true)"
@@ -230,12 +253,14 @@ gc_approve() {
   [ -n "$gc_a_base" ] || gc_refuse approve "the $gc_a_cmd state has no baseCommit"
   gc_a_head="$(git rev-parse -q --verify HEAD)" || gc_refuse approve "this repository has no commit yet"
   gc_a_id="$(gc_repo_id)" || gc_refuse approve "cannot compute the repo id"
-  gc_a_file="$(gc_approval_file "$gc_a_cmd")" || gc_refuse approve "cannot find the approval folder"
+  gc_a_file="$(gc_approval_file "$gc_a_cmd" "$gc_a_slug")" || gc_refuse approve "cannot find the approval folder"
   if ! ( : </dev/tty ) 2>/dev/null; then
     gc_refuse approve "approve reads your words from your own terminal; run it there, outside Cursor (no terminal found)"
   fi
+  gc_a_label="$gc_a_cmd"
+  [ -z "$gc_a_slug" ] || gc_a_label="$gc_a_cmd ($gc_a_slug)"
   {
-    printf 'Approve %s in %s\n' "$gc_a_cmd" "$(pwd)"
+    printf 'Approve %s in %s\n' "$gc_a_label" "$(pwd)"
     printf '  HEAD:       %s\n  baseCommit: %s\n  record:     %s\n' "$gc_a_head" "$gc_a_base" "$gc_a_file"
     printf 'Type your approval words, then Enter (an empty line approves nothing): '
   } >/dev/tty
@@ -243,15 +268,17 @@ gc_approve() {
   IFS= read -r gc_a_words </dev/tty || :
   [ -n "$(printf '%s' "$gc_a_words" | tr -d '[:space:]')" ] || gc_refuse approve "no approval words typed; nothing approved"
   python3 - "$gc_a_file" "$gc_a_cmd" "$gc_a_phase" "$(pwd)" "$gc_a_id" "$(gc_common_dir)" "$gc_a_head" \
-    "$gc_a_base" "$gc_a_words" <<'PY'
+    "$gc_a_base" "$gc_a_words" "$gc_a_slug" <<'PY'
 import datetime, fcntl, json, os, pwd, sys, tempfile
-out, command, phase, repo, repo_id, common, head, base, words = sys.argv[1:10]
+out, command, phase, repo, repo_id, common, head, base, words, slug = sys.argv[1:11]
 os.umask(0o077)
 os.makedirs(os.path.dirname(out), mode=0o700, exist_ok=True)
 record = {"command": command, "phase": phase, "repo": repo, "repoId": repo_id, "gitCommonDir": common,
           "head": head, "baseCommit": base,
           "approvedAt": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "approver": pwd.getpwuid(os.getuid()).pw_name, "words": words}
+if slug:
+    record["feature"] = slug
 lock = open(out + ".lock", "w", encoding="utf-8")
 fcntl.flock(lock, fcntl.LOCK_EX)
 try:
@@ -268,43 +295,58 @@ finally:
 PY
   gc_state_set "$gc_a_state" "$gc_a_feature" "$gc_a_artifact" "approvePhase=$gc_a_phase" \
     "activePhase=" "activeStatus=" "blockedReason=" "nextStep=" || exit 1
-  gc_ok approve "$gc_a_cmd approved at baseCommit $gc_a_base"
+  gc_ok approve "$gc_a_label approved at baseCommit $gc_a_base"
   printf 'Record: %s\n' "$gc_a_file"
 }
 
-# gc_approval_ok <command>: library check for D4. Prints `OK approval: ...` and returns 0 only when this repository's
-# record for <command> exists, names this command and repository, and its baseCommit equals the state's baseCommit;
-# else prints `REFUSED approval: <reason>` and returns 1 (it never exits the caller).
+# gc_approval_ok <command> [<feature>]: library check for D4/DIA. Prints `OK approval: ...` and returns 0 only when this
+# repository's record for <command> (and <feature> when given) exists, names this command and repository, and its
+# baseCommit equals the state's baseCommit; else prints `REFUSED approval: <reason>` and returns 1.
 gc_approval_ok() {
-  [ $# -eq 1 ] || { printf 'REFUSED approval: usage gc_approval_ok <command>\n'; return 1; }
+  [ $# -ge 1 ] && [ $# -le 2 ] || { printf 'REFUSED approval: usage gc_approval_ok <command> [<feature>]\n'; return 1; }
+  gc_ok_cmd="$1"
+  gc_ok_slug="${2:-}"
+  if [ -n "$gc_ok_slug" ]; then
+    case "$gc_ok_slug" in
+      [a-z0-9]* )
+        case "$gc_ok_slug" in *[!a-z0-9-]*) printf "REFUSED approval: invalid feature slug '%s'\n" "$gc_ok_slug"; return 1 ;; esac ;;
+      *) printf "REFUSED approval: invalid feature slug '%s'\n" "$gc_ok_slug"; return 1 ;;
+    esac
+  fi
   gc_ok_root="$(gc_root)" || { printf 'REFUSED approval: not inside a git work tree\n'; return 1; }
-  gc_ok_state="$(gc_rule "$1" state)" || { printf "REFUSED approval: gate-rules has no '%s state' rule\n" "$1"; return 1; }
+  gc_ok_state="$(gc_rule "$gc_ok_cmd" state "$gc_ok_slug")" || { printf "REFUSED approval: gate-rules has no '%s state' rule\n" "$gc_ok_cmd"; return 1; }
+  case "$gc_ok_state" in
+    *"<feature>"*) printf "REFUSED approval: %s requires a <feature> slug\n" "$gc_ok_cmd"; return 1 ;;
+  esac
   gc_ok_id="$(cd "$gc_ok_root" && gc_repo_id)" || { printf 'REFUSED approval: cannot compute the repo id\n'; return 1; }
-  gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$1")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
-  python3 - "$gc_ok_file" "$1" "$gc_ok_id" "$gc_ok_root/$gc_ok_state" <<'PY'
+  gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$gc_ok_cmd" "$gc_ok_slug")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
+  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_root/$gc_ok_state" "$gc_ok_slug" <<'PY'
 import json, sys
-rec_path, command, repo_id, state_path = sys.argv[1:5]
+rec_path, command, repo_id, state_path, slug = sys.argv[1:6]
+label = f"{command} ({slug})" if slug else command
 def refuse(why):
     print(f"REFUSED approval: {why}")
     raise SystemExit(1)
 try:
     base = (json.load(open(state_path, encoding="utf-8")).get("baseCommit") or "").strip()
 except (OSError, ValueError) as exc:
-    refuse(f"cannot read the {command} state ({exc})")
+    refuse(f"cannot read the {label} state ({exc})")
 if not base:
-    refuse(f"the {command} state has no baseCommit")
+    refuse(f"the {label} state has no baseCommit")
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
 except FileNotFoundError:
-    refuse(f"no approval record for {command} ({rec_path}); Sensei runs approve in his own terminal")
+    refuse(f"no approval record for {label} ({rec_path}); Sensei runs approve in his own terminal")
 except (OSError, ValueError) as exc:
     refuse(f"cannot read the approval record {rec_path} ({exc})")
 if not isinstance(rec, dict) or rec.get("command") != command or rec.get("repoId") != repo_id:
     refuse(f"the approval record {rec_path} is for another command or repository")
+if slug and rec.get("feature") not in (None, "", slug):
+    refuse(f"the approval record {rec_path} is for feature '{rec.get('feature')}', not '{slug}'")
 if rec.get("baseCommit") != base:
     refuse(f"the approval record approves baseCommit {rec.get('baseCommit')}, but the state's baseCommit is {base}; "
            "Sensei approves again")
-print(f"OK approval: {command} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
+print(f"OK approval: {label} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
 PY
 }
 
