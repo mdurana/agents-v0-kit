@@ -559,8 +559,62 @@ gd_block() {
   printf 'Next: Resolve the blocker, then run: %s start %s%s\n' "$G" "$gd_feature" "$gd_m_flag"
 }
 
+# Design: DDL3 (/v0-deliver ready delegation, Contract: None auto-commit & fast-forward, and Verify bounce propagation).
 gd_ready() {
-  gc_refuse ready "guard-deliver.sh ready is not implemented yet (Design: DDL3)"
+  gd_r_slug=""
+  gd_r_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        gd_r_maint=1
+        shift
+        ;;
+      -*)
+        gd_usage
+        ;;
+      *)
+        [ -z "$gd_r_slug" ] || gd_usage
+        gd_r_slug="$1"
+        shift
+        ;;
+    esac
+  done
+  [ -n "$gd_r_slug" ] || gc_refuse ready "missing <feature> slug; usage: $G ready <feature> [--maintain]"
+
+  gd_resolve_context ready "$gd_r_slug" "$gd_r_maint" "" 0
+  [ -f "$gd_state_full" ] || gc_refuse ready "deliver for '$gd_feature' has not been started ($gd_rel_state missing)"
+  [ "$gd_active_status" = "in_progress" ] && [ -n "$gd_active_phase" ] \
+    || gc_refuse ready "deliver for '$gd_feature' is not in_progress (activePhase='${gd_active_phase:-none}', activeStatus='${gd_active_status:-none}'); run $G start $gd_feature first"
+
+  gd_r_args="$gd_feature"
+  if [ "$gd_is_maintain" = 1 ] && [ "$gd_active_phase" != "maintain" ]; then
+    gd_r_args="$gd_r_args --maintain"
+  fi
+
+  # shellcheck disable=SC2086
+  if ! gd_r_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-${gd_active_phase}.sh" ready $gd_r_args 2>&1)"; then
+    printf '%s\n' "$gd_r_out"
+    exit 1
+  fi
+  printf '%s\n' "$gd_r_out"
+
+  # FDL6 / DDL3: When design qualifies for Contract: None, guard-design.sh ready writes status: contract_none.
+  # Auto-commit Contract: None design and route directly to build (`guard-deliver.sh start <feature>`).
+  if [ "$gd_active_phase" = "design" ] && [ -f "$gd_res_full" ] \
+    && grep -Fq "phase: design" "$gd_res_full" && grep -Fq "status: contract_none" "$gd_res_full"; then
+    if ! gd_cn_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-design.sh" commit "$gd_feature" 2>&1)"; then
+      printf '%s\n' "$gd_cn_out"
+      exit 1
+    fi
+    printf '%s\n' "$gd_cn_out"
+    gc_ok ready "deliver ($gd_feature) design (Contract: None) verified and auto-committed; proceed directly to build"
+    printf 'Next: %s start %s\n' "$G" "$gd_feature"
+    return 0
+  fi
+
+  gc_ok ready "deliver ($gd_feature) phase '$gd_active_phase' is awaiting_approval in $gd_work_dir"
+  printf 'Next: Sensei reviews the %s deliverables and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s %s (or: sh .agents-v0/scripts/guard-common.sh approve deliver %s)\n' \
+    "$gd_active_phase" "$gd_active_phase" "$gd_feature" "$gd_feature"
 }
 
 gd_commit() {
