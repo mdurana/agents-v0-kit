@@ -279,7 +279,7 @@ maintain ready.requires in-progress
 maintain ready.status awaiting_approval
 maintain ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>
 # commit: verifies external approval record, appends Approved Maintain row, updates phase-result.md, runs sync-feature-state.sh --approve maintain --clear-active, stages explicit paths, secret-scans, and commits "maintain/<feature>: maintain approved"
-maintain commit.paths app openapi docs README.md CHANGELOG.md pom.xml build.gradle package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
+maintain commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.gradle build.gradle.kts package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
 maintain commit.message maintain/<feature>: maintain approved
 maintain approved.next /v0-verify <feature> --maintain
 

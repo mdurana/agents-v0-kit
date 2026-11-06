@@ -884,8 +884,137 @@ PYST
   printf 'Next: %s\n' "$gm_next"
 }
 
+# Design: DM5 (/v0-maintain commit with external approval check, Delivery approvals row, safe staging, and secret scan).
 gm_commit() {
-  gc_refuse commit "commit not yet implemented (DM5)"
+  gm_c_slug="${1:-}"
+  [ $# -le 1 ] || gm_usage
+  gm_load commit "$gm_c_slug"
+  gm_enter_worktree_if_needed
+  gm_rule commit approved.next "$gm_feature"; gm_next="$gm_val"
+
+  [ -f "$gm_state" ] || gc_refuse commit "state file '$gm_state' is missing; run $G start $gm_feature and $G ready $gm_feature first"
+
+  # 1. Verify Sensei's external maintain approval record
+  case " $(gc_state_get "$gm_state" approvedPhases | tr -d '[]",') " in
+    *" $gm_phase "*) ;;
+    *) gc_refuse commit "maintain is not approved in '$gm_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature" ;;
+  esac
+  if ! gm_why="$(gc_approval_ok maintain "$gm_feature")"; then
+    gc_refuse commit "$gm_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature)"
+  fi
+
+  # 2. Refuse if index already has staged paths
+  gm_PreStaged="$(git diff --cached --name-only)"
+  [ -z "$gm_PreStaged" ] \
+    || gc_refuse commit "the git index already has staged files ($(printf '%s' "$gm_PreStaged" | tr '\n' ' ')); unstage them before running guard-maintain.sh commit"
+
+  # 3. Append/update Approved Maintain row in docs/agents-v0/maintain/<id>/note.md
+  gm_rec_file="$(gc_approval_file maintain "$gm_feature")"
+  GM_NOTE="$gm_artifact" GM_REP="$gm_report" GM_REC="$gm_rec_file" python3 - <<'PYROW'
+import datetime, json, os, re
+
+p = os.environ["GM_NOTE"]
+rep = os.environ["GM_REP"]
+rec_p = os.environ["GM_REC"]
+today = datetime.date.today().isoformat()
+approver = "Sensei"
+try:
+    rec = json.load(open(rec_p, encoding="utf-8"))
+    approver = rec.get("approver") or "Sensei"
+    if rec.get("approvedAt"):
+        today = rec["approvedAt"].split("T")[0]
+except Exception:
+    pass
+
+ev = f"`{p}`, `{rep}`"
+maint_row = f"| Maintain | {ev} | {approver} | Approved | {today} |"
+
+txt = open(p, encoding="utf-8").read()
+lines = txt.splitlines()
+out = []
+in_deliv = False
+replaced_maint = False
+has_deliv = False
+
+for line in lines:
+    if re.match(r"^##\s+Delivery approvals\b", line, re.I):
+        in_deliv = True
+        has_deliv = True
+        out.append(line)
+        continue
+    if in_deliv and re.match(r"^##\s+\S", line):
+        if not replaced_maint:
+            out.append(maint_row)
+            replaced_maint = True
+        in_deliv = False
+    if in_deliv and line.strip().startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 5 and cells[0].lower() == "maintain":
+            out.append(maint_row)
+            replaced_maint = True
+            continue
+    out.append(line)
+
+if in_deliv and not replaced_maint:
+    out.append(maint_row)
+elif not has_deliv:
+    out.extend([
+        "",
+        "## Delivery approvals",
+        "",
+        "| Phase | Artifacts | Approver | Decision | Date |",
+        "|-------|-----------|----------|----------|------|",
+        maint_row,
+    ])
+
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write("\n".join(out) + "\n")
+PYROW
+
+  # 4. Update docs/agents-v0/maintain/<id>/phase-result.md to status: approved
+  if [ -f "$gm_result" ]; then
+    GM_PR="$gm_result" python3 - <<'PY'
+import os, re
+p = os.environ["GM_PR"]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"(?m)^(-?\s*status:\s*)\S+", r"\g<1>approved", txt)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(txt)
+PY
+  fi
+
+  # 5. Sync feature state --approve maintain --clear-active
+  sh "$GC_HERE/sync-feature-state.sh" --approve maintain --clear-active "$gm_artifact" >/dev/null
+
+  # 6. Stage explicit maintain paths only (never git add -A, never state *.lock files)
+  gm_rule commit commit.paths "$gm_feature"; gm_paths="$gm_val"
+  for gm_p in $gm_paths; do
+    if [ -e "$gm_p" ] || git ls-files --error-unmatch "$gm_p" >/dev/null 2>&1; then
+      git add -- "$gm_p"
+    fi
+  done
+  for gm_lk in $(git diff --cached --name-only | grep -E '(state\.json\.lock|\.state\..*\.lock|\.record\..*\.lock)$' || true); do
+    git reset -q HEAD -- "$gm_lk" || true
+  done
+
+  gm_Staged="$(git diff --cached --name-only)"
+  [ -n "$gm_Staged" ] || gc_refuse commit "nothing staged to commit for '$gm_feature'"
+
+  # 7. Scan staged content for secrets
+  gc_scan_staged
+
+  # 8. Commit maintain/<id>: maintain approved
+  gm_msg="maintain/${gm_feature}: maintain approved"
+  git commit -q -m "$gm_msg"
+  gm_sha="$(git rev-parse --short HEAD)"
+
+  gm_cur_tier="$(gc_state_get "$gm_state" tier 2>/dev/null || echo "$gm_eff_tier")"
+  if [ "$gm_cur_tier" = "emergency" ]; then
+    gm_next="/v0-local-release ${gm_feature} --maintain (full /v0-verify ${gm_feature} --maintain owed by Follow-up verify due)"
+  fi
+
+  gc_ok commit "committed '$gm_msg' ($gm_sha)"
+  printf 'Next: %s\n' "$gm_next"
 }
 
 gm_steps() {

@@ -143,6 +143,8 @@ def commit_cmd(ph):
         return f"sh .agents-v0/scripts/guard-verify.sh commit {slug}"
     if ph == "release" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("releaseGuardManaged"):
         return f"sh .agents-v0/scripts/guard-local-release.sh commit {slug}"
+    if ph == "maintain" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("maintainGuardManaged"):
+        return f"sh .agents-v0/scripts/guard-maintain.sh commit {os.path.basename(os.path.dirname(art))}"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 
