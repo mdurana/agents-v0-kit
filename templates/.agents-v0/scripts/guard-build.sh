@@ -238,11 +238,171 @@ gb_check() {
   fi
 }
 
+# Design: DB2 (/v0-build start, block, reopen, and helper/failure-brief deduplication).
+gb_start() {
+  gb_s_slug=""
+  gb_s_reopen=0
+  gb_s_check_db=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reopen)
+        gb_s_reopen=1
+        shift
+        ;;
+      --check-db)
+        gb_s_check_db=1
+        shift
+        ;;
+      -*)
+        gb_usage
+        ;;
+      *)
+        [ -z "$gb_s_slug" ] || gb_usage
+        gb_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  gb_load start "$gb_s_slug"
+  gb_rule start start.requires "$gb_feature"; gb_requires="$gb_val"
+  gb_check_prereqs start "$gb_requires" "$gb_s_reopen"
+  if [ "$gb_s_reopen" != 1 ]; then
+    gb_check_prereqs start "not-approved" 0
+  else
+    gb_check_prereqs start "not-approved" 1
+  fi
+
+  # Collision guard: refuse unrelated dirty paths outside build/app/openapi/<feature>
+  gb_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -v '\.lock$' | grep -Ev "^(app/|openapi/|docs/agents-v0/build/${gb_feature}/|docs/agents-v0/requirements/${gb_feature}\\.)" || true)"
+  if [ -n "$gb_dirty" ]; then
+    gc_refuse start "working tree has uncommitted changes outside build paths ($gb_dirty); commit or stash them first"
+  fi
+
+  if [ "$gb_s_check_db" = 1 ] && [ -f "$GC_HERE/check-database-runtime.sh" ]; then
+    if ! gb_db_out="$(sh "$GC_HERE/check-database-runtime.sh" --phase build "$gb_req_art" 2>&1)"; then
+      gc_refuse start "database runtime unavailable ($gb_db_out); run $G block $gb_feature \"Database runtime unavailable\" and stop"
+    fi
+  fi
+
+  mkdir -p "docs/agents-v0/build/${gb_feature}"
+
+  # Seed plan.md from approved AC-1..AC-n in requirements/<feature>.md when absent
+  if [ ! -f "$gb_artifact" ]; then
+    GB_REQ="$gb_req_art" GB_PLAN="$gb_artifact" GB_SLUG="$gb_feature" python3 - <<'PYPLAN'
+import os, re
+req_text = open(os.environ["GB_REQ"], encoding="utf-8").read()
+clean_req = re.sub(r"<!--.*?-->", "", req_text, flags=re.S)
+acs = sorted(set(int(n) for n in re.findall(r"^###\s+AC-(\d+)\b", clean_req, re.M)))
+if not acs:
+    acs = [1]
+lines = [
+    f"# Build Plan: {os.environ['GB_SLUG']}",
+    "",
+    "| AC | Status | Test | Risk |",
+    "| --- | --- | --- | --- |",
+]
+for n in acs:
+    lines.append(f"| AC-{n} | pending | TBD | standard |")
+with open(os.environ["GB_PLAN"], "w", encoding="utf-8") as fh:
+    fh.write("\n".join(lines) + "\n")
+PYPLAN
+  fi
+
+  # Seed build-report.md when absent
+  if [ ! -f "$gb_report" ]; then
+    cat > "$gb_report" <<EOF
+# Build Report: ${gb_feature}
+
+## Attempt Cards
+| Command | Exit | Attempt | Failing test | Location |
+| --- | --- | --- | --- | --- |
+
+## Final Verify Summary
+- Status: pending
+
+## Per-Criterion Evidence
+EOF
+  fi
+
+  gb_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  if [ "$gb_s_reopen" = 1 ]; then
+    sh "$GC_HERE/sync-feature-state.sh" --reopen build "$gb_req_art" >/dev/null
+  else
+    sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status in_progress "$gb_req_art" >/dev/null
+  fi
+
+  GB_ST="$gb_state" GB_BASE="$gb_base" python3 - <<'PY'
+import json, os
+p = os.environ["GB_ST"]
+base = os.environ["GB_BASE"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base and not d.get("baseCommit"):
+    d["baseCommit"] = base
+d["buildGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  gb_rule start start.next "$gb_feature"; gb_next="$gb_val"
+  gc_ok start "build is in_progress for $gb_feature ($gb_artifact, $gb_report)"
+  printf 'Next: %s\n' "$gb_next"
+}
+
+gb_block() {
+  gb_b_slug="${1:-}"
+  shift || true
+  gb_b_reason="${1:-}"
+  [ $# -le 1 ] || gb_usage
+  gb_load block "$gb_b_slug"
+  gb_b_clean="$(gc_clean_reason block "$gb_b_reason")"
+
+  # Deduplicate helper-brief.md or failure-brief.md by SHA-256
+  gb_hb=""
+  if [ -f "docs/agents-v0/build/${gb_feature}/helper-brief.md" ]; then
+    gb_hb="docs/agents-v0/build/${gb_feature}/helper-brief.md"
+  elif [ -f "docs/agents-v0/build/${gb_feature}/failure-brief.md" ]; then
+    gb_hb="docs/agents-v0/build/${gb_feature}/failure-brief.md"
+  elif [ -f "docs/agents-v0/requirements/${gb_feature}.helper-brief.md" ]; then
+    gb_hb="docs/agents-v0/requirements/${gb_feature}.helper-brief.md"
+  fi
+  if [ -n "$gb_hb" ] && [ -f "$gb_state" ]; then
+    gb_dup="$(GB_ST="$gb_state" GB_HB="$gb_hb" python3 - <<'PY'
+import hashlib, json, os
+st_p = os.environ["GB_ST"]
+hb_p = os.environ["GB_HB"]
+d = json.load(open(st_p, encoding="utf-8")) if os.path.isfile(st_p) else {}
+h = hashlib.sha256(open(hb_p, "rb").read()).hexdigest()
+prev_h = d.get("lastHelperBriefHash", "")
+if prev_h and prev_h == h:
+    print("DUP")
+else:
+    d["lastHelperBriefHash"] = h
+    with open(st_p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+    print("OK")
+PY
+)"
+    if [ "$gb_dup" = "DUP" ]; then
+      gc_refuse block "identical brief ($gb_hb) was already recorded; escalate to Sensei instead of repeating the same ask"
+    fi
+  fi
+
+  sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status blocked --reason "$gb_b_clean" "$gb_req_art" >/dev/null
+  gb_rule block block.next "$gb_feature"; gb_next="$gb_val"
+  gc_ok block "build is blocked for $gb_feature ($gb_b_clean)"
+  printf 'Next: %s\n' "$gb_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gb_usage
 shift || true
 
 case "$cmd" in
   check) gb_check "$@" ;;
+  start) gb_start "$@" ;;
+  block) gb_block "$@" ;;
   *) gb_usage ;;
 esac
