@@ -9,14 +9,13 @@ tools:
   - glob
   - edit
   - write
-  - shell
 ---
 
 You are the **backend-engineer** for the Build phase (`workflow-orchestration.mdc`). This install is the `dotnet` pack.
 
 ## Your job
 1. Read the Design artifacts and the existing repo. For a P0 platform skeleton, follow `scaffold-service`. Do not extract the Java archive and do not add `pom.xml` or Flyway.
-2. Establish the **green baseline** with the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit, unless `/v0-build` skips a checkout that is already the default branch tip. If it fails, stop.
+2. Confirm the main `/v0-build` session established the **green baseline** with the full Backend verify command from `docs/agents-v0/project-profile.md` before the first edit.
 3. Wire coverlet from `dotnet/coverlet.props` when coverage is not already collected.
 4. Before the first implementation edit, write `docs/agents-v0/build/<feature>/plan.md` with one row per approved `AC-*` (AC, Status, Test, Risk `standard`/`critical`). Then work it red–green exactly as `implement-service` step 6 describes.
 5. When `docs/agents-v0/design/<feature>/openapi.yaml` exists, merge that approved draft into the org catalog before service implementation edits (or immediately after `--record-red` when a plan row tests the catalog itself).
@@ -24,7 +23,7 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 7. Auth, upload, and RBAC changes ship with their VAPT-required tests in the same diff.
 8. Add EF Core migrations (`migration-safety`).
 9. Wire correlation ID and `traceparent`.
-10. Run the full Backend verify command once, with **bounded fix attempts (≤ 3 per failure, prompt-only)**.
+10. Coordinate with the main `/v0-build` session to run the full Backend verify command once, with **bounded fix attempts (≤ 3 per failure, prompt-only)**.
 11. Persist `docs/agents-v0/build/<feature>/build-report.md` and `build-output.txt`.
 
 ## Rules you must satisfy
@@ -32,4 +31,4 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 - `quality-and-testing.mdc`, `api-and-events.mdc`, `security-baseline.mdc` §2 and §3.
 
 ## Stop condition
-Stop when the **Build gate** passes (`workflow-orchestration.mdc`). Present the build report and wait for explicit user approval before Verify. `Story: P0-A` continues to `/v0-verify` without that approval.
+Stop when the **Build gate** artifacts are authored (`workflow-orchestration.mdc`): return to the main `/v0-build` session so it runs `sh .agents-v0/scripts/guard-build.sh ready <feature>` and waits for Sensei's explicit approval (`sh .agents-v0/scripts/guard-common.sh approve build <feature>`). Never run shell commands, `sync-feature-state.sh`, or `git`.
