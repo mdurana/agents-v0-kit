@@ -226,7 +226,7 @@ gc_check_feature_slug() {
 }
 
 # approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
-# Design: DLRA, DMA (local-release and maintain external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
+# Design: DLRA, DMA, DDLA (local-release, maintain, and deliver external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
 gc_approve() {
   [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
   gc_to_root approve
@@ -235,6 +235,31 @@ gc_approve() {
   [ "$gc_a_cmd" != "release" ] || gc_a_cmd="local-release"
   if [ -n "$gc_a_slug" ]; then
     gc_check_feature_slug approve "$gc_a_slug"
+  fi
+  if [ "$gc_a_cmd" = "deliver" ]; then
+    [ -n "$gc_a_slug" ] || gc_refuse approve "deliver requires a <feature> slug (usage: sh .agents-v0/scripts/guard-common.sh approve deliver <feature>)"
+    gc_d_st="docs/agents-v0/requirements/${gc_a_slug}.state.json"
+    [ -f "$gc_d_st" ] || [ ! -f "docs/agents-v0/maintain/${gc_a_slug}/state.json" ] || gc_d_st="docs/agents-v0/maintain/${gc_a_slug}/state.json"
+    if [ ! -f "$gc_d_st" ] || [ "$(gc_state_get "$gc_d_st" activeStatus 2>/dev/null || true)" != "awaiting_approval" ]; then
+      gc_d_wt="$(git worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_a_slug}" -v m="branch refs/heads/maintain/${gc_a_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == f || $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_d_wt" ] && [ -d "$gc_d_wt" ]; then
+        if [ -f "$gc_d_wt/docs/agents-v0/requirements/${gc_a_slug}.state.json" ]; then
+          gc_d_st="$gc_d_wt/docs/agents-v0/requirements/${gc_a_slug}.state.json"
+        elif [ -f "$gc_d_wt/docs/agents-v0/maintain/${gc_a_slug}/state.json" ]; then
+          gc_d_st="$gc_d_wt/docs/agents-v0/maintain/${gc_a_slug}/state.json"
+        fi
+      fi
+    fi
+    [ -f "$gc_d_st" ] || gc_refuse approve "no deliver state yet for '$gc_a_slug' ($gc_d_st); nothing to approve"
+    gc_d_act="$(gc_state_get "$gc_d_st" activePhase 2>/dev/null || true)"
+    gc_d_stat="$(gc_state_get "$gc_d_st" activeStatus 2>/dev/null || true)"
+    [ "$gc_d_stat" = "awaiting_approval" ] && [ -n "$gc_d_act" ] \
+      || gc_refuse approve "deliver ($gc_a_slug) is not awaiting approval (activePhase: ${gc_d_act:-none}, state: ${gc_d_stat:-none}); nothing to approve"
+    gc_a_cmd="$gc_d_act"
+    [ "$gc_a_cmd" != "release" ] || gc_a_cmd="local-release"
   fi
   gc_a_state="$(gc_rule "$gc_a_cmd" state "$gc_a_slug")" || gc_refuse approve "gate-rules has no '$gc_a_cmd state' rule; nothing to approve"
   case "$gc_a_state" in
@@ -337,7 +362,7 @@ PY
   printf 'Record: %s\n' "$gc_a_file"
 }
 
-# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA/DMA. Prints `OK approval: ...` and returns 0 only when this
+# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA/DMA/DDLA. Prints `OK approval: ...` and returns 0 only when this
 # repository's record for <command> (and <feature> when given) exists, names this command and repository, and its
 # baseCommit equals the state's baseCommit; else prints `REFUSED approval: <reason>` and returns 1.
 gc_approval_ok() {
@@ -353,6 +378,30 @@ gc_approval_ok() {
     esac
   fi
   gc_ok_root="$(gc_root)" || { printf 'REFUSED approval: not inside a git work tree\n'; return 1; }
+  if [ "$gc_ok_cmd" = "deliver" ]; then
+    [ -n "$gc_ok_slug" ] || { printf 'REFUSED approval: deliver requires a <feature> slug\n'; return 1; }
+    gc_ok_d_st="$gc_ok_root/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
+    [ -f "$gc_ok_d_st" ] || [ ! -f "$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ] || gc_ok_d_st="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+    if [ ! -f "$gc_ok_d_st" ]; then
+      gc_ok_d_wt="$(git -C "$gc_ok_root" worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_ok_slug}" -v m="branch refs/heads/maintain/${gc_ok_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == f || $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_ok_d_wt" ] && [ -d "$gc_ok_d_wt" ]; then
+        if [ -f "$gc_ok_d_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json" ]; then
+          gc_ok_d_st="$gc_ok_d_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
+        elif [ -f "$gc_ok_d_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
+          gc_ok_d_st="$gc_ok_d_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+        fi
+      fi
+    fi
+    [ -f "$gc_ok_d_st" ] || { printf "REFUSED approval: no deliver state for '%s'\n" "$gc_ok_slug"; return 1; }
+    gc_ok_d_act="$(gc_state_get "$gc_ok_d_st" activePhase 2>/dev/null || true)"
+    gc_ok_d_last="$(gc_state_get "$gc_ok_d_st" lastApprovedPhase 2>/dev/null || true)"
+    gc_ok_cmd="${gc_ok_d_act:-$gc_ok_d_last}"
+    [ -n "$gc_ok_cmd" ] || { printf "REFUSED approval: no active or approved phase in '%s'\n" "$gc_ok_d_st"; return 1; }
+    [ "$gc_ok_cmd" != "release" ] || gc_ok_cmd="local-release"
+  fi
   gc_ok_state="$(gc_rule "$gc_ok_cmd" state "$gc_ok_slug")" || { printf "REFUSED approval: gate-rules has no '%s state' rule\n" "$gc_ok_cmd"; return 1; }
   case "$gc_ok_state" in
     *"<feature>"*) printf "REFUSED approval: %s requires a <feature> slug\n" "$gc_ok_cmd"; return 1 ;;
