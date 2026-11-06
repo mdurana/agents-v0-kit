@@ -2,7 +2,7 @@
 
 You can drive delivery in Cursor **without writing code**. You provide the business intent, answer questions, and approve the gates that apply. A story with an API, messages between systems, screens, or a public route stops at each phase. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. Engineers and the AI handle implementation, testing, and security checks.
 
-This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**. Each story then runs **Intake → Design → Build → Verify → Release** (and **Maintain** when something breaks or needs an update). Optional `/v0-local-release` may sit after Verify so the next story can start. `/v0-release` does not require it. Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
+This guide matches the workflow in this kit. A new program starts with **Roadmap**, then **Architecture**, then **Plan**, then **Scaffold**. Each story then runs **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)** (and **Maintain** when something breaks or needs an update). Use the phase commands in Cursor; gates, approvals, and evidence work the same way documented here. `bootstrap-greenfield.sh --pack java --scaffold-app` extracts the Java example archive under `app/`. Omitting `--pack` extracts that same archive. Any other pack builds its shell from its own scaffold during P0-A. An empty Pack does not select Java.
 
 ---
 
@@ -14,7 +14,7 @@ This guide matches the workflow in this kit. A new program starts with **Roadmap
 | **Cursor**     | Desktop app with the project open (your team’s service repo, after the kit is installed).            |
 | **Chat**       | Open the AI chat panel in that project.                                                              |
 | **Your input** | A Jira ticket, Confluence page, email spec, or a short description in plain language.                |
-| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton has one approval, at Release. A story with no API, no messages between systems, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. |
+| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton runs via `/v0-scaffold`. A story with no API, no messages between systems, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. |
 
 
 You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
@@ -29,7 +29,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 
 1. **Open chat** in the project that uses this workflow kit.
 2. **Start work** with one of these (type in chat):
-  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API.
+  - `/v0-deliver` — full journey from requirements through release. A story with an API, messages between systems, screens, or a public route stops at every gate. A story with none of those does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API.
   - `/v0-intake` — turn one ticket or one approved story into requirements.
 3. **Paste your spec** right after the command, for example:
   ```text
@@ -41,7 +41,7 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
    Target: next quarterly release.
    Jira: PROJ-1234 (paste description if you have it)
   ```
-4. When the AI **stops at a gate**, read the summary and reply `Approved` to continue, or describe what to change.
+4. When the AI **stops at a gate**, read the summary and approve in your terminal outside Cursor, or describe what to change.
 
 ---
 
@@ -55,14 +55,14 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-roadmap`  | A new program. Point it at the discovery document your team already wrote, anywhere in the repo. The AI sequences now / next / later and stops. It does not reopen the problem. |
 | `/v0-architecture` | After that roadmap is approved and before any story. The AI writes the system shape and the architecture decision and stops. |
 | `/v0-plan`     | After that architecture decision is approved: milestones, ordered stories, and `docs/agents-v0/milestones/plan.md` (the milestone table and story flowchart) before any `/v0-intake`. |
-| `/v0-intake`   | Turn one idea or ticket into clear requirements. Each acceptance criterion is a Given / When / Then. One is a failure case, unless the story has no security trigger and no failure behavior. The platform skeleton does not run this. |
+| `/v0-scaffold` | Greenfield platform skeleton (`P0-A`) on the integration branch before feature intake. |
+| `/v0-intake`   | Turn one idea or ticket into clear requirements. Each acceptance criterion is a Given / When / Then. One is a failure case, unless the story has no security trigger and no failure behavior. |
 | `/v0-export`   | Optional. Regenerates a Jira spreadsheet from the approved stories. It does not change the plan. |
 | `/v0-deck`     | Optional. Writes a briefing from one approved story (`intake`), or from the approved roadmap and plan (`product` or `delivery`). You say who the audience is and what the meeting must decide. |
-| `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. The platform skeleton skips this. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
-| `/v0-build`    | After design is approved, or after a no-contract design is locked. The platform skeleton starts here: it copies the milestone story and writes the design. |
-| `/v0-verify`   | After build is approved — automated tests and security review. The platform skeleton does not stop here. |
-| `/v0-local-release` | Optional, after verify. Records a local checkpoint so the next story can start. Skip it and run `/v0-release`. |
-| `/v0-release`  | After verify is approved — merge request readiness (GitLab), then completion after an authorized merge. The platform skeleton's one approval is here, after the test report and the merge-request link. |
+| `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
+| `/v0-build`    | After design is approved, or after a no-contract design is locked. |
+| `/v0-verify`   | After build is approved — automated tests and security review. |
+| `/v0-local-release` | After verify is approved — final native stack verify, lesson decisions, squash-merge into the integration branch, and release completion. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
 | `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |

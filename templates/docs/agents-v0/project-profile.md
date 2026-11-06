@@ -62,7 +62,7 @@ One row per environment, in promotion order. Leave empty when the merge is the e
 |-------------|----------------|-------------|------------------|
 | | | | |
 
-## Release (optional; read by `/v0-release`)
+## Release (optional; read by `/v0-local-release`)
 
 | Release | Value |
 |---------|-------|

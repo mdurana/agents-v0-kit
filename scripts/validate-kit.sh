@@ -94,7 +94,7 @@ for f in core/*/rules/*.mdc; do
   head -n1 "$f" | grep -qx -- '---' || err "$f: missing opening ---"
   awk 'NR<=20 && /^---$/ && NR>1 {found=1; exit} END{exit !found}' "$f" || err "$f: missing closing ---"
 done
-for phase in intake design build verify release; do
+for phase in intake design build verify local-release; do
   grep -Fq "\`/v0-$phase\`" core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-$phase"
 done
 grep -Fq 'docs/agents-v0/build/' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not mandate persisted Build evidence"
@@ -116,7 +116,7 @@ for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/common core/java core
 done
 
 # 3. Commands: every phase command exists; workflow rule references the phases; evidence contracts.
-for command in roadmap architecture plan scaffold intake design build verify maintain release local-release deliver status onboard triage export deck; do
+for command in roadmap architecture plan scaffold intake design build verify maintain local-release deliver status onboard triage export deck; do
   [ -f "core/common/commands/v0-$command.md" ] || err "missing /v0-$command command"
 done
 for f in core/common/commands/v0-*.md; do
@@ -163,7 +163,7 @@ for f in core/*/skills/*/SKILL.md; do
 done
 
 # 6. Phase commands carry explicit approval wording.
-for command in intake design build verify release local-release; do
+for command in intake design build verify local-release; do
   grep -Eqi 'explicit.*approval|approval.*explicit' "core/common/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
 done
 

@@ -255,6 +255,7 @@ install_cursor() {
     emit_command "$f" "$t/.cursor/commands/$(basename "$f")"
   done
   install_skills "$t/.cursor/skills"
+  rm -rf "$t/.cursor/commands/v0-release.md" "$t/.cursor/skills/release-pr"
   cp "$KIT"/core/common/hooks/*.sh "$KIT"/core/common/hooks/hook-policy.py "$t/.cursor/hooks/"
   if [ -n "$PACK" ] && [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
     cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.cursor/hooks/pack-scan.sh"
@@ -304,6 +305,7 @@ with open(dst, "w", encoding="utf-8") as fh:
 PY
   done
   install_skills "$t/.agents/skills"
+  rm -rf "$t/.agents/commands/v0-release.md" "$t/.agents/skills/v0-release" "$t/.agents/skills/release-pr"
   cp "$KIT"/core/common/hooks/*.sh "$KIT"/core/common/hooks/hook-policy.py "$t/.agents/hooks/"
   if [ -n "$PACK" ] && [ -f "$KIT/core/$PACK/hooks/pack-scan.sh" ]; then
     cp "$KIT/core/$PACK/hooks/pack-scan.sh" "$t/.agents/hooks/pack-scan.sh"

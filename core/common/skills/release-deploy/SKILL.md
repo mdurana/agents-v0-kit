@@ -5,7 +5,7 @@ description: Release phase playbook. Promote a merged change through the Deploy 
 
 # release-deploy
 
-Release phase playbook for the `release-manager` agent (`workflow-orchestration.mdc`). Use it after the authorized merge, and only when `docs/agents-v0/project-profile.md` has a **Deploy** table. A project with no Deploy rows stops at the merge, as `release-pr` says.
+Release phase playbook for the `release-manager` agent (`workflow-orchestration.mdc`). Use it after the authorized local release merge (`/v0-local-release`), and only when `docs/agents-v0/project-profile.md` has a **Deploy** table. A project with no Deploy rows stops at the merge, as `local-release` says.
 
 ## Steps
 1. Read the **Deploy** table in `docs/agents-v0/project-profile.md`: one row per environment, in promotion order, with the deploy command, the smoke check (which may include an SLO probe against the latency/availability targets in `docs/agents-v0/design/system/nfr-slo.md`), and the rollback command. A missing smoke check or rollback command is a blocker; do not guess one.

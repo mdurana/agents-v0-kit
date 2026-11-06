@@ -19,11 +19,11 @@ flowchart LR
   intake[Intake] -->|gate| design[Design]
   design -->|gate| build[Build]
   build -->|gate| verify[Verify]
-  verify -->|gate| localrel[Local Release / Release]
+  verify -->|gate| localrel[Local Release]
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`) or Remote Release (`/v0-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`), then **Scaffold** (`/v0-scaffold`) for greenfield platform skeleton. A single story starts at Intake. `/v0-export` and `/v0-deck` are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`), then **Scaffold** (`/v0-scaffold`) for greenfield platform skeleton. A single story starts at Intake. `/v0-export` and `/v0-deck` are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
 
 ## State and Phase Resume (`state.json`)
 
@@ -66,7 +66,7 @@ Each feature has its own `requirements/<feature>.md`, `<feature>.state.json`, `d
 | Tier | When | Path |
 |------|------|------|
 | **Trivial** | Docs-only or 1-for-1 patch version bump confirmed by the user | `/v0-triage` → `/v0-maintain` → abbreviated Verify (`/v0-verify`) |
-| **Standard** | Feature or bugfix touching application code | Full Intake → Design (gate when contracts, UI, or Material apply) → Build → Verify → Local Release / Release |
+| **Standard** | Feature or bugfix touching application code | Full Intake → Design (gate when contracts, UI, or Material apply) → Build → Verify → Local Release (`/v0-local-release`) |
 | **Major** | New service, auth model, or cross-cutting architecture | Standard + ADR + threat-model notes in Design (`Material: yes` updates `arc-record.md`) |
 | **Emergency** | User-confirmed production incident with rollback plan and `Follow-up verify due` date | `/v0-maintain` → immediate release; full `/v0-verify` owed by due date |
 
@@ -103,7 +103,7 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 - **Design (`/v0-design`, `contract-first-design`, `ux-design`):** Writes `design.md`, optional `openapi.yaml` / `asyncapi.yaml` / `events/`, ADR, and UX spec/mockups. Stories with contracts, UI, public routes, or `Material: yes` require `design-reviewer` (`review.md` with zero open Criticals) and stop for Design approval. `Contract: None` stories continue to Build.
 - **Build (`/v0-build`, `implement-*`):** Verifies a green baseline, writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` to a test, merges any approved `openapi.yaml` draft into the catalog, implements units via red-to-green TDD, and resolves the bound pack's native verify command with `.agents-v0/scripts/run-backend-verify.sh`. The script only prints. The caller executes the printed command.
 - **Verify (`/v0-verify`, `quality-gate`, `vapt-review`, `pr-review`):** `test-engineer` runs the native stack verify command and checks AC test coverage (`quality-gate.md`); then `security-reviewer` (`vapt-checklist.md`) and `code-reviewer` (`code-review.md`) inspect `git diff <baseCommit>...HEAD`. Zero `Critical` findings sets `verifyPassed: true`.
-- **Local Release (`/v0-local-release`, `local-release`) & Remote Release (`/v0-release`, `release-pr`):** `/v0-local-release` verifies `verifyPassed: true`, except a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due` (full `/v0-verify` stays owed by that date). It re-runs the native verify command on a clean tree, and merges locally after explicit user approval: a feature story is squash-merged (`git merge --squash feature/<feature>`, one commit), a maintenance branch uses `git merge --no-ff`. <!-- kitfix-20261031-gate-commit --> **Gate commits:** every approved gate is one commit, made right after `--approve <phase>` with the command the script prints: a feature story's intake (in the branch turn), design, build, verify and release preparation on `feature/<feature>`; P0-A, onboarding and the program phases on the integration branch (program phases also get a `<phase>-v<n>` tag). Never `--amend` a gate commit; `sync-feature-state.sh` refuses the next phase while the last approved gate is uncommitted (`check-gate-commit.sh`). At Design, Build and Verify approval, `check-traceability.sh` checks the earlier gates' ids (ACs, contract operations, passing tests) and names the earliest bad phase (warn first). `/v0-release` prepares and opens a GitLab MR (`glab mr create`) for teams using remote merge requests.
+- **Local Release (`/v0-local-release`, `local-release`):** `/v0-local-release` verifies `verifyPassed: true` (via `guard-local-release.sh`), except a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due` (full `/v0-verify` stays owed by that date). It re-runs the native verify command on a clean tree, and merges locally after Sensei's explicit external approval (`guard-common.sh approve local-release <feature>`): a feature story is squash-merged (`git merge --squash feature/<feature>`, one commit), a maintenance branch uses `git merge --no-ff`. <!-- kitfix-20261031-gate-commit --> **Gate commits:** every approved gate is one commit, made right after `--approve <phase>` with the command the script prints: a feature story's intake (in the branch turn), design, build, verify and release preparation on `feature/<feature>`; P0-A, onboarding and the program phases on the integration branch (program phases also get a `<phase>-v<n>` tag). Never `--amend` a gate commit; `sync-feature-state.sh` refuses the next phase while the last approved gate is uncommitted (`check-gate-commit.sh`). At Design, Build and Verify approval, `check-traceability.sh` checks the earlier gates' ids (ACs, contract operations, passing tests) and names the earliest bad phase (warn first).
 
 ## Rule Precedence
 

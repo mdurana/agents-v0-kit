@@ -18,8 +18,7 @@ flowchart TD
   build["/v0-build"]
   p0["P0-A"]
   verify["/v0-verify"]
-  localrel["/v0-local-release (primary)"]
-  release["/v0-release (optional MR)"]
+  localrel["/v0-local-release"]
   deploy["deploy, when the profile has a Deploy table"]
   triage["/v0-triage"]
   maintain["/v0-maintain"]
@@ -38,18 +37,16 @@ flowchart TD
   build -->|gate| verify
   verify -->|Critical, Re-opened| build
   verify -->|gate| localrel
-  verify -.->|optional remote MR| release
   localrel --> deploy
-  release --> deploy
   triage --> maintain
   maintain -->|trivial or standard| verify
   verify -->|Critical, Re-opened| maintain
 ```
 
-A standard story follows the solid path: **Intake → Design → Build → Verify → Local Release** (or optional `/v0-release` when publishing a remote merge request). A new multi-story program runs **Roadmap → Architecture → Plan** before entering the story path.
+A standard story follows the solid path: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)**. A new multi-story program runs **Roadmap → Architecture → Plan → Scaffold** before entering the story path.
 
 `/v0-deliver` runs one story end-to-end by following each phase command and stopping at every human gate that applies. It does not run `/v0-export` or `/v0-deck`.
-- **P0-A (platform skeleton):** Skips Intake and Design. Build copies the milestone story and `AC-1` through `AC-4`, writes the minimal `N/A` design, and runs through Verify to a single human approval gate at Release (`/v0-local-release` or `/v0-release`).
+- **P0-A (platform skeleton):** Runs via `/v0-scaffold` on the integration branch before feature stories start at `/v0-intake`.
 - **Contract-free stories (`Contract: None`):** A story with no OpenAPI draft, no AsyncAPI or `events/` contract, no UX spec, no new public route other than `/health`, `/ready`, or `/live`, and `Material: no` records `N/A: no /api/v1 operation` and `N/A: no event contract` in `design.md` and continues directly into Build without a separate Design approval stop.
 
 | Edge | What it means |
@@ -59,9 +56,8 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | Architecture | Runs after Roadmap and before story work. Produces C4 through operations and the ARC pack, reviewed by `design-reviewer`. The pattern ADR records `Pack: <id>` (`java`, `dotnet`, `node`, `python`, `go`, plus optional `ui`). Approving Architecture runs `.agents-v0/scripts/activate-stack-pack.sh`, populating `docs/agents-v0/project-profile.md` and activating the stack pack's rules and skills. |
 | Plan | Turns the approved roadmap and architecture pack into milestones (`docs/agents-v0/milestones/plan.md` and `<milestone>.md`) with ordered stories (`Surface` and `Size` on each story). Single-story work skips Plan. |
 | Design review | `design-reviewer` writes `review.md` whenever the story includes an OpenAPI draft, AsyncAPI or `events/` contract, UX spec, public route (other than `/health`, `/ready`, `/live`), or `Material: yes`. Design cannot advance until `review.md` has zero open Critical findings and the cited ADR is `Accepted`. |
-| P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive when `Pack: java`, or follows the bound pack's scaffold skill. Skips Intake and Design; stops once for human approval at Release. |
-| Local release (primary) | Runs after Verify is approved, or for P0-A when `verifyPassed` is `true` at the single Release gate, or for a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. Re-verifies the working tree with the stack pack's native verify command, squash-merges the feature branch into the target branch locally (`git merge --squash`, one commit) upon explicit user confirmation, and marks the story `released` in `<feature>.state.json`. |
-| Remote release (optional) | Used when the team ships via remote GitLab merge requests instead of local merge. Renders the MR body and opens the MR upon user confirmation. |
+| P0-A start | `bootstrap-greenfield.sh --scaffold-app` extracts the Java example archive when `Pack: java`, or follows the bound pack's scaffold skill via `/v0-scaffold`. |
+| Local release | Runs after Verify is approved, or for a maintenance note with `tier: emergency` when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`. Re-verifies the working tree with the stack pack's native verify command, squash-merges the feature branch into the target branch locally (`git merge --squash`, one commit) upon Sensei's external approval (`guard-common.sh approve local-release <feature>`), and marks the story `released` in `<feature>.state.json`. |
 | Verify back to Build / Maintain | Any `Critical` finding from `test-engineer`, `security-reviewer`, or `code-reviewer` sets `activeStatus: "in_progress"` and `activePhase: "build"` (or `"maintain"`) in the state file and increments `reopenCount` (capped at 3 bounces before mandatory user escalation). |
 | Triage | Docs-only or 1-for-1 patch version bump confirmed by the user; uses abbreviated Verify (native build/test + CVE check, skipping reviewer subagents). |
 
@@ -75,12 +71,12 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | `/v0-roadmap` | New multi-story program | `docs/agents-v0/roadmap/<program>.md`, `docs/agents-v0/program.state.json` |
 | `/v0-architecture` | After roadmap, before stories | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
 | `/v0-plan` | Multi-story backlog planning | `docs/agents-v0/milestones/plan.md`, `docs/agents-v0/milestones/<milestone>.md` |
+| `/v0-scaffold` | Greenfield platform skeleton (P0-A) | `docs/agents-v0/milestones/p0-platform-skeleton.md`, `docs/agents-v0/program.state.json` |
 | `/v0-intake` | One story's Gherkin `AC-*` and NFRs | `docs/agents-v0/requirements/<feature>.md`, `<feature>.state.json` |
 | `/v0-design` | Contracts, ADR, and UX before code | `docs/agents-v0/design/<feature>/` |
 | `/v0-build` | Red-to-green implementation per unit | `docs/agents-v0/build/<feature>/plan.md`, `build-report.md` |
 | `/v0-verify` | Native test/coverage run + security & code review | `docs/agents-v0/verify/<feature>/quality-gate.md`, `vapt-checklist.md`, `code-review.md` |
 | `/v0-local-release` | Merge verified feature branch locally | Updates `<feature>.state.json` (`lastApprovedPhase: "release"`) + one local squash commit (a maintenance branch: a merge commit) |
-| `/v0-release` | Optional remote MR workflow | Merge request ready for human merge |
 | `/v0-maintain` | Bugfix, CVE, upgrade, refactor, doc sync | `docs/agents-v0/maintain/<id>/note.md`, `docs/agents-v0/maintain/<id>/state.json` |
 | `/v0-triage` | User-confirmed trivial doc/version fix | `docs/agents-v0/maintain/<id>/note.md` (`tier: "trivial"` in `state.json`) |
 | `/v0-deliver` | Orchestrates one story across phases, stopping at each gate | Updates `<feature>.state.json` and `<feature>.phase-result.md` |
@@ -199,14 +195,12 @@ Verify combines **deterministic native stack execution** with **role-separated s
    - Any `Critical` finding (including unauthenticated endpoints, broken access control, injection, hardcoded secrets, or missing negative security tests) marks `"verifyPassed": false` and routes the feature back to Build/Maintain (`--reopen build`).
    - When all three reports pass with zero `Critical` findings, `<feature>.state.json` records `"verifyPassed": true` and pauses for human approval.
 
-## Local Release (`/v0-local-release`) and Remote Release (`/v0-release`)
+## Local Release (`/v0-local-release`)
 
-- **`/v0-local-release` (Primary workflow):**
-  1. Verifies `"verifyPassed": true`. A feature story, including one that already approved Verify, also has `"verify"` in `approvedPhases`. P0-A enters with `verifyPassed: true` while `verify` may still be absent. An emergency maintenance note enters when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`; `verify` stays unapproved until the owed `/v0-verify`.
-  2. Ensures a clean git working tree and runs the stack pack's native verify command one final time.
-  3. Prompts the user to confirm merging the feature branch into the integration branch (`git merge --squash feature/<feature>`, one squash commit with `Story-Branch` / `Story-Tip` trailers), updates `<feature>.state.json` via `sync-feature-state.sh --approve release`, and optionally tags the release or updates `CHANGELOG.md` via `.agents-v0/scripts/release-notes.sh`.
-- **`/v0-release` (Optional remote MR workflow):**
-  - Renders the merge-request summary via `.agents-v0/scripts/render-mr-body.sh` and opens/updates the GitLab MR (`glab mr create`) upon user authorization. `glab mr merge` and `glab mr approve` remain permanently blocked by `pre-shell.sh`.
+- **`/v0-local-release` (`guard-local-release.sh`):**
+  1. Verifies `"verifyPassed": true` and `"verify"` in `approvedPhases` backed by Sensei's external verify approval record. An emergency maintenance note enters when `maintain` is approved and the note records a rollback plan and `Follow-up verify due`; `verify` stays unapproved until the owed `/v0-verify`.
+  2. Checks for post-Verify non-doc drift (automatically bouncing back to `/v0-verify` if code changed after Verify approval) and runs the stack pack's native verify command one final time into `docs/agents-v0/release/<feature>/release-output.txt`.
+  3. Collects lesson candidates into `## Proposed lessons`, pauses for Sensei's external approval (`sh .agents-v0/scripts/guard-common.sh approve local-release <feature>`), commits release preparation on `feature/<feature>`, squash-merges into the integration branch (`git merge --squash feature/<feature>`, one squash commit with `Story-Branch` / `Story-Tip` trailers), appends accepted lessons to `docs/agents-v0/lessons.md`, updates `<feature>.state.json` via `sync-feature-state.sh --approve release`, and validates `check-release-evidence.sh`.
 
 ## Onboarding and Maintenance
 
