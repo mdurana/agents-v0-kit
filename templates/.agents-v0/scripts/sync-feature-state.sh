@@ -301,6 +301,19 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
     if [ -z "$gc_prev_active" ]; then
       sh "$gc_script" "$art" >/dev/null || exit 1
     fi
+    # Design handoff check (DI7): when entering design in_progress on a guard-managed intake story, verify external intake approval
+    if [ "$active_phase" = "design" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
+      di7_base=""
+      [ -f "$state" ] && di7_base="$(gc_state_get "$state" baseCommit 2>/dev/null || true)"
+      if [ -n "$di7_base" ]; then
+        if ! di7_ok="$(gc_approval_ok intake "$slug")"; then
+          printf 'FAIL: design for %s refused without Sensei external intake approval record: %s\n' "$slug" "$di7_ok" >&2
+          printf '  Complete /v0-intake %s (sh .agents-v0/scripts/guard-common.sh approve intake %s && sh .agents-v0/scripts/guard-intake.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
+          exit 1
+        fi
+      fi
+    fi
   fi
   case "$art" in
     docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
