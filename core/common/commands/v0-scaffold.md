@@ -7,7 +7,7 @@ description: Platform skeleton scaffolding for greenfield projects. Establish a 
 You are entering **platform scaffolding** (`workflow-orchestration.mdc`). Use it for greenfield projects to establish a verified baseline on the integration branch before feature story intake.
 
 ## Prerequisite
-Read `docs/agents-v0/project-profile.md` and `docs/agents-v0/milestones/p0-platform-skeleton.md`. `guard-scaffold.sh check` verifies entry prerequisites, greenfield status, integration branch check, Sensei's external approval record for `plan`, and that `scaffold` is not already in `approvedPhases`. Brownfield projects stop and suggest `/v0-onboard`.
+Read `docs/agents-v0/project-profile.md`, `docs/agents-v0/milestones/p0-platform-skeleton.md`, and `docs/agents-v0/lessons.md`. `guard-scaffold.sh check` verifies entry prerequisites, greenfield status, integration branch check, Sensei's external approval record for `plan`, and that `scaffold` is not already in `approvedPhases`. Brownfield projects stop and suggest `/v0-onboard`.
 
 ## Resume
 The guard decides: `guard-scaffold.sh start` (step 2) checks for a clean working tree on the integration branch and sets state to `in_progress`. Continue from the platform files already on disk. Do not edit `docs/agents-v0/program.state.json`; only the guard scripts write it.

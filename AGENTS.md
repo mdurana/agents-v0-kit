@@ -14,6 +14,7 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Roadmap (greenfield program) | `/v0-roadmap` | program-planner | program-roadmap | `docs/agents-v0/roadmap/<program>.md`, `docs/agents-v0/program.state.json` |
 | Architecture (before backlog) | `/v0-architecture` | solution-architect | program-architecture | `docs/agents-v0/architecture.md`, `docs/agents-v0/design/system/arc-record.md` |
 | Plan (program, more than one story) | `/v0-plan` | program-planner | program-planning | `docs/agents-v0/milestones/plan.md`, `docs/agents-v0/milestones/<milestone>.md` |
+| Scaffold (greenfield platform skeleton) | `/v0-scaffold` | platform-engineer | scaffold-service | `docs/agents-v0/milestones/p0-platform-skeleton.md`, `Dockerfile`, `docker-compose.yml`, `docs/agents-v0/program.state.json` |
 | Intake | `/v0-intake` | requirements-analyst | spec-intake | `docs/agents-v0/requirements/<feature>.md`, `<feature>.state.json` (Gherkin AC IDs with `Kind`, NFRs) |
 | Design | `/v0-design` | solution-architect, ux-designer | contract-first-design, ux-design | `docs/agents-v0/design/<feature>/` (contracts, ADR, diagrams, UX spec, mockups, `review.md`); ARC record when `Material: yes` |
 | Build | `/v0-build` | backend/bff/frontend-engineer | implement-* | Code + tests; `docs/agents-v0/build/<feature>/plan.md` & `build-report.md` |

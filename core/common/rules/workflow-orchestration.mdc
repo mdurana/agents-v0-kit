@@ -23,7 +23,7 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`) or Remote Release (`/v0-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`). A single story starts at Intake. P0-A starts at Build. `/v0-export` and `/v0-deck` are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`) or Remote Release (`/v0-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`), then **Scaffold** (`/v0-scaffold`) for greenfield platform skeleton. A single story starts at Intake. `/v0-export` and `/v0-deck` are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
 
 ## State and Phase Resume (`state.json`)
 
@@ -39,7 +39,7 @@ Workflow state, approved phases, `baseCommit`, and on-disk artifact pointers liv
 | `approvedPhases` | Ordered array of approved phases for this work item. |
 | `phaseDates` | Map of approved phase → `YYYY-MM-DD` approval date (`intake`, `design`, `build`, etc.), in the project time zone. |
 | `phaseTimes` | Map of approved phase → ISO 8601 approval time with its UTC offset (for example `2026-10-30T00:30:00+08:00`). Written by `--approve` only. |
-| `activePhase` | Phase currently in flight (`onboard`, `roadmap`, `architecture`, `plan`, `intake`, `design`, `build`, `verify`, `release`, `maintain`). |
+| `activePhase` | Phase currently in flight (`onboard`, `roadmap`, `architecture`, `plan`, `scaffold`, `intake`, `design`, `build`, `verify`, `release`, `maintain`). |
 | `activeStatus` | `in_progress`, `awaiting_approval`, or `blocked`. |
 | `blockedReason` | One-line reason when `activeStatus` is `blocked`. |
 | `verifyPassed` | `true` when `/v0-verify` passes with zero Critical findings. |
@@ -98,6 +98,7 @@ Every phase follows **Reconnaissance → Plan → Execute → Verify → Report*
 - **Roadmap (`/v0-roadmap`, `program-roadmap`):** Sequences discovery items into Now / Next / Later without inventing themes.
 - **Architecture (`/v0-architecture`, `program-architecture`):** Writes C4, data flows, ER models, `network.md`, pattern ADR (`Pack: <id>`), `context-map.md`, `nfr-slo.md`, `threat-model.md`, `ops-readiness.md`, `arc-record.md`, and passes `design-reviewer` (`architecture-review.md` with zero `Open` findings). Approval runs `.agents-v0/scripts/activate-stack-pack.sh`.
 - **Plan (`/v0-plan`, `program-planning`):** Writes `docs/agents-v0/milestones/plan.md` and `<milestone>.md` with `Surface` and `Size` on each story and acyclic dependencies.
+- **Scaffold (`/v0-scaffold`, `platform-engineer`):** Greenfield platform skeleton baseline (P0-A manifest, Dockerfile, docker-compose.yml, native verify) on the integration branch before feature intake.
 - **Intake (`/v0-intake`, `spec-intake`):** Writes `docs/agents-v0/requirements/<feature>.md` with user story, Gherkin `AC-1`…`AC-8` (including negative/edge scenarios), NFRs, and `Material: yes|no`.
 - **Design (`/v0-design`, `contract-first-design`, `ux-design`):** Writes `design.md`, optional `openapi.yaml` / `asyncapi.yaml` / `events/`, ADR, and UX spec/mockups. Stories with contracts, UI, public routes, or `Material: yes` require `design-reviewer` (`review.md` with zero open Criticals) and stop for Design approval. `Contract: None` stories continue to Build.
 - **Build (`/v0-build`, `implement-*`):** Verifies a green baseline, writes `docs/agents-v0/build/<feature>/plan.md` mapping every `AC-*` to a test, merges any approved `openapi.yaml` draft into the catalog, implements units via red-to-green TDD, and resolves the bound pack's native verify command with `.agents-v0/scripts/run-backend-verify.sh`. The script only prints. The caller executes the printed command.

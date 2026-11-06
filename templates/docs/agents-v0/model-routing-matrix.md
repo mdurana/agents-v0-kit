@@ -30,7 +30,7 @@ The Build role is a fast, inexpensive model. Some units are where a wrong answer
 
 A reviewer should not be the model that wrote the code. The Review role uses the `review` value in `.cursor/model-config.json`, not the Build model. The test author (`test-engineer`) stays on the Build role; the Review role judges its tests in the code review.
 
-## Kit agent mapping (20 agents)
+## Kit agent mapping (21 agents)
 
 
 | Kit agent            | Role         |
@@ -39,6 +39,7 @@ A reviewer should not be the model that wrote the code. The Review role uses the
 | requirements-analyst | Plan         |
 | solution-architect   | Plan         |
 | roadmap-planner      | Plan         |
+| platform-engineer    | Plan         |
 | ux-designer          | UX Designer  |
 | codebase-documenter  | Documenter   |
 | orchestrator         | Orchestrator |

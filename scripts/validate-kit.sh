@@ -116,7 +116,7 @@ for ref in $(grep -rhoE '`docs/[a-zA-Z0-9/_.-]+\.md`' core/common core/java core
 done
 
 # 3. Commands: every phase command exists; workflow rule references the phases; evidence contracts.
-for command in roadmap architecture plan intake design build verify maintain release local-release deliver status onboard triage export deck; do
+for command in roadmap architecture plan scaffold intake design build verify maintain release local-release deliver status onboard triage export deck; do
   [ -f "core/common/commands/v0-$command.md" ] || err "missing /v0-$command command"
 done
 for f in core/common/commands/v0-*.md; do
@@ -124,6 +124,7 @@ for f in core/common/commands/v0-*.md; do
   grep -Fq "\`/$c\`" AGENTS.md || err "AGENTS.md lifecycle table does not list /$c"
 done
 grep -Fq '`/v0-plan`' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-plan"
+grep -Fq '`/v0-scaffold`' core/common/rules/workflow-orchestration.mdc || err "workflow rule does not reference /v0-scaffold"
 grep -Fq 'docs/agents-v0/requirements/<feature>.md' core/common/commands/v0-intake.md || err "/v0-intake does not name its requirements artifact"
 grep -Fq 'docs/agents-v0/build/' core/common/commands/v0-build.md || err "/v0-build does not name persisted build evidence paths"
 grep -Fq 'docs/agents-v0/verify/' core/common/commands/v0-verify.md || err "/v0-verify does not name persisted evidence paths"
@@ -368,6 +369,19 @@ for internal in sync-feature-state.sh check-gate-commit.sh \
     err "core/common/commands/v0-plan.md names the internal '$internal' (the guard runs it; keep the prose to guard-plan.sh steps)"
   fi
 done
+# Scaffold redo, Design: DS8. Drift check A: the /v0-scaffold step block matches `guard-scaffold.sh steps` byte for byte.
+sh scripts/generate-scaffold-steps.sh --check >/dev/null || err "core/common/commands/v0-scaffold.md step block drifted from guard-scaffold.sh steps (run sh scripts/generate-scaffold-steps.sh)"
+[ -f scripts/test-scaffold-steps.sh ] || err "scripts/test-scaffold-steps.sh missing"
+sh scripts/test-scaffold-steps.sh >/dev/null || err "scripts/test-scaffold-steps.sh failed"
+[ -f scripts/test-guard-scaffold.sh ] || err "scripts/test-guard-scaffold.sh missing"
+sh scripts/test-guard-scaffold.sh >/dev/null || err "scripts/test-guard-scaffold.sh failed"
+# Drift check B: the /v0-scaffold prose names no internal script; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-scaffold.md; then
+    err "core/common/commands/v0-scaffold.md names the internal '$internal' (the guard runs it; keep the prose to guard-scaffold.sh steps)"
+  fi
+done
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
 [ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"
@@ -396,7 +410,7 @@ grep -Fq 'check-gate-commit.sh' templates/.agents-v0/scripts/sync-feature-state.
 grep -Fq 'check-traceability.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must run check-traceability.sh at design/build/verify approval"
 grep -Fq 'Story-Branch' templates/.agents-v0/scripts/check-release-evidence.sh || err "check-release-evidence must accept a squash release (Story-Branch trailer)"
 grep -Fq 'already squash-merged' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must refuse a squash-released branch"
-for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-roadmap v0-architecture v0-plan v0-onboard; do
+for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-roadmap v0-architecture v0-plan v0-onboard v0-scaffold; do
   grep -Fq 'kitfix-20261031-gate-commit' "core/common/commands/$c.md" || err "$c.md must state the gate commit (kitfix-20261031-gate-commit)"
 done
 for c in v0-design v0-build v0-verify; do
@@ -423,7 +437,7 @@ sh scripts/test-memory.sh || err "scripts/test-memory.sh failed"
 grep -Fq 'stories-status.sh' core/common/commands/v0-status.md || err "/v0-status does not use stories-status.sh"
 grep -Fq 'check-lessons.sh' core/common/commands/v0-local-release.md || err "/v0-local-release does not run check-lessons.sh"
 grep -Fq '## Proposed lessons' core/common/skills/local-release/SKILL.md || err "local-release does not collect Proposed lessons"
-for c in plan intake design build verify maintain; do
+for c in plan scaffold intake design build verify maintain; do
   grep -Fq 'docs/agents-v0/lessons.md' "core/common/commands/v0-$c.md" || err "/v0-$c does not read docs/agents-v0/lessons.md"
 done
 for s in stories-status.sh check-lessons.sh; do
