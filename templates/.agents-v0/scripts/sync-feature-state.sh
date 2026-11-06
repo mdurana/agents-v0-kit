@@ -401,6 +401,19 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
         fi
       fi
     fi
+    # Release handoff check (DV7): when entering release on a guard-managed verify story, verify external verify approval
+    if [ "$active_phase" = "release" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
+      dv7_gm=""
+      [ -f "$state" ] && dv7_gm="$(gc_state_get "$state" verifyGuardManaged 2>/dev/null || true)"
+      if [ "$dv7_gm" = "True" ] || [ "$dv7_gm" = "true" ]; then
+        if ! dv7_ok="$(gc_approval_ok verify "$slug")"; then
+          printf 'FAIL: release for %s refused without Sensei external verify approval record: %s\n' "$slug" "$dv7_ok" >&2
+          printf '  Complete /v0-verify %s (sh .agents-v0/scripts/guard-common.sh approve verify %s && sh .agents-v0/scripts/guard-verify.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
+          exit 1
+        fi
+      fi
+    fi
   fi
 
   case "$art" in
