@@ -9,7 +9,7 @@ You are entering the **Intake** phase of the delivery lifecycle (`workflow-orche
 ## Prerequisite & Resume
 - If `<feature>` was not given, follow the naming rule in `workflow-orchestration.mdc` Parallel Features. Do not set `in_progress`, and do not create `docs/agents-v0/requirements/<feature>.md`, until the slug is named.
 - Brownfield: if `docs/agents-v0/onboarding/report.md` exists, `docs/agents-v0/onboarding/state.json` must record `lastApprovedPhase: "onboard"`.
-- Milestone story: `plan` must be in `approvedPhases` in `docs/agents-v0/program.state.json`, or the manifest `docs/agents-v0/milestones/<milestone>.md` must have an `Approved` `plan` row. A single ticket with no milestone has no plan to check. Dependency `verify` approvals are required before `/v0-build`, not before Intake.
+- Milestone story: `plan` must be in `approvedPhases` in `docs/agents-v0/program.state.json` and Sensei's external approval record for `plan` must exist and be verified (`sh .agents-v0/scripts/guard-common.sh approve plan`), or the manifest `docs/agents-v0/milestones/<milestone>.md` must have an `Approved` `plan` row. A single ticket with no milestone has no plan to check. Dependency `verify` approvals are required before `/v0-build`, not before Intake.
 - P0-A skeleton: skip `/v0-intake` and proceed directly to `/v0-build`.
 - If `docs/agents-v0/requirements/<feature>.state.json` already has `release` in `approvedPhases`, stop. Do not reopen the story and do not create a worktree. A fix or a small change starts at `/v0-maintain`. A new feature starts at `/v0-intake` with a new slug.
 - If `intake` is already in `approvedPhases` and this run is not `--reopen intake`, stop. Do not set `in_progress`. The next command is `/v0-design`.
