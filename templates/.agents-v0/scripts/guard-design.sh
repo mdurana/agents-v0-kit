@@ -938,6 +938,26 @@ PY
   printf 'Next: %s\n' "$gd_approved_next"
 }
 
+gd_steps() {
+  [ $# -eq 0 ] || gd_usage
+  gd_rule steps ready.next; gd_ready_next="$gd_val"
+  gd_rule steps approved.next; gd_approved_next="$gd_val"
+  G='sh .agents-v0/scripts/guard-design.sh'
+  cat <<EOF_STEPS
+1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree, checks Sensei's external \`intake\` approval and committed gate, and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start <feature> [--reopen]\`. It verifies a clean working tree on \`feature/<feature>\`, seeds \`docs/agents-v0/design/<feature>/design.md\` from \`docs/agents-v0/design/_design.template.md\` if absent, and sets \`docs/agents-v0/requirements/<feature>.state.json\` to \`in_progress\`.
+3. Read \`docs/agents-v0/lessons.md\` and launch the shell-less Design subagents in sequence (none may edit the repo-wide \`openapi/\` catalog or run shell commands):
+   - **Contract draft (\`schema-author\`):** When the story adds or modifies an HTTP \`/api/v1\` operation or event contract, write \`docs/agents-v0/design/<feature>/openapi.yaml\` and/or \`docs/agents-v0/design/<feature>/events/\`.
+   - **Architecture & ADR (\`solution-architect\`, skill: \`contract-first-design\`):** Write \`docs/agents-v0/design/<feature>/design.md\` (tracing every \`AC-n\` and NFR, data model, BOLA authorization matrix per \`operationId\`, failure modes naming every \`Kind: negative\` and \`Kind: edge\` AC, observability, and rollout), an ADR under \`docs/agents-v0/adr/<NN>-<slug>.md\` (\`Status: Proposed\`, comparing at least two alternatives, or \`ADR: N/A: no product decision\` when \`Contract: None\`), and \`docs/agents-v0/design/system/arc-record.md\` when \`Material: yes\`.
+   - **UX spec & mockups (\`ux-designer\`, skill: \`ux-design\`):** For UI-affecting stories, write \`docs/agents-v0/design/<feature>/ux-spec.md\` (flows, loading/error/empty/success state matrix, component defaults, WCAG 2.1 AA rules) and static HTML mockups under \`docs/agents-v0/design/<feature>/mockups/\` with matching \`data-component\` attributes.
+   - **Design review (\`design-reviewer\`):** Unless the story qualifies for the \`Contract: None\` shortcut (no \`/api/v1\` operation, no event contract, no \`ux-spec.md\`, no non-health public route, and \`Material: no\`), launch \`design-reviewer\` to write \`docs/agents-v0/design/<feature>/review.md\` and resolve any open \`Critical\` findings (max 3 cycles).
+4. If \`docs/agents-v0/design/<feature>/helper-brief.md\` exists or open \`Critical\` findings remain after 3 review cycles, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper briefs and records \`blocked\`). If a helper brief was written, launch the named helper, pass findings back, remove the brief, and resume; otherwise stop and escalate to Sensei.
+5. When the design artifacts are complete, run \`$G ready <feature>\`. It verifies that the repo-wide \`openapi/\` catalog is untouched, checks \`design.md\` sections, AC traceability (\`T1\`–\`T3\`), \`Kind: negative\`/\`edge\` failure modes, OpenAPI 3.0 validity (\`/api/v1/\`, \`additionalProperties: false\`, \`Idempotency-Key\`, BOLA rules), UX mockup \`data-component\` parity, ADR options, and zero open \`Critical\` findings in \`review.md\`. When the story qualifies for the \`Contract: None\` shortcut, \`ready\` records \`status: contract_none\`; run \`$G commit <feature>\` and proceed directly to \`$gd_approved_next\`. Otherwise \`ready\` writes \`docs/agents-v0/requirements/<feature>.phase-result.md\` and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
+6. Stop. Present the design artifacts and \`review.md\` summary to Sensei and wait for explicit approval. Next: $gd_ready_next. Never run approve yourself; the agent cannot approve this gate.
+7. After Sensei runs approve in his own terminal, run \`$G commit <feature>\`. It verifies Sensei's external approval record, promotes the cited ADR to \`Status: Accepted\`, appends the verified \`Design\` row to \`Delivery approvals\`, runs traceability checks, stages only the story's design and state paths, scans staged content for secrets, and commits \`"<story>: design approved"\` on \`feature/<feature>\`. Then suggest: $gd_approved_next.
+EOF_STEPS
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gd_check "$@" ;;
@@ -945,8 +965,10 @@ case "$cmd" in
   block) shift; gd_block "$@" ;;
   ready) shift; gd_ready "$@" ;;
   commit) shift; gd_commit "$@" ;;
+  steps) shift; gd_steps "$@" ;;
   *) gd_usage ;;
 esac
+
 
 
 
