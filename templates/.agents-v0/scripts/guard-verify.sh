@@ -897,6 +897,26 @@ PY
   printf 'Next: %s\n' "$gv_next"
 }
 
+# Design: DV6 (/v0-verify generated step block).
+gv_steps() {
+  [ $# -eq 0 ] || gv_usage
+  gc_to_root steps
+  gv_rule steps ready.next "<feature>"; gv_r_next="$gv_val"
+  gv_rule steps approved.next "<feature>"; gv_a_next="$gv_val"
+  cat <<EOF
+1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree (or \`maintain/<id>\` for a maintenance note), checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies Sensei's external \`build\` approval record and committed Build gate (or \`maintain\` approval for a maintenance note), and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start <feature> [--reopen] [--check-db]\`. It verifies a clean working tree, optionally runs \`sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/<feature>.md\`, seeds \`docs/agents-v0/verify/<feature>/quality-gate.md\`, \`docs/agents-v0/verify/<feature>/vapt-checklist.md\`, and \`docs/agents-v0/verify/<feature>/code-review.md\` if absent, and sets state to \`in_progress\`.
+3. Read \`docs/agents-v0/lessons.md\` and execute the verification sequence in the main session with the shell-less Verify subagents (\`test-engineer\`, \`security-reviewer\`, \`code-reviewer\`):
+   - **Native stack verify & database runtime:** Before a verify command that needs a database, run \`sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/<feature>.md\` (never use \`sudo\`, a package manager, or a Docker TCP socket). Resolve layout roots via \`eval "\$(sh .agents-v0/scripts/resolve-layout.sh)"\`, resolve the verify command with \`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"\`, \`"Service verify"\`, and/or \`"Frontend verify"\`, execute the printed command in this main session, and record raw output in \`docs/agents-v0/verify/<feature>/verify-output.txt\`. After a Maven verify, run \`sh .agents-v0/scripts/check-tests-ran.sh\` (kitfix-20261031-tests-ran).
+   - **Quality gate (\`test-engineer\`, skill: \`quality-gate\`):** Launch shell-less \`test-engineer\` to write/update missing tests, verify every \`AC-*\` has a passing test, verify changed-line coverage $\ge 80\%$ and module coverage ($\ge 80\%$ backend / $\ge 70\%$ frontend or valid \`coverage_ratchet\`), verify zero unsuppressed HIGH/CRITICAL CVEs, and write \`docs/agents-v0/verify/<feature>/quality-gate.md\` (plus \`docs/agents-v0/verify/<feature>/ux-report.md\` for UI changes, \`docs/agents-v0/verify/<feature>/e2e-report.md\` for integration/vertical-slice/P2/P4 stories, and \`docs/agents-v0/design/system/slo-evidence.md\` when applicable).
+   - **Role-separated VAPT & code review (\`security-reviewer\` + \`code-reviewer\`):** Unless verifying a maintenance note with \`tier: "trivial"\`, launch shell-less \`security-reviewer\` (skill: \`vapt-review\`) to check always-on VAPT controls (\`F4\`, \`F8\`, \`F9\`, \`F10\`) and surface findings into \`docs/agents-v0/verify/<feature>/vapt-checklist.md\`, and launch shell-less \`code-reviewer\` (skill: \`pr-review\`) to write \`docs/agents-v0/verify/<feature>/code-review.md\`.
+4. If the database runtime is unavailable or \`docs/agents-v0/verify/<feature>/helper-brief.md\` (\`helper: schema-author\`) is needed, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper briefs by SHA-256 and records \`blocked\`) and stop.
+5. Run \`$G ready <feature>\`. It deterministically verifies \`verify-output.txt\`, \`check-tests-ran.sh\`, \`quality-gate.md\` (coverage $\ge 80\%$ changed & module, 0 HIGH/CRITICAL CVEs, \`ux-report.md\` when \`ux-spec.md\` exists), \`vapt-checklist.md\` (\`F4\`, \`F8\`, \`F9\`, \`F10\` with \`file:line\` evidence), \`code-review.md\`, and \`T6\` traceability (\`check-traceability.sh verify\`). If any Open \`Critical\` or \`FAIL\` finding exists across the reports, \`ready\` automatically writes the findings to \`<feature>.phase-result.md\`, runs \`--reopen build\` (or \`--reopen maintain\`, setting \`verifyPassed: false\` and incrementing \`reopenCount\`), and exits with \`REFUSED ready:\` routing back to \`/v0-build <feature>\`. When zero Critical findings exist and all checks pass, \`ready\` writes \`docs/agents-v0/requirements/<feature>.phase-result.md\` and sets state to \`awaiting_approval\` (\`verifyPassed: true\`).
+6. Stop. Present \`docs/agents-v0/verify/<feature>/quality-gate.md\`, \`vapt-checklist.md\`, and \`code-review.md\` to Sensei and wait for explicit approval. Next: $gv_r_next. Never run approve yourself; the agent cannot approve this gate.
+7. After Sensei runs approve in his own terminal, run \`$G commit <feature>\`. It verifies Sensei's external approval record, appends the verified \`Verify\` row to \`Delivery approvals\`, runs \`T6\` traceability checks, stages only the story's verify, test, and state paths, scans staged content for secrets, and commits \`"<story>: verify approved"\` on \`feature/<feature>\`. Then suggest: $gv_a_next.
+EOF
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gv_usage
 shift || true
@@ -907,5 +927,6 @@ case "$cmd" in
   block) gv_block "$@" ;;
   ready) gv_ready "$@" ;;
   commit) gv_commit "$@" ;;
+  steps) gv_steps "$@" ;;
   *) gv_usage ;;
 esac
