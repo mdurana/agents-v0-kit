@@ -250,6 +250,34 @@ case "$approve_lc" in
       fi
     fi
     ;;
+  release)
+    # Design: DLRA (external approval record required when releaseGuardManaged is true).
+    guard_common="$(dirname "$0")/guard-common.sh"
+    release_slug="$slug"
+    release_state="$state"
+    release_pr="docs/agents-v0/requirements/${release_slug}.phase-result.md"
+    [ -f "$release_pr" ] || release_pr="docs/agents-v0/maintain/${release_slug}/phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      release_gm=""
+      [ -f "$release_state" ] && release_gm="$(gc_state_get "$release_state" releaseGuardManaged 2>/dev/null || true)"
+      if [ -z "$release_gm" ] && command -v git >/dev/null 2>&1; then
+        for rel_b in "feature/${release_slug}" "maintain/${release_slug}"; do
+          if git show "${rel_b}:${release_state}" 2>/dev/null | grep -Eq '"releaseGuardManaged"[[:space:]]*:[[:space:]]*true'; then
+            release_gm="true"
+            break
+          fi
+        done
+      fi
+      if [ "$release_gm" = "True" ] || [ "$release_gm" = "true" ] || { [ -f "$release_pr" ] && grep -Fq "phase: release" "$release_pr" && grep -Fq "guard_managed: true" "$release_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok local-release "$release_slug")"; then
+          printf 'FAIL: --approve release for %s refused without Sensei external approval record: %s\n' "$release_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release %s\n' "$release_slug" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
 esac
 
 if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
@@ -1108,6 +1136,8 @@ if prev.get("buildGuardManaged"):
     data["buildGuardManaged"] = True
 if prev.get("verifyGuardManaged"):
     data["verifyGuardManaged"] = True
+if prev.get("releaseGuardManaged"):
+    data["releaseGuardManaged"] = True
 tmp_fd, tmp_path = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
 try:
     with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:

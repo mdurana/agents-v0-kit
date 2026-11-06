@@ -226,11 +226,13 @@ gc_check_feature_slug() {
 }
 
 # approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
+# Design: DLRA (local-release approval normalization, maintain/worktree state resolution, and story-branch state preservation).
 gc_approve() {
   [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
   gc_to_root approve
   gc_a_cmd="$1"
   gc_a_slug="${2:-}"
+  [ "$gc_a_cmd" != "release" ] || gc_a_cmd="local-release"
   if [ -n "$gc_a_slug" ]; then
     gc_check_feature_slug approve "$gc_a_slug"
   fi
@@ -246,6 +248,29 @@ gc_approve() {
     gc_existing_art="$(gc_state_get "$gc_a_state" artifact 2>/dev/null || true)"
     [ -n "$gc_existing_art" ] && [ "$gc_existing_art" != "docs/agents-v0/roadmap" ] && gc_a_artifact="$gc_existing_art"
   fi
+  gc_a_wt_dir=""
+  if [ -n "$gc_a_slug" ]; then
+    if [ ! -f "$gc_a_state" ] && [ -f "docs/agents-v0/maintain/${gc_a_slug}/state.json" ]; then
+      gc_a_state="docs/agents-v0/maintain/${gc_a_slug}/state.json"
+      gc_a_artifact="docs/agents-v0/maintain/${gc_a_slug}/note.md"
+    fi
+    if [ ! -f "$gc_a_state" ] || [ "$(gc_state_get "$gc_a_state" activeStatus 2>/dev/null || true)" != "awaiting_approval" ]; then
+      gc_a_wt_cand="$(git worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_a_slug}" -v m="branch refs/heads/maintain/${gc_a_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == f || $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_a_wt_cand" ] && [ -d "$gc_a_wt_cand" ]; then
+        if [ -f "$gc_a_wt_cand/docs/agents-v0/requirements/${gc_a_slug}.state.json" ]; then
+          gc_a_state="$gc_a_wt_cand/docs/agents-v0/requirements/${gc_a_slug}.state.json"
+          gc_a_wt_dir="$gc_a_wt_cand"
+        elif [ -f "$gc_a_wt_cand/docs/agents-v0/maintain/${gc_a_slug}/state.json" ]; then
+          gc_a_state="$gc_a_wt_cand/docs/agents-v0/maintain/${gc_a_slug}/state.json"
+          gc_a_artifact="docs/agents-v0/maintain/${gc_a_slug}/note.md"
+          gc_a_wt_dir="$gc_a_wt_cand"
+        fi
+      fi
+    fi
+  fi
   [ -f "$gc_a_state" ] || gc_refuse approve "no $gc_a_cmd state yet ($gc_a_state); nothing to approve"
   gc_a_active_phase="$(gc_state_get "$gc_a_state" activePhase)"
   [ -z "$gc_a_active_phase" ] || [ "$gc_a_active_phase" = "$gc_a_phase" ] \
@@ -255,7 +280,11 @@ gc_approve() {
     || gc_refuse approve "$gc_a_cmd is not awaiting approval (state: ${gc_a_status:-none}); nothing to approve"
   gc_a_base="$(gc_state_get "$gc_a_state" baseCommit)"
   [ -n "$gc_a_base" ] || gc_refuse approve "the $gc_a_cmd state has no baseCommit"
-  gc_a_head="$(git rev-parse -q --verify HEAD)" || gc_refuse approve "this repository has no commit yet"
+  if [ -n "$gc_a_wt_dir" ]; then
+    gc_a_head="$(git -C "$gc_a_wt_dir" rev-parse -q --verify HEAD)" || gc_refuse approve "this repository has no commit yet"
+  else
+    gc_a_head="$(git rev-parse -q --verify HEAD)" || gc_refuse approve "this repository has no commit yet"
+  fi
   gc_a_id="$(gc_repo_id)" || gc_refuse approve "cannot compute the repo id"
   gc_a_file="$(gc_approval_file "$gc_a_cmd" "$gc_a_slug")" || gc_refuse approve "cannot find the approval folder"
   if ! ( : </dev/tty ) 2>/dev/null; then
@@ -297,19 +326,25 @@ finally:
     fcntl.flock(lock, fcntl.LOCK_UN)
     lock.close()
 PY
-  gc_state_set "$gc_a_state" "$gc_a_feature" "$gc_a_artifact" "approvePhase=$gc_a_phase" \
-    "activePhase=" "activeStatus=" "blockedReason=" "nextStep=" || exit 1
+  # For local-release, keep story-branch state at activePhase=release, activeStatus=awaiting_approval, and preserve
+  # baseCommit so Step A (story branch commit) and Step B (integration branch merge + --approve release) succeed
+  # without marking release approved on the story branch (kitfix-20261029-step4-p1e / kitfix-20261031-gate-commit).
+  if [ "$gc_a_cmd" != "local-release" ]; then
+    gc_state_set "$gc_a_state" "$gc_a_feature" "$gc_a_artifact" "approvePhase=$gc_a_phase" \
+      "activePhase=" "activeStatus=" "blockedReason=" "nextStep=" || exit 1
+  fi
   gc_ok approve "$gc_a_label approved at baseCommit $gc_a_base"
   printf 'Record: %s\n' "$gc_a_file"
 }
 
-# gc_approval_ok <command> [<feature>]: library check for D4/DIA. Prints `OK approval: ...` and returns 0 only when this
+# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA. Prints `OK approval: ...` and returns 0 only when this
 # repository's record for <command> (and <feature> when given) exists, names this command and repository, and its
 # baseCommit equals the state's baseCommit; else prints `REFUSED approval: <reason>` and returns 1.
 gc_approval_ok() {
   [ $# -ge 1 ] && [ $# -le 2 ] || { printf 'REFUSED approval: usage gc_approval_ok <command> [<feature>]\n'; return 1; }
   gc_ok_cmd="$1"
   gc_ok_slug="${2:-}"
+  [ "$gc_ok_cmd" != "release" ] || gc_ok_cmd="local-release"
   if [ -n "$gc_ok_slug" ]; then
     case "$gc_ok_slug" in
       [a-z0-9]* )
@@ -322,9 +357,28 @@ gc_approval_ok() {
   case "$gc_ok_state" in
     *"<feature>"*) printf "REFUSED approval: %s requires a <feature> slug\n" "$gc_ok_cmd"; return 1 ;;
   esac
+  gc_ok_state_full="$gc_ok_root/$gc_ok_state"
+  if [ -n "$gc_ok_slug" ]; then
+    if [ ! -f "$gc_ok_state_full" ] && [ -f "$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
+      gc_ok_state_full="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+    fi
+    if [ ! -f "$gc_ok_state_full" ]; then
+      gc_ok_wt="$(git -C "$gc_ok_root" worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_ok_slug}" -v m="branch refs/heads/maintain/${gc_ok_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == f || $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_ok_wt" ] && [ -d "$gc_ok_wt" ]; then
+        if [ -f "$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json" ]; then
+          gc_ok_state_full="$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
+        elif [ -f "$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
+          gc_ok_state_full="$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+        fi
+      fi
+    fi
+  fi
   gc_ok_id="$(cd "$gc_ok_root" && gc_repo_id)" || { printf 'REFUSED approval: cannot compute the repo id\n'; return 1; }
   gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$gc_ok_cmd" "$gc_ok_slug")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
-  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_root/$gc_ok_state" "$gc_ok_slug" <<'PY'
+  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_state_full" "$gc_ok_slug" <<'PY'
 import json, sys
 rec_path, command, repo_id, state_path, slug = sys.argv[1:6]
 label = f"{command} ({slug})" if slug else command
