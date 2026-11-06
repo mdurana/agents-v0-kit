@@ -621,12 +621,15 @@ if tier != "trivial":
             print(f"REFUSE:{vapt_p} is missing always-on VAPT control row '{ctrl}'")
             sys.exit(0)
         row_txt = ctrl_lines[0]
-        if re.search(r"\bFAIL(ED)?\b", row_txt, re.I):
+        cells = [c.strip() for c in row_txt.strip().strip("|").split("|")]
+        status_cell = cells[2] if len(cells) >= 3 else row_txt
+        ev_cells = " | ".join(cells[3:]) if len(cells) >= 4 else row_txt
+        if re.search(r"^\s*FAIL(ED)?\b", status_cell, re.I):
             critical_findings.append(f"{vapt_p} ({ctrl} FAIL): {row_txt.strip()}")
-        elif not re.search(r"\b(PASS(ED)?|N/A)\b", row_txt, re.I):
+        elif not re.search(r"^\s*(PASS(ED)?|N/A)\b", status_cell, re.I):
             print(f"REFUSE:{vapt_p} row for '{ctrl}' must record PASS, FAIL, or N/A with reason")
             sys.exit(0)
-        elif re.search(r"\bPASS(ED)?\b", row_txt, re.I) and not re.search(r"[A-Za-z0-9_./-]+:[0-9]+", row_txt):
+        elif re.search(r"^\s*PASS(ED)?\b", status_cell, re.I) and not re.search(r"[A-Za-z0-9_./-]+:[0-9]+", ev_cells):
             print(f"REFUSE:{vapt_p} PASS row for '{ctrl}' must cite 'file:line' evidence")
             sys.exit(0)
     scan_findings_table(clean_vapt, vapt_p)
