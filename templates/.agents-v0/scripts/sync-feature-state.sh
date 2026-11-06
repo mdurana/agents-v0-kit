@@ -369,6 +369,19 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
         fi
       fi
     fi
+    # Verify handoff check (DB7): when entering verify in_progress on a guard-managed build story, verify external build approval
+    if [ "$active_phase" = "verify" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
+      db7_gm=""
+      [ -f "$state" ] && db7_gm="$(gc_state_get "$state" buildGuardManaged 2>/dev/null || true)"
+      if [ "$db7_gm" = "True" ] || [ "$db7_gm" = "true" ]; then
+        if ! db7_ok="$(gc_approval_ok build "$slug")"; then
+          printf 'FAIL: verify for %s refused without Sensei external build approval record: %s\n' "$slug" "$db7_ok" >&2
+          printf '  Complete /v0-build %s (sh .agents-v0/scripts/guard-common.sh approve build %s && sh .agents-v0/scripts/guard-build.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
+          exit 1
+        fi
+      fi
+    fi
   fi
 
   case "$art" in
