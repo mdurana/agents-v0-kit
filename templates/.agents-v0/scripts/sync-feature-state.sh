@@ -195,7 +195,26 @@ case "$approve_lc" in
       fi
     fi
     ;;
+  design)
+    guard_common="$(dirname "$0")/guard-common.sh"
+    design_slug="$slug"
+    design_state="docs/agents-v0/requirements/${design_slug}.state.json"
+    design_pr="docs/agents-v0/requirements/${design_slug}.phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      design_gm=""
+      [ -f "$design_state" ] && design_gm="$(gc_state_get "$design_state" designGuardManaged 2>/dev/null || true)"
+      if [ "$design_gm" = "True" ] || [ "$design_gm" = "true" ] || { [ -f "$design_pr" ] && grep -Fq "phase: design" "$design_pr" && grep -Fq "guard_managed: true" "$design_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok design "$design_slug")"; then
+          printf 'FAIL: --approve design for %s refused without Sensei external approval record: %s\n' "$design_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve design %s\n' "$design_slug" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
 esac
+
 if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
    && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   resolver="$(dirname "$0")/resolve-integration-branch.sh"
