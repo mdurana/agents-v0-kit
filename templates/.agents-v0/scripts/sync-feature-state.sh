@@ -231,6 +231,25 @@ case "$approve_lc" in
       fi
     fi
     ;;
+  verify)
+    guard_common="$(dirname "$0")/guard-common.sh"
+    verify_slug="$slug"
+    verify_state="$state"
+    verify_pr="docs/agents-v0/requirements/${verify_slug}.phase-result.md"
+    [ -f "$verify_pr" ] || verify_pr="docs/agents-v0/maintain/${verify_slug}/phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      verify_gm=""
+      [ -f "$verify_state" ] && verify_gm="$(gc_state_get "$verify_state" verifyGuardManaged 2>/dev/null || true)"
+      if [ "$verify_gm" = "True" ] || [ "$verify_gm" = "true" ] || { [ -f "$verify_pr" ] && grep -Fq "phase: verify" "$verify_pr" && grep -Fq "guard_managed: true" "$verify_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok verify "$verify_slug")"; then
+          printf 'FAIL: --approve verify for %s refused without Sensei external approval record: %s\n' "$verify_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve verify %s\n' "$verify_slug" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
 esac
 
 if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
@@ -1074,6 +1093,8 @@ if prev.get("designGuardManaged"):
     data["designGuardManaged"] = True
 if prev.get("buildGuardManaged"):
     data["buildGuardManaged"] = True
+if prev.get("verifyGuardManaged"):
+    data["verifyGuardManaged"] = True
 tmp_fd, tmp_path = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
 try:
     with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
