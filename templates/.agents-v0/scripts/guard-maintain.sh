@@ -332,12 +332,224 @@ gm_check() {
   gc_ok check "maintain ($gm_feature, tier=$gm_eff_tier) prerequisites satisfied"
 }
 
+gm_enter_worktree_if_needed() {
+  gm_ew_wt="$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/maintain/${gm_feature}" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == want { print path; exit }
+  ')"
+  if [ ! -f "$gm_state" ] && [ -n "$gm_ew_wt" ] && [ -f "$gm_ew_wt/$gm_state" ]; then
+    cd "$gm_ew_wt"
+  fi
+}
+
+# Design: DM2 (/v0-maintain start, worktree provisioning, reopen, block, and helper-brief deduplication).
 gm_start() {
-  gc_refuse start "start not yet implemented (DM2)"
+  gm_parse_check_start_args start "$@"
+  gm_load start "$gm_p_slug" "$gm_p_tier"
+  gm_enter_worktree_if_needed
+
+  gm_rule start start.requires "$gm_feature"
+  gm_check_prereqs start "$gm_val" "$gm_p_reopen"
+  gm_check_prereqs start "not-approved" "$gm_p_reopen"
+  gm_check_prereqs start "maintain-branch" "$gm_p_reopen"
+
+  # Provision or attach maintain/<id> worktree for standard/emergency when not already on maintain/<id>
+  gm_skip_bg=0
+  # >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+  [ "${AGENTS_V0_SKIP_BRANCH_GUARD:-0}" != 1 ] || gm_skip_bg=1
+  # <<< kit-test-override
+  if [ "$gm_skip_bg" != 1 ] && [ "$gm_eff_tier" != "trivial" ]; then
+    gm_cur_br="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    if [ "$gm_cur_br" != "maintain/$gm_feature" ]; then
+      gm_primary_root="$(pwd)"
+      if ! gm_wt_out="$(sh "$GC_HERE/feature-worktree.sh" --maintain "$gm_feature" 2>&1)"; then
+        gc_refuse start "feature-worktree.sh --maintain $gm_feature failed: $gm_wt_out"
+      fi
+      printf '%s\n' "$gm_wt_out"
+      gm_wt="$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/maintain/${gm_feature}" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == want { print path; exit }
+      ')"
+      [ -n "$gm_wt" ] && [ -d "$gm_wt" ] || gc_refuse start "could not locate worktree for maintain/$gm_feature"
+      if [ ! -f "$gm_wt/$gm_template" ] && [ -f "$gm_primary_root/$gm_template" ]; then
+        mkdir -p "$(dirname "$gm_wt/$gm_template")"
+        cp "$gm_primary_root/$gm_template" "$gm_wt/$gm_template"
+      fi
+      cd "$gm_wt"
+    fi
+  fi
+
+  # Seed docs/agents-v0/maintain/<id>/note.md from _note.template.md when absent
+  mkdir -p "$(dirname "$gm_artifact")"
+  if [ ! -f "$gm_artifact" ]; then
+    if [ -f "$gm_template" ]; then
+      cp "$gm_template" "$gm_artifact"
+    else
+      cat > "$gm_artifact" <<EOF
+# Maintenance note: ${gm_feature}
+
+Id: ${gm_feature}
+Tier: ${gm_eff_tier}
+Tier confirmed by: <name of the person who agreed to this tier, in chat> on <YYYY-MM-DD>
+Type: <bug | cve | dependency | refactor | docs | migration>
+Trigger: <issue, alert, or incident link>
+Follow-up verify due: <YYYY-MM-DD; Tier emergency only, delete the line otherwise>
+
+## Scope
+
+## Acceptance
+
+## Security surface
+
+## Rollback
+
+## Delivery approvals
+
+| Phase | Artifacts | Approver | Decision | Date |
+|-------|-----------|----------|----------|------|
+EOF
+    fi
+  fi
+
+  # Populate Id: <id> (and Tier: <tier> when --tier was explicitly passed) in note.md if still template placeholders
+  GM_NOTE="$gm_artifact" GM_ID="$gm_feature" GM_TIER_ARG="$gm_p_tier" python3 - <<'PYNOTE'
+import os, re
+p = os.environ["GM_NOTE"]
+mid = os.environ["GM_ID"]
+tier_arg = os.environ["GM_TIER_ARG"]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"^(Id:\s*)<id>\s*$", rf"\g<1>{mid}", txt, flags=re.M)
+if tier_arg:
+    txt = re.sub(r"^(Tier:\s*)<[^>]+>\s*$", rf"\g<1>{tier_arg}", txt, flags=re.M)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(txt)
+PYNOTE
+
+  # Seed docs/agents-v0/build/<id>/build-report.md when absent
+  mkdir -p "$(dirname "$gm_report")"
+  if [ ! -f "$gm_report" ]; then
+    cat > "$gm_report" <<EOF
+# Build Report: ${gm_feature}
+
+## Attempt Cards
+| Command | Exit | Attempt | Failing test | Location |
+| --- | --- | --- | --- | --- |
+
+## Final Verify Summary
+- Status: pending
+
+## Per-Criterion Evidence
+EOF
+  fi
+
+  gm_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  gm_rule start start.next "$gm_feature"; gm_next="$gm_val"
+  gm_rule start start.status "$gm_feature"; gm_status="$gm_val"
+
+  if [ "$gm_p_reopen" = 1 ] && [ -f "$gm_state" ]; then
+    python3 - "$gm_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+reopen_count = int(d.get("reopenCount") or 0) + 1
+d["reopenCount"] = reopen_count
+if "approvedPhases" in d and isinstance(d["approvedPhases"], list):
+    if "maintain" in d["approvedPhases"]:
+        idx = d["approvedPhases"].index("maintain")
+        d["approvedPhases"] = d["approvedPhases"][:idx]
+    d["lastApprovedPhase"] = d["approvedPhases"][-1] if d["approvedPhases"] else ""
+d["verifyPassed"] = False
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_state_set "$gm_state" "$gm_feature" "$gm_artifact" "activePhase=$gm_phase" \
+    "activeStatus=$gm_status" "blockedReason=" "nextStep=$gm_next" || exit 1
+
+  GM_ST="$gm_state" GM_BASE="$gm_base" GM_TIER="$gm_eff_tier" GM_REOPEN="$gm_p_reopen" python3 - <<'PY'
+import json, os
+p = os.environ["GM_ST"]
+base = os.environ["GM_BASE"]
+tier = os.environ["GM_TIER"]
+reopen = os.environ["GM_REOPEN"] == "1"
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base and (reopen or not d.get("baseCommit")):
+    d["baseCommit"] = base
+d["tier"] = tier
+d["maintainGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  gc_ok start "maintain is in_progress for $gm_feature (tier=$gm_eff_tier, note=$gm_artifact, report=$gm_report)"
+  printf 'Next: %s\n' "$gm_next"
 }
 
 gm_block() {
-  gc_refuse block "block not yet implemented (DM2)"
+  gm_b_slug="${1:-}"
+  shift || true
+  gm_b_reason="${*:-}"
+  gm_load block "$gm_b_slug"
+  gm_enter_worktree_if_needed
+  [ -n "$(printf '%s' "$gm_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+  gm_rule block block.next "$gm_feature"; gm_next="$gm_val"
+  gm_rule block block.status "$gm_feature"; gm_status="$gm_val"
+
+  [ -f "$gm_state" ] || gc_refuse block "maintain for '$gm_feature' has not been started ($gm_state missing)"
+  [ "$(gc_state_get "$gm_state" activePhase)" = "$gm_phase" ] \
+    || gc_refuse block "activePhase for '$gm_feature' is '$(gc_state_get "$gm_state" activePhase)', not '$gm_phase'"
+
+  # Deduplicate helper-brief.md or failure-brief.md by SHA-256
+  gm_hb=""
+  if [ -f "docs/agents-v0/maintain/${gm_feature}/helper-brief.md" ]; then
+    gm_hb="docs/agents-v0/maintain/${gm_feature}/helper-brief.md"
+  elif [ -f "docs/agents-v0/build/${gm_feature}/helper-brief.md" ]; then
+    gm_hb="docs/agents-v0/build/${gm_feature}/helper-brief.md"
+  elif [ -f "docs/agents-v0/build/${gm_feature}/failure-brief.md" ]; then
+    gm_hb="docs/agents-v0/build/${gm_feature}/failure-brief.md"
+  fi
+  if [ -n "$gm_hb" ]; then
+    gm_dup="$(GM_ST="$gm_state" GM_HB="$gm_hb" python3 - <<'PY'
+import hashlib, json, os, re
+st_p = os.environ["GM_ST"]
+hb_p = os.environ["GM_HB"]
+d = json.load(open(st_p, encoding="utf-8")) if os.path.isfile(st_p) else {}
+raw = open(hb_p, encoding="utf-8", errors="replace").read()
+norm = re.sub(r"\s+", " ", raw.strip().lower())
+h = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+prev_list = d.get("helperBriefHashes")
+if not isinstance(prev_list, list):
+    prev_list = []
+prev_last = d.get("lastHelperBriefHash", "")
+if h in prev_list or (prev_last and prev_last == h):
+    print("DUP")
+else:
+    prev_list.append(h)
+    d["helperBriefHashes"] = prev_list
+    d["lastHelperBriefHash"] = h
+    with open(st_p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+    print("OK")
+PY
+)"
+    if [ "$gm_dup" = "DUP" ]; then
+      gc_state_set "$gm_state" "$gm_feature" "$gm_artifact" "activePhase=$gm_phase" \
+        "activeStatus=$gm_status" "blockedReason=Duplicate helper-brief detected: $gm_b_reason" "nextStep=$gm_next" || exit 1
+      gc_refuse block "duplicate helper-brief ($gm_hb) detected with identical SHA-256 content; escalate to Sensei instead of looping"
+    fi
+  fi
+
+  gc_state_set "$gm_state" "$gm_feature" "$gm_artifact" "activePhase=$gm_phase" \
+    "activeStatus=$gm_status" "blockedReason=$gm_b_reason" "nextStep=$gm_next" || exit 1
+  gc_ok block "maintain blocked for $gm_feature: $gm_b_reason"
+  printf 'Next: %s\n' "$gm_next"
 }
 
 gm_ready() {
