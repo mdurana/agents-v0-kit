@@ -283,3 +283,25 @@ maintain commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.
 maintain commit.message maintain/<feature>: maintain approved
 maintain approved.next /v0-verify <feature> --maintain
 
+# --- deliver (/v0-deliver, guard-deliver.sh) -----------------------------------------------------
+deliver phase deliver
+deliver feature <feature>
+deliver state docs/agents-v0/requirements/<feature>.state.json
+deliver artifact docs/agents-v0/requirements/<feature>.md
+deliver result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+deliver check.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released
+deliver start.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released
+deliver start.status in_progress
+deliver start.next Delegate to the active phase guard (guard-intake.sh, guard-design.sh, guard-build.sh, guard-verify.sh, guard-local-release.sh, or guard-maintain.sh) in the story worktree.
+# block: status and next step
+deliver block.status blocked
+deliver block.next Resolve the blocker or helper brief, then run /v0-deliver <feature> again; it resumes from the files on disk.
+# ready: delegates to the active phase guard's ready subcommand, auto-advances Contract: None in design, and auto-bounces Verify on Open Critical findings
+deliver ready.requires in-progress
+deliver ready.status awaiting_approval
+deliver ready.next Sensei reviews the phase deliverables and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve <phase> <feature> (or: sh .agents-v0/scripts/guard-common.sh approve deliver <feature>)
+# commit: verifies external approval record and delegates safe-staged commit to the active phase guard
+deliver commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
+deliver commit.message <story>: phase approved
+deliver approved.next /v0-deliver <feature>
