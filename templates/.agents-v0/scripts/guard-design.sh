@@ -208,8 +208,182 @@ gd_check() {
   fi
 }
 
+gd_start() {
+  gd_s_slug=""
+  gd_s_reopen=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reopen)
+        gd_s_reopen=1
+        shift
+        ;;
+      -*)
+        gd_usage
+        ;;
+      *)
+        [ -z "$gd_s_slug" ] || gd_usage
+        gd_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  gd_load start "$gd_s_slug"
+  gd_rule start start.requires "$gd_feature"; gd_requires="$gd_val"
+  gd_check_prereqs start "$gd_requires" "$gd_s_reopen"
+  if [ "$gd_s_reopen" != 1 ]; then
+    gd_check_prereqs start "not-approved" 0
+  else
+    gd_check_prereqs start "not-approved" 1
+  fi
+
+  # Refuse unrelated dirty paths on feature/<feature> (ignoring .lock files and design-scoped paths)
+  gd_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -v '\.lock$' | grep -Ev "^(docs/agents-v0/design/${gd_feature}/|docs/agents-v0/adr/|docs/agents-v0/diagrams/|docs/agents-v0/design/system/arc-record\\.md$|docs/agents-v0/requirements/${gd_feature}\\.)" || true)"
+  if [ -n "$gd_dirty" ]; then
+    gc_refuse start "working tree has uncommitted changes outside design paths ($gd_dirty); commit or stash them first (note: never modify repo-wide openapi/ catalog during Design)"
+  fi
+
+  mkdir -p "docs/agents-v0/design/${gd_feature}"
+  if [ ! -f "$gd_artifact" ]; then
+    if [ -f "docs/agents-v0/design/_design.template.md" ]; then
+      sed "s/<feature>/$gd_feature/g" "docs/agents-v0/design/_design.template.md" > "$gd_artifact"
+    else
+      cat > "$gd_artifact" <<EOF
+# Design: $gd_feature
+
+ADR: docs/agents-v0/adr/01-${gd_feature}.md
+
+## Traceability
+
+| Requirement | Satisfied by | Notes |
+|-------------|--------------|-------|
+| <AC-1> | <operationId / component> | |
+
+## Data model
+
+<describe entities, keys, indexes, retention, PII, and migration shape>
+
+## Authorization
+
+| operationId | Roles or scopes | Resource rule | Notes |
+|-------------|-----------------|---------------|-------|
+| <operationId> | <role> | <BOLA ownership rule> | |
+
+## Events
+
+N/A: no event contract
+
+## Failure modes
+
+<describe dependency failures, slow/partial failure behavior, and name every Kind: negative and Kind: edge AC>
+
+## Observability
+
+<metrics, logs, traces, alerts>
+
+## Rollout
+
+<feature flag, deploy order, backward compatibility, rollback>
+EOF
+    fi
+  fi
+
+  gd_rule start start.next "$gd_feature"; gd_next="$gd_val"
+  gd_rule start start.status "$gd_feature"; gd_status="$gd_val"
+
+  if [ "$gd_s_reopen" = 1 ] && [ -f "$gd_state" ]; then
+    python3 - "$gd_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+reopen_count = int(d.get("reopenCount") or 0) + 1
+d["reopenCount"] = reopen_count
+if "approvedPhases" in d and isinstance(d["approvedPhases"], list):
+    if "design" in d["approvedPhases"]:
+        idx = d["approvedPhases"].index("design")
+        d["approvedPhases"] = d["approvedPhases"][:idx]
+    d["lastApprovedPhase"] = d["approvedPhases"][-1] if d["approvedPhases"] else ""
+d["verifyPassed"] = False
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_state_set "$gd_state" "$gd_feature" "$gd_req_art" "activePhase=$gd_phase" \
+    "activeStatus=$gd_status" "blockedReason=" "nextStep=$gd_next" || exit 1
+
+  # Mark designGuardManaged=true so sync-feature-state.sh and check-gate-commit.sh know this story's design uses guard-design.sh
+  python3 - "$gd_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p, encoding="utf-8"))
+d["designGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  gc_ok start "design in_progress on $gd_artifact"
+  printf 'Next: %s\n' "$gd_next"
+}
+
+gd_block() {
+  [ $# -ge 2 ] || gc_die "usage: $G block <feature> \"<plain reason>\""
+  gd_b_slug="$1"
+  shift
+  gd_reason="$*"
+  [ -n "$(printf '%s' "$gd_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+
+  gd_load block "$gd_b_slug"
+  gd_rule block block.status "$gd_feature"; gd_status="$gd_val"
+  gd_rule block block.next "$gd_feature"; gd_next="$gd_val"
+
+  [ -f "$gd_state" ] || gc_refuse block "design for '$gd_feature' has not been started ($gd_state missing)"
+  [ "$(gc_state_get "$gd_state" activePhase)" = "$gd_phase" ] \
+    || gc_refuse block "activePhase for '$gd_feature' is '$(gc_state_get "$gd_state" activePhase)', not '$gd_phase'"
+
+  # Helper-brief deduplication (FD6): if docs/agents-v0/design/<feature>/helper-brief.md exists, refuse identical repeat asks
+  gd_brief="docs/agents-v0/design/${gd_feature}/helper-brief.md"
+  if [ -f "$gd_brief" ]; then
+    if ! python3 - "$gd_state" "$gd_brief" <<'PY'
+import hashlib, json, re, sys
+state_p, brief_p = sys.argv[1:3]
+raw = open(brief_p, encoding="utf-8").read()
+norm = re.sub(r"\s+", " ", raw.strip().lower())
+digest = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+data = json.load(open(state_p, encoding="utf-8"))
+hashes = data.get("helperBriefHashes") if isinstance(data.get("helperBriefHashes"), dict) else {}
+prev = hashes.get("design") or data.get("lastDesignHelperBriefHash") or ""
+if prev and prev == digest:
+    sys.exit(1)
+hashes["design"] = digest
+data["helperBriefHashes"] = hashes
+data["lastDesignHelperBriefHash"] = digest
+with open(state_p, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+PY
+    then
+      gc_refuse block "duplicate helper brief in $gd_brief; do not re-ask the same helper question"
+    fi
+  fi
+
+  gc_state_set "$gd_state" "$gd_feature" "$gd_req_art" "activePhase=$gd_phase" \
+    "activeStatus=$gd_status" "blockedReason=$gd_reason" "nextStep=$gd_next" || exit 1
+
+  gc_ok block "design for $gd_feature blocked ($gd_reason)"
+  printf 'Next: %s\n' "$gd_next"
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gd_check "$@" ;;
+  start) shift; gd_start "$@" ;;
+  block) shift; gd_block "$@" ;;
   *) gd_usage ;;
 esac
+
