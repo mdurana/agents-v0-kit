@@ -333,7 +333,26 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
         fi
       fi
     fi
+    # Build handoff check (DD7): when entering build in_progress on a guard-managed design story, verify external design approval (or Contract: None)
+    if [ "$active_phase" = "build" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
+      dd7_gm=""
+      [ -f "$state" ] && dd7_gm="$(gc_state_get "$state" designGuardManaged 2>/dev/null || true)"
+      dd7_pr="docs/agents-v0/requirements/${slug}.phase-result.md"
+      dd7_cn=0
+      if [ -f "$dd7_pr" ] && grep -Fq "phase: design" "$dd7_pr" && grep -Fq "status: contract_none" "$dd7_pr"; then
+        dd7_cn=1
+      fi
+      if [ "$dd7_cn" != 1 ] && { [ "$dd7_gm" = "True" ] || [ "$dd7_gm" = "true" ]; }; then
+        if ! dd7_ok="$(gc_approval_ok design "$slug")"; then
+          printf 'FAIL: build for %s refused without Sensei external design approval record: %s\n' "$slug" "$dd7_ok" >&2
+          printf '  Complete /v0-design %s (sh .agents-v0/scripts/guard-common.sh approve design %s && sh .agents-v0/scripts/guard-design.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
+          exit 1
+        fi
+      fi
+    fi
   fi
+
   case "$art" in
     docs/agents-v0/requirements/*.md | */docs/agents-v0/requirements/*.md)
       if [ "$approve_lc" = release ]; then
