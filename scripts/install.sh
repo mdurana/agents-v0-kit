@@ -371,6 +371,7 @@ install_templates() {
 .agents-v0/scripts/guard-design.sh
 .agents-v0/scripts/guard-build.sh
 .agents-v0/scripts/guard-verify.sh
+.agents-v0/scripts/guard-local-release.sh
 .agents-v0/gate-rules
 .agents-v0/scripts/render-mr-body.sh
 .agents-v0/scripts/release-notes.sh
@@ -435,7 +436,7 @@ docs/agents-v0/brownfield-onboarding.md
         .agents-v0/scripts/packlib.py .agents-v0/scripts/endpoint_scan.py .agents-v0/scripts/resolve-layout.sh .agents-v0/scripts/run-backend-verify.sh \
         .agents-v0/scripts/check-attempt-budget.sh .agents-v0/scripts/check-failure-brief.sh .agents-v0/scripts/check-story-dependencies.sh \
         .agents-v0/scripts/check-release-evidence.sh .agents-v0/scripts/check-database-runtime.sh .agents-v0/scripts/check-tests-ran.sh .agents-v0/scripts/check-gate-commit.sh .agents-v0/scripts/check-traceability.sh .agents-v0/scripts/generate-repo-map.sh .agents-v0/scripts/collect-dependency-graphs.sh \
-        .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/guard-common.sh .agents-v0/scripts/guard-onboard.sh .agents-v0/scripts/guard-roadmap.sh .agents-v0/scripts/guard-architecture.sh .agents-v0/scripts/guard-plan.sh .agents-v0/scripts/guard-scaffold.sh .agents-v0/scripts/guard-intake.sh .agents-v0/scripts/guard-design.sh .agents-v0/scripts/guard-build.sh .agents-v0/scripts/guard-verify.sh .agents-v0/gate-rules .agents-v0/scripts/secret_scan.py .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
+        .agents-v0/scripts/discover-codebase.sh .agents-v0/scripts/check-onboarding-docs.sh .agents-v0/scripts/guard-common.sh .agents-v0/scripts/guard-onboard.sh .agents-v0/scripts/guard-roadmap.sh .agents-v0/scripts/guard-architecture.sh .agents-v0/scripts/guard-plan.sh .agents-v0/scripts/guard-scaffold.sh .agents-v0/scripts/guard-intake.sh .agents-v0/scripts/guard-design.sh .agents-v0/scripts/guard-build.sh .agents-v0/scripts/guard-verify.sh .agents-v0/scripts/guard-local-release.sh .agents-v0/gate-rules .agents-v0/scripts/secret_scan.py .agents-v0/scripts/audit-brownfield-baseline.sh .agents-v0/scripts/sync-feature-state.sh \
         .agents-v0/scripts/delivery-metrics.sh docs/agents-v0/onboarding/_report.template.md docs/agents-v0/onboarding/_module.template.md \
         docs/agents-v0/maintain/_note.template.md docs/agents-v0/design/system/_component.template.md docs/agents-v0/design/_design.template.md docs/agents-v0/design/_amendments.template.md \
         .agents-v0/scripts/render-mr-body.sh .agents-v0/scripts/release-notes.sh \

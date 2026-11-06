@@ -226,3 +226,33 @@ verify commit.paths app docs/agents-v0/verify/<feature> docs/agents-v0/design/sy
 verify commit.message <story>: verify approved
 verify approved.next /v0-local-release <feature>
 
+# --- local-release (/v0-local-release, guard-local-release.sh) ----------------------------------
+local-release phase release
+local-release feature <feature>
+local-release state docs/agents-v0/requirements/<feature>.state.json
+local-release artifact docs/agents-v0/requirements/<feature>.md
+local-release output docs/agents-v0/release/<feature>/release-output.txt
+local-release result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+local-release check.requires git-work-tree kit-installed feature-branch no-collision pack-configured not-released verify-approved not-approved
+local-release start.requires git-work-tree kit-installed feature-branch no-collision pack-configured not-released verify-approved not-awaiting-approval
+local-release start.status in_progress
+local-release start.next Run the final native stack verify command and check-tests-ran.sh (recording output in docs/agents-v0/release/<feature>/release-output.txt), run release-notes.sh when a changelog is configured, and launch shell-less release-manager (skill: local-release) to sync README/diagrams and author ## Proposed lessons in the phase-result file.
+# block: status and next step
+local-release block.status blocked
+local-release block.next Resolve the blocker, then run /v0-local-release <feature> again; it resumes from the files on disk.
+# ready: verifies release-output.txt, check-tests-ran.sh, check-lessons.sh --unchanged-since (x2), and sets awaiting_approval
+local-release ready.requires in-progress
+local-release ready.status awaiting_approval
+local-release ready.next Sensei reviews the release preparation and Proposed lessons (P-<n>) and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release <feature> (typing approval words and which P-<n> to accept/reject)
+# commit: two-step safe staging & secret scan — commits "<story>: release approved" on feature/<feature>, squash-merges into the integration branch, applies P-<n> decisions to docs/agents-v0/lessons.md, commits "<story>: release approved (squash-merge of feature/<feature>)" with Story-Branch/Story-Tip trailers, and runs check-release-evidence.sh
+local-release commit.paths README.md CHANGELOG.md docs/agents-v0/diagrams docs/agents-v0/release/<feature> docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
+local-release commit.message <story>: release approved
+local-release approved.next /v0-status
+
+# Alias rules so `guard-common.sh approve release <feature>` and `gc_approval_ok release <feature>` resolve identically
+release phase release
+release feature <feature>
+release state docs/agents-v0/requirements/<feature>.state.json
+release artifact docs/agents-v0/requirements/<feature>.md
+release result docs/agents-v0/requirements/<feature>.phase-result.md
