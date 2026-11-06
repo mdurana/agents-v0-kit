@@ -560,8 +560,253 @@ PY
   gc_ok block "local-release for '$glr_feature' marked blocked ($glr_b_reason)"
 }
 
+# Design: DLR3 (/v0-local-release ready gate: final native verify log check, proposed lessons collection, and check-lessons.sh enforcement).
 glr_ready() {
-  gc_refuse ready "not implemented yet"
+  glr_r_slug=""
+  glr_r_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        glr_r_maint=1
+        shift
+        ;;
+      -*)
+        glr_usage
+        ;;
+      *)
+        [ -z "$glr_r_slug" ] || glr_usage
+        glr_r_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  glr_load ready "$glr_r_slug" "$glr_r_maint"
+  glr_rule ready ready.requires "$glr_feature"; glr_requires="$glr_val"
+  glr_check_prereqs ready "$glr_requires"
+
+  # Auto-bounce to /v0-verify if any non-doc files drifted since Verify approval
+  glr_check_non_doc_drift ready
+
+  # 1. Verify final native stack output log exists, is non-empty, and has no failure markers
+  [ -s "$glr_output" ] \
+    || gc_refuse ready "missing or empty final native verify log '$glr_output'; run the final native stack verify command into '$glr_output' before ready"
+
+  glr_log_bad="$(GLR_OUT="$glr_output" python3 - <<'PYLOG'
+import os, re
+txt = open(os.environ["GLR_OUT"], encoding="utf-8", errors="replace").read()
+patterns = [
+    ("BUILD FAILURE", re.compile(r"\bBUILD FAILURE\b")),
+    ("FAIL marker", re.compile(r"(?m)^\s*(?:FAIL:|FAILED\b|\[ERROR\]\s+Tests\s+run:)")),
+    ("non-zero test failures", re.compile(r"Tests run:\s*\d+,\s*Failures:\s*[1-9]\d*")),
+    ("non-zero test errors", re.compile(r"Tests run:\s*\d+,\s*Failures:\s*\d+,\s*Errors:\s*[1-9]\d*")),
+]
+for label, rx in patterns:
+    m = rx.search(txt)
+    if m:
+        print(f"{label} ({m.group(0).strip()[:80]})")
+        break
+PYLOG
+)"
+  if [ -n "$glr_log_bad" ]; then
+    gc_refuse ready "final native verify log '$glr_output' is not green: $glr_log_bad"
+  fi
+
+  if grep -Eq 'Tests run:|\[INFO\] ---' "$glr_output" 2>/dev/null && [ -f "$GC_HERE/check-tests-ran.sh" ]; then
+    if ! glr_tr_out="$(sh "$GC_HERE/check-tests-ran.sh" "$glr_output" 2>&1)"; then
+      gc_refuse ready "check-tests-ran.sh failed on '$glr_output': $glr_tr_out"
+    fi
+  fi
+
+  # 2. Resolve integration ref for check-lessons.sh --unchanged-since
+  glr_int_ref="main"
+  if [ -f "$GC_HERE/resolve-integration-branch.sh" ]; then
+    glr_resolved="$(sh "$GC_HERE/resolve-integration-branch.sh" 2>/dev/null || true)"
+    [ -z "$glr_resolved" ] || glr_int_ref="$glr_resolved"
+  fi
+
+  # 3. Ensure phase-result exists before first check-lessons.sh pass
+  mkdir -p "$(dirname "$glr_result")"
+  if [ ! -f "$glr_result" ]; then
+    cat >"$glr_result" <<EOF
+phase: release
+status: awaiting_approval
+feature: $glr_feature
+guard_managed: true
+
+# Phase Result: $glr_feature (release)
+
+## Summary
+- Final native stack verification passed (\`$glr_output\`).
+
+## Lessons
+### release
+- none
+
+## Proposed lessons
+- none
+EOF
+  fi
+
+  # 4. Pass 1 of check-lessons.sh (--unchanged-since <integration-ref> --phase-result <phase-result>)
+  if [ -f "$GC_HERE/check-lessons.sh" ]; then
+    if ! glr_cl1="$(sh "$GC_HERE/check-lessons.sh" --unchanged-since "$glr_int_ref" --phase-result "$glr_result" 2>&1)"; then
+      gc_refuse ready "check-lessons.sh failed before proposal collection: $glr_cl1"
+    fi
+  fi
+
+  # 5. Normalize phase-result header (phase: release, status: awaiting_approval, guard_managed: true)
+  #    and collect any ## Lessons candidates into ## Proposed lessons if not already populated
+  GLR_RES="$glr_result" GLR_SLUG="$glr_feature" python3 - <<'PYPR'
+import os, re
+from pathlib import Path
+
+pr_path = Path(os.environ["GLR_RES"])
+slug = os.environ["GLR_SLUG"]
+txt = pr_path.read_text(encoding="utf-8")
+
+def norm_text(v):
+    return re.sub(r"\s+", " ", (v or "").strip()).rstrip(".").lower()
+
+# Load active lessons from docs/agents-v0/lessons.md to drop exact duplicates
+active_pairs = set()
+lessons_path = Path("docs/agents-v0/lessons.md")
+if lessons_path.is_file():
+    ltxt = re.sub(r"<!--.*?-->", "", lessons_path.read_text(encoding="utf-8"), flags=re.S)
+    cur_what, cur_do = "", ""
+    for line in ltxt.splitlines():
+        if line.startswith("### L-"):
+            if cur_what or cur_do:
+                active_pairs.add((cur_what, cur_do))
+            cur_what, cur_do = "", ""
+        elif line.startswith("- What happened:"):
+            cur_what = norm_text(line.partition(":")[2])
+        elif line.startswith("- Do instead:"):
+            cur_do = norm_text(line.partition(":")[2])
+    if cur_what or cur_do:
+        active_pairs.add((cur_what, cur_do))
+
+# Update or prepend header keys
+if re.search(r"(?m)^phase:\s*\S+", txt):
+    txt = re.sub(r"(?m)^phase:\s*\S+", "phase: release", txt, count=1)
+else:
+    txt = "phase: release\n" + txt
+
+if re.search(r"(?m)^status:\s*\S+", txt):
+    txt = re.sub(r"(?m)^status:\s*\S+", "status: awaiting_approval", txt, count=1)
+else:
+    txt = re.sub(r"(?m)^(phase:\s*\S+)", r"\1\nstatus: awaiting_approval", txt, count=1)
+
+if re.search(r"(?m)^guard_managed:\s*\S+", txt):
+    txt = re.sub(r"(?m)^guard_managed:\s*\S+", "guard_managed: true", txt, count=1)
+else:
+    txt = re.sub(r"(?m)^(status:\s*\S+)", r"\1\nguard_managed: true", txt, count=1)
+
+clean = re.sub(r"<!--.*?-->", "", txt, flags=re.S)
+
+# Parse ## Lessons candidates
+lessons_candidates = []
+m_les = re.search(r"(?m)^##\s+Lessons\s*$", clean, re.I)
+if m_les:
+    rest = clean[m_les.end():]
+    m_next = re.search(r"(?m)^#{1,2}\s", rest)
+    les_body = rest[:m_next.start()] if m_next else rest
+    cur_ph = "release"
+    for line in les_body.splitlines():
+        hm = re.match(r"^###\s+(\S+)\s*$", line.strip())
+        if hm:
+            cur_ph = hm.group(1).lower()
+            continue
+        if line.startswith("- ") and not re.match(r"^-\s+none\.?\s*$", line.strip(), re.I):
+            bullet_body = line[2:].strip()
+            w_m = re.search(r"What happened:\s*(.*?)(?=\s+·\s+(?:Trigger|What happened|Do instead|Scope):|$)", bullet_body)
+            d_m = re.search(r"Do instead:\s*(.*?)(?=\s+·\s+(?:Trigger|What happened|Do instead|Scope):|$)", bullet_body)
+            pair = (norm_text(w_m.group(1) if w_m else ""), norm_text(d_m.group(1) if d_m else ""))
+            if pair not in active_pairs:
+                lessons_candidates.append((cur_ph, bullet_body))
+else:
+    txt = txt.rstrip() + "\n\n## Lessons\n### release\n- none\n"
+
+# Check if ## Proposed lessons exists and whether it already has P-<n> entries
+clean = re.sub(r"<!--.*?-->", "", txt, flags=re.S)
+m_prop = re.search(r"(?m)^##\s+Proposed lessons\s*$", clean, re.I)
+has_existing_p = False
+if m_prop:
+    rest = clean[m_prop.end():]
+    m_next = re.search(r"(?m)^#{1,2}\s", rest)
+    prop_body = rest[:m_next.start()] if m_next else rest
+    for line in prop_body.splitlines():
+        if re.match(r"^- P-\d+\s+·\s+", line.strip()):
+            has_existing_p = True
+            break
+
+if not has_existing_p:
+    if lessons_candidates:
+        prop_lines = [f"- P-{i} · pending · {ph} · {b}" for i, (ph, b) in enumerate(lessons_candidates, 1)]
+    else:
+        prop_lines = ["- none"]
+    new_sec = "## Proposed lessons\n" + "\n".join(prop_lines) + "\n"
+    if m_prop:
+        # Replace existing ## Proposed lessons section
+        m_prop_raw = re.search(r"(?m)^##\s+Proposed lessons\s*$", txt, re.I)
+        if m_prop_raw:
+            rest_raw = txt[m_prop_raw.end():]
+            m_next_raw = re.search(r"(?m)^#{1,2}\s", rest_raw)
+            end_idx = m_prop_raw.end() + (m_next_raw.start() if m_next_raw else len(rest_raw))
+            txt = txt[:m_prop_raw.start()] + new_sec + ("\n" + txt[end_idx:].lstrip("\n") if end_idx < len(txt) else "")
+    else:
+        txt = txt.rstrip() + "\n\n" + new_sec
+
+pr_path.write_text(txt, encoding="utf-8")
+PYPR
+
+  # 6. Pass 2 of check-lessons.sh (--unchanged-since <integration-ref> --phase-result <phase-result>)
+  if [ -f "$GC_HERE/check-lessons.sh" ]; then
+    if ! glr_cl2="$(sh "$GC_HERE/check-lessons.sh" --unchanged-since "$glr_int_ref" --phase-result "$glr_result" 2>&1)"; then
+      gc_refuse ready "check-lessons.sh failed after proposal collection: $glr_cl2"
+    fi
+  fi
+
+  # 7. Secret scan across release output, phase-result, and updated docs
+  if [ -f "$GC_HERE/secret_scan.py" ]; then
+    glr_scan_files="$glr_output $glr_result"
+    [ ! -f "README.md" ] || glr_scan_files="$glr_scan_files README.md"
+    [ ! -f "CHANGELOG.md" ] || glr_scan_files="$glr_scan_files CHANGELOG.md"
+    # shellcheck disable=SC2086
+    if ! glr_sec_out="$(python3 "$GC_HERE/secret_scan.py" $glr_scan_files 2>&1)"; then
+      gc_refuse ready "secret scan failed: $glr_sec_out"
+    fi
+  fi
+
+  # 8. Transition state to awaiting_approval
+  glr_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  glr_rule ready ready.next "$glr_feature"; glr_next="$glr_val"
+  glr_rule ready ready.status "$glr_feature"; glr_status="$glr_val"
+
+  glr_was_vgm="$(gc_state_get "$glr_state" verifyGuardManaged 2>/dev/null || true)"
+  gc_state_set "$glr_state" "$glr_feature" "$glr_req_art" "activePhase=$glr_phase" \
+    "activeStatus=$glr_status" "blockedReason=" "nextStep=$glr_next" || exit 1
+
+  GLR_ST="$glr_state" GLR_BASE="$glr_base" GLR_VGM="$glr_was_vgm" python3 - <<'PY'
+import json, os
+p = os.environ["GLR_ST"]
+base = os.environ["GLR_BASE"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base:
+    d["baseCommit"] = base
+d["releaseGuardManaged"] = True
+if os.environ.get("GLR_VGM") in ("True", "true"):
+    d["verifyGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  gc_ok ready "local-release for '$glr_feature' is awaiting Sensei's approval"
+  printf 'Stop here. Present the release readiness summary and every P-<n> in %s to Sensei.\n' "$glr_result"
+  printf 'Sensei approves from an external terminal with:\n'
+  printf '  sh .agents-v0/scripts/guard-common.sh approve local-release %s\n' "$glr_feature"
+  printf 'Wait for Sensei to reply in chat before running: %s commit %s\n' "$G" "$glr_feature"
 }
 
 glr_commit() {
