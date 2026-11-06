@@ -256,3 +256,30 @@ release feature <feature>
 release state docs/agents-v0/requirements/<feature>.state.json
 release artifact docs/agents-v0/requirements/<feature>.md
 release result docs/agents-v0/requirements/<feature>.phase-result.md
+
+# --- maintain (/v0-maintain, guard-maintain.sh) -------------------------------------------------
+maintain phase maintain
+maintain feature <feature>
+maintain state docs/agents-v0/maintain/<feature>/state.json
+maintain artifact docs/agents-v0/maintain/<feature>/note.md
+maintain template docs/agents-v0/maintain/_note.template.md
+maintain report docs/agents-v0/build/<feature>/build-report.md
+maintain output docs/agents-v0/build/<feature>/build-output.txt
+maintain result docs/agents-v0/maintain/<feature>/phase-result.md
+# check & start: prerequisites
+maintain check.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released not-approved maintain-branch
+maintain start.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released not-awaiting-approval
+maintain start.status in_progress
+maintain start.next Run baseline verification, launch the shell-less maintenance-engineer subagent (skill: bugfix-triage, dependency-upgrade, or doc-sync), and record attempt cards and verification logs under docs/agents-v0/build/<feature>/.
+# block: status and next step
+maintain block.status blocked
+maintain block.next Resolve the blocker, helper brief, or attempt budget issue, then run /v0-maintain <feature> again; it resumes from the files on disk.
+# ready: verifies note.md, tier confirmation, emergency rollback + follow-up date, trivial scope restriction, <=800 non-doc source lines, attempt budget (<8), failure-brief & no 3rd red, build-output.txt + check-tests-ran.sh, check-onboarding-docs.sh, and sets awaiting_approval
+maintain ready.requires in-progress
+maintain ready.status awaiting_approval
+maintain ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>
+# commit: verifies external approval record, appends Approved Maintain row, updates phase-result.md, runs sync-feature-state.sh --approve maintain --clear-active, stages explicit paths, secret-scans, and commits "maintain/<feature>: maintain approved"
+maintain commit.paths app openapi docs README.md CHANGELOG.md pom.xml build.gradle package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
+maintain commit.message maintain/<feature>: maintain approved
+maintain approved.next /v0-verify <feature> --maintain
+
