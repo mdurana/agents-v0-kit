@@ -213,6 +213,24 @@ case "$approve_lc" in
       fi
     fi
     ;;
+  build)
+    guard_common="$(dirname "$0")/guard-common.sh"
+    build_slug="$slug"
+    build_state="docs/agents-v0/requirements/${build_slug}.state.json"
+    build_pr="docs/agents-v0/requirements/${build_slug}.phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      build_gm=""
+      [ -f "$build_state" ] && build_gm="$(gc_state_get "$build_state" buildGuardManaged 2>/dev/null || true)"
+      if [ "$build_gm" = "True" ] || [ "$build_gm" = "true" ] || { [ -f "$build_pr" ] && grep -Fq "phase: build" "$build_pr" && grep -Fq "guard_managed: true" "$build_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok build "$build_slug")"; then
+          printf 'FAIL: --approve build for %s refused without Sensei external approval record: %s\n' "$build_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve build %s\n' "$build_slug" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
 esac
 
 if [ "$approve_lc" = release ] && command -v git >/dev/null 2>&1 \
