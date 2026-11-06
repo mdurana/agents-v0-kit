@@ -141,6 +141,8 @@ def commit_cmd(ph):
         return f"sh .agents-v0/scripts/guard-build.sh commit {slug}"
     if ph == "verify" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("verifyGuardManaged"):
         return f"sh .agents-v0/scripts/guard-verify.sh commit {slug}"
+    if ph == "release" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("releaseGuardManaged"):
+        return f"sh .agents-v0/scripts/guard-local-release.sh commit {slug}"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 

@@ -809,8 +809,350 @@ PY
   printf 'Wait for Sensei to reply in chat before running: %s commit %s\n' "$G" "$glr_feature"
 }
 
+# Design: DLR5 (/v0-local-release two-step commit: story-branch release prep commit + integration branch squash/no-ff merge, lesson decisions, --approve release, and check-release-evidence.sh).
 glr_commit() {
-  gc_refuse commit "not implemented yet"
+  glr_m_slug=""
+  glr_m_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        glr_m_maint=1
+        shift
+        ;;
+      -*)
+        glr_usage
+        ;;
+      *)
+        [ -z "$glr_m_slug" ] || glr_usage
+        glr_m_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  glr_load commit "$glr_m_slug" "$glr_m_maint"
+  glr_rule commit commit.requires "$glr_feature"; glr_requires="$glr_val"
+  glr_check_prereqs commit "$glr_requires"
+
+  # 1. Verify Sensei's external approval record for local-release <feature>
+  if ! glr_ok_msg="$(gc_approval_ok local-release "$glr_feature")"; then
+    gc_refuse commit "$glr_ok_msg"
+  fi
+  glr_app_file="$(gc_approval_file local-release "$glr_feature")"
+  glr_words="$(GLR_AF="$glr_app_file" python3 - <<'PYW'
+import json, os
+d = json.load(open(os.environ["GLR_AF"], encoding="utf-8"))
+print(d.get("words") or "")
+PYW
+)"
+
+  # Refuse if the current worktree index already has staged files
+  if ! git diff --cached --quiet --no-ext-diff 2>/dev/null; then
+    gc_refuse commit "the git index already holds staged changes; unstage them (git restore --staged .) before running commit"
+  fi
+
+  # Re-verify no post-verify non-doc drift occurred before committing
+  glr_check_non_doc_drift commit
+
+  glr_sid="$(glr_story_id_of)"
+  glr_tier="$(gc_state_get "$glr_state" tier 2>/dev/null || true)"
+
+  # Resolve integration branch name and worktrees
+  glr_int_ref="main"
+  if [ -f "$GC_HERE/resolve-integration-branch.sh" ]; then
+    glr_res_int="$(sh "$GC_HERE/resolve-integration-branch.sh" 2>/dev/null || true)"
+    [ -z "$glr_res_int" ] || glr_int_ref="$glr_res_int"
+  fi
+  glr_int_branch="${glr_int_ref#origin/}"
+  [ "$glr_int_branch" != "HEAD" ] || glr_int_branch="main"
+
+  glr_story_branch="feature/$glr_feature"
+  if [ "$glr_is_maintain" = 1 ]; then
+    if [ "$glr_tier" = "trivial" ]; then
+      glr_story_branch="$glr_int_branch"
+    else
+      glr_story_branch="maintain/$glr_feature"
+    fi
+  fi
+
+  glr_story_wt="$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$glr_story_branch" '
+    /^worktree / { p = substr($0, 10) }
+    $0 == want { print p; exit }
+  ')"
+  glr_int_wt="$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$glr_int_branch" '
+    /^worktree / { p = substr($0, 10) }
+    $0 == want { print p; exit }
+  ')"
+
+  glr_cur_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  [ -n "$glr_story_wt" ] || { [ "$glr_cur_branch" = "$glr_story_branch" ] && glr_story_wt="$(pwd)"; }
+
+  glr_step_a_sha=""
+  # --- Step A: Commit release preparation on story branch (when separate from integration branch) ---
+  if [ "$glr_story_branch" != "$glr_int_branch" ]; then
+    [ -n "$glr_story_wt" ] && [ -d "$glr_story_wt" ] \
+      || gc_refuse commit "cannot find worktree for story branch '$glr_story_branch'"
+    (
+      cd "$glr_story_wt"
+      # Ensure state on story branch has activePhase=release, activeStatus=awaiting_approval
+      GLR_ST="$glr_state" python3 - <<'PYST'
+import json, os
+p = os.environ["GLR_ST"]
+if os.path.isfile(p):
+    d = json.load(open(p, encoding="utf-8"))
+    d["activePhase"] = "release"
+    d["activeStatus"] = "awaiting_approval"
+    d["releaseGuardManaged"] = True
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+PYST
+      for glr_p in README.md CHANGELOG.md .gitignore \
+        "docs/agents-v0/diagrams" \
+        "docs/agents-v0/release/$glr_feature" \
+        "docs/agents-v0/verify/$glr_feature" \
+        "$glr_req_art" "$glr_state" "$glr_result" \
+        "docs/agents-v0/requirements/${glr_feature}.trace.json" \
+        "docs/agents-v0/maintain/$glr_feature"; do
+        if [ -e "$glr_p" ] || [ -n "$(git ls-files -- "$glr_p" 2>/dev/null)" ]; then
+          git add --all -- "$glr_p"
+        fi
+      done
+      git reset -q -- '*.lock' '**/*.lock' 2>/dev/null || true
+      if ! git diff --cached --quiet --no-ext-diff 2>/dev/null; then
+        gc_scan_staged >/dev/null
+        git commit -q -m "${glr_sid}: release approved"
+      fi
+      # Refuse if story worktree still has uncommitted changes outside release paths
+      glr_rem="$(git status --porcelain=v1 -uall 2>/dev/null | grep -v '\.lock$' || true)"
+      if [ -n "$glr_rem" ]; then
+        gc_refuse commit "story worktree '$glr_story_wt' still has uncommitted changes after staging release paths: $glr_rem"
+      fi
+    ) || exit 1
+    glr_step_a_sha="$(git rev-parse --short "refs/heads/$glr_story_branch" 2>/dev/null || true)"
+  fi
+
+  # --- Step B: Integration branch merge, lesson decisions, --approve release, and final commit ---
+  if [ -z "$glr_int_wt" ]; then
+    # Single-worktree fallback (e.g. when integration branch is not checked out in another worktree)
+    git checkout -q "$glr_int_branch" || gc_refuse commit "cannot switch to integration branch '$glr_int_branch'"
+    glr_int_wt="$(pwd)"
+  fi
+
+  glr_step_b_sha=""
+  (
+    cd "$glr_int_wt"
+    if [ "$glr_story_branch" != "$glr_int_branch" ]; then
+      glr_int_dirty="$(git status --porcelain=v1 -uall 2>/dev/null | grep -v '\.lock$' || true)"
+      if [ -n "$glr_int_dirty" ]; then
+        gc_refuse commit "integration worktree '$glr_int_wt' ($glr_int_branch) has uncommitted changes ($glr_int_dirty); clean or stash them first"
+      fi
+      if [ "$glr_is_maintain" = 1 ]; then
+        if ! git merge --no-ff --no-commit "$glr_story_branch" >/dev/null 2>&1; then
+          git merge --abort >/dev/null 2>&1 || git reset --hard -q HEAD >/dev/null 2>&1 || true
+          gc_refuse commit "git merge --no-ff $glr_story_branch failed or conflicted in '$glr_int_wt'"
+        fi
+      else
+        if ! git merge --squash "$glr_story_branch" >/dev/null 2>&1; then
+          git reset --hard -q HEAD >/dev/null 2>&1 || true
+          gc_refuse commit "git merge --squash $glr_story_branch failed or conflicted in '$glr_int_wt'"
+        fi
+      fi
+    fi
+
+    # 1. Run sync-feature-state.sh --approve release while index holds the exact squash-merge tree
+    if ! glr_sync_out="$(sh .agents-v0/scripts/sync-feature-state.sh --approve release "$glr_req_art" 2>&1)"; then
+      gc_refuse commit "sync-feature-state.sh --approve release failed: $glr_sync_out"
+    fi
+
+    # 2. Apply Sensei's lesson decisions from approval words to phase-result and docs/agents-v0/lessons.md
+    GLR_RES="$glr_result" GLR_WORDS="$glr_words" GLR_SLUG="$glr_feature" GLR_HERE="$GC_HERE" python3 - <<'PYLES'
+import datetime, os, re, subprocess, sys
+from pathlib import Path
+
+pr_path = Path(os.environ["GLR_RES"])
+words = os.environ["GLR_WORDS"]
+slug = os.environ["GLR_SLUG"]
+here = os.environ["GLR_HERE"]
+
+FIELD_RE = re.compile(r"(Trigger|What happened|Do instead|Scope):\s*(.*?)(?=\s+·\s+(?:Trigger|What happened|Do instead|Scope):|$)")
+
+def parse_approval(text, proposed_ids):
+    problems, accepted, rejected = [], set(), set()
+    pid_list = r"P-\d+(?:\s*(?:,|and|&|\+)\s*P-\d+)*"
+    for m in re.finditer(rf"\b(accept(?:ed|s|ing)?|keep|reject(?:ed|s|ing)?|drop)\s+({pid_list})(\s+if\s+proposed)?",
+                         text, re.I):
+        verb = m.group(1).lower()
+        ids = [x.upper() for x in re.findall(r"P-\d+", m.group(2), re.I)]
+        tolerant = bool(m.group(3))
+        for pid in ids:
+            if pid not in proposed_ids:
+                if not tolerant:
+                    problems.append(f"the approval {'accepts' if verb[0] in 'ak' else 'rejects'} {pid}, which is not in ## Proposed lessons")
+                continue
+            (accepted if verb[0] in "ak" else rejected).add(pid)
+    both = sorted(accepted & rejected, key=lambda x: int(x[2:]))
+    for pid in both:
+        problems.append(f"the approval both accepts and rejects {pid}")
+    if re.search(r"\b(?:accept|keep)\s+all\b", text, re.I):
+        accepted |= set(proposed_ids) - rejected
+    return accepted - rejected, problems
+
+txt = pr_path.read_text(encoding="utf-8")
+lines = txt.splitlines()
+prop_ids = []
+prop_meta = {}
+in_prop = False
+for line in lines:
+    if re.match(r"^##\s+Proposed lessons\s*$", line, re.I):
+        in_prop = True
+        continue
+    if in_prop and re.match(r"^#{1,2}\s", line):
+        in_prop = False
+        continue
+    if in_prop:
+        m = re.match(r"^- (P-\d+)\s+·\s+(pending|accepted|rejected)\s+·\s+(\S+)\s+·\s+(.*)$", line)
+        if m:
+            pid = m.group(1).upper()
+            prop_ids.append(pid)
+            prop_meta[pid] = {"phase": m.group(3).lower(), "rest": m.group(4), "fields": dict(FIELD_RE.findall(m.group(4)))}
+
+want, problems = parse_approval(words, prop_ids)
+if problems:
+    print("; ".join(problems), file=sys.stderr)
+    sys.exit(1)
+
+new_lines = []
+in_prop = False
+for line in lines:
+    if re.match(r"^status:\s*\S+", line):
+        new_lines.append("status: approved")
+        continue
+    if re.match(r"^##\s+Proposed lessons\s*$", line, re.I):
+        in_prop = True
+        new_lines.append(line)
+        continue
+    if in_prop and re.match(r"^#{1,2}\s", line):
+        in_prop = False
+        new_lines.append(line)
+        continue
+    if in_prop:
+        m = re.match(r"^- (P-\d+)\s+·\s+(pending|accepted|rejected)\s+·\s+(\S+)\s+·\s+(.*)$", line)
+        if m:
+            pid = m.group(1).upper()
+            dec = "accepted" if pid in want else "rejected"
+            new_lines.append(f"- {pid} · {dec} · {m.group(3)} · {m.group(4)}")
+            continue
+    new_lines.append(line)
+
+pr_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+# Append accepted lessons to docs/agents-v0/lessons.md if not already present
+lessons_path = Path("docs/agents-v0/lessons.md")
+today = datetime.date.today().isoformat()
+for pid in prop_ids:
+    if pid not in want:
+        continue
+    meta = prop_meta[pid]
+    f = meta["fields"]
+    # Check if already present for this story
+    if lessons_path.is_file():
+        ltxt = lessons_path.read_text(encoding="utf-8")
+    else:
+        lessons_path.parent.mkdir(parents=True, exist_ok=True)
+        ltxt = "# Lessons\n\n## Active lessons\n_No entries yet._\n"
+        lessons_path.write_text(ltxt, encoding="utf-8")
+
+    # Get next L-NNN id from check-lessons.sh --next-id
+    r = subprocess.run(["sh", os.path.join(here, "check-lessons.sh"), "--next-id"], capture_output=True, text=True, check=True)
+    lid = r.stdout.strip()
+    entry = (
+        f"### {lid} · {today} · accepted\n"
+        f"- Story/phase: {slug} / {meta['phase']}\n"
+        f"- Trigger: {f.get('Trigger', 'other').strip()}\n"
+        f"- What happened: {f.get('What happened', '').strip()}\n"
+        f"- Do instead: {f.get('Do instead', '').strip()}\n"
+        f"- Scope: {f.get('Scope', 'repo').strip()}\n"
+    )
+    ltxt = re.sub(r"(?m)^_No entries yet\._\s*\n?", "", ltxt)
+    if re.search(r"(?m)^##\s+Active lessons\s*$", ltxt):
+        ltxt = ltxt.rstrip() + "\n\n" + entry
+    else:
+        ltxt = ltxt.rstrip() + "\n\n## Active lessons\n\n" + entry
+    lessons_path.write_text(ltxt, encoding="utf-8")
+PYLES
+
+    if [ -f .agents-v0/scripts/check-lessons.sh ]; then
+      if ! glr_cld="$(sh .agents-v0/scripts/check-lessons.sh --decided --phase-result "$glr_result" 2>&1)"; then
+        gc_refuse commit "check-lessons.sh --decided failed: $glr_cld"
+      fi
+      if ! glr_cla="$(sh .agents-v0/scripts/check-lessons.sh 2>&1)"; then
+        gc_refuse commit "check-lessons.sh failed: $glr_cla"
+      fi
+      if ! glr_clm="$(sh .agents-v0/scripts/check-lessons.sh --phase-result "$glr_result" --approval-text "$glr_words" 2>&1)"; then
+        gc_refuse commit "check-lessons.sh --approval-text failed: $glr_clm"
+      fi
+    fi
+
+    # 3. Record Release approval row in requirement / maintenance artifact
+    GLR_ART="$glr_req_art" GLR_APP_FILE="$glr_app_file" python3 - <<'PYART'
+import datetime, json, os, re
+from pathlib import Path
+
+art = Path(os.environ["GLR_ART"])
+if not art.is_file():
+    raise SystemExit(0)
+rec = json.load(open(os.environ["GLR_APP_FILE"], encoding="utf-8"))
+approver = rec.get("approver") or "sensei"
+date_str = (rec.get("approvedAt") or datetime.date.today().isoformat())[:10]
+txt = art.read_text(encoding="utf-8")
+if re.search(r"(?im)^\|\s*Release\s*\|", txt):
+    txt = re.sub(
+        r"(?im)^\|\s*Release\s*\|[^\n]*\|",
+        f"| Release | Approved | {approver} | {date_str} | Approved via guard-local-release.sh |",
+        txt,
+    )
+elif re.search(r"(?im)^##\s+Delivery approvals\b", txt):
+    txt = txt.rstrip() + f"\n| Release | Approved | {approver} | {date_str} | Approved via guard-local-release.sh |\n"
+art.write_text(txt, encoding="utf-8")
+PYART
+
+    # 4. Stage updated docs/agents-v0 files, scan staged for secrets, and commit
+    for glr_f in "$glr_req_art" "$glr_state" "$glr_result" "docs/agents-v0/lessons.md" "docs/agents-v0/lessons-archive.md"; do
+      if [ -e "$glr_f" ]; then
+        git add -- "$glr_f"
+      fi
+    done
+    git reset -q -- '*.lock' '**/*.lock' 2>/dev/null || true
+
+    glr_gate_msg="$(git rev-parse --git-path agents-v0-gate-msg.txt 2>/dev/null || true)"
+    if [ "$glr_is_maintain" = 0 ] && [ -n "$glr_gate_msg" ] && [ -f "$glr_gate_msg" ]; then
+      gc_scan_staged --message-file "$glr_gate_msg" >/dev/null
+      git commit -q -F "$glr_gate_msg" || gc_refuse commit "git commit -F $glr_gate_msg failed"
+    else
+      gc_scan_staged >/dev/null
+      git commit -q -m "${glr_sid}: release approved" || gc_refuse commit "git commit failed on '$glr_int_branch'"
+    fi
+
+    # 5. Verify check-release-evidence.sh for feature stories
+    if [ "$glr_is_maintain" = 0 ] && [ -f .agents-v0/scripts/check-release-evidence.sh ]; then
+      if ! glr_cre="$(sh .agents-v0/scripts/check-release-evidence.sh "$glr_req_art" 2>&1)"; then
+        gc_refuse commit "check-release-evidence.sh failed after squash commit: $glr_cre"
+      fi
+    fi
+  ) || exit 1
+
+  glr_step_b_sha="$(git -C "$glr_int_wt" rev-parse --short HEAD 2>/dev/null || true)"
+  if [ -n "$glr_step_a_sha" ]; then
+    gc_ok commit "local-release committed: story branch $glr_story_branch ($glr_step_a_sha) + integration branch $glr_int_branch ($glr_step_b_sha)"
+    printf 'Commits made:\n'
+    printf '  1. %s (%s): %s: release approved\n' "$glr_step_a_sha" "$glr_story_branch" "$glr_sid"
+    printf '  2. %s (%s): %s\n' "$glr_step_b_sha" "$glr_int_branch" "$(git -C "$glr_int_wt" log -1 --format=%s HEAD)"
+  else
+    gc_ok commit "local-release committed on integration branch $glr_int_branch ($glr_step_b_sha)"
+    printf 'Commits made:\n'
+    printf '  1. %s (%s): %s\n' "$glr_step_b_sha" "$glr_int_branch" "$(git -C "$glr_int_wt" log -1 --format=%s HEAD)"
+  fi
 }
 
 glr_steps() {
