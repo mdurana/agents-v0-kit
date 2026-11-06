@@ -127,10 +127,55 @@ gs_check() {
   printf 'Next: Start scaffold with: sh .agents-v0/scripts/guard-scaffold.sh start\n'
 }
 
+gs_start() {
+  [ $# -eq 0 ] || gs_usage
+  gs_load start
+  gs_rule start start.requires; gs_requires="$gs_val"
+  gs_check_prereqs start "$gs_requires"
+
+  mkdir -p docs/agents-v0/milestones
+  if [ ! -f "$gs_artifact" ]; then
+    if [ -f "templates/docs/agents-v0/milestones/p0-platform-skeleton.md" ]; then
+      cp "templates/docs/agents-v0/milestones/p0-platform-skeleton.md" "$gs_artifact"
+    else
+      printf '# Milestone P0: Platform Skeleton\n\n| ID | User Story | Feature Artifact | Status | Dependency | Surface | Size |\n|---|---|---|---|---|---|---|\n| P0-A | As a developer, I want a known-good baseline — the build and tests pass, this milestone is the tracked manifest, coverage and CVE scanning are bound to verify, and I can run the app locally with Dockerfile and Compose — so that feature work starts from a stack that already runs. | docs/agents-v0/milestones/p0-platform-skeleton.md | planned | — | vertical slice | 4 |\n' > "$gs_artifact"
+    fi
+  fi
+
+  gs_rule start start.next; gs_next="$gs_val"
+  gs_rule start start.status; gs_status="$gs_val"
+
+  gc_state_set "$gs_state" "$gs_feature" "$gs_artifact" "activePhase=$gs_phase" \
+    "activeStatus=$gs_status" "blockedReason=" "nextStep=$gs_next" || exit 1
+
+  gc_ok start "scaffold in_progress on $gs_artifact"
+  printf 'Next: %s\n' "$gs_next"
+}
+
+gs_block() {
+  [ $# -ge 1 ] || gc_die "usage: $G block \"<plain reason>\""
+  gs_load block
+  gs_reason="$*"
+  gs_rule block block.status; gs_status="$gs_val"
+  gs_rule block block.next; gs_next="$gs_val"
+
+  [ -f "$gs_state" ] || gc_refuse block "scaffold has not been started ($gs_state missing)"
+  [ "$(gc_state_get "$gs_state" activePhase)" = "$gs_phase" ] \
+    || gc_refuse block "activePhase is '$(gc_state_get "$gs_state" activePhase)', not '$gs_phase'"
+
+  gc_state_set "$gs_state" "$gs_feature" "$gs_artifact" "activePhase=$gs_phase" \
+    "activeStatus=$gs_status" "blockedReason=$gs_reason" "nextStep=$gs_next" || exit 1
+
+  gc_ok block "scaffold blocked ($gs_reason)"
+  printf 'Next: %s\n' "$gs_next"
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gs_check "$@" ;;
-  start|block|ready|commit|steps)
-    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS1" ;;
+  start) shift; gs_start "$@" ;;
+  block) shift; gs_block "$@" ;;
+  ready|commit|steps)
+    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS2" ;;
   *) gs_usage ;;
 esac

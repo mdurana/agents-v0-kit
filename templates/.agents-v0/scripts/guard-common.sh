@@ -162,6 +162,8 @@ try:
             data["artifacts"]["architecture"] = artifact
         elif sets.get("activePhase") == "plan" or phase == "plan":
             data["artifacts"]["plan"] = artifact
+        elif sets.get("activePhase") == "scaffold" or phase == "scaffold":
+            data["artifacts"]["scaffold"] = artifact
     fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
