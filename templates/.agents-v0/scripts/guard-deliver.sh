@@ -680,8 +680,24 @@ gd_commit() {
   printf 'Next: %s start %s%s\n' "$G" "$gd_feature" "$gd_m_flag"
 }
 
+# Design: DDL6 (/v0-deliver generated step block).
 gd_steps() {
-  gc_refuse steps "guard-deliver.sh steps is not implemented yet (Design: DDL6)"
+  [ $# -eq 0 ] || gd_usage
+  gd_rule steps ready.next; gd_ready_next="$gd_val"
+  gd_rule steps approved.next; gd_approved_next="$gd_val"
+  G='sh .agents-v0/scripts/guard-deliver.sh'
+  cat <<EOF_STEPS
+1. Run \`$G check <feature> [--maintain] [--tier trivial|standard|emergency|major] [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), routes \`--tier trivial\` to \`/v0-triage\` and \`--tier emergency\` (without \`--maintain\`) to \`/v0-maintain <id> --tier emergency\`, checks brownfield \`onboard\` approval (\`docs/agents-v0/onboarding/state.json\` + \`baseline-status.json\`), checks cross-story uncommitted collisions, resolves the linked worktree (\`feature/<feature>\` or \`maintain/<id>\`), refuses if the story is already released, and delegates prerequisite checks to the active/next phase guard (\`intake\` → \`design\` → \`build\` → \`verify\` → \`local-release\`, or \`maintain\` → \`verify\` → \`local-release\`). If a phase is at \`awaiting_approval\` without Sensei's external approval record, it refuses and prints the exact external \`approve\` command. When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start <feature> [--maintain] [--tier trivial|standard|emergency|major] [--reopen]\`. When the prior phase was externally approved by Sensei in his own terminal (or \`Contract: None\` design is ready), \`start\` automatically executes \`guard-<prev_phase>.sh commit <feature>\` inside the resolved worktree before starting the next phase. It then delegates \`start\` to the active phase guard (\`guard-intake.sh\`, \`guard-design.sh\`, \`guard-build.sh\`, \`guard-verify.sh\`, \`guard-local-release.sh\`, or \`guard-maintain.sh\`) in the story's worktree and sets \`"deliverGuardManaged": true\` in the state file.
+3. Read \`docs/agents-v0/lessons.md\`, optionally consult the shell-less \`orchestrator\` subagent for routing/status advice, and execute the active phase's work in the resolved worktree by following that phase's command (\`/v0-intake\`, \`/v0-design\`, \`/v0-build\`, \`/v0-verify\`, \`/v0-local-release\`, or \`/v0-maintain\`) and launching its shell-less specialist subagents (\`requirements-analyst\`, \`schema-author\`, \`solution-architect\`, \`ux-designer\`, \`design-reviewer\`, \`backend-engineer\`, \`bff-engineer\`, \`frontend-engineer\`, \`test-engineer\`, \`security-reviewer\`, \`code-reviewer\`, \`release-manager\`, \`maintenance-engineer\`).
+4. If a subagent writes a \`helper-brief.md\` or \`failure-brief.md\` or hits a phase blocker, run \`$G block <feature> "<plain reason>" [--maintain]\` (which delegates to the active phase guard's \`block\` subcommand with SHA-256 brief deduplication). Launch the requested shell-less helper (\`explore-researcher\`, \`schema-author\`, \`debug-investigator\`, \`docs-author\`), pass its findings back, remove the brief, and resume via Step 2; otherwise stop and escalate to Sensei.
+5. When the active phase's artifacts and verification evidence are complete, run \`$G ready <feature> [--maintain]\`. It delegates validation to \`guard-<active_phase>.sh ready <feature>\` inside the story's worktree:
+   - **\`Contract: None\` in Design:** When the story qualifies for the \`Contract: None\` shortcut, \`ready\` auto-commits \`"<story>: design (Contract: None)"\` on \`feature/<feature>\` and prints \`Next: $G start <feature>\`; loop immediately back to Step 2 to start \`build\`.
+   - **Verify Critical bounce:** When \`verify\` finds any Open \`Critical\` issue, \`ready\` automatically bounces the story to \`build\` (\`--reopen build\` or \`--reopen maintain\`) and exits non-zero; report the bounce and stop.
+   - **Standard phase gate:** Otherwise \`ready\` sets \`activeStatus\` to \`awaiting_approval\` and prints Sensei's external approval command. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
+6. Stop at the gate. Present the phase summary and artifacts to Sensei and wait for explicit approval. Next: $gd_ready_next. Never run \`approve\` yourself; the agent cannot approve any gate.
+7. After Sensei runs \`approve\` in his own terminal outside Cursor, either run \`$G commit <feature> [--maintain]\` (which verifies Sensei's external approval record, delegates the safe-staged gate commit to \`guard-<phase>.sh commit <feature>\` in the worktree, and prints \`Next: $G start <feature>\` or \`COMPLETE\` after \`local-release\`) or re-run \`$gd_approved_next\` (where Step 2 automatically commits the approved gate and starts the next phase).
+EOF_STEPS
 }
 
 cmd="${1:-}"
