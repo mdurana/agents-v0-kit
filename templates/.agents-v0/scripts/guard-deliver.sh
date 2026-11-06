@@ -404,12 +404,159 @@ gd_check() {
   printf 'Next: %s start %s%s\n' "$G" "$gd_feature" "$gd_m_flag"
 }
 
+# Design: DDL2 (/v0-deliver start with auto-commit of approved prior gate, worktree delegation, and block).
+gd_mark_deliver_managed() {
+  gd_mdm_st="$1"
+  gd_mdm_tier="${2:-}"
+  [ -f "$gd_mdm_st" ] || return 0
+  GD_ST="$gd_mdm_st" GD_TIER="$gd_mdm_tier" python3 - <<'PYMDM'
+import fcntl, json, os
+st_path = os.environ["GD_ST"]
+tier = os.environ.get("GD_TIER", "")
+lock = open(st_path + ".lock", "w", encoding="utf-8")
+fcntl.flock(lock, fcntl.LOCK_EX)
+try:
+    d = json.load(open(st_path, encoding="utf-8"))
+    d["deliverGuardManaged"] = True
+    if tier in ("standard", "emergency", "major"):
+        d["tier"] = tier
+    with open(st_path, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+finally:
+    fcntl.flock(lock, fcntl.LOCK_UN)
+    lock.close()
+PYMDM
+}
+
 gd_start() {
-  gc_refuse start "guard-deliver.sh start is not implemented yet (Design: DDL2)"
+  gd_parse_check_start_args start "$@"
+  gd_resolve_context start "$gd_p_slug" "$gd_p_maint" "$gd_p_tier" "$gd_p_reopen"
+
+  gd_m_flag=""
+  [ "$gd_is_maintain" != 1 ] || gd_m_flag=" --maintain"
+
+  # FDL2 / DDL2: If prior phase is approved externally (or Contract: None design ready) and uncommitted, auto-commit it first!
+  if [ -n "$gd_pending_commit_phase" ]; then
+    if [ "$gd_active_status" = "awaiting_approval" ] && [ "$gd_pending_commit_phase" != "local-release" ]; then
+      case " $(gc_state_get "$gd_state_full" approvedPhases 2>/dev/null | tr -d '[]",') " in
+        *" $gd_pending_commit_phase "*) ;;
+        *)
+          (cd "$gd_work_dir" && gc_state_set "$gd_rel_state" "$gd_feature" "$gd_rel_art" \
+            "approvePhase=$gd_pending_commit_phase" "activePhase=" "activeStatus=" "blockedReason=" "nextStep=") || exit 1
+          ;;
+      esac
+    fi
+    gd_cm_args="$gd_feature"
+    if [ "$gd_is_maintain" = 1 ] && [ "$gd_pending_commit_phase" != "maintain" ]; then
+      gd_cm_args="$gd_cm_args --maintain"
+    fi
+    # shellcheck disable=SC2086
+    if ! gd_cm_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-${gd_pending_commit_phase}.sh" commit $gd_cm_args 2>&1)"; then
+      printf '%s\n' "$gd_cm_out"
+      exit 1
+    fi
+    printf '%s\n' "$gd_cm_out"
+
+    if [ "$gd_pending_commit_phase" = "local-release" ]; then
+      gc_ok start "deliver ($gd_feature) auto-committed local-release; story delivery is COMPLETE"
+      printf 'Next: /v0-status\n'
+      return 0
+    fi
+
+    # Re-resolve context after committing the gate (e.g., intake commit creates feature/<feature> worktree)
+    gd_resolve_context start "$gd_p_slug" "$gd_p_maint" "$gd_p_tier" "$gd_p_reopen"
+  fi
+
+  [ "$gd_target_phase" != "complete" ] \
+    || gc_refuse start "story '$gd_feature' has already completed local-release"
+  [ "$gd_target_phase" != "unknown" ] \
+    || gc_refuse start "cannot resolve next phase for '$gd_feature' from lastApprovedPhase='$gd_last_approved'"
+
+  # If activeStatus is already in_progress for the target phase (and not --reopen), resume cleanly without failing on dirty phase files
+  if [ "$gd_active_status" = "in_progress" ] && [ "$gd_active_phase" = "$gd_target_phase" ] && [ "$gd_p_reopen" = 0 ]; then
+    gd_mark_deliver_managed "$gd_state_full" "$gd_p_tier"
+    gc_ok start "deliver ($gd_feature) resumed in-progress phase '$gd_target_phase' in $gd_work_dir"
+    printf 'Next: Execute phase '\''%s'\'' in %s, then run: %s ready %s%s\n' "$gd_target_phase" "$gd_work_dir" "$G" "$gd_feature" "$gd_m_flag"
+    return 0
+  fi
+
+  gd_st_args="$gd_feature"
+  if [ "$gd_is_maintain" = 1 ] && [ "$gd_target_phase" != "maintain" ]; then
+    gd_st_args="$gd_st_args --maintain"
+  fi
+  if [ "$gd_target_phase" = "maintain" ] && [ -n "$gd_p_tier" ]; then
+    gd_st_args="$gd_st_args --tier $gd_p_tier"
+  fi
+  if [ "$gd_p_reopen" = 1 ]; then
+    gd_st_args="$gd_st_args --reopen"
+  fi
+
+  # shellcheck disable=SC2086
+  if ! gd_st_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-${gd_target_phase}.sh" start $gd_st_args 2>&1)"; then
+    printf '%s\n' "$gd_st_out"
+    exit 1
+  fi
+  printf '%s\n' "$gd_st_out"
+
+  # Refresh worktree path in case guard-maintain.sh start provisioned maintain/<feature>
+  gd_resolve_context start "$gd_p_slug" "$gd_p_maint" "$gd_p_tier" 0
+  gd_mark_deliver_managed "$gd_state_full" "$gd_p_tier"
+
+  gc_ok start "deliver ($gd_feature) started phase '$gd_target_phase' in $gd_work_dir"
+  printf 'Next: Execute phase '\''%s'\'' in %s, then run: %s ready %s%s\n' "$gd_target_phase" "$gd_work_dir" "$G" "$gd_feature" "$gd_m_flag"
 }
 
 gd_block() {
-  gc_refuse block "guard-deliver.sh block is not implemented yet (Design: DDL2)"
+  gd_b_slug=""
+  gd_b_reason=""
+  gd_b_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        gd_b_maint=1
+        shift
+        ;;
+      -*)
+        gd_usage
+        ;;
+      *)
+        if [ -z "$gd_b_slug" ]; then
+          gd_b_slug="$1"
+        elif [ -z "$gd_b_reason" ]; then
+          gd_b_reason="$1"
+        else
+          gd_b_reason="$gd_b_reason $1"
+        fi
+        shift
+        ;;
+    esac
+  done
+  [ -n "$gd_b_slug" ] || gc_refuse block "missing <feature> slug; usage: $G block <feature> \"<reason>\" [--maintain]"
+  [ -n "$(printf '%s' "$gd_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+
+  gd_resolve_context block "$gd_b_slug" "$gd_b_maint" "" 0
+  [ -f "$gd_state_full" ] || gc_refuse block "deliver for '$gd_feature' has not been started ($gd_rel_state missing)"
+  gd_b_phase="${gd_active_phase:-$gd_target_phase}"
+  [ -n "$gd_b_phase" ] && [ "$gd_b_phase" != "complete" ] && [ "$gd_b_phase" != "unknown" ] \
+    || gc_refuse block "no active phase to block for '$gd_feature'"
+
+  if [ "$gd_b_phase" = "local-release" ] && [ "$gd_is_maintain" = 1 ]; then
+    if ! gd_b_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-local-release.sh" block "$gd_feature" "$gd_b_reason" --maintain 2>&1)"; then
+      printf '%s\n' "$gd_b_out"
+      exit 1
+    fi
+  else
+    if ! gd_b_out="$(cd "$gd_work_dir" && sh "$GC_HERE/guard-${gd_b_phase}.sh" block "$gd_feature" "$gd_b_reason" 2>&1)"; then
+      printf '%s\n' "$gd_b_out"
+      exit 1
+    fi
+  fi
+  printf '%s\n' "$gd_b_out"
+  gd_m_flag=""
+  [ "$gd_is_maintain" != 1 ] || gd_m_flag=" --maintain"
+  gc_ok block "deliver ($gd_feature) blocked in phase '$gd_b_phase' ($gd_b_reason)"
+  printf 'Next: Resolve the blocker, then run: %s start %s%s\n' "$G" "$gd_feature" "$gd_m_flag"
 }
 
 gd_ready() {
