@@ -226,7 +226,7 @@ gc_check_feature_slug() {
 }
 
 # approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
-# Design: DLRA (local-release approval normalization, maintain/worktree state resolution, and story-branch state preservation).
+# Design: DLRA, DMA (local-release and maintain external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
 gc_approve() {
   [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
   gc_to_root approve
@@ -337,7 +337,7 @@ PY
   printf 'Record: %s\n' "$gc_a_file"
 }
 
-# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA. Prints `OK approval: ...` and returns 0 only when this
+# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA/DMA. Prints `OK approval: ...` and returns 0 only when this
 # repository's record for <command> (and <feature> when given) exists, names this command and repository, and its
 # baseCommit equals the state's baseCommit; else prints `REFUSED approval: <reason>` and returns 1.
 gc_approval_ok() {

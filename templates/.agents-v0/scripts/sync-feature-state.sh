@@ -234,6 +234,11 @@ case "$approve_lc" in
   verify)
     guard_common="$(dirname "$0")/guard-common.sh"
     verify_slug="$slug"
+    case "$art" in
+      docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
+        verify_slug="$(basename "$(dirname "$art")")"
+        ;;
+    esac
     verify_state="$state"
     verify_pr="docs/agents-v0/requirements/${verify_slug}.phase-result.md"
     [ -f "$verify_pr" ] || verify_pr="docs/agents-v0/maintain/${verify_slug}/phase-result.md"
@@ -250,10 +255,39 @@ case "$approve_lc" in
       fi
     fi
     ;;
+  maintain)
+    # Design: DMA (external approval record required when maintainGuardManaged is true).
+    guard_common="$(dirname "$0")/guard-common.sh"
+    maint_slug="$slug"
+    case "$art" in
+      docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
+        maint_slug="$(basename "$(dirname "$art")")"
+        ;;
+    esac
+    maint_state="$state"
+    maint_pr="docs/agents-v0/maintain/${maint_slug}/phase-result.md"
+    if [ -f "$guard_common" ]; then
+      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+      maint_gm=""
+      [ -f "$maint_state" ] && maint_gm="$(gc_state_get "$maint_state" maintainGuardManaged 2>/dev/null || true)"
+      if [ "$maint_gm" = "True" ] || [ "$maint_gm" = "true" ] || { [ -f "$maint_pr" ] && grep -Fq "phase: maintain" "$maint_pr" && grep -Fq "guard_managed: true" "$maint_pr"; }; then
+        if ! ok_msg="$(gc_approval_ok maintain "$maint_slug")"; then
+          printf 'FAIL: --approve maintain for %s refused without Sensei external approval record: %s\n' "$maint_slug" "$ok_msg" >&2
+          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain %s\n' "$maint_slug" >&2
+          exit 1
+        fi
+      fi
+    fi
+    ;;
   release)
     # Design: DLRA (external approval record required when releaseGuardManaged is true).
     guard_common="$(dirname "$0")/guard-common.sh"
     release_slug="$slug"
+    case "$art" in
+      docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
+        release_slug="$(basename "$(dirname "$art")")"
+        ;;
+    esac
     release_state="$state"
     release_pr="docs/agents-v0/requirements/${release_slug}.phase-result.md"
     [ -f "$release_pr" ] || release_pr="docs/agents-v0/maintain/${release_slug}/phase-result.md"
@@ -960,12 +994,16 @@ feature_id = (
 prev_bc = (prev.get("baseCommit") or "").strip()
 head_bc = resolve_git_head(os.environ.get("HOOK_BASE", ""))
 rep_parent = ""
+guard_managed_any = any(
+    bool(prev.get(k))
+    for k in ("designGuardManaged", "buildGuardManaged", "verifyGuardManaged", "releaseGuardManaged", "maintainGuardManaged")
+)
 if onboarding:
     m_onb = re.search(r"^commit:\s*([0-9a-f]{7,40})\b", raw_text, re.I | re.M)
     if m_onb:
         rep_parent = m_onb.group(1)
         prev_bc = ""
-elif feature_id and not program_doc:
+elif feature_id and not program_doc and not guard_managed_any:
     for rep_path in (
         os.path.join("docs", "agents-v0", "build", feature_id, "build-report.md"),
         os.path.join("docs", "agents-v0", "verify", feature_id, "test-report.md"),
@@ -1138,6 +1176,8 @@ if prev.get("verifyGuardManaged"):
     data["verifyGuardManaged"] = True
 if prev.get("releaseGuardManaged"):
     data["releaseGuardManaged"] = True
+if prev.get("maintainGuardManaged"):
+    data["maintainGuardManaged"] = True
 tmp_fd, tmp_path = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
 try:
     with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
