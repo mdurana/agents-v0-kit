@@ -174,3 +174,28 @@ design ready.next Sensei reviews docs/agents-v0/design/<feature>/ and runs, in h
 design commit.paths docs/agents-v0/design/<feature> docs/agents-v0/adr docs/agents-v0/diagrams docs/agents-v0/design/system/arc-record.md docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 design commit.message <story>: design approved
 design approved.next /v0-build <feature>
+
+# --- build (/v0-build, guard-build.sh) ----------------------------------------------------------
+build phase build
+build feature <feature>
+build state docs/agents-v0/requirements/<feature>.state.json
+build artifact docs/agents-v0/build/<feature>/plan.md
+build report docs/agents-v0/build/<feature>/build-report.md
+build output docs/agents-v0/build/<feature>/build-output.txt
+build result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+build check.requires git-work-tree kit-installed feature-branch pack-configured design-approved dependencies-verified not-released not-approved
+build start.requires git-work-tree kit-installed feature-branch pack-configured design-approved dependencies-verified not-released not-awaiting-approval
+build start.status in_progress
+build start.next Run the baseline verify check, launch the implementing engineer subagents (backend-engineer, bff-engineer, frontend-engineer) to execute red-to-green TDD units, and persist evidence under docs/agents-v0/build/<feature>/.
+# block: status and next step
+build block.status blocked
+build block.next Resolve the blocker, failure brief, or attempt budget issue, then run /v0-build <feature> again; it resumes from the files on disk.
+# ready: verifies attempt budget (<8), failure-brief & no 3rd red, plan.md rows all done with named test, OpenAPI catalog merge, T4/T5 traceability, build-report.md cards & per-AC file:line citations, build-output.txt non-empty & secret-free, and check-tests-ran.sh
+build ready.requires in-progress
+build ready.status awaiting_approval
+build ready.next Sensei reviews docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve build <feature>
+# commit: verifies approval record, appends Approved Build row (and Design Contract: None row if needed), runs check-traceability.sh build, stages build paths, secret-scans, and commits "<story>: build approved" on feature/<feature>
+build commit.paths app openapi docs/agents-v0/build/<feature> docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
+build commit.message <story>: build approved
+build approved.next /v0-verify <feature>
