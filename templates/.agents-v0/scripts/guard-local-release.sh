@@ -307,12 +307,257 @@ glr_check() {
   fi
 }
 
+# Design: DLR2 (/v0-local-release start, block, and post-verify non-doc drift bounce).
+glr_story_id_of() {
+  glr_sid=""
+  if [ -f "$glr_req_art" ]; then
+    glr_sid="$(awk '
+      /^Story:[ \t]*/ { sub(/^Story:[ \t]*/, ""); gsub(/[ \t\r]+$/, ""); print; exit }
+      /^#[ \t]+Maintain Note:[ \t]*/ { sub(/^#[ \t]+Maintain Note:[ \t]*/, ""); gsub(/[ \t\r]+$/, ""); print; exit }
+    ' "$glr_req_art" 2>/dev/null || true)"
+  fi
+  case "$glr_sid" in
+    ""|"<"*|*"TBD"*) glr_sid="$glr_feature" ;;
+  esac
+  printf '%s\n' "$glr_sid"
+}
+
+glr_check_non_doc_drift() {
+  glr_d_step="$1"
+  # Skip non-doc drift bounce only for emergency maintenance notes releasing ahead of verify
+  if [ "$glr_is_maintain" = 1 ]; then
+    glr_d_tier="$(gc_state_get "$glr_state" tier 2>/dev/null || true)"
+    case " $(gc_state_get "$glr_state" approvedPhases | tr -d '[]",') " in
+      *" verify "*) ;;
+      *)
+        if [ "$glr_d_tier" = "emergency" ]; then
+          return 0
+        fi
+        ;;
+    esac
+  fi
+
+  glr_d_sid="$(glr_story_id_of)"
+  glr_drift="$(GLR_SLUG="$glr_feature" GLR_SID="$glr_d_sid" python3 - <<'PYDRIFT'
+import os, re, subprocess
+
+slug = os.environ["GLR_SLUG"]
+sid = os.environ["GLR_SID"]
+
+def is_doc_or_meta(p):
+    if p.endswith(".lock"):
+        return True
+    if p in ("README.md", "CHANGELOG.md", ".gitignore"):
+        return True
+    if p.startswith("docs/") or p.startswith(".agents-v0/"):
+        return True
+    return False
+
+changed = []
+# 1. Working tree changes
+st = subprocess.run(["git", "status", "--porcelain=v1", "-uall"], capture_output=True, text=True, check=False).stdout
+for line in st.splitlines():
+    if len(line) < 4:
+        continue
+    p = line[3:].split(" -> ")[-1].strip('"')
+    if p and not is_doc_or_meta(p) and p not in changed:
+        changed.append(p)
+
+# 2. Committed changes since latest '<story>: verify approved' commit on this branch
+log = subprocess.run(["git", "log", "--format=%H\t%s", "-n", "30", "HEAD"], capture_output=True, text=True, check=False).stdout
+v_sha = ""
+want_subjects = {f"{sid.lower()}: verify approved", f"{slug.lower()}: verify approved"}
+for line in log.splitlines():
+    parts = line.split("\t", 1)
+    if len(parts) == 2 and parts[1].strip().lower() in want_subjects:
+        v_sha = parts[0].strip()
+        break
+
+if v_sha:
+    df = subprocess.run(["git", "diff", "--name-only", f"{v_sha}..HEAD"], capture_output=True, text=True, check=False).stdout
+    for p in df.splitlines():
+        p = p.strip()
+        if p and not is_doc_or_meta(p) and p not in changed:
+            changed.append(p)
+
+if changed:
+    print(", ".join(changed[:5]))
+PYDRIFT
+)"
+  if [ -n "$glr_drift" ]; then
+    glr_was_vgm="$(gc_state_get "$glr_state" verifyGuardManaged 2>/dev/null || true)"
+    sh "$GC_HERE/sync-feature-state.sh" --reopen verify --verify-passed false "$glr_req_art" >/dev/null 2>&1 || true
+    GLR_ST="$glr_state" GLR_VGM="$glr_was_vgm" python3 - <<'PY'
+import json, os
+p = os.environ["GLR_ST"]
+if os.path.isfile(p):
+    d = json.load(open(p, encoding="utf-8"))
+    if os.environ.get("GLR_VGM") in ("True", "true"):
+        d["verifyGuardManaged"] = True
+    d["reopenCount"] = int(d.get("reopenCount") or 0) + 1
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+PY
+    if [ -f "$glr_result" ]; then
+      GLR_RES="$glr_result" python3 - <<'PY'
+import os, re
+p = os.environ["GLR_RES"]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"(?m)^status:\s*\S+", "status: changes_requested", txt)
+open(p, "w", encoding="utf-8").write(txt)
+PY
+    fi
+    gc_refuse "$glr_d_step" "BOUNCED $glr_d_step: non-doc files changed since Verify approval ($glr_drift); automatically reopened verify (verifyPassed=false). Route back to /v0-verify $glr_feature"
+  fi
+}
+
 glr_start() {
-  gc_refuse start "not implemented yet"
+  glr_s_slug=""
+  glr_s_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        glr_s_maint=1
+        shift
+        ;;
+      -*)
+        glr_usage
+        ;;
+      *)
+        [ -z "$glr_s_slug" ] || glr_usage
+        glr_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  glr_load start "$glr_s_slug" "$glr_s_maint"
+  glr_rule start start.requires "$glr_feature"; glr_requires="$glr_val"
+  glr_check_prereqs start "$glr_requires"
+
+  # Auto-bounce to /v0-verify if any non-doc files drifted since Verify approval
+  glr_check_non_doc_drift start
+
+  # Refuse unrelated dirty doc files outside release/verify/requirements/maintain/diagrams/README/CHANGELOG
+  glr_dirty="$(GLR_SLUG="$glr_feature" python3 - <<'PYDIRTY'
+import os, subprocess
+slug = os.environ["GLR_SLUG"]
+st = subprocess.run(["git", "status", "--porcelain=v1", "-uall"], capture_output=True, text=True, check=False).stdout
+bad = []
+allowed_prefixes = (
+    f"docs/agents-v0/release/{slug}/",
+    f"docs/agents-v0/verify/{slug}/",
+    f"docs/agents-v0/requirements/{slug}.",
+    f"docs/agents-v0/maintain/{slug}/",
+    "docs/agents-v0/diagrams/",
+)
+for line in st.splitlines():
+    if len(line) < 4:
+        continue
+    p = line[3:].split(" -> ")[-1].strip('"')
+    if p.endswith(".lock") or p in ("README.md", "CHANGELOG.md", ".gitignore"):
+        continue
+    if p == "docs/agents-v0/lessons.md":
+        bad.append(p)
+        continue
+    if not p.startswith(allowed_prefixes):
+        bad.append(p)
+if bad:
+    print(", ".join(bad[:5]))
+PYDIRTY
+)"
+  if [ -n "$glr_dirty" ]; then
+    gc_refuse start "working tree has uncommitted changes outside local-release paths ($glr_dirty); commit, revert, or stash them first"
+  fi
+
+  glr_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  glr_rule start start.next "$glr_feature"; glr_next="$glr_val"
+  glr_rule start start.status "$glr_feature"; glr_status="$glr_val"
+
+  glr_was_vgm="$(gc_state_get "$glr_state" verifyGuardManaged 2>/dev/null || true)"
+  gc_state_set "$glr_state" "$glr_feature" "$glr_req_art" "activePhase=$glr_phase" \
+    "activeStatus=$glr_status" "blockedReason=" "nextStep=$glr_next" || exit 1
+
+  GLR_ST="$glr_state" GLR_BASE="$glr_base" GLR_VGM="$glr_was_vgm" python3 - <<'PY'
+import json, os
+p = os.environ["GLR_ST"]
+base = os.environ["GLR_BASE"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base and not d.get("baseCommit"):
+    d["baseCommit"] = base
+d["releaseGuardManaged"] = True
+if os.environ.get("GLR_VGM") in ("True", "true"):
+    d["verifyGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  mkdir -p "docs/agents-v0/release/${glr_feature}"
+
+  gc_ok start "local-release started for '$glr_feature' (status: $glr_status)"
+  printf 'Next: Sync README/CHANGELOG if needed, run final native stack verify into %s, populate ## Proposed lessons in %s, then run %s ready %s\n' \
+    "$glr_output" "$glr_result" "$G" "$glr_feature"
 }
 
 glr_block() {
-  gc_refuse block "not implemented yet"
+  glr_b_slug=""
+  glr_b_reason=""
+  glr_b_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        glr_b_maint=1
+        shift
+        ;;
+      -*)
+        glr_usage
+        ;;
+      *)
+        if [ -z "$glr_b_slug" ]; then
+          glr_b_slug="$1"
+        elif [ -z "$glr_b_reason" ]; then
+          glr_b_reason="$1"
+        else
+          glr_usage
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  glr_load block "$glr_b_slug" "$glr_b_maint"
+  [ -n "$glr_b_reason" ] || gc_refuse block "missing block reason; pass a plain-text explanation"
+  case "$glr_b_reason" in
+    *"$gc_nl"*) gc_refuse block "block reason must be a single line" ;;
+  esac
+  glr_rule block block.requires "$glr_feature"; glr_requires="$glr_val"
+  glr_check_prereqs block "$glr_requires"
+
+  glr_rule block block.next "$glr_feature"; glr_next="$glr_val"
+  glr_rule block block.status "$glr_feature"; glr_status="$glr_val"
+
+  glr_was_vgm="$(gc_state_get "$glr_state" verifyGuardManaged 2>/dev/null || true)"
+  glr_was_rgm="$(gc_state_get "$glr_state" releaseGuardManaged 2>/dev/null || true)"
+  gc_state_set "$glr_state" "$glr_feature" "$glr_req_art" "activePhase=$glr_phase" \
+    "activeStatus=$glr_status" "blockedReason=$glr_b_reason" "nextStep=$glr_next" || exit 1
+
+  GLR_ST="$glr_state" GLR_VGM="$glr_was_vgm" GLR_RGM="$glr_was_rgm" python3 - <<'PY'
+import json, os
+p = os.environ["GLR_ST"]
+if os.path.isfile(p):
+    d = json.load(open(p, encoding="utf-8"))
+    if os.environ.get("GLR_VGM") in ("True", "true"):
+        d["verifyGuardManaged"] = True
+    if os.environ.get("GLR_RGM") in ("True", "true"):
+        d["releaseGuardManaged"] = True
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+PY
+
+  gc_ok block "local-release for '$glr_feature' marked blocked ($glr_b_reason)"
 }
 
 glr_ready() {
