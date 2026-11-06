@@ -235,6 +235,9 @@ PYEM
             fi
           fi
         fi
+        if [ "$glr_step" = "start" ]; then
+          glr_check_non_doc_drift start
+        fi
         glr_skip_cc=0
         # >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
         [ "${AGENTS_V0_SKIP_COMMIT_CHECK:-0}" != 1 ] || glr_skip_cc=1
@@ -394,7 +397,6 @@ if os.path.isfile(p):
     d = json.load(open(p, encoding="utf-8"))
     if os.environ.get("GLR_VGM") in ("True", "true"):
         d["verifyGuardManaged"] = True
-    d["reopenCount"] = int(d.get("reopenCount") or 0) + 1
     with open(p, "w", encoding="utf-8") as fh:
         json.dump(d, fh, indent=2)
         fh.write("\n")
@@ -528,12 +530,10 @@ glr_block() {
   done
 
   glr_load block "$glr_b_slug" "$glr_b_maint"
-  [ -n "$glr_b_reason" ] || gc_refuse block "missing block reason; pass a plain-text explanation"
-  case "$glr_b_reason" in
-    *"$gc_nl"*) gc_refuse block "block reason must be a single line" ;;
-  esac
-  glr_rule block block.requires "$glr_feature"; glr_requires="$glr_val"
-  glr_check_prereqs block "$glr_requires"
+  [ -n "$(printf '%s' "$glr_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason; pass a plain-text explanation"
+  [ -f "$glr_state" ] || gc_refuse block "local-release for '$glr_feature' has not been started ($glr_state missing)"
+  [ "$(gc_state_get "$glr_state" activePhase)" = "$glr_phase" ] \
+    || gc_refuse block "activePhase for '$glr_feature' is '$(gc_state_get "$glr_state" activePhase)', not '$glr_phase'"
 
   glr_rule block block.next "$glr_feature"; glr_next="$glr_val"
   glr_rule block block.status "$glr_feature"; glr_status="$glr_val"
@@ -612,9 +612,9 @@ PYLOG
     gc_refuse ready "final native verify log '$glr_output' is not green: $glr_log_bad"
   fi
 
-  if grep -Eq 'Tests run:|\[INFO\] ---' "$glr_output" 2>/dev/null && [ -f "$GC_HERE/check-tests-ran.sh" ]; then
-    if ! glr_tr_out="$(sh "$GC_HERE/check-tests-ran.sh" "$glr_output" 2>&1)"; then
-      gc_refuse ready "check-tests-ran.sh failed on '$glr_output': $glr_tr_out"
+  if [ -f "$GC_HERE/check-tests-ran.sh" ]; then
+    if ! glr_tr_out="$(sh "$GC_HERE/check-tests-ran.sh" 2>&1)"; then
+      gc_refuse ready "check-tests-ran.sh failed: $glr_tr_out"
     fi
   fi
 
@@ -769,13 +769,26 @@ PYPR
 
   # 7. Secret scan across release output, phase-result, and updated docs
   if [ -f "$GC_HERE/secret_scan.py" ]; then
-    glr_scan_files="$glr_output $glr_result"
-    [ ! -f "README.md" ] || glr_scan_files="$glr_scan_files README.md"
-    [ ! -f "CHANGELOG.md" ] || glr_scan_files="$glr_scan_files CHANGELOG.md"
-    # shellcheck disable=SC2086
-    if ! glr_sec_out="$(python3 "$GC_HERE/secret_scan.py" $glr_scan_files 2>&1)"; then
+    glr_sec_out="$(python3 -B - "$GC_HERE" "$glr_output" "$glr_result" "README.md" "CHANGELOG.md" <<'PYSEC'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import secret_scan
+hits = []
+for p in sys.argv[2:]:
+    if not p or not os.path.isfile(p):
+        continue
+    txt = open(p, encoding="utf-8", errors="replace").read()
+    for line_no, line in enumerate(txt.splitlines(), 1):
+        for rule_id, label, rx in secret_scan.CONTENT_RULES:
+            if rx.search(line):
+                hits.append(f"{p}:{line_no} ({rule_id}: {label})")
+if hits:
+    print("secret pattern detected in " + ", ".join(hits))
+    sys.exit(1)
+PYSEC
+)" || {
       gc_refuse ready "secret scan failed: $glr_sec_out"
-    fi
+    }
   fi
 
   # 8. Transition state to awaiting_approval
@@ -831,8 +844,8 @@ glr_commit() {
   done
 
   glr_load commit "$glr_m_slug" "$glr_m_maint"
-  glr_rule commit commit.requires "$glr_feature"; glr_requires="$glr_val"
-  glr_check_prereqs commit "$glr_requires"
+  [ -f "$glr_state" ] || gc_refuse commit "state file '$glr_state' is missing"
+  glr_check_prereqs commit "git-work-tree kit-installed feature-branch pack-configured not-released"
 
   # 1. Verify Sensei's external approval record for local-release <feature>
   if ! glr_ok_msg="$(gc_approval_ok local-release "$glr_feature")"; then

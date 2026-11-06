@@ -439,6 +439,21 @@ for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh
     err "core/common/commands/v0-verify.md names the internal '$internal' (the guard runs it; keep the prose to guard-verify.sh steps)"
   fi
 done
+# Local-release redo, Design: DLR8. Drift check A: the /v0-local-release step block matches `guard-local-release.sh steps` byte for byte.
+sh scripts/generate-local-release-steps.sh --check >/dev/null || err "core/common/commands/v0-local-release.md step block drifted from guard-local-release.sh steps (run sh scripts/generate-local-release-steps.sh)"
+[ -f scripts/test-local-release-steps.sh ] || err "scripts/test-local-release-steps.sh missing"
+sh scripts/test-local-release-steps.sh >/dev/null || err "scripts/test-local-release-steps.sh failed"
+[ -f scripts/test-guard-local-release.sh ] || err "scripts/test-guard-local-release.sh missing"
+sh scripts/test-guard-local-release.sh >/dev/null || err "scripts/test-guard-local-release.sh failed"
+# Drift check B: the /v0-local-release prose names no internal state writer or git add -A; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-local-release.md; then
+    err "core/common/commands/v0-local-release.md names the internal '$internal' (the guard runs it; keep the prose to guard-local-release.sh steps)"
+  fi
+done
+[ ! -e core/common/commands/v0-release.md ] || err "core/common/commands/v0-release.md must be removed (unified on /v0-local-release)"
+[ ! -e core/common/skills/release-pr/SKILL.md ] || err "core/common/skills/release-pr/SKILL.md must be removed (unified on local-release)"
 
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
