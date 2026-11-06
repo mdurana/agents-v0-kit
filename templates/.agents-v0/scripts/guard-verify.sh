@@ -480,6 +480,297 @@ PY
   printf 'Next: %s\n' "$gv_next"
 }
 
+# Design: DV3 (/v0-verify ready quality-gate, VAPT F4/F8/F9/F10, code-review, T6 traceability, and automatic Critical bounce).
+gv_ready() {
+  gv_r_slug="${1:-}"
+  [ $# -le 1 ] || gv_usage
+  gv_load ready "$gv_r_slug"
+  gv_rule ready ready.requires "$gv_feature"; gv_requires="$gv_val"
+  gv_check_prereqs ready "$gv_requires" 0
+
+  [ -f "$gv_artifact" ] || gc_refuse ready "quality gate report '$gv_artifact' does not exist"
+  [ -f "$gv_output" ] || gc_refuse ready "verify output '$gv_output' does not exist"
+
+  gv_tier="$(gc_state_get "$gv_state" tier 2>/dev/null || echo standard)"
+  if [ "$gv_tier" != "trivial" ]; then
+    [ -f "$gv_vapt" ] || gc_refuse ready "VAPT checklist '$gv_vapt' does not exist"
+    [ -f "$gv_review" ] || gc_refuse ready "code review report '$gv_review' does not exist"
+  fi
+
+  # 1. Verify check-tests-ran.sh (kitfix-20261031-tests-ran)
+  if [ -f "$GC_HERE/check-tests-ran.sh" ]; then
+    if ! gv_tr_ran="$(sh "$GC_HERE/check-tests-ran.sh" 2>&1)"; then
+      gc_refuse ready "check-tests-ran.sh failed: $gv_tr_ran"
+    fi
+  fi
+
+  # 2. Deterministic validation of verify-output.txt, quality-gate.md, vapt-checklist.md, code-review.md, ux-report.md, and Critical findings
+  gv_val_err="$(GV_SLUG="$gv_feature" GV_REQ="$gv_req_art" GV_QG="$gv_artifact" GV_VAPT="$gv_vapt" GV_REV="$gv_review" GV_OUT="$gv_output" GV_TIER="$gv_tier" python3 - <<'PYVAL'
+import datetime, os, re, sys
+
+slug = os.environ["GV_SLUG"]
+req_p = os.environ["GV_REQ"]
+qg_p = os.environ["GV_QG"]
+vapt_p = os.environ["GV_VAPT"]
+rev_p = os.environ["GV_REV"]
+out_p = os.environ["GV_OUT"]
+tier = os.environ.get("GV_TIER", "standard")
+
+out_raw = open(out_p, encoding="utf-8", errors="replace").read()
+if not out_raw.strip():
+    print(f"REFUSE:{out_p} is empty; record raw verify command output in {out_p}")
+    sys.exit(0)
+
+qg_raw = open(qg_p, encoding="utf-8", errors="replace").read()
+clean_qg = re.sub(r"<!--.*?-->", "", qg_raw, flags=re.S)
+
+if not re.search(r"(?m)^agent:\s*test-engineer\b", clean_qg):
+    print(f"REFUSE:{qg_p} is missing 'agent: test-engineer' header")
+    sys.exit(0)
+
+if re.search(r"Build status:\s*PENDING\b", clean_qg, re.I) or re.search(r"\bTBD\b", clean_qg):
+    print(f"REFUSE:{qg_p} still contains PENDING or TBD placeholders")
+    sys.exit(0)
+
+if not re.search(r"Build status:\s*(PASS|PASSED|GREEN|OK)\b", clean_qg, re.I):
+    print(f"REFUSE:{qg_p} must report 'Build status: PASS'")
+    sys.exit(0)
+
+# Coverage thresholds (default >=80% changed lines, >=80% backend, >=70% frontend, or valid coverage_ratchet in project-profile.md)
+backend_min = 80.0
+frontend_min = 70.0
+if os.path.isfile("docs/agents-v0/project-profile.md"):
+    prof_txt = open("docs/agents-v0/project-profile.md", encoding="utf-8", errors="replace").read()
+    m_rat = re.search(r"coverage_ratchet.*?([0-9]+(?:\.[0-9]+)?)%.*?(20[0-9]{2}-[0-9]{2}-[0-9]{2})", prof_txt, re.I | re.S)
+    if m_rat:
+        try:
+            exp = datetime.date.fromisoformat(m_rat.group(2))
+            if exp >= datetime.date.today():
+                backend_min = float(m_rat.group(1))
+        except ValueError:
+            pass
+
+m_chg = re.search(r"Changed-line coverage:\s*([0-9]+(?:\.[0-9]+)?)%", clean_qg, re.I)
+if not m_chg:
+    print(f"REFUSE:{qg_p} must report 'Changed-line coverage: <n>%'")
+    sys.exit(0)
+if float(m_chg.group(1)) < 80.0:
+    print(f"REFUSE:{qg_p} Changed-line coverage is {m_chg.group(1)}% (minimum required: 80%)")
+    sys.exit(0)
+
+m_be = re.search(r"Backend line coverage:\s*(?:([0-9]+(?:\.[0-9]+)?)%|N/A)", clean_qg, re.I)
+if m_be and m_be.group(1) is not None:
+    if float(m_be.group(1)) < backend_min:
+        print(f"REFUSE:{qg_p} Backend line coverage is {m_be.group(1)}% (minimum required: {backend_min:g}%)")
+        sys.exit(0)
+
+m_fe = re.search(r"Frontend line coverage:\s*(?:([0-9]+(?:\.[0-9]+)?)%|N/A)", clean_qg, re.I)
+if m_fe and m_fe.group(1) is not None:
+    if float(m_fe.group(1)) < frontend_min:
+        print(f"REFUSE:{qg_p} Frontend line coverage is {m_fe.group(1)}% (minimum required: {frontend_min:g}%)")
+        sys.exit(0)
+
+m_cve = re.search(r"Unsuppressed HIGH/CRITICAL CVEs:\s*([0-9]+)", clean_qg, re.I)
+if not m_cve:
+    print(f"REFUSE:{qg_p} must report 'Unsuppressed HIGH/CRITICAL CVEs: 0'")
+    sys.exit(0)
+if int(m_cve.group(1)) > 0:
+    print(f"REFUSE:{qg_p} reports {m_cve.group(1)} unsuppressed HIGH/CRITICAL CVE(s)")
+    sys.exit(0)
+
+# UX report check when ux-spec.md exists
+ux_spec_p = f"docs/agents-v0/design/{slug}/ux-spec.md"
+ux_rep_p = f"docs/agents-v0/verify/{slug}/ux-report.md"
+if os.path.isfile(ux_spec_p):
+    if not os.path.isfile(ux_rep_p):
+        print(f"REFUSE:{ux_spec_p} exists, so {ux_rep_p} is required for UI accessibility (axe-core) and UX verification")
+        sys.exit(0)
+
+critical_findings = []
+
+def scan_findings_table(text, source_name):
+    for line in text.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or set(line.replace("|", "").strip()) <= set("-: "):
+            continue
+        low = [c.lower() for c in cells]
+        if low[0] in ("id", "#", "finding"):
+            continue
+        # Check if any cell is 'critical' and status is not 'resolved'/'closed'
+        has_crit = any(c == "critical" for c in low)
+        is_resolved = any(c in ("resolved", "closed", "fixed") for c in low)
+        if has_crit and not is_resolved:
+            critical_findings.append(f"{source_name}: {line.strip()}")
+
+scan_findings_table(clean_qg, qg_p)
+
+if tier != "trivial":
+    vapt_raw = open(vapt_p, encoding="utf-8", errors="replace").read()
+    clean_vapt = re.sub(r"<!--.*?-->", "", vapt_raw, flags=re.S)
+    if not re.search(r"(?m)^commit:\s*\S+", clean_vapt) or not re.search(r"(?m)^agent:\s*security-reviewer\b", clean_vapt):
+        print(f"REFUSE:{vapt_p} must start with 'commit:' and 'agent: security-reviewer' headers")
+        sys.exit(0)
+    if re.search(r"\b(PENDING|TBD)\b", clean_vapt):
+        print(f"REFUSE:{vapt_p} still contains PENDING or TBD placeholders")
+        sys.exit(0)
+    for ctrl in ("F4", "F8", "F9", "F10"):
+        ctrl_lines = [l for l in clean_vapt.splitlines() if re.search(rf"\b{ctrl}\b", l) and l.strip().startswith("|")]
+        if not ctrl_lines:
+            print(f"REFUSE:{vapt_p} is missing always-on VAPT control row '{ctrl}'")
+            sys.exit(0)
+        row_txt = ctrl_lines[0]
+        if re.search(r"\bFAIL(ED)?\b", row_txt, re.I):
+            critical_findings.append(f"{vapt_p} ({ctrl} FAIL): {row_txt.strip()}")
+        elif not re.search(r"\b(PASS(ED)?|N/A)\b", row_txt, re.I):
+            print(f"REFUSE:{vapt_p} row for '{ctrl}' must record PASS, FAIL, or N/A with reason")
+            sys.exit(0)
+        elif re.search(r"\bPASS(ED)?\b", row_txt, re.I) and not re.search(r"[A-Za-z0-9_./-]+:[0-9]+", row_txt):
+            print(f"REFUSE:{vapt_p} PASS row for '{ctrl}' must cite 'file:line' evidence")
+            sys.exit(0)
+    scan_findings_table(clean_vapt, vapt_p)
+
+    rev_raw = open(rev_p, encoding="utf-8", errors="replace").read()
+    clean_rev = re.sub(r"<!--.*?-->", "", rev_raw, flags=re.S)
+    if not re.search(r"(?m)^commit:\s*\S+", clean_rev) or not re.search(r"(?m)^agent:\s*code-reviewer\b", clean_rev):
+        print(f"REFUSE:{rev_p} must start with 'commit:' and 'agent: code-reviewer' headers")
+        sys.exit(0)
+    if re.search(r"\b(PENDING|TBD)\b", clean_rev):
+        print(f"REFUSE:{rev_p} still contains PENDING or TBD placeholders")
+        sys.exit(0)
+    scan_findings_table(clean_rev, rev_p)
+
+if critical_findings:
+    print("BOUNCE:" + " ; ".join(critical_findings))
+    sys.exit(0)
+
+print("OK")
+PYVAL
+)"
+
+  case "$gv_val_err" in
+    REFUSE:*)
+      gc_refuse ready "${gv_val_err#REFUSE:}"
+      ;;
+    BOUNCE:*)
+      gv_crit_summary="${gv_val_err#BOUNCE:}"
+      # Write phase-result with Critical findings and trigger automatic reopen of build (or maintain)
+      GV_PR="$gv_result" GV_SLUG="$gv_feature" GV_CRIT="$gv_crit_summary" python3 - <<'PYBNC'
+import os, re
+p = os.environ["GV_PR"]
+slug = os.environ["GV_SLUG"]
+crit = os.environ["GV_CRIT"]
+lessons_block = "## Lessons\n\n### verify\n- none\n"
+if os.path.isfile(p):
+    txt = open(p, encoding="utf-8").read()
+    m = re.search(r"(^##\s+Lessons\b.*)", txt, re.M | re.S)
+    if m:
+        lessons_block = m.group(1).strip() + "\n"
+        if "### verify" not in lessons_block:
+            lessons_block += "\n### verify\n- none\n"
+content = (
+    f"# Phase Result: {slug}\n\n"
+    f"phase: verify\n"
+    f"status: changes_requested\n"
+    f"guard_managed: true\n\n"
+    f"## Critical Findings\n"
+    f"- {crit}\n\n"
+    f"{lessons_block}"
+)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(content)
+PYBNC
+      gv_reopen_target="build"
+      [ "$gv_is_maintain" = 1 ] && gv_reopen_target="maintain"
+      if [ "$gv_is_maintain" = 1 ] && [ "$gv_tier" = "emergency" ]; then
+        case " $(gc_state_get "$gv_state" approvedPhases | tr -d '[]",') " in
+          *" release "*)
+            sh "$GC_HERE/sync-feature-state.sh" --verify-passed false --active-phase verify --status blocked --reason "Critical finding in owed emergency verify; start a new maintenance id" "$gv_req_art" >/dev/null || true
+            gc_refuse ready "Open Critical finding(s) in owed emergency verify ($gv_crit_summary); state set to blocked — start /v0-maintain with a new <id>"
+            ;;
+        esac
+      fi
+      if ! gv_ro_out="$(sh "$GC_HERE/sync-feature-state.sh" --verify-passed false --reopen "$gv_reopen_target" "$gv_req_art" 2>&1)"; then
+        gc_refuse ready "Open Critical finding(s) ($gv_crit_summary) triggered reopen of $gv_reopen_target, which exceeded the reopen bounce cap: $gv_ro_out"
+      fi
+      gc_refuse ready "Open Critical finding(s) detected ($gv_crit_summary); automatically reopened '$gv_reopen_target' (verifyPassed=false). Route back to /v0-${gv_reopen_target} $gv_feature"
+      ;;
+  esac
+
+  # 3. Traceability check T6 (every AC-<n> has a passing row in quality-gate.md)
+  if [ "$gv_is_maintain" = 0 ] && [ -f "$GC_HERE/check-traceability.sh" ]; then
+    gv_tr_out="$(AGENTS_V0_TRACE_MODE=fail sh "$GC_HERE/check-traceability.sh" verify "$gv_req_art" --no-write 2>&1)" || {
+      gc_refuse ready "verify traceability check (T6) failed: $gv_tr_out"
+    }
+  fi
+
+  # 4. Secret scan on verify reports and verify-output.txt
+  if [ -f "$GC_HERE/secret_scan.py" ]; then
+    gv_sec_out="$(python3 -B - "$GC_HERE" "$gv_artifact" "$gv_output" "$gv_vapt" "$gv_review" <<'PYSEC'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import secret_scan
+hits = []
+for p in sys.argv[2:]:
+    if not p or not os.path.isfile(p):
+        continue
+    txt = open(p, encoding="utf-8", errors="replace").read()
+    for line_no, line in enumerate(txt.splitlines(), 1):
+        for rule_id, label, rx in secret_scan.CONTENT_RULES:
+            if rx.search(line):
+                hits.append(f"{p}:{line_no} ({rule_id}: {label})")
+if hits:
+    print("secret pattern detected in " + ", ".join(hits))
+    sys.exit(1)
+PYSEC
+)" || {
+      gc_refuse ready "secret scan failed on verify evidence: $gv_sec_out"
+    }
+  fi
+
+  # 5. Write/update <feature>.phase-result.md for verify
+  GV_PR="$gv_result" GV_SLUG="$gv_feature" python3 - <<'PYPR'
+import os, re
+p = os.environ["GV_PR"]
+slug = os.environ["GV_SLUG"]
+lessons_block = "## Lessons\n\n### verify\n- none\n"
+if os.path.isfile(p):
+    txt = open(p, encoding="utf-8").read()
+    m = re.search(r"(^##\s+Lessons\b.*)", txt, re.M | re.S)
+    if m:
+        lessons_block = m.group(1).strip() + "\n"
+        if "### verify" not in lessons_block:
+            lessons_block += "\n### verify\n- none\n"
+content = (
+    f"# Phase Result: {slug}\n\n"
+    f"phase: verify\n"
+    f"status: awaiting_approval\n"
+    f"guard_managed: true\n\n"
+    f"{lessons_block}"
+)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(content)
+PYPR
+
+  gv_rule ready ready.next "$gv_feature"; gv_next="$gv_val"
+  gc_state_set "$gv_state" "$gv_feature" "$gv_req_art" "activePhase=$gv_phase" \
+    "activeStatus=awaiting_approval" "blockedReason=" "nextStep=$gv_next" || exit 1
+  python3 - "$gv_state" <<'PYVP'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p, encoding="utf-8"))
+d["verifyPassed"] = True
+d["verifyGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PYVP
+
+  gc_ok ready "verify for $gv_feature passed all checks (verifyPassed=true) and is awaiting Sensei's approval"
+  printf 'Next: %s\n' "$gv_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gv_usage
 shift || true
@@ -488,5 +779,6 @@ case "$cmd" in
   check) gv_check "$@" ;;
   start) gv_start "$@" ;;
   block) gv_block "$@" ;;
+  ready) gv_ready "$@" ;;
   *) gv_usage ;;
 esac
