@@ -207,7 +207,11 @@ PY
     || gc_refuse ready "missing docker-compose.yml (or compose.yaml) for platform skeleton (AC-4)"
 
   # 3. AC-1 & AC-3: Build / verify check
-  if [ -z "${AGENTS_V0_SKIP_NATIVE_VERIFY:-}" ] && [ -x .agents-v0/scripts/run-backend-verify.sh ]; then
+  gs_skip_verify=""
+  # >>> kit-test-override (install.sh removes this block; kit test copies only)
+  gs_skip_verify="${AGENTS_V0_SKIP_NATIVE_VERIFY:-}"
+  # <<< kit-test-override
+  if [ -z "$gs_skip_verify" ] && [ -x .agents-v0/scripts/run-backend-verify.sh ]; then
     gs_vcmd="$(sh .agents-v0/scripts/run-backend-verify.sh "Backend verify" 2>/dev/null || true)"
     if [ -n "$gs_vcmd" ]; then
       sh -c "$gs_vcmd" >/dev/null 2>&1 || gc_refuse ready "native backend verify failed: $gs_vcmd"

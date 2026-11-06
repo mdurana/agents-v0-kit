@@ -128,3 +128,26 @@ scaffold commit.paths app Dockerfile docker-compose.yml compose.yaml .dockerigno
 scaffold commit.message scaffold: platform skeleton approved
 scaffold commit.tag scaffold-v
 scaffold approved.next /v0-intake
+
+# --- intake (/v0-intake, guard-intake.sh) -------------------------------------------------------
+intake phase intake
+intake feature <feature>
+intake state docs/agents-v0/requirements/<feature>.state.json
+intake artifact docs/agents-v0/requirements/<feature>.md
+intake result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+intake check.requires git-work-tree kit-installed integration-branch onboard-if-brownfield plan-if-program scaffold-if-greenfield not-released not-approved
+intake start.requires git-work-tree kit-installed integration-branch onboard-if-brownfield plan-if-program scaffold-if-greenfield not-released not-awaiting-approval
+intake start.status in_progress
+intake start.next Launch the requirements-analyst subagent (skill: spec-intake) to author docs/agents-v0/requirements/<feature>.md.
+# block: status and next step
+intake block.status blocked
+intake block.next Resolve the blocker or helper brief, then run /v0-intake <feature> again; it resumes from the files on disk.
+# ready: verifies user story, Gherkin AC-1..AC-8, negative/edge + security-trigger refusal, single surface / vertical slice, mandatory sections, and Open questions: none
+intake ready.requires in-progress
+intake ready.status awaiting_approval
+intake ready.next Sensei reviews docs/agents-v0/requirements/<feature>.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve intake <feature>
+# commit: verifies approval record, appends Approved row, runs feature-worktree.sh <feature>, stages intake files in the worktree, secret-scans, and commits "<story>: intake approved" on feature/<feature>
+intake commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
+intake commit.message <story>: intake approved
+intake approved.next /v0-design <feature>
