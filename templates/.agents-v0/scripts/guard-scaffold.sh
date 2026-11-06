@@ -295,6 +295,22 @@ PY
   gc_commit_tag scaffold
 }
 
+gs_steps() {
+  [ $# -eq 0 ] || gs_usage
+  gs_rule steps ready.next; gs_ready_next="$gs_val"
+  gs_rule steps approved.next; gs_approved_next="$gs_val"
+  G='sh .agents-v0/scripts/guard-scaffold.sh'
+  cat <<EOF_STEPS
+1. Run \`$G check\`. It verifies entry prerequisites, greenfield status, on-branch integration check, Sensei's external plan approval record, and that scaffold is not already approved. When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start\`. It verifies a clean working tree on the integration branch and sets \`docs/agents-v0/program.state.json\` to \`in_progress\` on \`docs/agents-v0/milestones/p0-platform-skeleton.md\`.
+3. Launch the \`platform-engineer\` subagent to configure application scaffold files under \`app/\`, \`Dockerfile\`, \`docker-compose.yml\`, and CI verify baseline. It runs no shell commands and leaves \`Delivery approvals\` tables empty.
+4. On a blocker, run \`$G block "<plain reason>"\` and stop.
+5. When the platform skeleton and container configurations are complete, run \`$G ready\`. It verifies the milestone P0 manifest, Dockerfile, docker-compose.yml, executes the pack's native backend verify command, writes \`docs/agents-v0/milestones/scaffold.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
+6. Stop. Present the platform skeleton verification report to Sensei. Next: $gs_ready_next. Never run approve yourself; the agent cannot approve this gate.
+7. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, updates \`p0-platform-skeleton.md\` status to released with the approved Delivery row, stages scaffold files, secret-scans, makes the single gate commit, and tags \`scaffold-v<n>\`. Then suggest: $gs_approved_next.
+EOF_STEPS
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gs_check "$@" ;;
@@ -302,7 +318,6 @@ case "$cmd" in
   block) shift; gs_block "$@" ;;
   ready) shift; gs_ready "$@" ;;
   commit) shift; gs_commit "$@" ;;
-  steps)
-    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS5" ;;
+  steps) shift; gs_steps "$@" ;;
   *) gs_usage ;;
 esac
