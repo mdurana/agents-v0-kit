@@ -552,8 +552,336 @@ PY
   printf 'Next: %s\n' "$gm_next"
 }
 
+# Design: DM3 (/v0-maintain ready note, tier, 800-line ceiling, attempt-budget, failure-brief, and verification validator).
 gm_ready() {
-  gc_refuse ready "ready not yet implemented (DM3)"
+  [ $# -eq 1 ] || gm_usage
+  gm_r_slug="$1"
+  gm_load ready "$gm_r_slug"
+  gm_enter_worktree_if_needed
+
+  gm_rule ready ready.requires "$gm_feature"
+  gm_check_prereqs ready "$gm_val" 0
+
+  [ -f "$gm_artifact" ] || gc_refuse ready "maintenance note '$gm_artifact' is missing"
+  [ -f "$gm_report" ] || gc_refuse ready "build report '$gm_report' is missing"
+
+  # 1-5. Validate note.md fields, placeholders, Tier confirmed by, emergency rollback + follow-up date, trivial scope, and MAINTAIN_MAX_LINES
+  gm_base="$(gc_state_get "$gm_state" baseCommit 2>/dev/null || true)"
+  [ -n "$gm_base" ] || gm_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  gm_max_lines="${MAINTAIN_MAX_LINES:-800}"
+
+  if ! gm_val_out="$(GM_NOTE="$gm_artifact" GM_ID="$gm_feature" GM_BASE="$gm_base" GM_MAX_LINES="$gm_max_lines" python3 - <<'PYREADY'
+import os, re, subprocess, sys
+
+note_path = os.environ["GM_NOTE"]
+slug = os.environ["GM_ID"]
+base_commit = os.environ["GM_BASE"]
+try:
+    max_lines = int(os.environ.get("GM_MAX_LINES") or "800")
+except ValueError:
+    max_lines = 800
+
+def refuse(msg):
+    print(msg)
+    sys.exit(1)
+
+raw = open(note_path, encoding="utf-8").read()
+if not raw.strip():
+    refuse(f"{note_path} is empty")
+
+if "<!-- TEMPLATE:" in raw:
+    refuse(f"{note_path} still contains unfilled '<!-- TEMPLATE:' comments; complete or remove template comments before ready")
+
+clean = re.sub(r"<!--.*?-->", "", raw, flags=re.S)
+no_code = re.sub(r"```.*?```", "", clean, flags=re.S)
+
+# Check header fields: Id, Tier, Type, Trigger
+m_id = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Id(?:\*\*)?\s*:\s*`?([^\s`]+)`?\s*$", no_code)
+if not m_id or m_id.group(1).strip() != slug:
+    refuse(f"{note_path} must declare 'Id: {slug}' (found: {m_id.group(1) if m_id else 'missing'})")
+
+m_tier = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Tier(?:\*\*)?\s*:\s*`?([^\n`]+)`?\s*$", no_code)
+if not m_tier:
+    refuse(f"{note_path} is missing 'Tier: trivial | standard | emergency'")
+tier = m_tier.group(1).strip().lower()
+if tier not in ("trivial", "standard", "emergency"):
+    refuse(f"{note_path} has invalid Tier '{m_tier.group(1).strip()}'; must be trivial, standard, or emergency")
+
+m_type = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Type(?:\*\*)?\s*:\s*`?([^\n`]+)`?\s*$", no_code)
+if not m_type:
+    refuse(f"{note_path} is missing 'Type: bug | cve | dependency | refactor | docs | migration'")
+mtype = m_type.group(1).strip().lower()
+if mtype not in ("bug", "cve", "dependency", "refactor", "docs", "migration"):
+    refuse(f"{note_path} has invalid Type '{m_type.group(1).strip()}'; must be bug, cve, dependency, refactor, docs, or migration")
+
+m_trig = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Trigger(?:\*\*)?\s*:\s*(.+?)\s*$", no_code)
+if not m_trig or not m_trig.group(1).strip() or re.search(r"<[^>]+>", m_trig.group(1)):
+    refuse(f"{note_path} must have a non-placeholder 'Trigger:' line")
+
+# Check Tier confirmed by for trivial and emergency
+m_conf = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Tier\s+confirmed\s+by(?:\*\*)?\s*:\s*(.+?)\s*$", no_code)
+if tier in ("trivial", "emergency"):
+    if not m_conf:
+        refuse(f"{note_path} with Tier: {tier} requires 'Tier confirmed by: <person> on <YYYY-MM-DD>'")
+    cval = m_conf.group(1).strip()
+    if not cval or re.search(r"<[^>]+>", cval) or cval.lower() in ("tbd", "todo", "n/a", "none"):
+        refuse(f"{note_path} has placeholder 'Tier confirmed by: {cval}'; record the person and date")
+
+# Check Follow-up verify due for emergency (and ensure template placeholder is removed for non-emergency)
+m_due = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Follow-up\s+verify\s+due(?:\*\*)?\s*:\s*(.+?)\s*$", no_code)
+if tier == "emergency":
+    if not m_due or not re.match(r"^\d{4}-\d{2}-\d{2}\b", m_due.group(1).strip()):
+        refuse(f"{note_path} with Tier: emergency requires 'Follow-up verify due: YYYY-MM-DD'")
+elif m_due and re.search(r"<[^>]+>", m_due.group(1)):
+    refuse(f"{note_path} still has template placeholder on 'Follow-up verify due:'; delete the line for non-emergency notes")
+
+# Check required sections: Scope, Acceptance, Security surface, Rollback
+def get_section(name):
+    m = re.search(rf"(?im)^##\s+{re.escape(name)}\s*$(.*?)(?=^##\s+|\Z)", no_code, flags=re.S)
+    return m.group(1).strip() if m else None
+
+for sec in ("Scope", "Acceptance", "Security surface"):
+    body = get_section(sec)
+    if body is None or not body:
+        refuse(f"{note_path} section '## {sec}' is missing or empty")
+    if re.search(r"<[A-Za-z][^>\n]*>", body):
+        refuse(f"{note_path} section '## {sec}' still contains a template placeholder")
+
+rb_body = get_section("Rollback")
+if rb_body is None:
+    refuse(f"{note_path} section '## Rollback' is missing")
+if tier == "emergency":
+    if not rb_body or rb_body.lower() in ("none", "n/a", "tbd", "todo") or re.search(r"<[A-Za-z][^>\n]*>", rb_body):
+        refuse(f"{note_path} with Tier: emergency requires a concrete non-empty '## Rollback' plan")
+
+acc_body = get_section("Acceptance") or ""
+if mtype == "bug":
+    if not (re.search(r"(?i)\bexpected\b", acc_body) and re.search(r"(?i)\bactual\b", acc_body)):
+        refuse(f"{note_path} with Type: bug must document both 'Expected' and 'Actual' behavior in '## Acceptance'")
+    if not re.search(r"(?i)\btest\b|`[^`]+`", acc_body):
+        refuse(f"{note_path} with Type: bug must name the reproducing test in '## Acceptance'")
+elif mtype in ("cve", "dependency"):
+    if not (re.search(r"->|→|\bto\b|\bfrom\b|CVE-\d{4}-\d+", acc_body, flags=re.I)):
+        refuse(f"{note_path} with Type: {mtype} must document package versions (from -> to) or CVE IDs in '## Acceptance'")
+
+sec_body = get_section("Security surface") or ""
+if tier == "trivial":
+    if not re.match(r"^(?:[-*]\s*)?(?:none|no|n/a|not\s+applicable)\b", sec_body.strip(), flags=re.I):
+        refuse(f"{note_path} with Tier: trivial cannot touch a security surface ('## Security surface' must state 'None'); use Tier: standard")
+
+# Check changed files and line counts relative to base_commit
+diff_target = base_commit if base_commit else "HEAD"
+numstat_out = subprocess.run(["git", "diff", "--numstat", diff_target], capture_output=True, text=True, check=False).stdout
+status_out = subprocess.run(["git", "status", "--porcelain=v1", "-uall"], capture_output=True, text=True, check=False).stdout
+
+changed_files = {}
+for line in numstat_out.splitlines():
+    parts = line.split("\t")
+    if len(parts) == 3:
+        a, d, p = parts
+        try:
+            lines_changed = (int(a) if a != "-" else 0) + (int(d) if d != "-" else 0)
+        except ValueError:
+            lines_changed = 0
+        changed_files[p] = lines_changed
+
+for line in status_out.splitlines():
+    if len(line) < 4:
+        continue
+    st = line[:2]
+    p = line[3:].split(" -> ")[-1].strip('"')
+    if p.endswith(".lock"):
+        continue
+    if st == "??" and os.path.isfile(p) and p not in changed_files:
+        try:
+            changed_files[p] = sum(1 for _ in open(p, encoding="utf-8", errors="replace"))
+        except OSError:
+            changed_files[p] = 0
+
+LOCKFILES = {
+    "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "Cargo.lock", "go.sum", "poetry.lock", "uv.lock"
+}
+MANIFESTS = {
+    "pom.xml", "build.gradle", "build.gradle.kts", "package.json", "pyproject.toml",
+    "requirements.txt", "Cargo.toml", "go.mod"
+} | LOCKFILES
+
+def is_doc_or_meta(p):
+    if p.startswith("docs/") or p.startswith(".agents-v0/") or p.startswith(".cursor/") or p.startswith(".agents/"):
+        return True
+    bn = os.path.basename(p)
+    if bn.endswith(".md") or bn in ("README", "CHANGELOG", "LICENSE"):
+        return True
+    return False
+
+def is_manifest_or_lock(p):
+    bn = os.path.basename(p)
+    return bn in MANIFESTS or (bn.startswith("requirements") and bn.endswith(".txt"))
+
+non_doc_source_lines = 0
+non_doc_files = []
+for p, lcount in changed_files.items():
+    if is_doc_or_meta(p):
+        continue
+    non_doc_files.append(p)
+    if os.path.basename(p) not in LOCKFILES:
+        non_doc_source_lines += lcount
+
+if tier == "trivial":
+    bad_trivial = [p for p in non_doc_files if not is_manifest_or_lock(p)]
+    if bad_trivial:
+        refuse(f"Tier: trivial only allows documentation edits or 1-for-1 patch version bumps in manifests/lockfiles; found source changes in: {', '.join(bad_trivial[:5])}. Use Tier: standard on a maintain/{slug} worktree")
+
+if non_doc_source_lines > max_lines:
+    refuse(f"changed non-doc source lines ({non_doc_source_lines}) exceed MAINTAIN_MAX_LINES ({max_lines}); changes over {max_lines} lines are a feature and must route to /v0-intake")
+
+has_non_doc = "1" if (non_doc_files or mtype != "docs") else "0"
+print(f"{tier}|{mtype}|{non_doc_source_lines}|{has_non_doc}")
+PYREADY
+)"; then
+    gc_refuse ready "$gm_val_out"
+  fi
+
+  gm_parsed_tier="$(printf '%s' "$gm_val_out" | cut -d'|' -f1)"
+  gm_parsed_type="$(printf '%s' "$gm_val_out" | cut -d'|' -f2)"
+  gm_parsed_lines="$(printf '%s' "$gm_val_out" | cut -d'|' -f3)"
+  gm_has_nondoc="$(printf '%s' "$gm_val_out" | cut -d'|' -f4)"
+
+  # 6. Validate attempt budget (<8) and failure-brief / 3rd-red cap on build-report.md
+  if [ -f "$GC_HERE/check-attempt-budget.sh" ]; then
+    if ! gm_ab_out="$(sh "$GC_HERE/check-attempt-budget.sh" "$gm_report" 2>&1)"; then
+      gc_refuse ready "attempt budget check failed ($gm_ab_out); run $G block $gm_feature \"Attempt budget exhausted\" and stop"
+    fi
+  fi
+  if [ -f "$GC_HERE/check-failure-brief.sh" ]; then
+    if ! gm_fb_out="$(sh "$GC_HERE/check-failure-brief.sh" "$gm_report" 2>&1)"; then
+      gc_refuse ready "failure-brief check failed ($gm_fb_out); author docs/agents-v0/build/$gm_feature/failure-brief.md or run $G block $gm_feature \"Consecutive red verify cap\""
+    fi
+  fi
+
+  # For non-docs changes, verify passing attempt row + Final Verify Summary PASS + build-output.txt + check-tests-ran.sh
+  if [ "$gm_has_nondoc" = "1" ]; then
+    if ! gm_rep_ok="$(GM_REP="$gm_report" python3 - <<'PYREP'
+import os, re, sys
+txt = open(os.environ["GM_REP"], encoding="utf-8").read()
+clean = re.sub(r"<!--.*?-->", "", txt, flags=re.S)
+pass_rows = 0
+for line in clean.splitlines():
+    if line.strip().startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and cells[0].lower() not in ("command", "---") and not set(cells[0]) <= {"-"}:
+            ex = cells[1].lower()
+            if ex in ("0", "pass", "passed", "ok", "exit 0"):
+                pass_rows += 1
+if pass_rows == 0:
+    print("build-report.md must record at least one passing verification attempt row (Exit 0)")
+    sys.exit(1)
+if not re.search(r"(?im)^-\s*Status:\s*(?:PASS|passed|green|ok)\b", clean):
+    print("build-report.md '## Final Verify Summary' must record '- Status: PASS'")
+    sys.exit(1)
+PYREP
+)"; then
+      gc_refuse ready "$gm_rep_ok"
+    fi
+
+    [ -f "$gm_output" ] && [ -s "$gm_output" ] \
+      || gc_refuse ready "verification output log '$gm_output' is missing or empty; run the native stack verify command and tee output to '$gm_output'"
+
+    if [ -f "$GC_HERE/check-tests-ran.sh" ]; then
+      if ! gm_tr_out="$(sh "$GC_HERE/check-tests-ran.sh" 2>&1)"; then
+        gc_refuse ready "check-tests-ran.sh failed ($gm_tr_out)"
+      fi
+    fi
+  fi
+
+  # 7. When docs/agents-v0/onboarding/report.md exists, run check-onboarding-docs.sh
+  if [ -f "docs/agents-v0/onboarding/report.md" ] && [ -f "$GC_HERE/check-onboarding-docs.sh" ]; then
+    if ! gm_od_out="$(sh "$GC_HERE/check-onboarding-docs.sh" 2>&1)"; then
+      gc_refuse ready "check-onboarding-docs.sh failed ($gm_od_out)"
+    fi
+  fi
+
+  # 8. Secret scan on note.md, build-report.md, and build-output.txt
+  if [ -f "$GC_HERE/secret_scan.py" ]; then
+    if ! gm_sec_out="$(python3 - "$GC_HERE" "$gm_artifact" "$gm_report" "$gm_output" <<'PYSEC'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import secret_scan
+bad = []
+for p in sys.argv[2:]:
+    if not p or not os.path.isfile(p):
+        continue
+    for lineno, line in enumerate(open(p, encoding="utf-8", errors="replace"), 1):
+        for r_id, pat in secret_scan.CONTENT_RULES:
+            if pat.search(line):
+                bad.append(f"{p}:{lineno} ({r_id})")
+if bad:
+    print(", ".join(bad))
+    sys.exit(1)
+PYSEC
+)"; then
+      gc_refuse ready "secret pattern detected in maintenance artifacts ($gm_sec_out)"
+    fi
+  fi
+
+  # Write/normalize docs/agents-v0/maintain/<id>/phase-result.md
+  GM_RES="$gm_result" GM_ID="$gm_feature" GM_ART="$gm_artifact" GM_BASE="$gm_base" \
+  GM_TIER="$gm_parsed_tier" GM_TYPE="$gm_parsed_type" GM_LINES="$gm_parsed_lines" python3 - <<'PYRES'
+import os, re
+
+res_path = os.environ["GM_RES"]
+slug = os.environ["GM_ID"]
+art_path = os.environ["GM_ART"]
+base_commit = os.environ["GM_BASE"]
+tier = os.environ["GM_TIER"]
+mtype = os.environ["GM_TYPE"]
+lines = os.environ["GM_LINES"]
+
+lessons_block = "## Lessons\n\n### maintain\n- none\n"
+if os.path.isfile(res_path):
+    old_res = open(res_path, encoding="utf-8").read()
+    lm = re.search(r"(^##\s+Lessons\b.*)", old_res, flags=re.M | re.S)
+    if lm:
+        lessons_block = lm.group(1).rstrip() + "\n"
+
+res_content = f"""# Phase Result: maintain ({slug})
+
+- phase: maintain
+- status: awaiting_approval
+- guard_managed: true
+- feature: {slug}
+- tier: {tier}
+- type: {mtype}
+- changed_lines: {lines}
+- artifact: {art_path}
+- base_commit: {base_commit}
+
+{lessons_block}"""
+
+os.makedirs(os.path.dirname(res_path) or ".", exist_ok=True)
+with open(res_path, "w", encoding="utf-8") as fh:
+    fh.write(res_content)
+PYRES
+
+  gm_rule ready ready.next "$gm_feature"; gm_next="$gm_val"
+  gm_rule ready ready.status "$gm_feature"; gm_status="$gm_val"
+  gc_state_set "$gm_state" "$gm_feature" "$gm_artifact" "activePhase=$gm_phase" \
+    "activeStatus=$gm_status" "blockedReason=" "nextStep=$gm_next" || exit 1
+
+  GM_ST="$gm_state" GM_TIER="$gm_parsed_tier" python3 - <<'PYST'
+import json, os
+p = os.environ["GM_ST"]
+tier = os.environ["GM_TIER"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+d["tier"] = tier
+d["maintainGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PYST
+
+  gc_ok ready "maintain note verified for $gm_feature (tier=$gm_parsed_tier, type=$gm_parsed_type, non_doc_lines=$gm_parsed_lines)"
+  printf 'Next: %s\n' "$gm_next"
 }
 
 gm_commit() {
