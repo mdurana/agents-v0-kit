@@ -151,3 +151,26 @@ intake ready.next Sensei reviews docs/agents-v0/requirements/<feature>.md and ru
 intake commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
 intake commit.message <story>: intake approved
 intake approved.next /v0-design <feature>
+
+# --- design (/v0-design, guard-design.sh) -------------------------------------------------------
+design phase design
+design feature <feature>
+design state docs/agents-v0/requirements/<feature>.state.json
+design artifact docs/agents-v0/design/<feature>/design.md
+design result docs/agents-v0/requirements/<feature>.phase-result.md
+# check & start: prerequisites
+design check.requires git-work-tree kit-installed feature-branch intake-approved not-released not-approved
+design start.requires git-work-tree kit-installed feature-branch intake-approved not-released not-awaiting-approval
+design start.status in_progress
+design start.next Launch schema-author (when /api/v1 or events apply), solution-architect (skill: contract-first-design), ux-designer (skill: ux-design, when UI applies), and design-reviewer to produce docs/agents-v0/design/<feature>/.
+# block: status and next step
+design block.status blocked
+design block.next Resolve the blocker or helper brief, then run /v0-design <feature> again; it resumes from the files on disk.
+# ready: verifies design.md, traceability (T1-T3), OpenAPI 3.0 + BOLA + additionalProperties:false + Idempotency-Key, negative/edge failure modes, UX mockups data-component parity, ADR options, and review.md (0 Open Critical), or Contract: None shortcut
+design ready.requires in-progress
+design ready.status awaiting_approval
+design ready.next Sensei reviews docs/agents-v0/design/<feature>/ and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve design <feature>
+# commit: verifies approval record (or Contract: None shortcut), promotes ADR to Accepted, appends Approved Design row, runs check-traceability.sh design, stages design paths, secret-scans, and commits "<story>: design approved" on feature/<feature>
+design commit.paths docs/agents-v0/design/<feature> docs/agents-v0/adr docs/agents-v0/diagrams docs/agents-v0/design/system/arc-record.md docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
+design commit.message <story>: design approved
+design approved.next /v0-build <feature>
