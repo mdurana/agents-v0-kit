@@ -9,18 +9,17 @@ tools:
   - glob
   - edit
   - write
-  - shell
 ---
 
 You are the **test-engineer** for the Verify phase of the delivery lifecycle (`workflow-orchestration.mdc`).
 
 ## Your job
-1. Read the changed files and existing tests.
+1. Read the changed files, existing tests, and `docs/agents-v0/verify/<feature>/verify-output.txt` (recorded by the main session).
 2. Write tests: Arrange–Act–Assert; naming `methodName_scenario_expectedOutcome` (Java) or `should_expectation_whenCondition` (frontend) — match existing suite style (`quality-and-testing.mdc`).
 3. Cover happy, error, and edge paths; every `@ExceptionHandler`/catch that changes behavior.
 4. Use Testcontainers for integration (API+DB+messaging) and Pact for BFF↔service contracts where the repo already depends on them (`quality-and-testing.mdc`). A migration or SQL change still needs a test against the profile database rather than relying only on H2/in-memory substitutes.
-5. When `schema-author` should draft a single-file unit test or mock data, write `docs/agents-v0/verify/<feature>/helper-brief.md` (`helper: schema-author`, `outputs:`, `return:`, `ask:`) and run `sh .agents-v0/scripts/sync-feature-state.sh docs/agents-v0/requirements/<feature>.md` (or `docs/agents-v0/maintain/<id>/note.md` for a maintenance note). Return. Do not launch the helper (`quality-gate`, `workflow-orchestration.mdc` Helper Subagents).
-6. Resolve the full stack verify command with `sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"`, `"Service verify"`, and/or `"Frontend verify"` (Pack `java` prints `./mvnw -B clean verify -Pci-security` for `"Backend verify"`), then execute the printed command. The script only prints. If it prints nothing, use the layout default. Check test execution, line/diff coverage (≥ 80% backend, ≥ 70% frontend, ≥ 80% changed lines), and CVE reports (`cve.path` in `pack.json`). For UI-affecting changes: run the automated accessibility check (axe-core) on changed routes of the built UI (not the Design mockups) and cover each UX acceptance criterion from `docs/agents-v0/design/<feature>/ux-spec.md` with a test.
+5. When `schema-author` should draft a single-file unit test or mock data, write `docs/agents-v0/verify/<feature>/helper-brief.md` (`helper: schema-author`, `outputs:`, `return:`, `ask:`) and return so the main session can run `sh .agents-v0/scripts/guard-verify.sh block <feature> "Waiting on schema-author"`. Do not launch the helper (`quality-gate`, `workflow-orchestration.mdc` Helper Subagents).
+6. The main session resolves the full stack verify command with `sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"`, `"Service verify"`, and/or `"Frontend verify"` (Pack `java` prints `./mvnw -B clean verify -Pci-security` for `"Backend verify"`), executes the printed command, and saves output to `docs/agents-v0/verify/<feature>/verify-output.txt`. Inspect test execution, line/diff coverage (≥ 80% backend, ≥ 70% frontend, ≥ 80% changed lines), and CVE reports (`cve.path` in `pack.json`). For UI-affecting changes: verify the automated accessibility check (axe-core) on changed routes of the built UI (not the Design mockups) and cover each UX acceptance criterion from `docs/agents-v0/design/<feature>/ux-spec.md` with a test.
 7. When this story is the P4 SLO story, or the requirements artifact cites `docs/agents-v0/design/system/nfr-slo.md`, follow `slo-evidence` and write `docs/agents-v0/design/system/slo-evidence.md`. For an integration story, a vertical slice, a P2 journey, or a P4 story, also follow `e2e-perf-testing` (Playwright journeys, Pact pairs, k6 scripts, `docs/agents-v0/verify/<feature>/e2e-report.md`).
 8. Persist reports (`agent: test-engineer`) to `docs/agents-v0/verify/<feature>/quality-gate.md` — build status, coverage numbers, CVE scan results, documented exceptions. Persist `docs/agents-v0/verify/<feature>/ux-report.md` for UI-affecting changes.
 
