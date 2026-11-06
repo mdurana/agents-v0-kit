@@ -398,7 +398,217 @@ PY
 }
 
 gi_ready() {
-  gc_refuse ready "not yet implemented (DI3)"
+  [ $# -eq 1 ] || gi_usage
+  gi_r_slug="$1"
+  gi_load ready "$gi_r_slug"
+  gi_rule ready ready.requires "$gi_feature"; gi_requires="$gi_val"
+  gi_check_prereqs ready "$gi_requires" 0
+
+  gi_brief="docs/agents-v0/requirements/${gi_feature}.helper-brief.md"
+  if [ -f "$gi_brief" ]; then
+    gc_refuse ready "unresolved helper brief '$gi_brief' is still on disk; resolve and remove it (or run $G block $gi_feature \"<reason>\")"
+  fi
+
+  [ -f "$gi_artifact" ] || gc_refuse ready "requirements artifact '$gi_artifact' is missing"
+
+  gi_base="$(gc_state_get "$gi_state" baseCommit 2>/dev/null || git rev-parse HEAD)"
+
+  if ! gi_val_out="$(python3 - "$gi_artifact" "$gi_result" "$gi_feature" "$gi_base" <<'PY'
+import glob, os, re, sys
+
+art_path, res_path, slug, base_commit = sys.argv[1:5]
+txt = open(art_path, "r", encoding="utf-8").read()
+
+def refuse(msg):
+    print(f"REFUSED ready: {msg}")
+    sys.exit(1)
+
+# 1. Proposed split check
+if re.search(r"^##\s+Proposed split\b", txt, flags=re.M | re.I):
+    refuse(f"{art_path} contains '## Proposed split'; run guard-intake.sh block {slug} \"Proposed split pending user confirmation\"")
+
+# Strip Delivery approvals section before placeholder scanning
+body_lines = []
+in_approvals = False
+for line in txt.splitlines():
+    if re.match(r"^##\s+Delivery approvals\b", line, flags=re.I):
+        in_approvals = True
+    if not in_approvals:
+        body_lines.append(line)
+body = "\n".join(body_lines)
+
+# 2. Unresolved placeholders
+placeholders = re.findall(r"<(?:role|goal|benefit|precondition|scenario[^>]*|negative[^>]*|action|observable[^>]*|invalid[^>]*|explicitly[^>]*|TBD|TODO|[^>]{1,40})>|\[(?:role|goal|benefit|TODO|TBD|FIXME)\]|\b(?:TODO|TBD|FIXME)\b", body)
+# Filter out valid comparison operators like `< 250ms` or `< 100`
+real_ph = [p for p in placeholders if not re.match(r"^<\s*\d", p)]
+if real_ph:
+    refuse(f"{art_path} contains unresolved placeholders: {', '.join(sorted(set(real_ph))[:5])}")
+
+# 3. User story sentence
+us_match = re.search(r"(As an?\s+[^,\n]+,\s*I want\s+[^,\n]+,\s*so that\s+[^\n.]+\.)", body, flags=re.I)
+if not us_match:
+    refuse(f"{art_path} is missing a complete user story sentence ('As a <role>, I want <goal>, so that <benefit>.')")
+user_story = us_match.group(1).strip()
+
+# 4. Surfaces & Vertical slice check
+surf_match = re.search(r"^Surfaces:\s*(.+)$", body, flags=re.M | re.I)
+if not surf_match:
+    refuse(f"{art_path} is missing 'Surfaces: backend | bff | frontend'")
+raw_surfaces = [s.strip().lower() for s in re.split(r"[,|/]+", surf_match.group(1)) if s.strip()]
+valid_surfaces = {"backend", "bff", "frontend"}
+if not raw_surfaces or any(s not in valid_surfaces for s in raw_surfaces):
+    refuse(f"{art_path} has invalid Surfaces '{surf_match.group(1).strip()}' (expected subset of: backend, bff, frontend)")
+vs_match = re.search(r"^Vertical slice:\s*(yes|no)\b", body, flags=re.M | re.I)
+is_vertical = bool(vs_match and vs_match.group(1).lower() == "yes")
+if len(raw_surfaces) > 1 and not is_vertical:
+    refuse(f"{art_path} lists multiple surfaces ({', '.join(raw_surfaces)}) without 'Vertical slice: yes'")
+
+# 5. Mandatory sections
+required_sections = [
+    "Preconditions",
+    "Desk check",
+    "Acceptance criteria",
+    "Out of scope",
+    "Non-functional requirements",
+    "Applicable regulations",
+    "Security-review triggers",
+    "Open questions",
+    "Delivery approvals",
+]
+if "frontend" in raw_surfaces:
+    required_sections.append("UX requirements")
+for sec in required_sections:
+    if not re.search(rf"^##\s+{re.escape(sec)}\b", txt, flags=re.M | re.I):
+        refuse(f"{art_path} is missing mandatory section '## {sec}'")
+
+if not re.search(r"^Material:\s*(yes|no)\b", body, flags=re.M | re.I):
+    refuse(f"{art_path} Desk check section is missing 'Material: yes | no'")
+
+if not re.search(r"^Open questions:\s*none\s*$", body, flags=re.M | re.I):
+    refuse(f"{art_path} must resolve all open questions and state 'Open questions: none'")
+
+# 6. Parse Gherkin Acceptance Criteria (### AC-1 .. ### AC-N)
+ac_matches = list(re.finditer(r"^###\s+AC-(\d+)\b[^\n]*$", body, flags=re.M))
+if not ac_matches:
+    refuse(f"{art_path} has no Gherkin acceptance criteria ('### AC-1 ...')")
+ac_nums = [int(m.group(1)) for m in ac_matches]
+expected_nums = list(range(1, len(ac_nums) + 1))
+if ac_nums != expected_nums:
+    refuse(f"{art_path} acceptance criteria must be numbered contiguously AC-1..AC-{len(ac_nums)} (found: {', '.join('AC-'+str(n) for n in ac_nums)})")
+if len(ac_nums) > 8:
+    refuse(f"{art_path} has {len(ac_nums)} acceptance criteria (maximum is 8; split the story if larger)")
+
+vague_then_re = re.compile(r"\b(works as expected|is handled properly|handles errors gracefully|is processed\s*$|succeeds\s*$)", flags=re.I)
+refusal_re = re.compile(r"\b(refuse[ds]?|reject(?:ed|s)?|deni(?:ed|es)|400|401|403|404|409|422|error|fail(?:ed|s)?|invalid|unauthorized|forbidden)\b", flags=re.I)
+
+kinds = []
+refusing_negatives = 0
+for idx, m in enumerate(ac_matches):
+    start = m.end()
+    end = ac_matches[idx + 1].start() if idx + 1 < len(ac_matches) else len(body)
+    # Stop at next ## heading if last AC
+    next_h2 = re.search(r"^##\s+", body[start:end], flags=re.M)
+    if next_h2:
+        end = start + next_h2.start()
+    block = body[start:end]
+    ac_id = f"AC-{m.group(1)}"
+    km = re.search(r"^Kind:\s*(happy|negative|edge)\s*$", block, flags=re.M | re.I)
+    if not km:
+        refuse(f"{ac_id} is missing 'Kind: happy | negative | edge'")
+    kind = km.group(1).lower()
+    kinds.append(kind)
+    for kw in ("Given", "When", "Then"):
+        if not re.search(rf"^{kw}\s+\S+", block, flags=re.M):
+            refuse(f"{ac_id} is missing a '{kw} ...' Gherkin clause")
+    for then_m in re.finditer(r"^Then\s+(.+)$", block, flags=re.M):
+        clause = then_m.group(1).strip()
+        if vague_then_re.search(clause):
+            refuse(f"{ac_id} has a vague Then clause ('{clause}'); state a concrete observable outcome")
+    if kind == "negative" and refusal_re.search(block):
+        refusing_negatives += 1
+
+# 7. Security-review triggers & negative/edge enforcement (Jiraiya Rec 3)
+sec_m = re.search(r"^##\s+Security-review triggers\b(.*?)(?=^##\s+|\Z)", body, flags=re.M | re.S | re.I)
+sec_block = sec_m.group(1) if sec_m else ""
+sec_triggered = bool(re.search(r":\s*(yes|true)\b|\|\s*(yes|true)\s*\|", sec_block, flags=re.I))
+neg_na = bool(re.search(r"^Negatives:\s*N/A:\s*\S+", body, flags=re.M | re.I))
+
+neg_or_edge_count = sum(1 for k in kinds if k in ("negative", "edge"))
+if sec_triggered:
+    if neg_na:
+        refuse(f"{art_path} has active security-review triggers, so 'Negatives: N/A' is forbidden")
+    if refusing_negatives < 1:
+        refuse(f"{art_path} has active security-review triggers and must include at least one refusing 'Kind: negative' AC")
+else:
+    if neg_or_edge_count < 1 and not neg_na:
+        refuse(f"{art_path} must include at least one 'Kind: negative' or 'Kind: edge' AC (or 'Negatives: N/A: <reason>' when no security trigger applies)")
+
+# 8. Milestone story link & size alignment check
+ac_count = len(ac_nums)
+for mf in sorted(glob.glob("docs/agents-v0/milestones/*.md")):
+    if os.path.basename(mf) in ("plan.md", "_template.md"):
+        continue
+    mtxt = open(mf, encoding="utf-8").read()
+    for line in mtxt.splitlines():
+        if art_path in line and line.strip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) >= 7:
+                try:
+                    planned_size = int(cells[6])
+                except ValueError:
+                    planned_size = 0
+                if planned_size > 0 and abs(ac_count - planned_size) > 2:
+                    if not re.search(r"Plan deviation:\s*\S+", body, flags=re.I):
+                        refuse(f"{art_path} has {ac_count} ACs but milestone {mf} planned Size {planned_size} (diff > 2); document 'Plan deviation: <reason>' or align ACs")
+
+# Extract regulations summary
+reg_m = re.search(r"^##\s+Applicable regulations\b(.*?)(?=^##\s+|\Z)", body, flags=re.M | re.S | re.I)
+reg_summary = "none"
+if reg_m:
+    reg_items = [re.sub(r"^[-*]\s*", "", l.strip()) for l in reg_m.group(1).strip().splitlines() if l.strip()]
+    if reg_items:
+        reg_summary = ", ".join(reg_items[:3])
+
+# Preserve existing ## Lessons block in phase-result if present
+lessons_block = "## Lessons\n\n### intake\n- none\n"
+if os.path.isfile(res_path):
+    old_res = open(res_path, encoding="utf-8").read()
+    lm = re.search(r"(^##\s+Lessons\b.*)", old_res, flags=re.M | re.S)
+    if lm:
+        lessons_block = lm.group(1).rstrip() + "\n"
+
+res_content = f"""# Phase Result: intake ({slug})
+
+- phase: intake
+- status: awaiting_approval
+- guard_managed: true
+- feature: {slug}
+- artifact: {art_path}
+- base_commit: {base_commit}
+- user_story: {user_story}
+- ac_count: {ac_count}
+- negative_count: {neg_or_edge_count}
+- regulations: {reg_summary}
+- open_questions: none
+
+{lessons_block}"""
+
+with open(res_path, "w", encoding="utf-8") as fh:
+    fh.write(res_content)
+
+print(f"ac_count={ac_count} negative_or_edge={neg_or_edge_count}")
+PY
+)"; then
+    printf '%s\n' "$gi_val_out"
+    exit 1
+  fi
+
+  gc_ok ready "intake requirements verified on $gi_artifact ($gi_val_out)"
+  gi_rule ready ready.next "$gi_feature"; gi_next="$gi_val"
+  gi_rule ready ready.status "$gi_feature"; gi_status="$gi_val"
+  gc_state_set "$gi_state" "$gi_feature" "$gi_artifact" "activePhase=$gi_phase" \
+    "activeStatus=$gi_status" "blockedReason=" "nextStep=$gi_next" || exit 1
+  printf 'Next: %s\n' "$gi_next"
 }
 
 gi_commit() {
