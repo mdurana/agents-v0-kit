@@ -454,6 +454,19 @@ for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh
 done
 [ ! -e core/common/commands/v0-release.md ] || err "core/common/commands/v0-release.md must be removed (unified on /v0-local-release)"
 [ ! -e core/common/skills/release-pr/SKILL.md ] || err "core/common/skills/release-pr/SKILL.md must be removed (unified on local-release)"
+# Maintain redo, Design: DM8. Drift check A: the /v0-maintain step block matches `guard-maintain.sh steps` byte for byte.
+sh scripts/generate-maintain-steps.sh --check >/dev/null || err "core/common/commands/v0-maintain.md step block drifted from guard-maintain.sh steps (run sh scripts/generate-maintain-steps.sh)"
+[ -f scripts/test-maintain-steps.sh ] || err "scripts/test-maintain-steps.sh missing"
+sh scripts/test-maintain-steps.sh >/dev/null || err "scripts/test-maintain-steps.sh failed"
+[ -f scripts/test-guard-maintain.sh ] || err "scripts/test-guard-maintain.sh missing"
+sh scripts/test-guard-maintain.sh >/dev/null || err "scripts/test-guard-maintain.sh failed"
+# Drift check B: the /v0-maintain prose names no internal state writer or git add -A; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh check-attempt-budget.sh check-failure-brief.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-maintain.md; then
+    err "core/common/commands/v0-maintain.md names the internal '$internal' (the guard runs it; keep the prose to guard-maintain.sh steps)"
+  fi
+done
 
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.

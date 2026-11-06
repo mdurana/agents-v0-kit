@@ -10,6 +10,7 @@
 #
 # Design: DM1 (/v0-maintain guard and parameterized per-note maintenance gate).
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
 
 GC_HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 GUARD_COMMON_LIB=1
@@ -112,6 +113,7 @@ PYNT
 gm_is_brownfield() {
   [ -f docs/agents-v0/onboarding/state.json ] && return 0
   [ -f docs/agents-v0/onboarding/report.md ] && return 0
+  [ -f docs/agents-v0/onboarding/baseline-status.json ] && return 0
   return 1
 }
 
@@ -147,6 +149,16 @@ gm_check_prereqs() {
         [ -f .agents-v0/scripts/guard-common.sh ] && [ -f .agents-v0/gate-rules ] \
           || gc_refuse "$gm_step" "the kit is not installed in this repository (.agents-v0/); run install.sh first" ;;
       onboard-if-brownfield)
+        if [ -f docs/agents-v0/onboarding/baseline-status.json ]; then
+          gm_bs_ok="$(python3 -c 'import json,sys
+try:
+  d=json.load(open(sys.argv[1]))
+  print("1" if d.get("ok") is True else "0")
+except Exception:
+  print("0")' docs/agents-v0/onboarding/baseline-status.json 2>/dev/null || echo 0)"
+          [ "$gm_bs_ok" = "1" ] \
+            || gc_refuse "$gm_step" "brownfield baseline check failed in docs/agents-v0/onboarding/baseline-status.json (ok != true); fix baseline or complete /v0-onboard first"
+        fi
         if gm_is_brownfield; then
           [ -f docs/agents-v0/onboarding/state.json ] \
             || gc_refuse "$gm_step" "brownfield onboarding state missing (docs/agents-v0/onboarding/state.json); complete /v0-onboard first"
@@ -812,9 +824,9 @@ for p in sys.argv[2:]:
     if not p or not os.path.isfile(p):
         continue
     for lineno, line in enumerate(open(p, encoding="utf-8", errors="replace"), 1):
-        for r_id, pat in secret_scan.CONTENT_RULES:
+        for r_id, r_label, pat in secret_scan.CONTENT_RULES:
             if pat.search(line):
-                bad.append(f"{p}:{lineno} ({r_id})")
+                bad.append(f"{p}:{lineno} ({r_id}: {r_label})")
 if bad:
     print(", ".join(bad))
     sys.exit(1)
