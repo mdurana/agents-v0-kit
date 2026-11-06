@@ -771,6 +771,132 @@ PYVP
   printf 'Next: %s\n' "$gv_next"
 }
 
+# Design: DV5 (/v0-verify commit with Delivery approvals row, T6 traceability, safe staging, and secret scan).
+gv_commit() {
+  gv_m_slug="${1:-}"
+  [ $# -le 1 ] || gv_usage
+  gv_load commit "$gv_m_slug"
+  gv_rule commit approved.next "$gv_feature"; gv_next="$gv_val"
+
+  [ -f "$gv_state" ] || gc_refuse commit "state file '$gv_state' is missing"
+
+  # 1. Verify Sensei's external verify approval record
+  case " $(gc_state_get "$gv_state" approvedPhases | tr -d '[]",') " in
+    *" $gv_phase "*) ;;
+    *) gc_refuse commit "verify is not approved in '$gv_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature" ;;
+  esac
+  if ! gv_why="$(gc_approval_ok verify "$gv_feature")"; then
+    gc_refuse commit "$gv_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature)"
+  fi
+
+  # 2. Refuse if index already has staged paths
+  gv_PreStaged="$(git diff --cached --name-only)"
+  [ -z "$gv_PreStaged" ] \
+    || gc_refuse commit "the git index already has staged files ($(printf '%s' "$gv_PreStaged" | tr '\n' ' ')); unstage them before running guard-verify.sh commit"
+
+  # 3. Append/update Approved Verify row in Delivery approvals of requirements/<feature>.md (or note.md)
+  GV_REQ="$gv_req_art" GV_SLUG="$gv_feature" python3 - <<'PYROW'
+import datetime, os, re
+
+p = os.environ["GV_REQ"]
+slug = os.environ["GV_SLUG"]
+today = datetime.date.today().isoformat()
+txt = open(p, encoding="utf-8").read()
+lines = txt.splitlines()
+
+ev_parts = [f"`docs/agents-v0/verify/{slug}/quality-gate.md`"]
+for extra in ("vapt-checklist.md", "code-review.md", "ux-report.md", "e2e-report.md"):
+    if os.path.isfile(f"docs/agents-v0/verify/{slug}/{extra}"):
+        ev_parts.append(f"`docs/agents-v0/verify/{slug}/{extra}`")
+verify_ev = ", ".join(ev_parts)
+verify_row = f"| Verify | {verify_ev} | Sensei | Approved | {today} |"
+
+out = []
+in_deliv = False
+replaced_verify = False
+for line in lines:
+    if re.match(r"^##\s+Delivery approvals\b", line, re.I):
+        in_deliv = True
+        out.append(line)
+        continue
+    if in_deliv and re.match(r"^##\s+\S", line):
+        if not replaced_verify:
+            out.append(verify_row)
+            replaced_verify = True
+        in_deliv = False
+    if in_deliv and line.strip().startswith("|"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 5 and cells[0].lower() == "verify":
+            out.append(verify_row)
+            replaced_verify = True
+            continue
+    out.append(line)
+
+if in_deliv and not replaced_verify:
+    out.append(verify_row)
+
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write("\n".join(out) + "\n")
+PYROW
+
+  # 4. Update <feature>.phase-result.md to status: approved
+  if [ -f "$gv_result" ]; then
+    GV_PR="$gv_result" python3 - <<'PY'
+import os, re
+p = os.environ["GV_PR"]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"(?m)^status:\s*\S+", "status: approved", txt)
+with open(p, "w", encoding="utf-8") as fh:
+    fh.write(txt)
+PY
+  fi
+
+  # 5. Sync feature state --verify-passed true --approve verify (runs check-traceability.sh verify and indexes verify reports)
+  sh "$GC_HERE/sync-feature-state.sh" --verify-passed true --approve verify "$gv_req_art" >/dev/null
+
+  # 6. Resolve Story ID for commit message
+  gv_story_id="$(GV_REQ="$gv_req_art" GV_SLUG="$gv_feature" GV_MAINT="$gv_is_maintain" python3 - <<'PY'
+import os, re
+req_p = os.environ["GV_REQ"]
+slug = os.environ["GV_SLUG"]
+if os.environ.get("GV_MAINT") == "1":
+    print(f"maintain/{slug}")
+else:
+    txt = open(req_p, encoding="utf-8").read()
+    m = re.search(r"^\s*(?:\*\*)?Story(?:\*\*)?:\s*(?:\*\*)?`?([A-Z][A-Z0-9]*-[A-Z0-9]+)", txt, re.M)
+    print(m.group(1) if m else slug)
+PY
+)"
+
+  # 7. Stage explicit verify paths only (never git add -A, never *.lock)
+  gv_rule commit commit.paths "$gv_feature"; gv_paths="$gv_val"
+  if [ "$gv_is_maintain" = 1 ]; then
+    gv_paths="$gv_paths docs/agents-v0/maintain/$gv_feature"
+  fi
+  for gv_p in $gv_paths; do
+    if [ -e "$gv_p" ] || git ls-files --error-unmatch "$gv_p" >/dev/null 2>&1; then
+      git add -- "$gv_p"
+    fi
+  done
+  for gv_lk in $(git diff --cached --name-only | grep '\.lock$' || true); do
+    git reset -q HEAD -- "$gv_lk" || true
+  done
+
+  gv_Staged="$(git diff --cached --name-only)"
+  [ -n "$gv_Staged" ] || gc_refuse commit "nothing staged to commit for '$gv_feature'"
+
+  # 8. Scan staged content for secrets
+  gc_scan_staged
+
+  # 9. Commit on feature/<feature> (or maintain/<id>)
+  gv_msg="${gv_story_id}: verify approved"
+  git commit -q -m "$gv_msg"
+  gv_sha="$(git rev-parse --short HEAD)"
+
+  gc_ok commit "committed '$gv_msg' ($gv_sha) on $(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo HEAD)"
+  printf 'Next: %s\n' "$gv_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gv_usage
 shift || true
@@ -780,5 +906,6 @@ case "$cmd" in
   start) gv_start "$@" ;;
   block) gv_block "$@" ;;
   ready) gv_ready "$@" ;;
+  commit) gv_commit "$@" ;;
   *) gv_usage ;;
 esac
