@@ -737,7 +737,19 @@ PY
 }
 
 gi_steps() {
-  gc_refuse steps "not yet implemented (DI6)"
+  [ $# -eq 0 ] || gi_usage
+  gi_rule steps ready.next; gi_ready_next="$gi_val"
+  gi_rule steps approved.next; gi_approved_next="$gi_val"
+  G='sh .agents-v0/scripts/guard-intake.sh'
+  cat <<EOF_STEPS
+1. Run \`$G check <feature> [--tier trivial|emergency|standard|major] [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), routes \`trivial\` to \`/v0-triage\` and \`emergency\` to \`/v0-maintain\`, verifies the integration branch, checks Sensei's external \`onboard\`/\`plan\`/\`scaffold\` approvals when applicable, and ensures the story is not already released or approved. When it prints \`REFUSED\`, show its message and stop.
+2. Run \`$G start <feature> [--reopen]\`. It verifies a clean working tree on the integration branch, seeds \`docs/agents-v0/requirements/<feature>.md\` if absent, and sets \`docs/agents-v0/requirements/<feature>.state.json\` to \`in_progress\`.
+3. Read \`docs/agents-v0/lessons.md\` and launch the \`requirements-analyst\` subagent (skill: \`spec-intake\`) to author \`docs/agents-v0/requirements/<feature>.md\` (user story sentence, Gherkin \`AC-1\`..\`AC-8\` with \`Kind: happy | negative | edge\` and observable \`Then\` outcomes, security-review triggers, NFRs, regulations, and \`Open questions: none\`). It runs no shell commands and leaves \`Delivery approvals\` tables empty.
+4. If \`docs/agents-v0/requirements/<feature>.helper-brief.md\` exists or the story requires \`## Proposed split\`, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper briefs and records \`blocked\`). If a helper brief was written, launch \`explore-researcher\`, pass findings back to \`requirements-analyst\`, remove the brief, and resume; if split or blocked on user input, stop.
+5. When \`docs/agents-v0/requirements/<feature>.md\` is complete, run \`$G ready <feature>\`. It validates the user story sentence, Gherkin acceptance criteria, negative/edge and security-trigger refusal rules, single-surface / vertical-slice budget, milestone size alignment, mandatory sections, and \`Open questions: none\`, writes \`docs/agents-v0/requirements/<feature>.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
+6. Stop. Present the requirements summary to Sensei and wait for explicit approval. Next: $gi_ready_next. Never run approve yourself; the agent cannot approve this gate.
+7. After Sensei runs approve in his own terminal and authorises branch \`feature/<feature>\` in its own turn (Do not run the script in the same turn as the Intake approval), run \`$G commit <feature>\`. It verifies Sensei's external approval record, appends the verified \`Intake\` row to \`Delivery approvals\`, creates or attaches the \`feature/<feature>\` worktree via \`feature-worktree.sh\`, moves untracked intake artifacts into the worktree, stages only the story's intake files, scans staged content for secrets, and commits \`"<story>: intake approved"\` on \`feature/<feature>\`. Then open the worktree and suggest: $gi_approved_next.
+EOF_STEPS
 }
 
 cmd="${1:-}"
