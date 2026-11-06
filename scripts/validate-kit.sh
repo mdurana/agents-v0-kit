@@ -413,6 +413,19 @@ for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh
     err "core/common/commands/v0-design.md names the internal '$internal' (the guard runs it; keep the prose to guard-design.sh steps)"
   fi
 done
+# Build redo, Design: DB8. Drift check A: the /v0-build step block matches `guard-build.sh steps` byte for byte.
+sh scripts/generate-build-steps.sh --check >/dev/null || err "core/common/commands/v0-build.md step block drifted from guard-build.sh steps (run sh scripts/generate-build-steps.sh)"
+[ -f scripts/test-build-steps.sh ] || err "scripts/test-build-steps.sh missing"
+sh scripts/test-build-steps.sh >/dev/null || err "scripts/test-build-steps.sh failed"
+[ -f scripts/test-guard-build.sh ] || err "scripts/test-guard-build.sh missing"
+sh scripts/test-guard-build.sh >/dev/null || err "scripts/test-guard-build.sh failed"
+# Drift check B: the /v0-build prose names no internal state writer or git add -A; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh check-attempt-budget.sh check-failure-brief.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-build.md; then
+    err "core/common/commands/v0-build.md names the internal '$internal' (the guard runs it; keep the prose to guard-build.sh steps)"
+  fi
+done
 
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.

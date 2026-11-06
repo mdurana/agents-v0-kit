@@ -1070,6 +1070,10 @@ data = {
         "verify": verify_ev,
     },
 }
+if prev.get("designGuardManaged"):
+    data["designGuardManaged"] = True
+if prev.get("buildGuardManaged"):
+    data["buildGuardManaged"] = True
 tmp_fd, tmp_path = tempfile.mkstemp(prefix=".state.", suffix=".tmp", dir=os.path.dirname(out) or ".")
 try:
     with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:

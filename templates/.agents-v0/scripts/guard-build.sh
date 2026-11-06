@@ -285,6 +285,48 @@ gb_start() {
     fi
   fi
 
+  gb_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  gb_rule start start.next "$gb_feature"; gb_next="$gb_val"
+  gb_rule start start.status "$gb_feature"; gb_status="$gb_val"
+
+  if [ "$gb_s_reopen" = 1 ] && [ -f "$gb_state" ]; then
+    python3 - "$gb_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+reopen_count = int(d.get("reopenCount") or 0) + 1
+d["reopenCount"] = reopen_count
+if "approvedPhases" in d and isinstance(d["approvedPhases"], list):
+    if "build" in d["approvedPhases"]:
+        idx = d["approvedPhases"].index("build")
+        d["approvedPhases"] = d["approvedPhases"][:idx]
+    d["lastApprovedPhase"] = d["approvedPhases"][-1] if d["approvedPhases"] else ""
+d["verifyPassed"] = False
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_state_set "$gb_state" "$gb_feature" "$gb_req_art" "activePhase=$gb_phase" \
+    "activeStatus=$gb_status" "blockedReason=" "nextStep=$gb_next" || exit 1
+
+  GB_ST="$gb_state" GB_BASE="$gb_base" python3 - <<'PY'
+import json, os
+p = os.environ["GB_ST"]
+base = os.environ["GB_BASE"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base and not d.get("baseCommit"):
+    d["baseCommit"] = base
+d["buildGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
   mkdir -p "docs/agents-v0/build/${gb_feature}"
 
   # Seed plan.md from approved AC-1..AC-n in requirements/<feature>.md when absent
@@ -325,27 +367,6 @@ PYPLAN
 EOF
   fi
 
-  gb_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
-  if [ "$gb_s_reopen" = 1 ]; then
-    sh "$GC_HERE/sync-feature-state.sh" --reopen build "$gb_req_art" >/dev/null
-  else
-    sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status in_progress "$gb_req_art" >/dev/null
-  fi
-
-  GB_ST="$gb_state" GB_BASE="$gb_base" python3 - <<'PY'
-import json, os
-p = os.environ["GB_ST"]
-base = os.environ["GB_BASE"]
-d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
-if base and not d.get("baseCommit"):
-    d["baseCommit"] = base
-d["buildGuardManaged"] = True
-with open(p, "w", encoding="utf-8") as fh:
-    json.dump(d, fh, indent=2)
-    fh.write("\n")
-PY
-
-  gb_rule start start.next "$gb_feature"; gb_next="$gb_val"
   gc_ok start "build is in_progress for $gb_feature ($gb_artifact, $gb_report)"
   printf 'Next: %s\n' "$gb_next"
 }
@@ -353,10 +374,16 @@ PY
 gb_block() {
   gb_b_slug="${1:-}"
   shift || true
-  gb_b_reason="${1:-}"
-  [ $# -le 1 ] || gb_usage
+  gb_b_reason="${*:-}"
   gb_load block "$gb_b_slug"
-  gb_b_clean="$(gc_clean_reason block "$gb_b_reason")"
+  [ -n "$(printf '%s' "$gb_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+  gb_b_clean="$gb_b_reason"
+  gb_rule block block.next "$gb_feature"; gb_next="$gb_val"
+  gb_rule block block.status "$gb_feature"; gb_status="$gb_val"
+
+  [ -f "$gb_state" ] || gc_refuse block "build for '$gb_feature' has not been started ($gb_state missing)"
+  [ "$(gc_state_get "$gb_state" activePhase)" = "$gb_phase" ] \
+    || gc_refuse block "activePhase for '$gb_feature' is '$(gc_state_get "$gb_state" activePhase)', not '$gb_phase'"
 
   # Deduplicate helper-brief.md or failure-brief.md by SHA-256
   gb_hb=""
@@ -367,17 +394,22 @@ gb_block() {
   elif [ -f "docs/agents-v0/requirements/${gb_feature}.helper-brief.md" ]; then
     gb_hb="docs/agents-v0/requirements/${gb_feature}.helper-brief.md"
   fi
-  if [ -n "$gb_hb" ] && [ -f "$gb_state" ]; then
+  if [ -n "$gb_hb" ]; then
     gb_dup="$(GB_ST="$gb_state" GB_HB="$gb_hb" python3 - <<'PY'
-import hashlib, json, os
+import hashlib, json, os, re
 st_p = os.environ["GB_ST"]
 hb_p = os.environ["GB_HB"]
 d = json.load(open(st_p, encoding="utf-8")) if os.path.isfile(st_p) else {}
-h = hashlib.sha256(open(hb_p, "rb").read()).hexdigest()
-prev_h = d.get("lastHelperBriefHash", "")
+raw = open(hb_p, encoding="utf-8", errors="replace").read()
+norm = re.sub(r"\s+", " ", raw.strip().lower())
+h = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+hashes = d.get("helperBriefHashes") if isinstance(d.get("helperBriefHashes"), dict) else {}
+prev_h = hashes.get("build") or d.get("lastHelperBriefHash", "")
 if prev_h and prev_h == h:
     print("DUP")
 else:
+    hashes["build"] = h
+    d["helperBriefHashes"] = hashes
     d["lastHelperBriefHash"] = h
     with open(st_p, "w", encoding="utf-8") as fh:
         json.dump(d, fh, indent=2)
@@ -390,8 +422,8 @@ PY
     fi
   fi
 
-  sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status blocked --reason "$gb_b_clean" "$gb_req_art" >/dev/null
-  gb_rule block block.next "$gb_feature"; gb_next="$gb_val"
+  gc_state_set "$gb_state" "$gb_feature" "$gb_req_art" "activePhase=$gb_phase" \
+    "activeStatus=$gb_status" "blockedReason=$gb_b_clean" "nextStep=$gb_next" || exit 1
   gc_ok block "build is blocked for $gb_feature ($gb_b_clean)"
   printf 'Next: %s\n' "$gb_next"
 }
@@ -590,7 +622,22 @@ PYVAL
 
   # 5. Secret scan on build-output.txt and build-report.md
   if [ -f "$GC_HERE/secret_scan.py" ]; then
-    gb_sec_out="$(python3 "$GC_HERE/secret_scan.py" "$gb_report" "$gb_output" 2>&1)" || {
+    gb_sec_out="$(python3 -B - "$GC_HERE" "$gb_report" "$gb_output" <<'PYSEC'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import secret_scan
+hits = []
+for p in sys.argv[2:]:
+    txt = open(p, encoding="utf-8", errors="replace").read()
+    for line_no, line in enumerate(txt.splitlines(), 1):
+        for rule_id, label, rx in secret_scan.CONTENT_RULES:
+            if rx.search(line):
+                hits.append(f"{p}:{line_no} ({rule_id}: {label})")
+if hits:
+    print("secret pattern detected in " + ", ".join(hits))
+    sys.exit(1)
+PYSEC
+)" || {
       gc_refuse ready "secret scan failed on build evidence: $gb_sec_out"
     }
   fi
@@ -626,8 +673,9 @@ with open(p, "w", encoding="utf-8") as fh:
     fh.write(content)
 PYPR
 
-  sh "$GC_HERE/sync-feature-state.sh" --active-phase build --status awaiting_approval "$gb_req_art" >/dev/null
   gb_rule ready ready.next "$gb_feature"; gb_next="$gb_val"
+  gc_state_set "$gb_state" "$gb_feature" "$gb_req_art" "activePhase=$gb_phase" \
+    "activeStatus=awaiting_approval" "blockedReason=" "nextStep=$gb_next" || exit 1
   gc_ok ready "build for $gb_feature verified and awaiting Sensei's approval"
   printf 'Next: %s\n' "$gb_next"
 }
@@ -761,7 +809,7 @@ PY
   [ -n "$gb_Staged" ] || gc_refuse commit "nothing staged to commit for '$gb_feature'"
 
   # 8. Scan staged content for secrets
-  gc_scan_staged commit
+  gc_scan_staged
 
   # 9. Commit on feature/<feature>
   gb_msg="${gb_story_id}: build approved"
