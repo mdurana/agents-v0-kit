@@ -386,6 +386,19 @@ for internal in sync-feature-state.sh check-gate-commit.sh \
     err "core/common/commands/v0-scaffold.md names the internal '$internal' (the guard runs it; keep the prose to guard-scaffold.sh steps)"
   fi
 done
+# Intake redo, Design: DI8. Drift check A: the /v0-intake step block matches `guard-intake.sh steps` byte for byte.
+sh scripts/generate-intake-steps.sh --check >/dev/null || err "core/common/commands/v0-intake.md step block drifted from guard-intake.sh steps (run sh scripts/generate-intake-steps.sh)"
+[ -f scripts/test-intake-steps.sh ] || err "scripts/test-intake-steps.sh missing"
+sh scripts/test-intake-steps.sh >/dev/null || err "scripts/test-intake-steps.sh failed"
+[ -f scripts/test-guard-intake.sh ] || err "scripts/test-guard-intake.sh missing"
+sh scripts/test-guard-intake.sh >/dev/null || err "scripts/test-guard-intake.sh failed"
+# Drift check B: the /v0-intake prose names no internal script; the guard runs these, the prose does not.
+for internal in sync-feature-state.sh check-gate-commit.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-intake.md; then
+    err "core/common/commands/v0-intake.md names the internal '$internal' (the guard runs it; keep the prose to guard-intake.sh steps)"
+  fi
+done
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
 [ -x scripts/hooks/commit-msg ] || err "scripts/hooks/commit-msg missing or not executable (Design: line hook)"

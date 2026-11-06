@@ -253,8 +253,8 @@ gi_start() {
     gi_check_prereqs start "not-approved" 0
   fi
 
-  # Refuse unrelated dirty paths on the integration branch
-  gi_dirty="$(git status --porcelain 2>/dev/null | awk '{print $NF}' | grep -Ev "^docs/agents-v0/requirements/${gi_feature}(\\.|$)" || true)"
+  # Refuse unrelated dirty paths on the integration branch (ignoring .lock files)
+  gi_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -v '\.lock$' | grep -Ev "^docs/agents-v0/requirements/${gi_feature}(\\.|$)" || true)"
   if [ -n "$gi_dirty" ]; then
     gc_refuse start "working tree has uncommitted changes outside docs/agents-v0/requirements/${gi_feature}.*; commit or stash them first"
   fi

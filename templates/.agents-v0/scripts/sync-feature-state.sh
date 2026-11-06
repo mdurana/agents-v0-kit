@@ -179,7 +179,7 @@ case "$approve_lc" in
     ;;
   intake)
     guard_common="$(dirname "$0")/guard-common.sh"
-    intake_slug="$(basename "${req_file:-}" .md)"
+    intake_slug="$slug"
     intake_state="docs/agents-v0/requirements/${intake_slug}.state.json"
     intake_pr="docs/agents-v0/requirements/${intake_slug}.phase-result.md"
     if [ -f "$guard_common" ]; then

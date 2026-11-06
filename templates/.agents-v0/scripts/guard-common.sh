@@ -74,16 +74,20 @@ gc_state_file() {
   esac
 }
 
-# --- gate rules and state (Design: D2) --------------------------------------------------------------------------------
-# gc_rule <command> <key>: print the value of `<command> <key> <value>` from .agents-v0/gate-rules (data only);
-# exit 1 when the file or the rule is missing.
+# --- gate rules and state (Design: D2, DIA) ---------------------------------------------------------------------------
+# gc_rule <command> <key> [<feature>]: print the value of `<command> <key> <value>` from .agents-v0/gate-rules (data only);
+# exit 1 when the file or the rule is missing. When <feature> is given, substitutes `<feature>` in the value.
 gc_rule() {
   gc_rules="${GC_RULES:-$GC_HERE/../gate-rules}"
   [ -f "$gc_rules" ] || return 1
-  awk -v c="$1" -v k="$2" '
+  gc_r_val="$(awk -v c="$1" -v k="$2" '
     /^[[:space:]]*#/ || NF < 3 { next }
     $1 == c && $2 == k { sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, ""); print; found = 1; exit }
-    END { exit found ? 0 : 1 }' "$gc_rules"
+    END { exit found ? 0 : 1 }' "$gc_rules")" || return 1
+  if [ -n "${3:-}" ]; then
+    gc_r_val="$(printf '%s' "$gc_r_val" | sed "s/<feature>/$3/g")"
+  fi
+  printf '%s\n' "$gc_r_val"
 }
 # gc_state_get <state file> <key>: print a top-level value of a state file (empty when the file or key is missing).
 gc_state_get() {
