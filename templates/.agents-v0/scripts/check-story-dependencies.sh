@@ -81,6 +81,21 @@ if not deps:
 for dep in deps:
     if dep not in rows:
         blocked(dep, f"not in any milestone manifest")
+    if dep == "P0-A":
+        # Scaffold / platform baseline check (Jiraiya Recommendation 1, DS5)
+        prog_state = Path("docs/agents-v0/program.state.json")
+        if prog_state.is_file():
+            try:
+                pdata = json.loads(prog_state.read_text(encoding="utf-8"))
+                if "scaffold" in (pdata.get("approvedPhases") or []):
+                    continue
+            except Exception:
+                pass
+        p0_man = Path("docs/agents-v0/milestones/p0-platform-skeleton.md")
+        if p0_man.is_file():
+            m_txt = p0_man.read_text(encoding="utf-8", errors="replace")
+            if re.search(r"\|\s*scaffold\s*\|\s*Approved", m_txt, re.I) or re.search(r"\|\s*P0-A\s*\|.*?\|\s*released\s*\|", m_txt, re.I):
+                continue
     dep_art = rows[dep][0].get("feature artifact", "").strip("` ")
     if not dep_art.endswith(".md"):
         blocked(dep, "manifest row has no Feature artifact")

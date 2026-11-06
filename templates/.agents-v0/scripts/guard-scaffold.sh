@@ -240,13 +240,69 @@ EOF
   printf 'Next: %s\n' "$gs_next"
 }
 
+gs_commit() {
+  [ $# -eq 0 ] || gs_usage
+  gs_load commit
+
+  # 1. Check state approved and Sensei approval record matches (DS5, DSA)
+  case " $(gc_state_get "$gs_state" approvedPhases | tr -d '[]",') " in
+    *" $gs_phase "*) ;;
+    *) gc_refuse commit "scaffold is not approved in $gs_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  gs_ok_out="$(gc_approval_ok scaffold)" || {
+    printf '%s\n' "$gs_ok_out"
+    gc_refuse commit "no approval record from Sensei matches this scaffold; Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$gs_ok_out"
+
+  [ -f "$gs_artifact" ] || gc_refuse commit "platform skeleton manifest '$gs_artifact' not found"
+
+  # 2. Update p0-platform-skeleton.md: set status to released and append Delivery approvals row
+  gs_rec_file="$(gc_approval_file scaffold)"
+  python3 - "$gs_artifact" "$gs_rec_file" <<'PY'
+import json, re, sys
+manifest, rec_path = sys.argv[1:3]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+txt = open(manifest, "r", encoding="utf-8").read()
+# Update P0-A story row status to released if currently planned
+txt = re.sub(
+    r"(\|\s*P0-A\s*\|.*?\|\s*)planned(\s*\|)",
+    r"\g<1>released\g<2>",
+    txt,
+    flags=re.I
+)
+
+# Append to Delivery approvals
+row = f"| scaffold | Approved | {approver} | {approved_at} | Initial platform skeleton baseline |\n"
+if "## Delivery approvals" in txt:
+    if not re.search(r"\|\s*scaffold\s*\|", txt, re.I):
+        txt = txt.rstrip() + "\n" + row
+else:
+    txt = txt.rstrip() + "\n\n## Delivery approvals\n\n| Phase | Decision | Approver | Date | Notes |\n|---|---|---|---|---|\n" + row
+
+open(manifest, "w", encoding="utf-8").write(txt)
+PY
+
+  # 3. Commit and tag via gc_commit_tag (stages allowed paths, secret-scans, commits and tags)
+  gc_commit_tag scaffold
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gs_check "$@" ;;
   start) shift; gs_start "$@" ;;
   block) shift; gs_block "$@" ;;
   ready) shift; gs_ready "$@" ;;
-  commit|steps)
-    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS3" ;;
+  commit) shift; gs_commit "$@" ;;
+  steps)
+    gc_refuse "$cmd" "command '$cmd' not yet fully implemented in DS5" ;;
   *) gs_usage ;;
 esac

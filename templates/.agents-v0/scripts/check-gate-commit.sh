@@ -131,6 +131,8 @@ def commit_cmd(ph):
         return "sh .agents-v0/scripts/guard-architecture.sh commit"
     if ph == "plan":  # Plan redo DP5: guard stages, scans, commits and tags
         return "sh .agents-v0/scripts/guard-plan.sh commit"
+    if ph == "scaffold":  # Scaffold redo DS5: guard stages, scans, commits and tags
+        return "sh .agents-v0/scripts/guard-scaffold.sh commit"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
 
 if mode == "message":
@@ -148,7 +150,7 @@ if mode == "message":
     elif kind == "onboarding":
         print(commit_cmd(phase))
     elif kind == "program":
-        if phase in ("roadmap", "architecture", "plan"):
+        if phase in ("roadmap", "architecture", "plan", "scaffold"):
             print(commit_cmd(phase))
         else:
             print(commit_cmd(phase) + f" && git tag -a {phase}-v<n> -m \"{phase} approved\"   (n = 1, or the next free number for a revision)")
