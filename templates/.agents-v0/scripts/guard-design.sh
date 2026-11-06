@@ -729,13 +729,224 @@ PY
   esac
 }
 
+gd_commit() {
+  [ $# -eq 1 ] || gd_usage
+  gd_cm_slug="$1"
+  gd_load commit "$gd_cm_slug"
+
+  [ -f "$gd_state" ] || gc_refuse commit "no state for '$gd_feature' ($gd_state); run $G start $gd_feature and $G ready $gd_feature first"
+  [ -f "$gd_artifact" ] || gc_refuse commit "design artifact '$gd_artifact' not found"
+
+  # Reject any modification to the repo-wide OpenAPI catalog during Design (Jiraiya Rec 3)
+  gd_cat_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -E '^openapi/' || true)"
+  if [ -n "$gd_cat_dirty" ]; then
+    gc_refuse commit "repo-wide OpenAPI catalog ($gd_cat_dirty) was modified during Design; revert catalog changes before committing Design"
+  fi
+
+  # Check branch (unless skipped in kit test override)
+  gd_skip_bg=0
+  # >>> kit-test-override (kitfix-20261031-installed-no-overrides: install.sh removes this block; kit test copies only)
+  [ "${AGENTS_V0_SKIP_BRANCH_GUARD:-0}" != 1 ] || gd_skip_bg=1
+  # <<< kit-test-override
+  if [ "$gd_skip_bg" != 1 ]; then
+    gd_cur_br="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    [ "$gd_cur_br" = "feature/$gd_feature" ] \
+      || gc_refuse commit "design commit for '$gd_feature' must run on branch 'feature/$gd_feature' (current: '${gd_cur_br:-detached}')"
+  fi
+
+  # Check if Contract: None shortcut was verified by ready
+  gd_is_cn=0
+  if [ -f "$gd_result" ] && grep -Fq "phase: design" "$gd_result" && grep -Fq "status: contract_none" "$gd_result"; then
+    gd_is_cn=1
+  fi
+
+  if [ "$gd_is_cn" = 1 ]; then
+    # Contract: None shortcut commit (no external approval required; --approve build backfills design)
+    gd_story_id="$(python3 - "$gd_req_art" "$gd_state" "$gd_feature" <<'PY'
+import glob, json, os, re, sys
+req_path, state_path, slug = sys.argv[1:4]
+d = json.load(open(state_path, encoding="utf-8"))
+d["activePhase"] = ""
+d["activeStatus"] = ""
+d["blockedReason"] = ""
+d["nextStep"] = f"/v0-build {slug}"
+with open(state_path, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+
+txt = open(req_path, encoding="utf-8").read()
+m = re.search(r"^\s*(?:\*\*)?Story(?:\*\*)?:\s*(?:\*\*)?`?([A-Z][A-Z0-9]*-[A-Z0-9]+)", txt, flags=re.M)
+if m:
+    print(m.group(1))
+    sys.exit(0)
+for mf in sorted(glob.glob("docs/agents-v0/milestones/*.md")):
+    for line in open(mf, encoding="utf-8"):
+        if f"requirements/{slug}.md" in line and line.strip().startswith("|"):
+            cell = line.strip().strip("|").split("|")[0].strip().strip("`* ")
+            if cell:
+                print(cell)
+                sys.exit(0)
+print(slug)
+PY
+)"
+    gd_allowed="docs/agents-v0/design/${gd_feature} docs/agents-v0/requirements/${gd_feature}.state.json docs/agents-v0/requirements/${gd_feature}.phase-result.md"
+    if ! gd_bad_staged="$(gc_outside_paths "$gd_allowed")"; then
+      gc_refuse commit "the index already holds paths outside Contract: None design ($gd_bad_staged); unstage them first"
+    fi
+    for gd_p in $gd_allowed; do
+      if [ -e "$gd_p" ] || git ls-files --error-unmatch -- "$gd_p" >/dev/null 2>&1; then
+        git add -- "$gd_p"
+      fi
+    done
+    gc_scan_staged
+    gd_msg="${gd_story_id}: design (Contract: None)"
+    git commit -q -m "$gd_msg" || gc_refuse commit "git commit failed for Contract: None design"
+    gd_sha="$(git rev-parse --short HEAD)"
+    gc_ok commit "design (Contract: None) for $gd_feature committed as $gd_sha (\"$gd_msg\")"
+    gd_rule commit approved.next "$gd_feature"; gd_approved_next="$gd_val"
+    printf 'Next: %s\n' "$gd_approved_next"
+    return 0
+  fi
+
+  # Standard Design Gate commit
+  case " $(gc_state_get "$gd_state" approvedPhases | tr -d '[]",') " in
+    *" $gd_phase "*) ;;
+    *) gc_refuse commit "design is not approved in $gd_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  gd_ok_out="$(gc_approval_ok design "$gd_feature")" || {
+    printf '%s\n' "$gd_ok_out"
+    gc_refuse commit "no approval record from Sensei matches design ($gd_feature); Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$gd_ok_out"
+
+  # Run traceability check (T1-T3)
+  if [ -f "$GC_HERE/check-traceability.sh" ]; then
+    sh "$GC_HERE/check-traceability.sh" design "$gd_req_art" || gc_refuse commit "check-traceability.sh design failed for '$gd_feature'"
+  fi
+
+  # Promote ADR to Accepted, append verified Design row to <feature>.md, update phase-result.md, and index artifacts in state.json
+  gd_rec_file="$(gc_approval_file design "$gd_feature")"
+  gd_story_id="$(python3 - "$gd_req_art" "$gd_artifact" "$gd_result" "$gd_state" "$gd_rec_file" "$gd_feature" <<'PY'
+import glob, json, os, re, sys
+
+req_path, design_path, res_path, state_path, rec_path, slug = sys.argv[1:7]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+# 1. Promote cited ADR from Proposed to Accepted
+design_txt = open(design_path, "r", encoding="utf-8").read()
+adr_m = re.search(r"^ADR:\s*(\S+)", design_txt, flags=re.M | re.I)
+adr_path = ""
+if adr_m and not adr_m.group(1).lower().startswith("n/a"):
+    adr_path = adr_m.group(1).strip("`")
+    if os.path.isfile(adr_path):
+        atxt = open(adr_path, "r", encoding="utf-8").read()
+        atxt_new = re.sub(r"((?:\*\*)?Status(?:\*\*)?:\s*)Proposed\b", r"\g<1>Accepted", atxt, flags=re.I)
+        if atxt_new != atxt:
+            with open(adr_path, "w", encoding="utf-8") as fh:
+                fh.write(atxt_new)
+
+# 2. Collect design artifacts for the approval row and state.json
+arts = [design_path]
+for opt_p in (
+    f"docs/agents-v0/design/{slug}/openapi.yaml",
+    f"docs/agents-v0/design/{slug}/asyncapi.yaml",
+    f"docs/agents-v0/design/{slug}/ux-spec.md",
+    f"docs/agents-v0/design/{slug}/review.md",
+):
+    if os.path.isfile(opt_p):
+        arts.append(opt_p)
+if adr_path and os.path.isfile(adr_path):
+    arts.append(adr_path)
+
+# 3. Append or update Design row in <feature>.md ## Delivery approvals
+req_txt = open(req_path, "r", encoding="utf-8").read()
+row = f"| Design | {', '.join(arts)} | {approver} | Approved | {approved_at} |\n"
+if "## Delivery approvals" in req_txt:
+    if re.search(r"^\|\s*Design\s*\|", req_txt, flags=re.M | re.I):
+        req_txt = re.sub(r"^\|\s*Design\s*\|[^\n]*\n", row, req_txt, flags=re.M | re.I)
+    else:
+        req_txt = req_txt.rstrip() + "\n" + row
+else:
+    req_txt = req_txt.rstrip() + "\n\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|---|---|---|---|---|\n" + row
+with open(req_path, "w", encoding="utf-8") as fh:
+    fh.write(req_txt)
+
+# 4. Update phase-result.md to status: approved
+if os.path.isfile(res_path):
+    rtxt = open(res_path, "r", encoding="utf-8").read()
+    rtxt = re.sub(r"^(- status:\s*).*$", r"\g<1>approved", rtxt, flags=re.M)
+    with open(res_path, "w", encoding="utf-8") as fh:
+        fh.write(rtxt)
+
+# 5. Index artifacts in <feature>.state.json
+if os.path.isfile(state_path):
+    st = json.load(open(state_path, encoding="utf-8"))
+    art_map = st.get("artifacts") if isinstance(st.get("artifacts"), dict) else {}
+    art_map["requirements"] = req_path
+    art_map["design"] = design_path
+    if os.path.isfile(f"docs/agents-v0/design/{slug}/openapi.yaml"):
+        art_map["openapi"] = f"docs/agents-v0/design/{slug}/openapi.yaml"
+    if os.path.isfile(f"docs/agents-v0/design/{slug}/ux-spec.md"):
+        art_map["uxSpec"] = f"docs/agents-v0/design/{slug}/ux-spec.md"
+    if os.path.isfile(f"docs/agents-v0/design/{slug}/review.md"):
+        art_map["designReview"] = f"docs/agents-v0/design/{slug}/review.md"
+    st["artifacts"] = art_map
+    with open(state_path, "w", encoding="utf-8") as fh:
+        json.dump(st, fh, indent=2)
+        fh.write("\n")
+
+# 6. Resolve story ID
+m = re.search(r"^\s*(?:\*\*)?Story(?:\*\*)?:\s*(?:\*\*)?`?([A-Z][A-Z0-9]*-[A-Z0-9]+)", req_txt, flags=re.M)
+if m:
+    print(m.group(1))
+    sys.exit(0)
+for mf in sorted(glob.glob("docs/agents-v0/milestones/*.md")):
+    for line in open(mf, encoding="utf-8"):
+        if f"requirements/{slug}.md" in line and line.strip().startswith("|"):
+            cell = line.strip().strip("|").split("|")[0].strip().strip("`* ")
+            if cell:
+                print(cell)
+                sys.exit(0)
+print(slug)
+PY
+)"
+
+  gd_rule commit commit.paths "$gd_feature"; gd_allowed="$gd_val"
+  if ! gd_bad_staged="$(gc_outside_paths "$gd_allowed")"; then
+    gc_refuse commit "the index already holds paths outside design ($gd_bad_staged); unstage them first"
+  fi
+
+  for gd_p in $gd_allowed; do
+    if [ -e "$gd_p" ] || git ls-files --error-unmatch -- "$gd_p" >/dev/null 2>&1; then
+      git add -- "$gd_p"
+    fi
+  done
+
+  gc_scan_staged
+  gd_msg="${gd_story_id}: design approved"
+  git commit -q -m "$gd_msg" || gc_refuse commit "git commit failed on feature/$gd_feature"
+  gd_sha="$(git rev-parse --short HEAD)"
+  gc_ok commit "design for $gd_feature committed on feature/$gd_feature as $gd_sha (\"$gd_msg\")"
+  gd_rule commit approved.next "$gd_feature"; gd_approved_next="$gd_val"
+  printf 'Next: %s\n' "$gd_approved_next"
+}
+
 cmd="${1:-}"
 case "$cmd" in
   check) shift; gd_check "$@" ;;
   start) shift; gd_start "$@" ;;
   block) shift; gd_block "$@" ;;
   ready) shift; gd_ready "$@" ;;
+  commit) shift; gd_commit "$@" ;;
   *) gd_usage ;;
 esac
+
 
 

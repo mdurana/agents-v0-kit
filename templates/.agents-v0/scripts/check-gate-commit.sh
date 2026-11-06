@@ -135,7 +135,10 @@ def commit_cmd(ph):
         return "sh .agents-v0/scripts/guard-scaffold.sh commit"
     if ph == "intake" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("baseCommit"):
         return f"sh .agents-v0/scripts/guard-intake.sh commit {slug}"
+    if ph == "design" and os.path.isfile(state) and (load(open(state, encoding="utf-8").read()) or {}).get("designGuardManaged"):
+        return f"sh .agents-v0/scripts/guard-design.sh commit {slug}"
     return f"git add -A && git commit -m \"{story_id()}: {ph} approved\""
+
 
 if mode == "message":
     if not phase:
