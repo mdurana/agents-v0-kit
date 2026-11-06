@@ -163,7 +163,7 @@ for f in core/*/skills/*/SKILL.md; do
 done
 
 # 6. Phase commands carry explicit approval wording.
-for command in intake design build verify local-release; do
+for command in intake design build verify local-release maintain; do
   grep -Eqi 'explicit.*approval|approval.*explicit' "core/common/commands/v0-$command.md" || err "/v0-$command lacks explicit approval wording"
 done
 
@@ -484,7 +484,7 @@ grep -Fq 'check-gate-commit.sh' templates/.agents-v0/scripts/sync-feature-state.
 grep -Fq 'check-traceability.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must run check-traceability.sh at design/build/verify approval"
 grep -Fq 'Story-Branch' templates/.agents-v0/scripts/check-release-evidence.sh || err "check-release-evidence must accept a squash release (Story-Branch trailer)"
 grep -Fq 'already squash-merged' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must refuse a squash-released branch"
-for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-roadmap v0-architecture v0-plan v0-onboard v0-scaffold; do
+for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-maintain v0-roadmap v0-architecture v0-plan v0-onboard v0-scaffold; do
   grep -Fq 'kitfix-20261031-gate-commit' "core/common/commands/$c.md" || err "$c.md must state the gate commit (kitfix-20261031-gate-commit)"
 done
 for c in v0-design v0-build v0-verify; do
