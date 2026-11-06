@@ -138,15 +138,14 @@ for f in core/*/agents/*.md; do
   grep -Eq '^mode:[[:space:]]*subagent' "$f" || err "$f: missing mode: subagent"
   grep -Eq '^model:[[:space:]]*[a-z0-9.-]+(\[[^]]+\])?$' "$f" || err "$f: missing cursor model"
   case "$name" in
-    explore-researcher|schema-author|docs-author|codebase-documenter|roadmap-planner|solution-architect|design-reviewer|program-planner|platform-engineer|requirements-analyst|ux-designer|backend-engineer|bff-engineer|frontend-engineer|debug-investigator|test-engineer|security-reviewer|code-reviewer|release-manager|maintenance-engineer)
+    explore-researcher|schema-author|docs-author|codebase-documenter|roadmap-planner|solution-architect|design-reviewer|program-planner|platform-engineer|requirements-analyst|ux-designer|backend-engineer|bff-engineer|frontend-engineer|debug-investigator|test-engineer|security-reviewer|code-reviewer|release-manager|maintenance-engineer|orchestrator)
       if awk 'NR==1 && /^---$/{fm=1;next} fm && /^---$/{exit} fm && /^[[:space:]]*-[[:space:]]*shell$/{found=1;exit} END{exit !found}' "$f"; then
         err "$f: subagent $name must NOT declare '- shell' in tools frontmatter"
       fi
-      ;;  # no shell (DR4, DA4, DP4, DS4, DI4, DD4, DB4, DV4, DLR4, DM4)
+      ;;  # no shell (DR4, DA4, DP4, DS4, DI4, DD4, DB4, DV4, DLR4, DM4, DDL4 — 100% of subagents are shell-less)
 
     *)
-      awk 'NR==1 && /^---$/{fm=1;next} fm && /^---$/{exit} fm && /^[[:space:]]*-[[:space:]]*shell$/{found=1;exit} END{exit !found}' "$f" \
-        || err "$f: phase agent must declare '- shell' in tools frontmatter"
+      err "$f: unknown subagent $name; all kit subagents must be registered in the shell-less enforcement list"
       ;;
   esac
   grep -Fqr -- "$name" core/common core/java core/dotnet core/node core/python core/go || err "$name is not referenced by a command, agent, or skill"
