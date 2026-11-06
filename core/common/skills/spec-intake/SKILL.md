@@ -21,25 +21,24 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - **UX requirements** (UI-affecting changes) — WCAG 2.1 AA target, device/browser matrix, design-system reference, UX acceptance criteria.
    - **Regulations** — GDPR, BSP, internal GXI as applicable.
    - **Security-review triggers** — `none`, or a bullet for each trigger that applies: auth, upload, RBAC, public route, any `{id}` path. Do not restate the catalog when none apply.
-   - **Open questions** — resolve them with the user. Before the gate the section is the single word `none`.
+   - **Open questions** — resolve them with the user. Before the gate the section includes `Open questions: none`.
    - **Milestone file** — when `Milestone:` is set, also record `Milestone file: docs/agents-v0/milestones/<milestone>.md` and `Story: <story-id>`. The manifest must name that story id.
    - **Milestone/Story links** — `Milestone: <Pn-name>` and `Story: <story-id>` under the title when the story belongs to a milestone program (`docs/agents-v0/milestones/<milestone>.md`).
-   - **Delivery approvals** — record only actual user decisions, in this canonical table format:
+   - **Delivery approvals** — leave the table empty with headers only (never pre-fill rows; `guard-intake.sh commit <feature>` appends the verified `Intake` row after Sensei's external approval):
 
      | Phase | Artifacts | Approver | Decision | Date |
      |-------|-----------|----------|----------|------|
-     | Intake | docs/agents-v0/requirements/&lt;feature&gt;.md | &lt;name&gt; | Approved | &lt;date&gt; |
 
-     Append one row per approved phase; record evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`.
+     Subsequent phases append one row per approved phase; record evidence paths in each phase row's Artifacts column — Build: `docs/agents-v0/build/<feature>/...`; Verify: `docs/agents-v0/verify/<feature>/...`.
 4. The UI is the bound pack's `ui` id. The React example is React 19, TypeScript 5.9, and Vite 7.
 5. Apply the **story-size budget** before the gate (`workflow-orchestration.mdc`):
    - Record `Surfaces:` as `backend`, `bff`, or `frontend`. When `docs/agents-v0/project-profile.md` lists `Service roots`, also record `Service root: <root>` for a backend or BFF story. A story that needs two service roots is two stories.
    - Count `AC-*` rows. The cap is eight (`AC-1` through `AC-8`).
-   - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. The required negative counts toward the eight. Write `## Proposed split` with a **table** of extra milestone rows (story sentence, surface, dependency). The main session records `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status blocked --reason "Proposed split pending user confirmation" docs/agents-v0/requirements/<feature>.md` and stops until the user approves the split. After approval, this artifact keeps the first slice and drops `## Proposed split`; each other row is its own feature.
-   - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Do not write `## Proposed split` for the seeded P0-A row. This skill does not write that story; `/v0-build` copies it.
-6. Resolve open questions with the user. Write `none` under Open questions.
-7. Verify that `docs/agents-v0/requirements/<feature>.md` satisfies every item in the checklist below. P0-A does not run this skill; `/v0-build` copies that milestone story and AC-1 through AC-4.
-8. Do not write the phase-result file. Present the Intake gate result and return. The main session writes `docs/agents-v0/requirements/<feature>.phase-result.md` (`phase: intake`, `status: awaiting_approval`) and runs `sh .agents-v0/scripts/sync-feature-state.sh --active-phase intake --status awaiting_approval docs/agents-v0/requirements/<feature>.md`. After the user approves, the main session appends the `Intake` row, runs `--approve intake`, then runs `sh .agents-v0/scripts/feature-worktree.sh <feature>` (`/v0-intake`). Do not start Design. Do not create that worktree before approval.
+   - More than one surface, more than one bounded context, or more than eight criteria: do not present the Intake gate. The required negative counts toward the eight. Write `## Proposed split` with a **table** of extra milestone rows (story sentence, surface, dependency). The main session runs `sh .agents-v0/scripts/guard-intake.sh block <feature> "Proposed split pending user confirmation"` and stops until the user approves the split. After approval, this artifact keeps the first slice and drops `## Proposed split`; each other row is its own feature.
+   - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Greenfield P0-A runs `/v0-scaffold` on the integration branch, not `/v0-intake`.
+6. Resolve open questions with the user. Write `Open questions: none` under `## Open questions`.
+7. Verify that `docs/agents-v0/requirements/<feature>.md` satisfies every item in the checklist below.
+8. Do not write the phase-result file and do not run shell commands. Present the drafted requirements artifact and return. The main session runs `sh .agents-v0/scripts/guard-intake.sh ready <feature>` (which validates the artifact, writes `docs/agents-v0/requirements/<feature>.phase-result.md`, and sets `awaiting_approval`). After Sensei approves in his external terminal (`sh .agents-v0/scripts/guard-common.sh approve intake <feature>`) and authorises the branch in its own turn, the main session runs `sh .agents-v0/scripts/guard-intake.sh commit <feature>` (`/v0-intake`). Do not start Design. Do not create a worktree before approval.
 
 Scenario shape:
 

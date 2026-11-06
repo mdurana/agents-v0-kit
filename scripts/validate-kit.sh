@@ -138,7 +138,11 @@ for f in core/*/agents/*.md; do
   grep -Eq '^mode:[[:space:]]*subagent' "$f" || err "$f: missing mode: subagent"
   grep -Eq '^model:[[:space:]]*[a-z0-9.-]+(\[[^]]+\])?$' "$f" || err "$f: missing cursor model"
   case "$name" in
-    explore-researcher|schema-author|docs-author|codebase-documenter|roadmap-planner|solution-architect|design-reviewer|program-planner|platform-engineer) ;;  # no shell (DR4, DA4, DP4, DS4)
+    explore-researcher|schema-author|docs-author|codebase-documenter|roadmap-planner|solution-architect|design-reviewer|program-planner|platform-engineer|requirements-analyst)
+      if awk 'NR==1 && /^---$/{fm=1;next} fm && /^---$/{exit} fm && /^[[:space:]]*-[[:space:]]*shell$/{found=1;exit} END{exit !found}' "$f"; then
+        err "$f: subagent $name must NOT declare '- shell' in tools frontmatter"
+      fi
+      ;;  # no shell (DR4, DA4, DP4, DS4, DI4)
     *)
       awk 'NR==1 && /^---$/{fm=1;next} fm && /^---$/{exit} fm && /^[[:space:]]*-[[:space:]]*shell$/{found=1;exit} END{exit !found}' "$f" \
         || err "$f: phase agent must declare '- shell' in tools frontmatter"
