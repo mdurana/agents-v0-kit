@@ -386,8 +386,79 @@ PY
   printf 'Next: %s\n' "$gp_next"
 }
 
+gp_commit() {
+  [ $# -eq 0 ] || gp_usage
+  gp_load commit
+
+  # 1. Check state approved and Sensei approval record matches (DP5, FP1)
+  case " $(gc_state_get "$gp_state" approvedPhases | tr -d '[]",') " in
+    *" $gp_phase "*) ;;
+    *) gc_refuse commit "plan is not approved in $gp_state; Sensei runs approve in his own terminal first" ;;
+  esac
+
+  gp_ok_out="$(gc_approval_ok plan)" || {
+    printf '%s\n' "$gp_ok_out"
+    gc_refuse commit "no approval record from Sensei matches this plan; Sensei runs approve in his own terminal"
+  }
+  printf '%s\n' "$gp_ok_out"
+
+  [ -f "$gp_artifact" ] || gc_refuse commit "plan artifact '$gp_artifact' not found"
+
+  # 2. Append verified plan approval row to plan.md and all in-scope manifests (FP5, Jiraiya Recommendation 2)
+  gp_rec_file="$(gc_approval_file plan)"
+  python3 - "$gp_artifact" "$gp_rec_file" <<'PY'
+import glob, json, os, re, sys
+
+plan_path, rec_path = sys.argv[1:3]
+try:
+    rec = json.load(open(rec_path, encoding="utf-8"))
+    approver = rec.get("approver", "Sensei")
+    approved_at = rec.get("approvedAt", "").split("T")[0]
+except Exception:
+    approver = "Sensei"
+    approved_at = ""
+
+manifests = sorted(
+    f for f in glob.glob("docs/agents-v0/milestones/*.md")
+    if not os.path.basename(f).startswith("_") and not f.endswith(".phase-result.md")
+)
+
+for mf in manifests:
+    txt = open(mf, "r", encoding="utf-8").read()
+    if re.search(r"\|\s*plan\s*\|", txt, re.I):
+        continue
+    
+    # Target Delivery approvals row
+    row = f"| plan | {mf} | {approver} | Approved | {approved_at} |\n"
+    if "## Delivery approvals" in txt:
+        lines = txt.splitlines(keepends=True)
+        out_lines = []
+        appended = False
+        in_approvals = False
+        for line in lines:
+            out_lines.append(line)
+            if "## Delivery approvals" in line:
+                in_approvals = True
+            elif in_approvals and line.startswith("|") and "---" in line and not appended:
+                out_lines.append(row)
+                appended = True
+        if not appended:
+            out_lines.append(row)
+        with open(mf, "w", encoding="utf-8") as f:
+            f.writelines(out_lines)
+    else:
+        with open(mf, "a", encoding="utf-8") as f:
+            f.write(f"\n## Delivery approvals\n\n| Phase | Artifacts | Approver | Decision | Date |\n|-------|-----------|----------|----------|------|\n{row}")
+PY
+
+  # 3. Stage plan commit paths, secret scan, commit, and tag (FP2, DP5)
+  gc_commit_tag plan
+  gp_rule commit approved.next
+  printf 'Next: %s\n' "$gp_val"
+}
+
 gp_usage() {
-  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check | start | block "<plain reason>" [--next "<next step>"] | ready\n' >&2
+  printf 'usage: sh .agents-v0/scripts/guard-plan.sh check | start | block "<plain reason>" [--next "<next step>"] | ready | commit\n' >&2
   exit 2
 }
 
@@ -398,6 +469,7 @@ case "$gp_cmd" in
   start) gp_start "$@" ;;
   block) gp_block "$@" ;;
   ready) gp_ready "$@" ;;
+  commit) gp_commit "$@" ;;
   -h|--help) sed -n '2,24p' "$GP_HERE/guard-plan.sh" ;;
   *) gp_usage ;;
 esac
