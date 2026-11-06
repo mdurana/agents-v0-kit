@@ -61,6 +61,7 @@ gv_rule() {
 gv_load() {
   gv_step="$1"
   gv_slug="$2"
+  gv_force_maint="${3:-0}"
   gv_validate_slug "$gv_step" "$gv_slug"
   gc_to_root "$gv_step"
   gv_rule "$gv_step" phase "$gv_slug"; gv_phase="$gv_val"
@@ -73,7 +74,7 @@ gv_load() {
   gv_rule "$gv_step" result "$gv_slug"; gv_result="$gv_val"
   gv_req_art="docs/agents-v0/requirements/${gv_feature}.md"
   gv_is_maintain=0
-  if [ ! -f "$gv_req_art" ] && [ -f "docs/agents-v0/maintain/${gv_feature}/note.md" ]; then
+  if [ "$gv_force_maint" = 1 ] || { [ ! -f "$gv_req_art" ] && [ -f "docs/agents-v0/maintain/${gv_feature}/note.md" ]; }; then
     gv_is_maintain=1
     gv_req_art="docs/agents-v0/maintain/${gv_feature}/note.md"
     gv_state="docs/agents-v0/maintain/${gv_feature}/state.json"
@@ -166,6 +167,12 @@ gv_check_prereqs() {
             *" maintain "*) ;;
             *) gc_refuse "$gv_step" "maintain is not in approvedPhases in '$gv_state'; complete /v0-maintain $gv_feature first" ;;
           esac
+          gv_mgm="$(gc_state_get "$gv_state" maintainGuardManaged 2>/dev/null || true)"
+          if [ "$gv_mgm" = "True" ] || [ "$gv_mgm" = "true" ]; then
+            if ! gv_mnt_ok="$(gc_approval_ok maintain "$gv_feature")"; then
+              gc_refuse "$gv_step" "external maintain approval record missing or mismatched ($gv_mnt_ok); complete /v0-maintain $gv_feature first"
+            fi
+          fi
         else
           case " $(gc_state_get "$gv_state" approvedPhases | tr -d '[]",') " in
             *" build "*) ;;
@@ -228,10 +235,15 @@ gv_check_prereqs() {
 gv_check() {
   gv_c_slug=""
   gv_c_reopen=0
+  gv_c_maint=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --reopen)
         gv_c_reopen=1
+        shift
+        ;;
+      --maintain)
+        gv_c_maint=1
         shift
         ;;
       -*)
@@ -245,7 +257,7 @@ gv_check() {
     esac
   done
 
-  gv_load check "$gv_c_slug"
+  gv_load check "$gv_c_slug" "$gv_c_maint"
   gv_rule check check.requires "$gv_feature"; gv_requires="$gv_val"
   gv_check_prereqs check "$gv_requires" "$gv_c_reopen"
 
@@ -262,6 +274,7 @@ gv_start() {
   gv_s_slug=""
   gv_s_reopen=0
   gv_s_check_db=0
+  gv_s_maint=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --reopen)
@@ -270,6 +283,10 @@ gv_start() {
         ;;
       --check-db)
         gv_s_check_db=1
+        shift
+        ;;
+      --maintain)
+        gv_s_maint=1
         shift
         ;;
       -*)
@@ -283,7 +300,7 @@ gv_start() {
     esac
   done
 
-  gv_load start "$gv_s_slug"
+  gv_load start "$gv_s_slug" "$gv_s_maint"
   gv_rule start start.requires "$gv_feature"; gv_requires="$gv_val"
   gv_check_prereqs start "$gv_requires" "$gv_s_reopen"
   if [ "$gv_s_reopen" != 1 ]; then
@@ -482,9 +499,25 @@ PY
 
 # Design: DV3 (/v0-verify ready quality-gate, VAPT F4/F8/F9/F10, code-review, T6 traceability, and automatic Critical bounce).
 gv_ready() {
-  gv_r_slug="${1:-}"
-  [ $# -le 1 ] || gv_usage
-  gv_load ready "$gv_r_slug"
+  gv_r_slug=""
+  gv_r_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        gv_r_maint=1
+        shift
+        ;;
+      -*)
+        gv_usage
+        ;;
+      *)
+        [ -z "$gv_r_slug" ] || gv_usage
+        gv_r_slug="$1"
+        shift
+        ;;
+    esac
+  done
+  gv_load ready "$gv_r_slug" "$gv_r_maint"
   gv_rule ready ready.requires "$gv_feature"; gv_requires="$gv_val"
   gv_check_prereqs ready "$gv_requires" 0
 
@@ -776,9 +809,25 @@ PYVP
 
 # Design: DV5 (/v0-verify commit with Delivery approvals row, T6 traceability, safe staging, and secret scan).
 gv_commit() {
-  gv_m_slug="${1:-}"
-  [ $# -le 1 ] || gv_usage
-  gv_load commit "$gv_m_slug"
+  gv_m_slug=""
+  gv_m_maint=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --maintain)
+        gv_m_maint=1
+        shift
+        ;;
+      -*)
+        gv_usage
+        ;;
+      *)
+        [ -z "$gv_m_slug" ] || gv_usage
+        gv_m_slug="$1"
+        shift
+        ;;
+    esac
+  done
+  gv_load commit "$gv_m_slug" "$gv_m_maint"
   gv_rule commit approved.next "$gv_feature"; gv_next="$gv_val"
 
   [ -f "$gv_state" ] || gc_refuse commit "state file '$gv_state' is missing"

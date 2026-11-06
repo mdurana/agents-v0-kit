@@ -450,7 +450,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
         fi
       fi
     fi
-    # Verify handoff check (DB7): when entering verify in_progress on a guard-managed build story, verify external build approval
+    # Verify handoff check (DB7 / DM7): when entering verify in_progress on a guard-managed build story or maintenance note, verify external build/maintain approval
     if [ "$active_phase" = "verify" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
       GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
       db7_gm=""
@@ -462,17 +462,44 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
           exit 1
         fi
       fi
+      dm7_gm=""
+      [ -f "$state" ] && dm7_gm="$(gc_state_get "$state" maintainGuardManaged 2>/dev/null || true)"
+      if [ "$dm7_gm" = "True" ] || [ "$dm7_gm" = "true" ]; then
+        dm7_slug="$slug"
+        case "$art" in
+          docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md) dm7_slug="$(basename "$(dirname "$art")")" ;;
+        esac
+        if ! dm7_ok="$(gc_approval_ok maintain "$dm7_slug")"; then
+          printf 'FAIL: verify for %s refused without Sensei external maintain approval record: %s\n' "$dm7_slug" "$dm7_ok" >&2
+          printf '  Complete /v0-maintain %s (sh .agents-v0/scripts/guard-common.sh approve maintain %s && sh .agents-v0/scripts/guard-maintain.sh commit %s) first.\n' "$dm7_slug" "$dm7_slug" "$dm7_slug" >&2
+          exit 1
+        fi
+      fi
     fi
-    # Release handoff check (DV7): when entering release on a guard-managed verify story, verify external verify approval
+    # Release handoff check (DV7 / DM7): when entering release on a guard-managed verify story or emergency maintenance note, verify external approval
     if [ "$active_phase" = "release" ] && [ -f "$(dirname "$0")/guard-common.sh" ]; then
       GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$(dirname "$0")/guard-common.sh"
+      dv7_slug="$slug"
+      case "$art" in
+        docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md) dv7_slug="$(basename "$(dirname "$art")")" ;;
+      esac
       dv7_gm=""
       [ -f "$state" ] && dv7_gm="$(gc_state_get "$state" verifyGuardManaged 2>/dev/null || true)"
       if [ "$dv7_gm" = "True" ] || [ "$dv7_gm" = "true" ]; then
-        if ! dv7_ok="$(gc_approval_ok verify "$slug")"; then
-          printf 'FAIL: release for %s refused without Sensei external verify approval record: %s\n' "$slug" "$dv7_ok" >&2
-          printf '  Complete /v0-verify %s (sh .agents-v0/scripts/guard-common.sh approve verify %s && sh .agents-v0/scripts/guard-verify.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
+        if ! dv7_ok="$(gc_approval_ok verify "$dv7_slug")"; then
+          printf 'FAIL: release for %s refused without Sensei external verify approval record: %s\n' "$dv7_slug" "$dv7_ok" >&2
+          printf '  Complete /v0-verify %s (sh .agents-v0/scripts/guard-common.sh approve verify %s && sh .agents-v0/scripts/guard-verify.sh commit %s) first.\n' "$dv7_slug" "$dv7_slug" "$dv7_slug" >&2
           exit 1
+        fi
+      else
+        dm7_rgm=""
+        [ -f "$state" ] && dm7_rgm="$(gc_state_get "$state" maintainGuardManaged 2>/dev/null || true)"
+        if [ "$dm7_rgm" = "True" ] || [ "$dm7_rgm" = "true" ]; then
+          if ! dm7_rok="$(gc_approval_ok maintain "$dv7_slug")"; then
+            printf 'FAIL: release for %s refused without Sensei external maintain approval record: %s\n' "$dv7_slug" "$dm7_rok" >&2
+            printf '  Complete /v0-maintain %s (sh .agents-v0/scripts/guard-common.sh approve maintain %s && sh .agents-v0/scripts/guard-maintain.sh commit %s) first.\n' "$dv7_slug" "$dv7_slug" "$dv7_slug" >&2
+            exit 1
+          fi
         fi
       fi
     fi

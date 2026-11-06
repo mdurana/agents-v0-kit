@@ -213,6 +213,12 @@ PYEM
 )"
               if [ "$glr_em_ok" = "1" ]; then
                 glr_em_bypass=1
+                glr_mgm="$(gc_state_get "$glr_state" maintainGuardManaged 2>/dev/null || true)"
+                if [ "$glr_mgm" = "True" ] || [ "$glr_mgm" = "true" ]; then
+                  if ! glr_m_ok="$(gc_approval_ok maintain "$glr_feature")"; then
+                    gc_refuse "$glr_step" "external maintain approval record missing or mismatched ($glr_m_ok); complete /v0-maintain $glr_feature first"
+                  fi
+                fi
               else
                 gc_refuse "$glr_step" "emergency maintenance note '$glr_feature' requires a rollback plan and 'Follow-up verify due: YYYY-MM-DD' in '$glr_req_art' before releasing ahead of /v0-verify"
               fi
