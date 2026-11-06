@@ -257,11 +257,236 @@ gv_check() {
   fi
 }
 
+# Design: DV2 (/v0-verify start, block, reopen, and helper-brief deduplication).
+gv_start() {
+  gv_s_slug=""
+  gv_s_reopen=0
+  gv_s_check_db=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reopen)
+        gv_s_reopen=1
+        shift
+        ;;
+      --check-db)
+        gv_s_check_db=1
+        shift
+        ;;
+      -*)
+        gv_usage
+        ;;
+      *)
+        [ -z "$gv_s_slug" ] || gv_usage
+        gv_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  gv_load start "$gv_s_slug"
+  gv_rule start start.requires "$gv_feature"; gv_requires="$gv_val"
+  gv_check_prereqs start "$gv_requires" "$gv_s_reopen"
+  if [ "$gv_s_reopen" != 1 ]; then
+    gv_check_prereqs start "not-approved" 0
+  else
+    gv_check_prereqs start "not-approved" 1
+  fi
+
+  # Collision guard: refuse unrelated dirty paths outside verify/app/requirements/<feature>
+  gv_dirty="$(git status --porcelain -uall 2>/dev/null | awk '{print $NF}' | grep -v '\.lock$' | grep -Ev "^(app/|docs/agents-v0/verify/${gv_feature}/|docs/agents-v0/design/system/slo-evidence\\.md$|docs/agents-v0/requirements/${gv_feature}\\.|docs/agents-v0/maintain/${gv_feature}/)" || true)"
+  if [ -n "$gv_dirty" ]; then
+    gc_refuse start "working tree has uncommitted changes outside verify paths ($gv_dirty); commit or stash them first"
+  fi
+
+  if [ "$gv_s_check_db" = 1 ] && [ -f "$GC_HERE/check-database-runtime.sh" ]; then
+    if ! gv_db_out="$(sh "$GC_HERE/check-database-runtime.sh" --phase verify "$gv_req_art" 2>&1)"; then
+      gc_refuse start "database runtime unavailable ($gv_db_out); run $G block $gv_feature \"Database runtime unavailable\" and stop"
+    fi
+  fi
+
+  gv_base="$(git rev-parse --verify -q HEAD 2>/dev/null || true)"
+  gv_rule start start.next "$gv_feature"; gv_next="$gv_val"
+  gv_rule start start.status "$gv_feature"; gv_status="$gv_val"
+
+  if [ "$gv_s_reopen" = 1 ] && [ -f "$gv_state" ]; then
+    python3 - "$gv_state" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+reopen_count = int(d.get("reopenCount") or 0) + 1
+d["reopenCount"] = reopen_count
+if "approvedPhases" in d and isinstance(d["approvedPhases"], list):
+    if "verify" in d["approvedPhases"]:
+        idx = d["approvedPhases"].index("verify")
+        d["approvedPhases"] = d["approvedPhases"][:idx]
+    d["lastApprovedPhase"] = d["approvedPhases"][-1] if d["approvedPhases"] else ""
+d["verifyPassed"] = False
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_state_set "$gv_state" "$gv_feature" "$gv_req_art" "activePhase=$gv_phase" \
+    "activeStatus=$gv_status" "blockedReason=" "nextStep=$gv_next" || exit 1
+
+  GV_ST="$gv_state" GV_BASE="$gv_base" python3 - <<'PY'
+import json, os
+p = os.environ["GV_ST"]
+base = os.environ["GV_BASE"]
+d = json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+if base and not d.get("baseCommit"):
+    d["baseCommit"] = base
+d["verifyGuardManaged"] = True
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+
+  mkdir -p "docs/agents-v0/verify/${gv_feature}"
+
+  # Seed quality-gate.md from approved AC-1..AC-n when absent
+  if [ ! -f "$gv_artifact" ]; then
+    GV_REQ="$gv_req_art" GV_QG="$gv_artifact" GV_SLUG="$gv_feature" GV_SHA="${gv_base:-HEAD}" python3 - <<'PYQG'
+import os, re
+req_text = open(os.environ["GV_REQ"], encoding="utf-8").read()
+clean_req = re.sub(r"<!--.*?-->", "", req_text, flags=re.S)
+acs = sorted(set(int(n) for n in re.findall(r"^###\s+AC-(\d+)\b", clean_req, re.M)))
+if not acs:
+    acs = [1]
+lines = [
+    f"commit: {os.environ['GV_SHA']}",
+    "agent: test-engineer",
+    "",
+    f"# Quality Gate: {os.environ['GV_SLUG']}",
+    "",
+    "## Summary",
+    "- Build status: PENDING",
+    "- Changed-line coverage: TBD%",
+    "- Backend line coverage: TBD%",
+    "- Frontend line coverage: N/A",
+    "- Unsuppressed HIGH/CRITICAL CVEs: TBD",
+    "",
+    "## AC Traceability",
+    "| AC | Test | Status | Evidence |",
+    "| --- | --- | --- | --- |",
+]
+for n in acs:
+    lines.append(f"| AC-{n} | TBD | PENDING | TBD |")
+lines += [
+    "",
+    "## Findings",
+    "| ID | Label | Finding | Evidence | Status |",
+    "| --- | --- | --- | --- | --- |",
+]
+with open(os.environ["GV_QG"], "w", encoding="utf-8") as fh:
+    fh.write("\n".join(lines) + "\n")
+PYQG
+  fi
+
+  gv_tier="$(gc_state_get "$gv_state" tier 2>/dev/null || echo standard)"
+  if [ "$gv_tier" != "trivial" ]; then
+    if [ ! -f "$gv_vapt" ]; then
+      cat > "$gv_vapt" <<EOF
+commit: ${gv_base:-HEAD}
+agent: security-reviewer
+
+# VAPT Checklist: ${gv_feature}
+
+| Finding | Control | Status | Evidence | Retest |
+| --- | --- | --- | --- | --- |
+| F4 | Access control enforced server-side | PENDING | TBD | TBD |
+| F8 | Same-role peer {id} access -> 403/404 | PENDING | TBD | TBD |
+| F9 | JWT alg/iss/aud/exp + fail-closed blacklist | PENDING | TBD | TBD |
+| F10 | Audit events recorded without raw token | PENDING | TBD | TBD |
+
+## Findings
+| ID | Label | Finding | Evidence | Status |
+| --- | --- | --- | --- | --- |
+EOF
+    fi
+    if [ ! -f "$gv_review" ]; then
+      cat > "$gv_review" <<EOF
+commit: ${gv_base:-HEAD}
+agent: code-reviewer
+
+# Code Review: ${gv_feature}
+
+| ID | Label | Finding | Evidence | Rule Clause | Status |
+| --- | --- | --- | --- | --- | --- |
+EOF
+    fi
+  fi
+
+  gc_ok start "verify is in_progress for $gv_feature ($gv_artifact)"
+  printf 'Next: %s\n' "$gv_next"
+}
+
+gv_block() {
+  gv_b_slug="${1:-}"
+  shift || true
+  gv_b_reason="${*:-}"
+  gv_load block "$gv_b_slug"
+  [ -n "$(printf '%s' "$gv_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+  gv_b_clean="$gv_b_reason"
+  gv_rule block block.next "$gv_feature"; gv_next="$gv_val"
+  gv_rule block block.status "$gv_feature"; gv_status="$gv_val"
+
+  [ -f "$gv_state" ] || gc_refuse block "verify for '$gv_feature' has not been started ($gv_state missing)"
+  [ "$(gc_state_get "$gv_state" activePhase)" = "$gv_phase" ] \
+    || gc_refuse block "activePhase for '$gv_feature' is '$(gc_state_get "$gv_state" activePhase)', not '$gv_phase'"
+
+  # Deduplicate helper-brief.md by SHA-256
+  gv_hb=""
+  if [ -f "docs/agents-v0/verify/${gv_feature}/helper-brief.md" ]; then
+    gv_hb="docs/agents-v0/verify/${gv_feature}/helper-brief.md"
+  elif [ -f "docs/agents-v0/requirements/${gv_feature}.helper-brief.md" ]; then
+    gv_hb="docs/agents-v0/requirements/${gv_feature}.helper-brief.md"
+  fi
+  if [ -n "$gv_hb" ]; then
+    gv_dup="$(GV_ST="$gv_state" GV_HB="$gv_hb" python3 - <<'PY'
+import hashlib, json, os, re
+st_p = os.environ["GV_ST"]
+hb_p = os.environ["GV_HB"]
+d = json.load(open(st_p, encoding="utf-8")) if os.path.isfile(st_p) else {}
+raw = open(hb_p, encoding="utf-8", errors="replace").read()
+norm = re.sub(r"\s+", " ", raw.strip().lower())
+h = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+hashes = d.get("helperBriefHashes") if isinstance(d.get("helperBriefHashes"), dict) else {}
+prev_h = hashes.get("verify") or d.get("lastHelperBriefHash", "")
+if prev_h and prev_h == h:
+    print("DUP")
+else:
+    hashes["verify"] = h
+    d["helperBriefHashes"] = hashes
+    d["lastHelperBriefHash"] = h
+    with open(st_p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=2)
+        fh.write("\n")
+    print("OK")
+PY
+)"
+    if [ "$gv_dup" = "DUP" ]; then
+      gc_refuse block "identical brief ($gv_hb) was already recorded; escalate to Sensei instead of repeating the same ask"
+    fi
+  fi
+
+  gc_state_set "$gv_state" "$gv_feature" "$gv_req_art" "activePhase=$gv_phase" \
+    "activeStatus=$gv_status" "blockedReason=$gv_b_clean" "nextStep=$gv_next" || exit 1
+  gc_ok block "verify is blocked for $gv_feature ($gv_b_clean)"
+  printf 'Next: %s\n' "$gv_next"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || gv_usage
 shift || true
 
 case "$cmd" in
   check) gv_check "$@" ;;
+  start) gv_start "$@" ;;
+  block) gv_block "$@" ;;
   *) gv_usage ;;
 esac
