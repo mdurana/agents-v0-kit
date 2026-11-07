@@ -78,7 +78,8 @@ ss_approvals_dir="${AGENTS_V0_APPROVALS_DIR:-}"
 # <<< kit-test-override
 [ -n "$ss_approvals_dir" ] || ss_approvals_dir="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')/.agents-v0-approvals"
 
-SS_JSON="$as_json" SS_ALL="$all_copies" SS_STORY="$target_story" SS_APPROVALS_DIR="$ss_approvals_dir" python3 - <<'PY'
+ss_script_dir="$(cd "$(dirname "$0")" && pwd)"
+SS_JSON="$as_json" SS_ALL="$all_copies" SS_STORY="$target_story" SS_APPROVALS_DIR="$ss_approvals_dir" SS_SCRIPT_DIR="$ss_script_dir" python3 - <<'PY'
 import hashlib
 import json
 import os
@@ -91,6 +92,7 @@ as_json = os.environ.get("SS_JSON") == "1"
 all_copies = os.environ.get("SS_ALL") == "1"
 target_story = os.environ.get("SS_STORY", "").strip()
 approvals_root = os.environ.get("SS_APPROVALS_DIR", "").strip()
+script_dir = os.environ.get("SS_SCRIPT_DIR", "").strip()
 caller_cwd = os.path.abspath(".")
 
 
@@ -418,6 +420,120 @@ def compute_next_command(row, data, wt_path):
     return "/v0-status"
 
 
+def is_source_path(p):
+    p = (p or "").strip().strip('"')
+    if not p:
+        return False
+    for prefix in ("docs/agents-v0/", ".agents-v0/", ".cursor/", ".agents/"):
+        if p.startswith(prefix):
+            return False
+    if p in (".gitignore", ".cursorignore"):
+        return False
+    return True
+
+
+def check_release_and_deploy(wt, kind, story, data):
+    """Cross-check release evidence and optional deploy record when kind == 'feature' and 'release' in approvedPhases."""
+    if not data or not isinstance(data, dict) or kind != "feature":
+        return None, False, "", ""
+    app_phases = data.get("approvedPhases") or []
+    if not isinstance(app_phases, list) or "release" not in app_phases:
+        return None, False, "", ""
+    wt_path = wt["path"]
+    art_rel = f"docs/agents-v0/requirements/{story}.md"
+    art_full = os.path.join(wt_path, art_rel)
+    if not os.path.isfile(art_full):
+        return (
+            False,
+            False,
+            "unsupported by evidence (requirements doc missing; restore state file)",
+            f"UNSUPPORTED BY EVIDENCE: restore docs/agents-v0/requirements/{story}.state.json (sync-feature-state.sh cannot re-open a released story)",
+        )
+    cre = os.path.join(wt_path, ".agents-v0", "scripts", "check-release-evidence.sh")
+    if not os.path.isfile(cre) and script_dir:
+        cre = os.path.join(script_dir, "check-release-evidence.sh")
+    if os.path.isfile(cre):
+        try:
+            r = subprocess.run(["sh", cre, art_rel], cwd=wt_path, capture_output=True, text=True, check=False)
+            if r.returncode != 0:
+                return (
+                    False,
+                    False,
+                    "unsupported by evidence (restore state file)",
+                    f"UNSUPPORTED BY EVIDENCE: restore docs/agents-v0/requirements/{story}.state.json (sync-feature-state.sh cannot re-open a released story)",
+                )
+        except OSError:
+            pass
+    # Optional deploy-table check in docs/agents-v0/project-profile.md
+    prof_full = os.path.join(wt_path, "docs", "agents-v0", "project-profile.md")
+    if os.path.isfile(prof_full):
+        try:
+            prof_txt = re.sub(r"<!--.*?-->", "", Path(prof_full).read_text(encoding="utf-8", errors="replace"), flags=re.S)
+            m_dep = re.search(r"(?ims)^##\s+Deploy\b(.*?)(?=^##\s+|\Z)", prof_txt)
+            deploy_envs = []
+            if m_dep:
+                for line in m_dep.group(1).splitlines():
+                    line_s = line.strip()
+                    if not line_s.startswith("|"):
+                        continue
+                    cells = [c.strip() for c in line_s.strip("|").split("|")]
+                    if len(cells) >= 2:
+                        env_name = cells[0]
+                        if env_name and env_name.lower() not in ("env", "environment") and not re.match(r"^[-:]+$", env_name) and not env_name.startswith("<"):
+                            deploy_envs.append(env_name)
+            if deploy_envs:
+                req_txt = re.sub(r"<!--.*?-->", "", Path(art_full).read_text(encoding="utf-8", errors="replace"), flags=re.S)
+                if not re.search(r"(?im)^\|\s*release\s*\([^|\n]+\)\s*\|", req_txt):
+                    return (
+                        True,
+                        True,
+                        "local-release complete; deploy record pending (release-deploy)",
+                        f"Follow release-deploy skill for {story} (configured Deploy row in docs/agents-v0/project-profile.md)",
+                    )
+        except OSError:
+            pass
+    return True, False, "", ""
+
+
+def check_post_verify_drift(wt, kind, story, data):
+    """Detect source modifications after Verify passed while the story is not yet released."""
+    if not data or not isinstance(data, dict) or wt.get("nogit") or not wt.get("exists"):
+        return False, "", ""
+    if data.get("verifyPassed") is not True:
+        return False, "", ""
+    app_phases = data.get("approvedPhases") or []
+    last_app = (data.get("lastApprovedPhase") or "").strip()
+    active_phase = (data.get("activePhase") or "").strip()
+    if (isinstance(app_phases, list) and "release" in app_phases) or last_app == "release":
+        return False, "", ""
+    if active_phase and active_phase not in ("verify", "release"):
+        return False, "", ""
+    wt_path = wt["path"]
+    changed = []
+    porc = git(["status", "--porcelain"], cwd=wt_path)
+    for line in porc.splitlines():
+        if len(line) > 3:
+            p = line[3:].strip()
+            if " -> " in p:
+                p = p.split(" -> ", 1)[1].strip()
+            if is_source_path(p):
+                changed.append(p)
+    base_c = (data.get("baseCommit") or "").strip()
+    if base_c and last_app == "verify" and not active_phase:
+        diff_out = git(["diff", "--name-only", f"{base_c}..HEAD"], cwd=wt_path)
+        for p in diff_out.splitlines():
+            if is_source_path(p):
+                changed.append(p.strip())
+    if changed:
+        flag_m = " --maintain" if kind == "maintain" else ""
+        return (
+            True,
+            f"post-Verify source drift: re-run /v0-verify {story}{flag_m}",
+            f"/v0-verify {story}{flag_m} (post-Verify source drift detected)",
+        )
+    return False, "", ""
+
+
 copies = {}  # (kind, story) -> list of rows
 for wt in worktrees:
     if not wt["exists"]:
@@ -427,9 +543,15 @@ for wt in worktrees:
         own = bool(owner_branch(kind, story)) and wt["branch"] == owner_branch(kind, story)
         state_rel = os.path.relpath(str(path), wt["path"])
         u_phase, u_cmd = detect_uncommitted_gate(wt, kind, story, state_rel, data)
+        rel_ok, dep_pend, rel_note, rel_cmd = check_release_and_deploy(wt, kind, story, data)
+        drift_ok, drift_note, drift_cmd = check_post_verify_drift(wt, kind, story, data)
         note_parts = [err] if err else []
         if u_phase:
             note_parts.append(f"uncommitted gate ({u_phase}): run {u_cmd}")
+        if rel_note:
+            note_parts.append(rel_note)
+        if drift_note:
+            note_parts.append(drift_note)
         row = {
             "story": story,
             "kind": kind,
@@ -444,9 +566,18 @@ for wt in worktrees:
         row["_own"] = own
         row["_uncommittedPhase"] = u_phase
         row["_uncommittedCmd"] = u_cmd
+        row["_relOk"] = rel_ok
+        row["_depPend"] = dep_pend
+        row["_drift"] = drift_ok
         row["_wtPath"] = wt["path"]
         row["_data"] = data or {}
-        row["nextCommand"] = compute_next_command(row, data, wt["path"])
+        nxt = compute_next_command(row, data, wt["path"])
+        if not u_cmd:
+            if rel_cmd:
+                nxt = rel_cmd
+            elif drift_cmd:
+                nxt = drift_cmd
+        row["nextCommand"] = nxt
         copies.setdefault((kind, story), []).append(row)
 
 # Story branches whose worktree has no state file yet (e.g. intake doc not moved yet).
@@ -505,6 +636,9 @@ if target_story:
         raise SystemExit(1)
     chosen = dict(matches[0])
     raw_data = chosen.pop("_data", {})
+    rel_ok = chosen.pop("_relOk", None)
+    dep_pend = chosen.pop("_depPend", False)
+    drift_ok = chosen.pop("_drift", False)
     chosen.pop("_own", None)
     chosen.pop("_uncommittedPhase", None)
     chosen.pop("_uncommittedCmd", None)
@@ -515,6 +649,9 @@ if target_story:
         chosen["baseCommit"] = raw_data.get("baseCommit") or ""
         chosen["artifact"] = raw_data.get("artifact") or ""
         chosen["artifacts"] = raw_data.get("artifacts") or {}
+        chosen["releaseEvidenceOk"] = rel_ok
+        chosen["deployPending"] = dep_pend
+        chosen["postVerifyDrift"] = drift_ok
         print(json.dumps(chosen, indent=2))
         raise SystemExit(0)
     app_list = ", ".join(raw_data.get("approvedPhases") or []) or "none"
@@ -525,6 +662,8 @@ if target_story:
     print(f"Approved phases: {app_list} (lastApprovedPhase: {chosen.get('lastApprovedPhase') or 'none'})")
     print(f"Active phase: {chosen.get('activePhase') or 'none'} (activeStatus: {chosen.get('activeStatus') or 'none'})")
     print(f"Verify passed: {chosen.get('verifyPassed')} (reopenCount: {chosen.get('reopenCount') or 0}, baseCommit: {raw_data.get('baseCommit') or '-'})")
+    if rel_ok is not None:
+        print(f"Release evidence OK: {rel_ok}")
     if chosen.get("blockedReason"):
         print(f"Blocked reason: {chosen['blockedReason']}")
     if chosen.get("note"):
@@ -536,6 +675,9 @@ for r in rows:
     r.pop("_own", None)
     r.pop("_uncommittedPhase", None)
     r.pop("_uncommittedCmd", None)
+    r.pop("_relOk", None)
+    r.pop("_depPend", None)
+    r.pop("_drift", None)
     r.pop("_wtPath", None)
     r.pop("_data", None)
 
