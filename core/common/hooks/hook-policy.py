@@ -101,14 +101,55 @@ TEST_OVERRIDES_RE = re.compile(r"--test-overrides\b|\bstrip-test-overrides\.sh\b
 # Design: DA (onboard redo): the approval record lives outside the repo in ~/.agents-v0-approvals/<repo id>/ and is
 #   written only by `guard-common.sh approve`, which Sensei runs himself in his own terminal. An agent never touches
 #   the folder (any form: ~, $HOME, ${HOME}, the expanded home path) and never runs approve.
-APPROVALS_DIR_RE = re.compile(r"\.?agents-v0-approvals\b")
+APPROVALS_DIR_RE = re.compile(
+    r"\.agents-v0-(?:approvals\b|[a-z]*[*?\[]|\$\{?[A-Za-z_])"
+    r"|agents-v0-(?:approvals\b|a[a-z]*[*?\[]|\$\{?[A-Za-z_])"
+)
 APPROVALS_DIR_MSG = ("the approval folder (~/.agents-v0-approvals) is Sensei's: only `guard-common.sh approve`, run by "
                      "Sensei in his own terminal, writes it. An agent never reads, writes or lists it. Ask Sensei to approve.")
-APPROVE_RUN_RE = re.compile(r"\bguard-common(?:\.sh)?\b[^\n;&|]*\sapprove\b|\bgc_approve\b")
+APPROVE_RUN_RE = re.compile(
+    r"(?:\bguard-common(?:\.sh)?\b|\.agents-v0/scripts/(?:\$\{?[A-Za-z_]\w*\}?|[^\s;&|/]*[*?\[]))[^\n;&|]*\sapprove\b"
+    r"|\bgc_approve\b"
+)
 APPROVE_RUN_MSG = ("`guard-common.sh approve` is Sensei's own step, run by him in his own terminal outside Cursor. "
                    "An agent never runs it. Tell Sensei the work is ready for his approval and stop.")
 TEST_OVERRIDES_MSG = ("installing the kit with its test overrides (install.sh --test-overrides) is for the kit's own test "
                       "suites only; an agent never reinstalls or strips the kit scripts. Report the problem instead.")
+
+
+def _deobfuscate_shell_cmd(cmd: str) -> str:
+    """Expand inline shell variable assignments, collapse string concatenations, and strip mid-token quotes."""
+    out = cmd
+    # 1. Collapse Python/JS/shell adjacent or '+'-joined string literals: 'a'+'b', "a"+"b", 'a''b', "a""b"
+    for _ in range(4):
+        nxt = re.sub(r"(['\"])\s*\+\s*\1", "", out)
+        nxt = re.sub(r"(['\"])([^'\"\n]*)\1(['\"])([^'\"\n]*)\3", r"\1\2\4\1", nxt)
+        if nxt == out:
+            break
+        out = nxt
+    # 2. Collect simple inline VAR=val assignments and expand $VAR / ${VAR}
+    assigns: dict[str, str] = {}
+    for m in re.finditer(r"(?:^|[;&|\n()]\s*|\s+)([A-Za-z_][A-Za-z0-9_]*)=('[^']*'|\"[^\"]*\"|[^\s;&|'\"]+)", out):
+        k, v = m.group(1), m.group(2)
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+            v = v[1:-1]
+        assigns[k] = v
+    if assigns:
+        for _ in range(3):
+            changed = False
+            for k, v in assigns.items():
+                expanded = re.sub(rf"\$\{{{re.escape(k)}\}}|\${re.escape(k)}\b", lambda _m, rep=v: rep, out)
+                if expanded != out:
+                    out = expanded
+                    changed = True
+            if not changed:
+                break
+    # 3. Strip quotes/backslashes embedded inside path/identifier tokens (e.g. guard-"common".sh -> guard-common.sh)
+    out = re.sub(r"(?<=[A-Za-z0-9_./-])(['\"])([A-Za-z0-9_./-]+)\1", r"\2", out)
+    out = re.sub(r"(['\"])([A-Za-z0-9_./-]+)\1(?=[A-Za-z0-9_./-])", r"\2", out)
+    out = re.sub(r"\\([A-Za-z0-9_.-])", r"\1", out)
+    return out
+
 
 def _json_out(action: Action, message: str = "") -> None:
     print(json.dumps({"action": action, "message": message}), end="")
@@ -389,7 +430,16 @@ def _script_literals(parts: List[str]) -> List[str]:
     """String literals inside interpreter -c/-e bodies (outer shell quotes already removed)."""
     lits: List[str] = []
     for tok in parts[1:]:
-        lits.extend(re.findall(r"['\"]([^'\"]+)['\"]", tok))
+        collapsed = tok
+        for _ in range(4):
+            nxt = re.sub(r"(['\"])\s*\+\s*\1", "", collapsed)
+            nxt = re.sub(r"(['\"])([^'\"\n]*)\1\s*\+\s*(['\"])([^'\"\n]*)\3", r"\1\2\4\1", nxt)
+            if nxt == collapsed:
+                break
+            collapsed = nxt
+        lits.extend(re.findall(r"['\"]([^'\"]+)['\"]", collapsed))
+        if collapsed != tok:
+            lits.extend(re.findall(r"['\"]([^'\"]+)['\"]", tok))
     return lits
 
 
@@ -2059,7 +2109,7 @@ def _cd_target(seg: str) -> Optional[str]:
     return m.group(2) if m else None
 
 
-def classify_command(cmd: str) -> Tuple[Action, str]:
+def _classify_command_once(cmd: str) -> Tuple[Action, str]:
     global _BASE_DIR
     _BASE_DIR = None
     del _ESCALATIONS[:]
@@ -2167,6 +2217,20 @@ def classify_command(cmd: str) -> Tuple[Action, str]:
     if worst == "ask":
         return "ask", msg
     return "allow", ""
+
+
+def classify_command(cmd: str) -> Tuple[Action, str]:
+    act, msg = _classify_command_once(cmd)
+    if act == "block":
+        return act, msg
+    deobf = _deobfuscate_shell_cmd(cmd)
+    if deobf != cmd:
+        d_act, d_msg = _classify_command_once(deobf)
+        if d_act == "block":
+            return d_act, d_msg
+        if d_act == "ask" and act == "allow":
+            return d_act, d_msg
+    return act, msg
 
 
 def _segment_may_print_secrets(seg: str) -> bool:

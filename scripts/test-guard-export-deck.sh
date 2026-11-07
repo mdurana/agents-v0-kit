@@ -30,7 +30,8 @@ mkdir -p \
 
 cp "$ROOT/templates/.agents-v0/gate-rules" "$REPO/.agents-v0/gate-rules"
 cp "$ROOT/templates/.agents-v0/secret-allowlist.json" "$REPO/.agents-v0/secret-allowlist.json"
-for s in guard-common.sh guard-export.sh guard-deck.sh secret_scan.py; do
+export AGENTS_V0_APPROVALS_DIR="$TMP/approvals"
+for s in guard-common.sh guard-export.sh guard-deck.sh sync-feature-state.sh secret_scan.py; do
   cp "$ROOT/templates/.agents-v0/scripts/$s" "$REPO/.agents-v0/scripts/$s"
   chmod +x "$REPO/.agents-v0/scripts/$s" 2>/dev/null || true
 done
@@ -355,6 +356,59 @@ if sh .agents-v0/scripts/guard-deck.sh verify delivery >/dev/null 2>&1 && \
   ok "guard-deck.sh verify and commit succeed for delivery briefing"
 else
   bad "guard-deck.sh verify or commit failed for delivery briefing"
+fi
+
+# 16. M1 regression: non-kit *.lock files (e.g. Cargo.lock) outside allowed prefix are caught by gc_readonly_outside
+echo "lock-tamper" > Cargo.lock
+if sh .agents-v0/scripts/guard-export.sh verify >/dev/null 2>&1; then
+  bad "guard-export.sh verify should refuse non-kit Cargo.lock outside docs/agents-v0/backlog/ (M1)"
+else
+  ok "guard-export.sh verify refuses non-kit Cargo.lock outside docs/agents-v0/backlog/ (M1)"
+fi
+rm -f Cargo.lock
+
+# 17. C3 regression: sync-feature-state.sh --approve design refuses when guard-design.sh start was never run
+rm -f docs/agents-v0/requirements/audit.state.json
+if sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/audit.md >/dev/null 2>&1; then
+  bad "sync-feature-state.sh --approve design should refuse without Sensei approval record even when guard start was skipped (C3)"
+else
+  ok "sync-feature-state.sh --approve design refuses without Sensei approval record when guard start was skipped (C3)"
+fi
+
+# 18. C2 regression: post-approval file edit under commit.paths triggers contentHash mismatch in gc_approval_ok
+head_sha="$(git rev-parse HEAD)"
+cat > docs/agents-v0/requirements/audit.state.json <<EOF
+{
+  "feature": "audit",
+  "artifact": "docs/agents-v0/requirements/audit.md",
+  "activePhase": "intake",
+  "activeStatus": "awaiting_approval",
+  "baseCommit": "$head_sha"
+}
+EOF
+repo_id="$(GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agents-v0/scripts/guard-common.sh && gc_repo_id)"
+mkdir -p "$AGENTS_V0_APPROVALS_DIR/$repo_id"
+cat > "$AGENTS_V0_APPROVALS_DIR/$repo_id/intake-audit.json" <<EOF
+{
+  "command": "intake",
+  "phase": "intake",
+  "feature": "audit",
+  "repo": "$REPO",
+  "repoId": "$repo_id",
+  "gitCommonDir": "$REPO/.git",
+  "head": "$head_sha",
+  "baseCommit": "$head_sha",
+  "contentHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "commitPaths": "docs/agents-v0/requirements/audit.md",
+  "approvedAt": "2026-11-05T10:00:00Z",
+  "approver": "sensei",
+  "words": "Approved"
+}
+EOF
+if (GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agents-v0/scripts/guard-common.sh && gc_approval_ok intake audit) >/dev/null 2>&1; then
+  bad "gc_approval_ok should refuse when files under commit.paths changed after approval (C2 contentHash mismatch)"
+else
+  ok "gc_approval_ok refuses when files under commit.paths changed after approval (C2 contentHash mismatch)"
 fi
 
 printf '=== test-guard-export-deck.sh: %d passed, %d failed ===\n' "$pass" "$fail"

@@ -46,7 +46,7 @@ Directory profiles (`project-delivery-core.mdc`): `service` (`app/backend/`, or 
 | BFF root | <!-- `app/bff/` or n/a --> |
 | Service roots | <!-- comma-separated roots for a multi-service repo, e.g. `app/services/order, app/services/inventory`, or n/a --> |
 | OpenAPI | <!-- `openapi/api-v1.yaml`; multi-service repos use `openapi/<service>-v1.yaml` per service, or n/a --> |
-| CI image prefix | <!-- optional; mirror prefix for `.gitlab-ci.yml` (`CI_IMAGE_PREFIX`, e.g. `registry.example.com/`) --> |
+| CI image prefix | <!-- optional; container image mirror prefix (`CI_IMAGE_PREFIX`, e.g. `registry.example.com/`) --> |
 | Phase attempt budget | <!-- total failed verify attempts per phase before blocked; default 8 --> |
 
 ## Contracts

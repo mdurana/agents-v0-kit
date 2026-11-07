@@ -645,15 +645,6 @@ gd_commit() {
     || gc_refuse commit "no approved uncommitted gate found for '$gd_feature' (activePhase='${gd_active_phase:-none}', activeStatus='${gd_active_status:-none}', lastApprovedPhase='${gd_last_approved:-none}'); run $G ready $gd_feature and have Sensei approve first"
 
   gd_c_phase="$gd_pending_commit_phase"
-  if [ "$gd_active_status" = "awaiting_approval" ] && [ "$gd_c_phase" != "local-release" ]; then
-    case " $(gc_state_get "$gd_state_full" approvedPhases 2>/dev/null | tr -d '[]",') " in
-      *" $gd_c_phase "*) ;;
-      *)
-        (cd "$gd_work_dir" && gc_state_set "$gd_rel_state" "$gd_feature" "$gd_rel_art" \
-          "approvePhase=$gd_c_phase" "activePhase=" "activeStatus=" "blockedReason=" "nextStep=") || exit 1
-        ;;
-    esac
-  fi
 
   gd_c_args="$gd_feature"
   if [ "$gd_is_maintain" = 1 ] && [ "$gd_c_phase" != "maintain" ]; then

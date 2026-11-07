@@ -347,14 +347,58 @@ gc_approve() {
   gc_a_words=""
   IFS= read -r gc_a_words </dev/tty || :
   [ -n "$(printf '%s' "$gc_a_words" | tr -d '[:space:]')" ] || gc_refuse approve "no approval words typed; nothing approved"
+  gc_a_target_dir="${gc_a_wt_dir:-$(pwd)}"
+  gc_a_cpaths="$(gc_rule "$gc_a_cmd" commit.paths "$gc_a_slug" 2>/dev/null || true)"
+  if [ -n "$gc_a_slug" ] && [ -d "$gc_a_target_dir/docs/agents-v0/maintain/$gc_a_slug" ]; then
+    gc_a_cpaths="$gc_a_cpaths docs/agents-v0/maintain/$gc_a_slug"
+  fi
   python3 - "$gc_a_file" "$gc_a_cmd" "$gc_a_phase" "$(pwd)" "$gc_a_id" "$(gc_common_dir)" "$gc_a_head" \
-    "$gc_a_base" "$gc_a_words" "$gc_a_slug" <<'PY'
-import datetime, fcntl, json, os, pwd, sys, tempfile
-out, command, phase, repo, repo_id, common, head, base, words, slug = sys.argv[1:11]
+    "$gc_a_base" "$gc_a_words" "$gc_a_slug" "$gc_a_target_dir" "$gc_a_cpaths" <<'PY'
+import datetime, fcntl, hashlib, json, os, pwd, re, sys, tempfile
+out, command, phase, repo, repo_id, common, head, base, words, slug, target_dir, cpaths = sys.argv[1:13]
+
+def compute_content_hash(root_dir: str, paths_str: str) -> str:
+    skip_re = re.compile(
+        r"(?:^|/)(?:state\.json|[^/]+\.state\.json|phase-result\.md|[^/]+\.phase-result\.md|"
+        r"[^/]+\.trace\.json|lessons\.md|lessons-archive\.md|CHANGELOG\.md|.*\.lock)$"
+    )
+    rels = set()
+    for tok in paths_str.split():
+        if "<" in tok or ">" in tok:
+            continue
+        full = os.path.join(root_dir, tok)
+        if os.path.isfile(full):
+            rels.add(tok.lstrip("./"))
+        elif os.path.isdir(full):
+            for dirpath, dirnames, filenames in os.walk(full):
+                dirnames[:] = [d for d in dirnames if d != ".git"]
+                for fn in filenames:
+                    rel = os.path.relpath(os.path.join(dirpath, fn), root_dir).replace("\\", "/")
+                    rels.add(rel)
+    h = hashlib.sha256()
+    for rel in sorted(rels):
+        if skip_re.search(rel):
+            continue
+        fp = os.path.join(root_dir, rel)
+        try:
+            raw = open(fp, "rb").read()
+        except OSError:
+            continue
+        if rel.endswith(".md"):
+            txt = raw.decode("utf-8", errors="replace")
+            txt = re.sub(r"(?ms)^##\s+Delivery approvals\b.*?(?=^##\s+|\Z)", "", txt)
+            if rel.startswith("docs/agents-v0/adr/"):
+                txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status(?:\*\*)?:\s*)Accepted\b", r"\g<1>Proposed", txt)
+            raw = txt.encode("utf-8")
+        h.update(rel.encode("utf-8") + b"\0" + hashlib.sha256(raw).hexdigest().encode("ascii") + b"\n")
+    return h.hexdigest()
+
 os.umask(0o077)
 os.makedirs(os.path.dirname(out), mode=0o700, exist_ok=True)
 record = {"command": command, "phase": phase, "repo": repo, "repoId": repo_id, "gitCommonDir": common,
           "head": head, "baseCommit": base,
+          "contentHash": compute_content_hash(target_dir, cpaths),
+          "commitPaths": cpaths,
           "approvedAt": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "approver": pwd.getpwuid(os.getuid()).pw_name, "words": words}
 if slug:
@@ -453,6 +497,7 @@ gc_approval_ok() {
     *"<feature>"*) printf "REFUSED approval: %s requires a <feature> slug\n" "$gc_ok_cmd"; return 1 ;;
   esac
   gc_ok_state_full="$gc_ok_root/$gc_ok_state"
+  gc_ok_target_dir="$gc_ok_root"
   if [ -n "$gc_ok_slug" ]; then
     if [ ! -f "$gc_ok_state_full" ] && [ -f "$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
       gc_ok_state_full="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
@@ -465,21 +510,60 @@ gc_approval_ok() {
       if [ -n "$gc_ok_wt" ] && [ -d "$gc_ok_wt" ]; then
         if [ -f "$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json" ]; then
           gc_ok_state_full="$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
+          gc_ok_target_dir="$gc_ok_wt"
         elif [ -f "$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
           gc_ok_state_full="$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+          gc_ok_target_dir="$gc_ok_wt"
         fi
       fi
     fi
   fi
   gc_ok_id="$(cd "$gc_ok_root" && gc_repo_id)" || { printf 'REFUSED approval: cannot compute the repo id\n'; return 1; }
   gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$gc_ok_cmd" "$gc_ok_slug")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
-  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_state_full" "$gc_ok_slug" <<'PY'
-import json, sys
-rec_path, command, repo_id, state_path, slug = sys.argv[1:6]
+  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_state_full" "$gc_ok_slug" "$gc_ok_target_dir" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+rec_path, command, repo_id, state_path, slug, target_dir = sys.argv[1:7]
 label = f"{command} ({slug})" if slug else command
 def refuse(why):
     print(f"REFUSED approval: {why}")
     raise SystemExit(1)
+
+def compute_content_hash(root_dir: str, paths_str: str) -> str:
+    skip_re = re.compile(
+        r"(?:^|/)(?:state\.json|[^/]+\.state\.json|phase-result\.md|[^/]+\.phase-result\.md|"
+        r"[^/]+\.trace\.json|lessons\.md|lessons-archive\.md|CHANGELOG\.md|.*\.lock)$"
+    )
+    rels = set()
+    for tok in paths_str.split():
+        if "<" in tok or ">" in tok:
+            continue
+        full = os.path.join(root_dir, tok)
+        if os.path.isfile(full):
+            rels.add(tok.lstrip("./"))
+        elif os.path.isdir(full):
+            for dirpath, dirnames, filenames in os.walk(full):
+                dirnames[:] = [d for d in dirnames if d != ".git"]
+                for fn in filenames:
+                    rel = os.path.relpath(os.path.join(dirpath, fn), root_dir).replace("\\", "/")
+                    rels.add(rel)
+    h = hashlib.sha256()
+    for rel in sorted(rels):
+        if skip_re.search(rel):
+            continue
+        fp = os.path.join(root_dir, rel)
+        try:
+            raw = open(fp, "rb").read()
+        except OSError:
+            continue
+        if rel.endswith(".md"):
+            txt = raw.decode("utf-8", errors="replace")
+            txt = re.sub(r"(?ms)^##\s+Delivery approvals\b.*?(?=^##\s+|\Z)", "", txt)
+            if rel.startswith("docs/agents-v0/adr/"):
+                txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status(?:\*\*)?:\s*)Accepted\b", r"\g<1>Proposed", txt)
+            raw = txt.encode("utf-8")
+        h.update(rel.encode("utf-8") + b"\0" + hashlib.sha256(raw).hexdigest().encode("ascii") + b"\n")
+    return h.hexdigest()
+
 try:
     base = (json.load(open(state_path, encoding="utf-8")).get("baseCommit") or "").strip()
 except (OSError, ValueError) as exc:
@@ -499,6 +583,16 @@ if slug and rec.get("feature") not in (None, "", slug):
 if rec.get("baseCommit") != base:
     refuse(f"the approval record approves baseCommit {rec.get('baseCommit')}, but the state's baseCommit is {base}; "
            "Sensei approves again")
+exp_hash = (rec.get("contentHash") or "").strip()
+cpaths = (rec.get("commitPaths") or "").strip()
+if exp_hash and cpaths:
+    cur_head = subprocess.run(["git", "-C", target_dir, "rev-parse", "-q", "--verify", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+    if cur_head and cur_head == (rec.get("head") or "").strip():
+        cur_hash = compute_content_hash(target_dir, cpaths)
+        if cur_hash != exp_hash:
+            refuse(f"files under commit.paths changed after Sensei approved {label} (contentHash mismatch); "
+                   "run ready and have Sensei approve again")
 print(f"OK approval: {label} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
 PY
 }
@@ -688,11 +782,12 @@ PY
 }
 
 # gc_readonly_outside <allowed_prefix_dir>: exit 0 when git status --porcelain -uall has no modified/untracked files
-# outside <allowed_prefix_dir> (ignoring *.lock); otherwise print the offending paths and exit 1.
+# outside <allowed_prefix_dir> (ignoring kit state/record *.lock files); otherwise print the offending paths and exit 1.
 gc_readonly_outside() {
   python3 - "$1" <<'PY'
-import subprocess, sys
+import re, subprocess, sys
 prefix = sys.argv[1].rstrip("/") + "/"
+kit_lock_re = re.compile(r"(?:^|/)(?:state\.json\.lock|[^/]+\.state\.json\.lock|\.state\..*\.lock|\.record\..*\.lock)$")
 st = subprocess.run(["git", "status", "--porcelain", "-uall"], capture_output=True, text=True, check=True)
 outside = []
 for line in st.stdout.splitlines():
@@ -702,7 +797,7 @@ for line in st.stdout.splitlines():
     if " -> " in raw:
         raw = raw.split(" -> ", 1)[1].strip()
     raw = raw.strip('"')
-    if raw.endswith(".lock"):
+    if kit_lock_re.search(raw):
         continue
     if not raw.startswith(prefix):
         outside.append(raw)

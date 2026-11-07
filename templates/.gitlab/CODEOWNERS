@@ -1,6 +1,5 @@
 # Delivery artifacts — require owner review before merge (pair with branch protection).
 # Replace @your-team with a real GitLab group before setting GITLAB_TOKEN.
-# Code Owner approval must cover /.gitlab-ci.yml so a merge request cannot rewrite that job.
 /docs/agents-v0/requirements/ @your-team
 /docs/agents-v0/milestones/ @your-team
 /docs/agents-v0/build/ @your-team
@@ -16,7 +15,6 @@
 # The profile holds the verify commands, coverage_ratchet, and the known_failures budget. CI honors
 # those rows, so a merge request must not approve its own exception.
 /docs/agents-v0/project-profile.md @your-team
-/.gitlab-ci.yml @your-team
 /.gitlab/ @your-team
 /.cursor/hooks.json @your-team
 /.cursor/cli.json @your-team

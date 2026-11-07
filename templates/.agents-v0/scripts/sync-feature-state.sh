@@ -161,9 +161,9 @@ fi
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
 # after the merge leaves that branch ahead of the integration branch.
 approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
-# Refuse --approve roadmap, architecture, plan, scaffold, or guard-managed intake unless gc_approval_ok succeeds (F1, FA1, FP1, FS1, FI1, DSA, DIA)
+# Refuse --approve for any phase unless Sensei's external approval record (gc_approval_ok) succeeds (C3)
 case "$approve_lc" in
-  roadmap|architecture|plan|scaffold)
+  onboard|roadmap|architecture|plan|scaffold)
     guard_common="$(dirname "$0")/guard-common.sh"
     if [ -f "$guard_common" ]; then
       GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
@@ -177,140 +177,29 @@ case "$approve_lc" in
       exit 1
     fi
     ;;
-  intake)
+  intake|design|build|verify|maintain|release)
     guard_common="$(dirname "$0")/guard-common.sh"
-    intake_slug="$slug"
-    intake_state="docs/agents-v0/requirements/${intake_slug}.state.json"
-    intake_pr="docs/agents-v0/requirements/${intake_slug}.phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      intake_base=""
-      [ -f "$intake_state" ] && intake_base="$(gc_state_get "$intake_state" baseCommit 2>/dev/null || true)"
-      if [ -n "$intake_base" ] || { [ -f "$intake_pr" ] && grep -Fq "guard_managed: true" "$intake_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok intake "$intake_slug")"; then
-          printf 'FAIL: --approve intake for %s refused without Sensei external approval record: %s\n' "$intake_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve intake %s\n' "$intake_slug" >&2
-          exit 1
-        fi
-      fi
-    fi
-    ;;
-  design)
-    guard_common="$(dirname "$0")/guard-common.sh"
-    design_slug="$slug"
-    design_state="docs/agents-v0/requirements/${design_slug}.state.json"
-    design_pr="docs/agents-v0/requirements/${design_slug}.phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      design_gm=""
-      [ -f "$design_state" ] && design_gm="$(gc_state_get "$design_state" designGuardManaged 2>/dev/null || true)"
-      if [ "$design_gm" = "True" ] || [ "$design_gm" = "true" ] || { [ -f "$design_pr" ] && grep -Fq "phase: design" "$design_pr" && grep -Fq "guard_managed: true" "$design_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok design "$design_slug")"; then
-          printf 'FAIL: --approve design for %s refused without Sensei external approval record: %s\n' "$design_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve design %s\n' "$design_slug" >&2
-          exit 1
-        fi
-      fi
-    fi
-    ;;
-  build)
-    guard_common="$(dirname "$0")/guard-common.sh"
-    build_slug="$slug"
-    build_state="docs/agents-v0/requirements/${build_slug}.state.json"
-    build_pr="docs/agents-v0/requirements/${build_slug}.phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      build_gm=""
-      [ -f "$build_state" ] && build_gm="$(gc_state_get "$build_state" buildGuardManaged 2>/dev/null || true)"
-      if [ "$build_gm" = "True" ] || [ "$build_gm" = "true" ] || { [ -f "$build_pr" ] && grep -Fq "phase: build" "$build_pr" && grep -Fq "guard_managed: true" "$build_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok build "$build_slug")"; then
-          printf 'FAIL: --approve build for %s refused without Sensei external approval record: %s\n' "$build_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve build %s\n' "$build_slug" >&2
-          exit 1
-        fi
-      fi
-    fi
-    ;;
-  verify)
-    guard_common="$(dirname "$0")/guard-common.sh"
-    verify_slug="$slug"
+    phase_slug="$slug"
     case "$art" in
       docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
-        verify_slug="$(basename "$(dirname "$art")")"
+        phase_slug="$(basename "$(dirname "$art")")"
         ;;
     esac
-    verify_state="$state"
-    verify_pr="docs/agents-v0/requirements/${verify_slug}.phase-result.md"
-    [ -f "$verify_pr" ] || verify_pr="docs/agents-v0/maintain/${verify_slug}/phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      verify_gm=""
-      [ -f "$verify_state" ] && verify_gm="$(gc_state_get "$verify_state" verifyGuardManaged 2>/dev/null || true)"
-      if [ "$verify_gm" = "True" ] || [ "$verify_gm" = "true" ] || { [ -f "$verify_pr" ] && grep -Fq "phase: verify" "$verify_pr" && grep -Fq "guard_managed: true" "$verify_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok verify "$verify_slug")"; then
-          printf 'FAIL: --approve verify for %s refused without Sensei external approval record: %s\n' "$verify_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve verify %s\n' "$verify_slug" >&2
-          exit 1
-        fi
-      fi
-    fi
-    ;;
-  maintain)
-    # Design: DMA (external approval record required when maintainGuardManaged is true).
-    guard_common="$(dirname "$0")/guard-common.sh"
-    maint_slug="$slug"
-    case "$art" in
-      docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
-        maint_slug="$(basename "$(dirname "$art")")"
-        ;;
-    esac
-    maint_state="$state"
-    maint_pr="docs/agents-v0/maintain/${maint_slug}/phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      maint_gm=""
-      [ -f "$maint_state" ] && maint_gm="$(gc_state_get "$maint_state" maintainGuardManaged 2>/dev/null || true)"
-      if [ "$maint_gm" = "True" ] || [ "$maint_gm" = "true" ] || { [ -f "$maint_pr" ] && grep -Fq "phase: maintain" "$maint_pr" && grep -Fq "guard_managed: true" "$maint_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok maintain "$maint_slug")"; then
-          printf 'FAIL: --approve maintain for %s refused without Sensei external approval record: %s\n' "$maint_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain %s\n' "$maint_slug" >&2
-          exit 1
-        fi
-      fi
-    fi
-    ;;
-  release)
-    # Design: DLRA (external approval record required when releaseGuardManaged is true).
-    guard_common="$(dirname "$0")/guard-common.sh"
-    release_slug="$slug"
-    case "$art" in
-      docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md)
-        release_slug="$(basename "$(dirname "$art")")"
-        ;;
-    esac
-    release_state="$state"
-    release_pr="docs/agents-v0/requirements/${release_slug}.phase-result.md"
-    [ -f "$release_pr" ] || release_pr="docs/agents-v0/maintain/${release_slug}/phase-result.md"
-    if [ -f "$guard_common" ]; then
-      GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
-      release_gm=""
-      [ -f "$release_state" ] && release_gm="$(gc_state_get "$release_state" releaseGuardManaged 2>/dev/null || true)"
-      if [ -z "$release_gm" ] && command -v git >/dev/null 2>&1; then
-        for rel_b in "feature/${release_slug}" "maintain/${release_slug}"; do
-          if git show "${rel_b}:${release_state}" 2>/dev/null | grep -Eq '"releaseGuardManaged"[[:space:]]*:[[:space:]]*true'; then
-            release_gm="true"
-            break
+    approve_cmd="$approve_lc"
+    [ "$approve_cmd" != "release" ] || approve_cmd="local-release"
+    case "$approve_lc:$phase_slug" in
+      verify:p0-a*|release:p0-a*) ;;
+      *)
+        if [ -f "$guard_common" ]; then
+          GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
+          if ! ok_msg="$(gc_approval_ok "$approve_cmd" "$phase_slug")"; then
+            printf 'FAIL: --approve %s for %s refused without Sensei external approval record: %s\n' "$approve_lc" "$phase_slug" "$ok_msg" >&2
+            printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s %s\n' "$approve_cmd" "$phase_slug" >&2
+            exit 1
           fi
-        done
-      fi
-      if [ "$release_gm" = "True" ] || [ "$release_gm" = "true" ] || { [ -f "$release_pr" ] && grep -Fq "phase: release" "$release_pr" && grep -Fq "guard_managed: true" "$release_pr"; }; then
-        if ! ok_msg="$(gc_approval_ok local-release "$release_slug")"; then
-          printf 'FAIL: --approve release for %s refused without Sensei external approval record: %s\n' "$release_slug" "$ok_msg" >&2
-          printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release %s\n' "$release_slug" >&2
-          exit 1
         fi
-      fi
-    fi
+        ;;
+    esac
     ;;
 esac
 

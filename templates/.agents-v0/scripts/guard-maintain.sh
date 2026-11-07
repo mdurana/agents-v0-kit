@@ -1007,6 +1007,9 @@ PY
 
   # 6. Stage explicit maintain paths only (never git add -A, never state *.lock files)
   gm_rule commit commit.paths "$gm_feature"; gm_paths="$gm_val"
+  if ! gm_bad_staged="$(gc_outside_paths "$gm_paths")"; then
+    gc_refuse commit "the index already holds paths outside maintain ($gm_bad_staged); unstage them first (git reset)"
+  fi
   for gm_p in $gm_paths; do
     if [ -e "$gm_p" ] || git ls-files --error-unmatch "$gm_p" >/dev/null 2>&1; then
       git add -- "$gm_p"

@@ -69,7 +69,7 @@ Record the directory layout in the profile **This repo** table (Profile `service
 
 A copy install puts org rules in `.cursor/rules/org/` and refreshes them on `install.sh --update`. A `--link` install symlinks those rules to the pinned kit commit; a kit change reaches the project when the pin moves.
 
-The install seeds `.gitlab-ci.yml` (Maven `.m2/repository` cache and npm `.npm/` cache). If the repo already has a pipeline, merge the kit delivery jobs into that file instead of replacing it. Protect the default branch, and replace `@your-team` in `CODEOWNERS`. Set `ENABLE_GITLAB_SAST=1` when the instance provides the SAST template. `install.sh --git-hooks` installs `pre-push`, which checks `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/maintain/<id>/state.json` for the branch slug. See [greenfield-onboarding.md](greenfield-onboarding.md).
+Protect the default branch, and replace `@your-team` in `CODEOWNERS`. `install.sh --git-hooks` installs `pre-push`, which checks `docs/agents-v0/requirements/<feature>.state.json` and `docs/agents-v0/maintain/<id>/state.json` for the branch slug. See [greenfield-onboarding.md](greenfield-onboarding.md).
 
 ## 2. Audit the baseline (do this before `/v0-build` or `/v0-maintain`)
 

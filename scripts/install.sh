@@ -338,7 +338,6 @@ install_templates() {
   # Design: D2: guard-onboard.sh and .agents-v0/gate-rules (data the guards read) are kit-managed, refreshed by --update.
   minimal="
 .gitignore
-.gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .gitlab/CODEOWNERS
 .agents-v0/scripts/packlib.py
@@ -430,7 +429,6 @@ docs/agents-v0/agents-v0-kit.md
 docs/agents-v0/quality-gates-engineering-principles.md
 docs/agents-v0/greenfield-onboarding.md
 docs/agents-v0/brownfield-onboarding.md
-.gitlab-ci.yml
 .gitlab/merge_request_templates/default.md
 .agents-v0/hooks/pre-push
 "
@@ -669,7 +667,7 @@ if [ "$LINK" = 1 ]; then
   sh "$KIT/scripts/link-project.sh" "$@" "$TARGET_ABS"
   install_templates "$TARGET_ABS"
   if [ -f "$TARGET_ABS/.gitlab/CODEOWNERS" ] && grep -q '@your-team' "$TARGET_ABS/.gitlab/CODEOWNERS"; then
-    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval, including /.gitlab-ci.yml.\n' >&2
+    printf 'WARN: .gitlab/CODEOWNERS still uses the @your-team placeholder — replace it with a real GitLab group and enable Code Owner approval.\n' >&2
   fi
   printf 'Linked agents-v0 into %s (kit files stay in the pinned checkout).\n' "$TARGET_ABS"
   exit 0

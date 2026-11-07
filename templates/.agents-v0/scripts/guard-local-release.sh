@@ -968,12 +968,12 @@ PYST
       fi
       if [ "$glr_is_maintain" = 1 ]; then
         if ! git merge --no-ff --no-commit "$glr_story_branch" >/dev/null 2>&1; then
-          git merge --abort >/dev/null 2>&1 || git reset --hard -q HEAD >/dev/null 2>&1 || true
+          git merge --abort >/dev/null 2>&1 || git reset --merge -q >/dev/null 2>&1 || true
           gc_refuse commit "git merge --no-ff $glr_story_branch failed or conflicted in '$glr_int_wt'"
         fi
       else
         if ! git merge --squash "$glr_story_branch" >/dev/null 2>&1; then
-          git reset --hard -q HEAD >/dev/null 2>&1 || true
+          git reset --merge -q >/dev/null 2>&1 || true
           gc_refuse commit "git merge --squash $glr_story_branch failed or conflicted in '$glr_int_wt'"
         fi
       fi

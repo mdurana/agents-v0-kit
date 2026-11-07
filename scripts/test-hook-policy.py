@@ -714,6 +714,13 @@ DA_APPROVAL_SHELL_CASES = [
     ("bash ./.agents-v0/scripts/guard-common.sh approve onboard", "block"),
     ("cd sub && sh ../.agents-v0/scripts/guard-common.sh approve onboard", "block"),
     ("echo ok | sh .agents-v0/scripts/guard-common.sh approve onboard", "block"),
+    ("a=.agents-v0-appr; b=ovals; ls ~/${a}${b}", "block"),
+    ("ls ~/.agents-v0-a*", "block"),
+    ("python3 -c \"import os; os.listdir(os.path.expanduser('~/.agents-v0-'+'approvals/x'))\"", "block"),
+    ("GC=guard-common.sh; sh .agents-v0/scripts/$GC approve roadmap", "block"),
+    ("sh .agents-v0/scripts/$GC approve roadmap", "block"),
+    ("sh .agents-v0/scripts/guard-\"common\".sh approve roadmap", "block"),
+    ("python3 -c \"f='docs/agents-v0/program'+'.state.json'; open(f,'w').write('{}')\"", "block"),
     ("sh .agents-v0/scripts/guard-common.sh paths", "allow"),
     ("sh .agents-v0/scripts/guard-onboard.sh start", "allow"),
 ]

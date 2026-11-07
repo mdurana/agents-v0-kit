@@ -262,11 +262,6 @@ grep -Fq 'agents-v0-audit-manifest' templates/.agents-v0/scripts/export-audit-pa
 grep -Fq '.agents-v0/scripts/[^/]+\.(sh|py)$' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/scripts/*.{sh,py} script"
 grep -Fq '.agents-v0/hooks/' core/common/hooks/hook-policy.py || err "hook-policy must protect every .agents-v0/hooks/ git hook"
 grep -Fq 'AGENTS\.md$' core/common/hooks/hook-policy.py || err "hook-policy must protect AGENTS.md"
-grep -Fq '${CI_IMAGE_PREFIX}node:22-bookworm' templates/.gitlab-ci.yml || err "frontend job must use a Node 22 image with CI_IMAGE_PREFIX"
-python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' templates/.gitlab-ci.yml >/dev/null 2>&1 || err ".gitlab-ci.yml does not parse as YAML"
-for ci_ref in $(grep -oE '\.agents-v0/scripts/[A-Za-z0-9_-]+\.sh' templates/.gitlab-ci.yml | sort -u); do
-  [ -f "templates/$ci_ref" ] || err ".gitlab-ci.yml names $ci_ref but templates/$ci_ref does not exist"
-done
 grep -Fq 'endpoint-stacks.md' templates/.agents-v0/scripts/discover-codebase.sh || err "discover-codebase.sh must propose non-Spring endpoint rows"
 grep -Fq 'import endpoint_scan' templates/.agents-v0/scripts/discover-codebase.sh || err "discover-codebase.sh must use the shared endpoint scanner"
 grep -Fq 'endpoint_scan.py' scripts/install.sh || err "install.sh does not seed endpoint_scan.py"
@@ -593,7 +588,6 @@ grep -Fq 'README.md' scripts/install.sh || err "install.sh does not seed README.
 
 # 11. Required template artifacts.
 for artifact in \
-  templates/.gitlab-ci.yml \
   templates/.gitlab/merge_request_templates/default.md \
   templates/.gitlab/CODEOWNERS \
   templates/docs/agents-v0/architecture.md \

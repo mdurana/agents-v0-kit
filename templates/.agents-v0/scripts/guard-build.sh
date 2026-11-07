@@ -796,6 +796,9 @@ PY
 
   # 7. Stage explicit build paths only (never git add -A, never *.lock)
   gb_rule commit commit.paths "$gb_feature"; gb_paths="$gb_val"
+  if ! gb_bad_staged="$(gc_outside_paths "$gb_paths")"; then
+    gc_refuse commit "the index already holds paths outside build ($gb_bad_staged); unstage them first (git reset)"
+  fi
   for gb_p in $gb_paths; do
     if [ -e "$gb_p" ] || git ls-files --error-unmatch "$gb_p" >/dev/null 2>&1; then
       git add -- "$gb_p"
