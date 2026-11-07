@@ -226,7 +226,7 @@ gc_check_feature_slug() {
 }
 
 # approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
-# Design: DLRA, DMA, DDLA (local-release, maintain, and deliver external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
+# Design: DLRA, DMA, DDLA, DSTA (local-release, maintain, deliver, and triage external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
 gc_approve() {
   [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
   gc_to_root approve
@@ -235,6 +235,28 @@ gc_approve() {
   [ "$gc_a_cmd" != "release" ] || gc_a_cmd="local-release"
   if [ -n "$gc_a_slug" ]; then
     gc_check_feature_slug approve "$gc_a_slug"
+  fi
+  if [ "$gc_a_cmd" = "triage" ]; then
+    [ -n "$gc_a_slug" ] || gc_refuse approve "triage requires an <id> slug (usage: sh .agents-v0/scripts/guard-common.sh approve triage <id>)"
+    gc_t_st="docs/agents-v0/maintain/${gc_a_slug}/state.json"
+    gc_t_note="docs/agents-v0/maintain/${gc_a_slug}/note.md"
+    if [ ! -f "$gc_t_st" ] || [ "$(gc_state_get "$gc_t_st" activeStatus 2>/dev/null || true)" != "awaiting_approval" ]; then
+      gc_t_wt="$(git worktree list --porcelain 2>/dev/null | awk -v m="branch refs/heads/maintain/${gc_a_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_t_wt" ] && [ -d "$gc_t_wt" ] && [ -f "$gc_t_wt/docs/agents-v0/maintain/${gc_a_slug}/state.json" ]; then
+        gc_t_st="$gc_t_wt/docs/agents-v0/maintain/${gc_a_slug}/state.json"
+        gc_t_note="$gc_t_wt/docs/agents-v0/maintain/${gc_a_slug}/note.md"
+      fi
+    fi
+    [ -f "$gc_t_st" ] || gc_refuse approve "no triage state yet for '$gc_a_slug' ($gc_t_st); nothing to approve"
+    [ -f "$gc_t_note" ] || gc_refuse approve "missing maintenance note '$gc_t_note'; nothing to approve"
+    gc_t_tier="$(sed -n 's/^[[:space:]]*[-*][[:space:]]*Tier:[[:space:]]*\([A-Za-z-]*\).*/\1/p; s/^Tier:[[:space:]]*\([A-Za-z-]*\).*/\1/p' "$gc_t_note" 2>/dev/null | head -n 1 | tr '[:upper:]' '[:lower:]')"
+    gc_t_st_tier="$(gc_state_get "$gc_t_st" tier 2>/dev/null || true)"
+    [ "$gc_t_tier" = "trivial" ] && { [ -z "$gc_t_st_tier" ] || [ "$gc_t_st_tier" = "trivial" ]; } \
+      || gc_refuse approve "triage approve only applies to Tier: trivial notes ('$gc_a_slug' has Tier: ${gc_t_tier:-${gc_t_st_tier:-missing}}); run: sh .agents-v0/scripts/guard-common.sh approve maintain $gc_a_slug"
+    gc_a_cmd="maintain"
   fi
   if [ "$gc_a_cmd" = "deliver" ]; then
     [ -n "$gc_a_slug" ] || gc_refuse approve "deliver requires a <feature> slug (usage: sh .agents-v0/scripts/guard-common.sh approve deliver <feature>)"
@@ -362,7 +384,7 @@ PY
   printf 'Record: %s\n' "$gc_a_file"
 }
 
-# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA/DMA/DDLA. Prints `OK approval: ...` and returns 0 only when this
+# gc_approval_ok <command> [<feature>]: library check for D4/DIA/DLRA/DMA/DDLA/DSTA. Prints `OK approval: ...` and returns 0 only when this
 # repository's record for <command> (and <feature> when given) exists, names this command and repository, and its
 # baseCommit equals the state's baseCommit; else prints `REFUSED approval: <reason>` and returns 1.
 gc_approval_ok() {
@@ -378,6 +400,30 @@ gc_approval_ok() {
     esac
   fi
   gc_ok_root="$(gc_root)" || { printf 'REFUSED approval: not inside a git work tree\n'; return 1; }
+  if [ "$gc_ok_cmd" = "triage" ]; then
+    [ -n "$gc_ok_slug" ] || { printf 'REFUSED approval: triage requires an <id> slug\n'; return 1; }
+    gc_ok_t_st="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+    gc_ok_t_note="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/note.md"
+    if [ ! -f "$gc_ok_t_st" ]; then
+      gc_ok_t_wt="$(git -C "$gc_ok_root" worktree list --porcelain 2>/dev/null | awk -v m="branch refs/heads/maintain/${gc_ok_slug}" '
+        /^worktree / { p = substr($0, 10) }
+        $0 == m { print p; exit }
+      ')"
+      if [ -n "$gc_ok_t_wt" ] && [ -d "$gc_ok_t_wt" ] && [ -f "$gc_ok_t_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
+        gc_ok_t_st="$gc_ok_t_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+        gc_ok_t_note="$gc_ok_t_wt/docs/agents-v0/maintain/${gc_ok_slug}/note.md"
+      fi
+    fi
+    [ -f "$gc_ok_t_st" ] || { printf "REFUSED approval: no triage state for '%s'\n" "$gc_ok_slug"; return 1; }
+    [ -f "$gc_ok_t_note" ] || { printf "REFUSED approval: missing maintenance note '%s'\n" "$gc_ok_t_note"; return 1; }
+    gc_ok_t_tier="$(sed -n 's/^[[:space:]]*[-*][[:space:]]*Tier:[[:space:]]*\([A-Za-z-]*\).*/\1/p; s/^Tier:[[:space:]]*\([A-Za-z-]*\).*/\1/p' "$gc_ok_t_note" 2>/dev/null | head -n 1 | tr '[:upper:]' '[:lower:]')"
+    gc_ok_t_st_tier="$(gc_state_get "$gc_ok_t_st" tier 2>/dev/null || true)"
+    if [ "$gc_ok_t_tier" != "trivial" ] || { [ -n "$gc_ok_t_st_tier" ] && [ "$gc_ok_t_st_tier" != "trivial" ]; }; then
+      printf "REFUSED approval: triage approval only applies to Tier: trivial notes ('%s' has Tier: %s)\n" "$gc_ok_slug" "${gc_ok_t_tier:-${gc_ok_t_st_tier:-missing}}"
+      return 1
+    fi
+    gc_ok_cmd="maintain"
+  fi
   if [ "$gc_ok_cmd" = "deliver" ]; then
     [ -n "$gc_ok_slug" ] || { printf 'REFUSED approval: deliver requires a <feature> slug\n'; return 1; }
     gc_ok_d_st="$gc_ok_root/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
