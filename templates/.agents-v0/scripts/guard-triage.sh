@@ -317,20 +317,147 @@ gt_check() {
   printf '%s\n' "$gt_out"
 }
 
+# Design: DST2 (/v0-triage start, block, ready, and commit delegating to guard-maintain.sh).
 gt_start() {
-  gc_refuse start "not implemented yet"
+  gt_s_slug=""
+  gt_s_reopen=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --reopen) gt_s_reopen=1; shift ;;
+      -*) gt_usage ;;
+      *)
+        [ -z "$gt_s_slug" ] || gt_usage
+        gt_s_slug="$1"
+        shift
+        ;;
+    esac
+  done
+
+  gc_need_git_work_tree start
+  gc_to_root start
+  gc_need_kit start
+  gc_need_onboard_if_brownfield start
+  gt_validate_slug start "$gt_s_slug"
+  gt_verify_trivial_tier start "$gt_s_slug"
+  gt_check_trivial_diff start "$gt_s_slug" "HEAD"
+
+  if [ "$gt_s_reopen" = 1 ]; then
+    gt_out="$(sh "$GC_HERE/guard-maintain.sh" start "$gt_s_slug" --tier trivial --reopen 2>&1)" || {
+      printf '%s\n' "$gt_out" >&2
+      exit 1
+    }
+  else
+    gt_out="$(sh "$GC_HERE/guard-maintain.sh" start "$gt_s_slug" --tier trivial 2>&1)" || {
+      printf '%s\n' "$gt_out" >&2
+      exit 1
+    }
+  fi
+
+  gt_state="docs/agents-v0/maintain/${gt_s_slug}/state.json"
+  gt_rule start start.next "$gt_s_slug"; gt_next="$gt_val"
+  if [ -f "$gt_state" ]; then
+    GT_ST="$gt_state" GT_NEXT="$gt_next" python3 - <<'PY'
+import json, os
+p = os.environ["GT_ST"]
+d = json.load(open(p, encoding="utf-8"))
+d["triageGuardManaged"] = True
+d["nextStep"] = os.environ["GT_NEXT"]
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+
+  gc_ok start "triage is in_progress for $gt_s_slug (tier=trivial, note=docs/agents-v0/maintain/${gt_s_slug}/note.md, report=docs/agents-v0/build/${gt_s_slug}/build-report.md)"
+  printf 'Next: %s\n' "$gt_next"
 }
 
 gt_block() {
-  gc_refuse block "not implemented yet"
+  gt_b_slug="${1:-}"
+  shift || true
+  gt_b_reason="${*:-}"
+  gc_need_git_work_tree block
+  gc_to_root block
+  gc_need_kit block
+  gt_validate_slug block "$gt_b_slug"
+  [ -n "$(printf '%s' "$gt_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
+  gt_verify_trivial_tier block "$gt_b_slug"
+
+  gt_out="$(sh "$GC_HERE/guard-maintain.sh" block "$gt_b_slug" "$gt_b_reason" 2>&1)" || {
+    printf '%s\n' "$gt_out" >&2
+    exit 1
+  }
+  gt_state="docs/agents-v0/maintain/${gt_b_slug}/state.json"
+  gt_rule block block.next "$gt_b_slug"; gt_next="$gt_val"
+  if [ -f "$gt_state" ]; then
+    GT_ST="$gt_state" GT_NEXT="$gt_next" python3 - <<'PY'
+import json, os
+p = os.environ["GT_ST"]
+d = json.load(open(p, encoding="utf-8"))
+d["nextStep"] = os.environ["GT_NEXT"]
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+  gc_ok block "triage blocked for $gt_b_slug: $gt_b_reason"
+  printf 'Next: %s\n' "$gt_next"
 }
 
 gt_ready() {
-  gc_refuse ready "not implemented yet"
+  [ $# -eq 1 ] || gt_usage
+  gt_r_slug="$1"
+  gc_need_git_work_tree ready
+  gc_to_root ready
+  gc_need_kit ready
+  gt_validate_slug ready "$gt_r_slug"
+  gt_verify_trivial_tier ready "$gt_r_slug"
+
+  gt_state="docs/agents-v0/maintain/${gt_r_slug}/state.json"
+  gt_base="$(gc_state_get "$gt_state" baseCommit 2>/dev/null || true)"
+  [ -n "$gt_base" ] || gt_base="HEAD"
+  gt_check_trivial_diff ready "$gt_r_slug" "$gt_base"
+
+  gt_out="$(sh "$GC_HERE/guard-maintain.sh" ready "$gt_r_slug" 2>&1)" || {
+    printf '%s\n' "$gt_out" >&2
+    exit 1
+  }
+  gt_rule ready ready.next "$gt_r_slug"; gt_next="$gt_val"
+  if [ -f "$gt_state" ]; then
+    GT_ST="$gt_state" GT_NEXT="$gt_next" python3 - <<'PY'
+import json, os
+p = os.environ["GT_ST"]
+d = json.load(open(p, encoding="utf-8"))
+d["triageGuardManaged"] = True
+d["nextStep"] = os.environ["GT_NEXT"]
+with open(p, "w", encoding="utf-8") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+PY
+  fi
+  gc_ok ready "triage for $gt_r_slug is verified and awaiting Sensei's external approval"
+  printf 'Next: %s\n' "$gt_next"
 }
 
 gt_commit() {
-  gc_refuse commit "not implemented yet"
+  [ $# -eq 1 ] || gt_usage
+  gt_m_slug="$1"
+  gc_need_git_work_tree commit
+  gc_to_root commit
+  gc_need_kit commit
+  gt_validate_slug commit "$gt_m_slug"
+  gt_verify_trivial_tier commit "$gt_m_slug"
+
+  gt_state="docs/agents-v0/maintain/${gt_m_slug}/state.json"
+  gt_base="$(gc_state_get "$gt_state" baseCommit 2>/dev/null || true)"
+  [ -n "$gt_base" ] || gt_base="HEAD"
+  gt_check_trivial_diff commit "$gt_m_slug" "$gt_base"
+
+  gt_out="$(sh "$GC_HERE/guard-maintain.sh" commit "$gt_m_slug" 2>&1)" || {
+    printf '%s\n' "$gt_out" >&2
+    exit 1
+  }
+  printf '%s\n' "$gt_out"
 }
 
 gt_steps() {

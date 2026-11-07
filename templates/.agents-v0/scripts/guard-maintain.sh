@@ -718,7 +718,14 @@ MANIFESTS = {
     "requirements.txt", "Cargo.toml", "go.mod"
 } | LOCKFILES
 
+CONTRACT_RE = re.compile(
+    r"(^|/)(openapi[^/]*\.(ya?ml|json)|asyncapi[^/]*\.(ya?ml|json)|[^/]+\.(proto|graphql|gql|avro|sql))$",
+    re.I,
+)
+
 def is_doc_or_meta(p):
+    if CONTRACT_RE.search(p) or p.startswith("openapi/"):
+        return False
     if p.startswith("docs/") or p.startswith(".agents-v0/") or p.startswith(".cursor/") or p.startswith(".agents/"):
         return True
     bn = os.path.basename(p)
