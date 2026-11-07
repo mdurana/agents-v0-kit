@@ -5,10 +5,10 @@ description: Extract a markdown deck from an approved Intake artifact, or from a
 
 # leadership-deck
 
-Documentation playbook for `/v0-deck`. It does not record a delivery approval. It does not interview, and it does not add a mission statement or a success metric that the sources do not already contain.
+Documentation playbook for `/v0-deck`, executed by the shell-less **`docs-author`** subagent (`core/common/agents/docs-author.md`, `shell: false`) after the main session runs `sh .agents-v0/scripts/guard-deck.sh check <kind> [<feature>] <audience> <decision>`. It does not record a delivery approval. It does not interview, and it does not add a mission statement or a success metric that the sources do not already contain.
 
 ## Steps
-1. Require a kind, an audience of `Technical`, `Non-technical`, or `Mixed`, and the decision sentence the user wants the meeting to take. Stop when one of those is missing.
+1. Require a kind, an audience of `Technical`, `Non-technical`, or `Mixed`, and the decision sentence the user wants the meeting to take (validated up front by `sh .agents-v0/scripts/guard-deck.sh check ...`). Stop when one of those is missing.
    - `intake` also requires the feature slug: `/v0-deck intake <feature> <audience> <decision>`.
    - `product` and `delivery` stay `/v0-deck product <audience> <decision>` and `/v0-deck delivery <audience> <decision>`.
 2. **Intake** sources:
@@ -23,8 +23,8 @@ Documentation playbook for `/v0-deck`. It does not record a delivery approval. I
 5. Refuse a source that lacks approval in `.state.json` and lacks an `Approved` row. The discovery file is one exception: the roadmap approval admits it. The ARC record is the other: an approved `architecture` phase (in `program.state.json` or an `Approved` `architecture` row that names the file) admits it.
 6. Write the deck as markdown. Every figure, date, and metric is copied from a source. When a number is not in the sources, omit it. Scenario text is copied from the requirements artifact. Do not invent a problem statement.
 7. Use the outline for the kind. For `Non-technical`, an in-scope line is the scenario name only (`### AC-n — <name>`). For `Technical` and `Mixed`, also copy `Kind:` and the `Then` line.
-8. Write the params file with Audience, Decision, and one source line per file (`path`, approval date from `.state.json` `phaseDates.<phase>` / `updatedAt` or the `Approved` row). The discovery line uses the roadmap approval date. A requirements line uses the Intake approval date. The ARC line uses the `arc` or `architecture` approval date.
-9. Do not edit those sources. Do not add an `Approved` row.
+8. Write the params file with `Kind:`, `Audience:`, `Decision:`, and one source line per file (`path`, approval date from `.state.json` `phaseDates.<phase>` / `updatedAt` or the `Approved` row). The discovery line uses the roadmap approval date. A requirements line uses the Intake approval date. The ARC line uses the `arc` or `architecture` approval date.
+9. Do not edit those sources. Do not add an `Approved` row. After `docs-author` returns, the main session runs `sh .agents-v0/scripts/guard-deck.sh verify <kind> [<feature>]` and `sh .agents-v0/scripts/guard-deck.sh commit <kind> [<feature>]`.
 
 ### Intake outline
 File: `docs/agents-v0/presentations/<feature>-intake.md`. Params: `docs/agents-v0/presentations/<feature>-intake.params.md`.
@@ -48,8 +48,8 @@ File: `docs/agents-v0/presentations/<roadmap-stem>.md` for product, and `docs/ag
 8. Delivery only: release evidence for stories with `release` in `<feature>.state.json` (`approvedPhases`) or named on `Approved` `release` rows. Copy `artifacts.verify`, `artifacts.buildReport`, and `docs/agents-v0/requirements/<feature>.phase-result.md`. Omit a figure those files do not contain.
 
 ## Rule-compliance checklist
-- [ ] Audience and decision were supplied by the user. Intake also names the feature.
+- [ ] Audience and decision were supplied by the user and verified by `guard-deck.sh check`. Intake also names the feature.
 - [ ] Every source except the discovery file is approved in `.state.json` (`approvedPhases`) or has an `Approved` row. The ARC record may instead be covered by an approved `architecture` phase in `program.state.json` or named by an `Approved` `architecture` row.
 - [ ] The deck contains no number that the sources do not contain.
 - [ ] Non-technical in-scope lines are scenario names. Technical and Mixed lines also copy `Kind` and `Then`.
-- [ ] Requirements, design, and `Delivery approvals` were not edited.
+- [ ] Requirements, design, and `Delivery approvals` were not edited (`guard-deck.sh verify` enforces read-only tree outside `docs/agents-v0/presentations/`).
