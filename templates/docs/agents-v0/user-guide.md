@@ -65,9 +65,9 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-local-release` | After verify is approved — final native stack verify, lesson decisions, squash-merge into the integration branch, and release completion. |
 | `/v0-deliver`  | Run the whole chain. You approve at each gate that applies.                                             |
 | `/v0-maintain` | Bug, security patch, dependency update, or doc fix after go-live.                                       |
-| `/v0-triage`   | Small, low-risk change (typo, docs-only, version-only update). The change itself must qualify, and you confirm it before the lighter path starts. |
+| `/v0-triage`   | Small, low-risk change (typo, docs-only, 1-for-1 patch version update). Guarded by `guard-triage.sh`; you confirm the trivial tier in chat and approve in your terminal (`approve triage <id>`). |
 | `/v0-onboard`  | First-time setup on an **existing** repo: documents what is there (modules, architecture, flows, security baseline) with sources cited, and records what it could not determine. You approve the report before intake. |
-| `/v0-status`   | Name the feature when more than one is open. One open story can omit the name. An unfinished phase is run again from the saved files; a phase waiting on you does not start the next one. |
+| `/v0-status`   | Read-only status across all folders (`stories-status.sh` and `stories-status.sh --story <slug>`). Name the feature when more than one is open; one open story can omit the name. Reports the exact next command to run. |
 
 
 You can also write in normal language, for example: *“Run intake on PROJ-1234”* or *“We’re only doing design for the notifications feature.”* Using the slash commands is clearer for the workflow. When one story is open, the phase command can omit the name. When more than one is open, name it: `/v0-status tax-statement`. A new story or fix needs a new name.
