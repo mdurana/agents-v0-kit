@@ -8,69 +8,96 @@
 # worktree from `git worktree list` and prints one table. It writes no files and keeps no cache:
 # each run reads the state files again.
 #
+# Design: DST3, DST5, DST6.
+#
 # Usage:
-#   sh .agents-v0/scripts/stories-status.sh [--json] [--all-copies] [--root <dir>]
-#     --json        print a JSON array instead of the table
-#     --all-copies  print every copy of a state file (one row per worktree that has it).
-#                   Default: one row per story, read from the worktree on that story's branch
-#                   (feature/<feature> or maintain/<id>) when one exists, otherwise from main.
-#     --root <dir>  run as if started in <dir> (default: current directory)
+#   sh .agents-v0/scripts/stories-status.sh [--json] [--all-copies] [--root <dir>] [--story <slug>] [<slug>]
+#   sh .agents-v0/scripts/stories-status.sh steps | --steps
+#     --json          print a JSON array instead of the table (or single JSON object with --story)
+#     --all-copies    print every copy of a state file (one row per worktree that has it).
+#                     Default: one row per story, read from the worktree on that story's branch
+#                     (feature/<feature> or maintain/<id>) when one exists, otherwise from main.
+#     --root <dir>    run as if started in <dir> (default: current directory)
+#     --story <slug>  print a detailed read-only status summary and deterministic Next command for <slug>
+#     steps|--steps   print the canonical step block for core/common/commands/v0-status.md
 #
-# Reads:
-#   docs/agents-v0/program.state.json
-#   docs/agents-v0/onboarding/state.json
-#   docs/agents-v0/requirements/<feature>.state.json
-#   docs/agents-v0/maintain/<id>/state.json
-# in each worktree (uncommitted working-tree content, which is what the phase agents write).
-#
-# Columns: story, kind, branch, worktree (relative to the main checkout), activePhase,
-# activeStatus, lastApprovedPhase, verifyPassed, reopenCount, tier, blockedReason,
-# lastCommit (YYYY-MM-DD: branch tip for a story read from its own worktree; otherwise the
-# last commit that touched its state file), note (malformed JSON, missing state file, copies
-# that disagree, missing worktree folder).
-#
-# Exit 0 always after printing, even when a state file is missing or malformed (those rows say
-# so in the note column). Exit 2 only for a usage error.
+# Exit 0 always after printing in table/--json mode, even when a state file is missing or malformed
+# (those rows say so in the note column). Exit 1 in --story <slug> mode when <slug> is not found.
+# Exit 2 only for a usage error.
 
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
 
 as_json=0
 all_copies=0
 root=""
+target_story=""
+want_steps=0
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --json) as_json=1; shift ;;
     --all-copies) all_copies=1; shift ;;
+    steps|--steps) want_steps=1; shift ;;
     --root)
-      [ $# -ge 2 ] || { printf 'usage: %s [--json] [--all-copies] [--root <dir>]\n' "$0" >&2; exit 2; }
+      [ $# -ge 2 ] || { printf 'usage: %s [--json] [--all-copies] [--root <dir>] [--story <slug>]\n' "$0" >&2; exit 2; }
       root="$2"; shift 2 ;;
+    --story)
+      [ $# -ge 2 ] || { printf 'usage: %s [--json] [--all-copies] [--root <dir>] [--story <slug>]\n' "$0" >&2; exit 2; }
+      target_story="$2"; shift 2 ;;
     -h|--help)
-      printf 'usage: %s [--json] [--all-copies] [--root <dir>]\n' "$0"
+      printf 'usage: %s [--json] [--all-copies] [--root <dir>] [--story <slug>] [steps]\n' "$0"
       exit 0 ;;
-    *)
-      printf 'usage: %s [--json] [--all-copies] [--root <dir>]\n' "$0" >&2
+    -*)
+      printf 'usage: %s [--json] [--all-copies] [--root <dir>] [--story <slug>]\n' "$0" >&2
       exit 2 ;;
+    *)
+      if [ -z "$target_story" ]; then
+        target_story="$1"
+        shift
+      else
+        printf 'usage: %s [--json] [--all-copies] [--root <dir>] [--story <slug>]\n' "$0" >&2
+        exit 2
+      fi
+      ;;
   esac
 done
+
 if [ -n "$root" ]; then
   cd "$root" || { printf 'FAIL: --root not found: %s\n' "$root" >&2; exit 2; }
 fi
 
-SS_JSON="$as_json" SS_ALL="$all_copies" python3 - <<'PY'
+if [ "$want_steps" = 1 ]; then
+  printf 'steps not implemented yet\n' >&2
+  exit 1
+fi
+
+ss_approvals_dir=""
+# >>> kit-test-override (Design: DST3; install.sh removes this block; kit test copies only)
+ss_approvals_dir="${AGENTS_V0_APPROVALS_DIR:-}"
+# <<< kit-test-override
+[ -n "$ss_approvals_dir" ] || ss_approvals_dir="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')/.agents-v0-approvals"
+
+SS_JSON="$as_json" SS_ALL="$all_copies" SS_STORY="$target_story" SS_APPROVALS_DIR="$ss_approvals_dir" python3 - <<'PY'
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 as_json = os.environ.get("SS_JSON") == "1"
 all_copies = os.environ.get("SS_ALL") == "1"
+target_story = os.environ.get("SS_STORY", "").strip()
+approvals_root = os.environ.get("SS_APPROVALS_DIR", "").strip()
+caller_cwd = os.path.abspath(".")
 
 
 def git(args, cwd="."):
     """Run a read-only git command; return stdout or "" on any failure."""
     try:
-        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+        r = subprocess.run(["git", "--no-optional-locks", *args], cwd=cwd, capture_output=True, text=True, check=False)
     except OSError:
         return ""
     return r.stdout if r.returncode == 0 else ""
@@ -97,6 +124,16 @@ for wt in worktrees:
     if not os.path.isdir(wt["path"]):
         wt["exists"] = False
 main_path = worktrees[0]["path"]
+
+# Compute repo_id matching guard-common.sh gc_repo_id
+repo_id = ""
+if not worktrees[0].get("nogit"):
+    common_dir = git(["rev-parse", "--git-common-dir"], cwd=main_path).strip()
+    if common_dir:
+        abs_cd = os.path.realpath(os.path.join(main_path, common_dir))
+        base_name = os.path.basename(os.path.dirname(abs_cd)) if os.path.basename(abs_cd) == ".git" else os.path.basename(abs_cd)
+        base_name = re.sub(r"[^A-Za-z0-9._-]", "_", base_name) or "repo"
+        repo_id = f"{base_name}-{hashlib.sha256(abs_cd.encode()).hexdigest()[:12]}"
 
 
 def rel_wt(path):
@@ -166,6 +203,221 @@ def owner_branch(kind, story):
     return ""
 
 
+def phase_result_rel(kind, story, phase, data):
+    if kind == "onboarding":
+        return "docs/agents-v0/onboarding/phase-result.md"
+    if kind == "program":
+        if phase == "roadmap":
+            art = (data or {}).get("artifact") or ""
+            stem = os.path.basename(art)[:-3] if art.endswith(".md") else "program"
+            return f"docs/agents-v0/roadmap/{stem}.phase-result.md"
+        if phase == "architecture":
+            return "docs/agents-v0/architecture.phase-result.md"
+        if phase == "plan":
+            return "docs/agents-v0/milestones/plan.phase-result.md"
+        if phase == "scaffold":
+            return "docs/agents-v0/milestones/scaffold.phase-result.md"
+    if kind == "feature":
+        return f"docs/agents-v0/requirements/{story}.phase-result.md"
+    if kind == "maintain":
+        return f"docs/agents-v0/maintain/{story}/phase-result.md"
+    return ""
+
+
+def approval_record_path(kind, story, phase):
+    if not approvals_root or not repo_id:
+        return ""
+    if kind in ("program", "onboarding"):
+        return os.path.join(approvals_root, repo_id, f"{phase}.json")
+    return os.path.join(approvals_root, repo_id, f"{phase}-{story}.json")
+
+
+def detect_uncommitted_gate(wt, kind, story, state_rel, data):
+    """Detect if Sensei externally approved a gate that has not been committed via guard-<phase>.sh commit yet."""
+    if not data or wt.get("nogit") or not wt.get("exists"):
+        return "", ""
+    wt_path = wt["path"]
+    active_phase = (data.get("activePhase") or "").strip()
+    active_status = (data.get("activeStatus") or "").strip()
+    last_app = (data.get("lastApprovedPhase") or "").strip()
+    tier = (data.get("tier") or "").strip()
+
+    # Case B: local-release keeps activePhase="release", activeStatus="awaiting_approval" when approved externally
+    if active_phase == "release" and active_status == "awaiting_approval":
+        rec_p = approval_record_path(kind, story, "local-release")
+        if rec_p and os.path.isfile(rec_p):
+            try:
+                rec = json.loads(Path(rec_p).read_text(encoding="utf-8"))
+                base_c = (data.get("baseCommit") or "").strip()
+                if not base_c or rec.get("baseCommit") == base_c:
+                    flag_m = " --maintain" if kind == "maintain" else ""
+                    cmd = f"sh .agents-v0/scripts/guard-local-release.sh commit {story}{flag_m}"
+                    return "local-release", cmd
+            except Exception:
+                pass
+        return "", ""
+
+    # Case A: lastApprovedPhase is set and activePhase is empty
+    if active_phase or not last_app or last_app == "release":
+        return "", ""
+
+    # Check if HEAD:<state_rel> already has this lastApprovedPhase committed
+    head_raw = git(["show", f"HEAD:{state_rel}"], cwd=wt_path)
+    if head_raw:
+        try:
+            head_data = json.loads(head_raw)
+            head_app = (head_data.get("lastApprovedPhase") or "").strip()
+            head_phases = head_data.get("approvedPhases") or []
+            if head_app == last_app or last_app in head_phases:
+                return "", ""
+        except Exception:
+            pass
+
+    # Verify evidence that external approve actually ran (either approval record on disk or phase-result awaiting_approval)
+    has_evidence = False
+    rec_p = approval_record_path(kind, story, last_app)
+    if rec_p and os.path.isfile(rec_p):
+        has_evidence = True
+    else:
+        pr_rel = phase_result_rel(kind, story, last_app, data)
+        if pr_rel:
+            pr_full = os.path.join(wt_path, pr_rel)
+            if os.path.isfile(pr_full):
+                try:
+                    pr_txt = Path(pr_full).read_text(encoding="utf-8", errors="replace")
+                    if re.search(r"(?im)^-?\s*status:\s*awaiting_approval\b", pr_txt):
+                        has_evidence = True
+                except Exception:
+                    pass
+
+    if not has_evidence:
+        return "", ""
+
+    if kind in ("program", "onboarding"):
+        return last_app, f"sh .agents-v0/scripts/guard-{last_app}.sh commit"
+    if kind == "maintain":
+        if last_app == "maintain" and tier == "trivial":
+            return "maintain", f"sh .agents-v0/scripts/guard-triage.sh commit {story}"
+        if last_app == "verify":
+            return "verify", f"sh .agents-v0/scripts/guard-verify.sh commit {story} --maintain"
+        return last_app, f"sh .agents-v0/scripts/guard-{last_app}.sh commit {story}"
+    return last_app, f"sh .agents-v0/scripts/guard-{last_app}.sh commit {story} (or /v0-deliver {story})"
+
+
+def compute_next_command(row, data, wt_path):
+    """Compute the deterministic next command for a story/program/onboarding/maintain row."""
+    if row.get("note") and any(k in row["note"] for k in ("malformed", "unreadable", "no state file", "worktree folder missing")):
+        return "Fix or restore the state file / worktree reported in note"
+
+    uncommitted_cmd = row.get("_uncommittedCmd") or ""
+    if uncommitted_cmd:
+        return uncommitted_cmd
+
+    kind = row["kind"]
+    story = row["story"]
+    active_phase = (row.get("activePhase") or "").strip()
+    active_status = (row.get("activeStatus") or "").strip()
+    last_app = (row.get("lastApprovedPhase") or "").strip()
+    tier = (row.get("tier") or "").strip()
+    app_phases = (data or {}).get("approvedPhases") or []
+    if not isinstance(app_phases, list):
+        app_phases = []
+    is_released = ("release" in app_phases) or (last_app == "release")
+
+    # Worktree switch hint when story has its own worktree and caller is not inside it
+    wt_rel = row.get("worktree") or "."
+    wt_abs = os.path.abspath(wt_path)
+    in_other_checkout = (wt_rel != ".") and (not caller_cwd.startswith(wt_abs))
+
+    if kind == "feature" and is_released:
+        return "COMPLETE (start a new /v0-intake <feature>, /v0-triage <id>, or /v0-maintain <id>)"
+
+    if kind == "maintain" and is_released:
+        if tier == "emergency" and "verify" not in app_phases and last_app != "verify":
+            if active_phase == "verify" and active_status == "blocked":
+                return "Start /v0-maintain with a new <id> (owed emergency verify is blocked by a Critical finding)"
+            return f"/v0-verify {story} --maintain"
+        return "COMPLETE (start a new /v0-triage <id> or /v0-maintain <id>)"
+
+    if active_status in ("in_progress", "blocked"):
+        if kind in ("program", "onboarding"):
+            return f"/v0-{active_phase}"
+        if active_phase == "release":
+            flag_m = " --maintain" if kind == "maintain" else ""
+            base_cmd = f"/v0-local-release {story}{flag_m}"
+        elif kind == "maintain" and active_phase == "maintain" and tier == "trivial":
+            base_cmd = f"/v0-triage {story}"
+        elif kind == "maintain" and active_phase == "verify":
+            base_cmd = f"/v0-verify {story} --maintain"
+        else:
+            base_cmd = f"/v0-{active_phase} {story}"
+        if in_other_checkout and kind in ("feature", "maintain") and tier != "trivial":
+            return f"Open worktree {wt_rel} and run {base_cmd} (or /v0-deliver {story})"
+        return base_cmd
+
+    if active_status == "awaiting_approval":
+        ap_cmd = "local-release" if active_phase == "release" else active_phase
+        if kind in ("program", "onboarding"):
+            return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit"
+        if kind == "maintain" and ap_cmd == "maintain" and tier == "trivial":
+            return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve triage {story} — then run: sh .agents-v0/scripts/guard-triage.sh commit {story}"
+        flag_m = " --maintain" if (kind == "maintain" and ap_cmd in ("verify", "local-release")) else ""
+        return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} {story} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit {story}{flag_m}"
+
+    # No activePhase: route from lastApprovedPhase
+    if kind == "onboarding":
+        if last_app == "onboard" or "onboard" in app_phases:
+            return "/v0-roadmap (program), /v0-intake <feature> (single story), /v0-triage <id> (trivial), or /v0-maintain <id> (fix)"
+        return "/v0-onboard"
+
+    if kind == "program":
+        if not last_app:
+            return "/v0-roadmap"
+        if last_app == "roadmap":
+            return "/v0-architecture"
+        if last_app == "architecture":
+            return "/v0-plan"
+        if last_app == "plan":
+            onb_st = os.path.join(main_path, "docs", "agents-v0", "onboarding", "state.json")
+            if not os.path.isfile(onb_st) and "scaffold" not in app_phases:
+                return "/v0-scaffold"
+            return "/v0-intake <first-story> (or /v0-deliver <first-story>)"
+        if last_app == "scaffold":
+            return "/v0-intake <first-story> (or /v0-deliver <first-story>)"
+        return "/v0-status"
+
+    if kind == "feature":
+        nxt_map = {
+            "": f"/v0-intake {story}",
+            "intake": f"/v0-design {story}",
+            "design": f"/v0-build {story}",
+            "build": f"/v0-verify {story}",
+            "verify": f"/v0-local-release {story}",
+        }
+        base_cmd = nxt_map.get(last_app, f"/v0-deliver {story}")
+        if in_other_checkout and last_app in ("intake", "design", "build", "verify"):
+            return f"Open worktree {wt_rel} and run {base_cmd} (or /v0-deliver {story})"
+        return f"{base_cmd} (or /v0-deliver {story})"
+
+    if kind == "maintain":
+        if not last_app:
+            return f"/v0-triage {story}" if tier == "trivial" else f"/v0-maintain {story}"
+        if last_app == "maintain":
+            if tier == "emergency":
+                base_cmd = f"/v0-local-release {story} --maintain"
+            else:
+                base_cmd = f"/v0-verify {story} --maintain"
+        elif last_app == "verify":
+            base_cmd = f"/v0-local-release {story} --maintain"
+        else:
+            base_cmd = f"/v0-maintain {story}"
+        if in_other_checkout and tier != "trivial":
+            return f"Open worktree {wt_rel} and run {base_cmd} (or /v0-deliver {story} --maintain)"
+        return base_cmd
+
+    return "/v0-status"
+
+
 copies = {}  # (kind, story) -> list of rows
 for wt in worktrees:
     if not wt["exists"]:
@@ -173,18 +425,28 @@ for wt in worktrees:
     for story, kind, path in find_state_files(wt["path"]):
         data, err = read_state(path)
         own = bool(owner_branch(kind, story)) and wt["branch"] == owner_branch(kind, story)
+        state_rel = os.path.relpath(str(path), wt["path"])
+        u_phase, u_cmd = detect_uncommitted_gate(wt, kind, story, state_rel, data)
+        note_parts = [err] if err else []
+        if u_phase:
+            note_parts.append(f"uncommitted gate ({u_phase}): run {u_cmd}")
         row = {
             "story": story,
             "kind": kind,
             "branch": wt["branch"],
             "worktree": rel_wt(wt["path"]),
-            "stateFile": os.path.relpath(str(path), wt["path"]),
+            "stateFile": state_rel,
         }
         for f in FIELDS:
             row[f] = (data or {}).get(f, None) if data is not None else None
         row["lastCommit"] = last_commit(wt, path, own)
-        row["note"] = err
+        row["note"] = "; ".join(note_parts)
         row["_own"] = own
+        row["_uncommittedPhase"] = u_phase
+        row["_uncommittedCmd"] = u_cmd
+        row["_wtPath"] = wt["path"]
+        row["_data"] = data or {}
+        row["nextCommand"] = compute_next_command(row, data, wt["path"])
         copies.setdefault((kind, story), []).append(row)
 
 # Story branches whose worktree has no state file yet (e.g. intake doc not moved yet).
@@ -197,11 +459,13 @@ for wt in worktrees:
                 continue
             note = "worktree folder missing (git worktree prune?)" if not wt["exists"] else "no state file in its worktree"
             row = {"story": story, "kind": kind, "branch": b, "worktree": rel_wt(wt["path"]),
-                   "stateFile": "", "lastCommit": "", "note": note, "_own": True}
+                   "stateFile": "", "lastCommit": "", "note": note, "_own": True,
+                   "_uncommittedPhase": "", "_uncommittedCmd": "", "_wtPath": wt["path"], "_data": {}}
             for f in FIELDS:
                 row[f] = None
             if wt["exists"] and not wt.get("nogit"):
                 row["lastCommit"] = git(["log", "-1", "--format=%cs"], cwd=wt["path"]).strip()
+            row["nextCommand"] = compute_next_command(row, None, wt["path"])
             copies.setdefault((kind, story), []).append(row)
 
 
@@ -226,15 +490,54 @@ for key in sorted(copies, key=lambda k: (kind_order.get(k[0], 9), k[1])):
     notes = [pick["note"]] if pick["note"] else []
     if differ:
         notes.append("other copy differs: " + ", ".join(differ))
-    bad = [label(r) for r in others if r["note"]]
+    bad = [label(r) for r in others if r["note"] and not r["note"].startswith("uncommitted gate")]
     if bad:
         notes.append("unreadable copy in: " + ", ".join(bad))
     pick = dict(pick)
     pick["note"] = "; ".join(notes)
     rows.append(pick)
 
+if target_story:
+    matches = [r for r in rows if r["story"] == target_story]
+    if not matches:
+        open_names = ", ".join(r["story"] for r in rows) if rows else "none"
+        print(f"REFUSED status: no state file found for '{target_story}' (available workstreams: {open_names})", file=sys.stderr)
+        raise SystemExit(1)
+    chosen = dict(matches[0])
+    raw_data = chosen.pop("_data", {})
+    chosen.pop("_own", None)
+    chosen.pop("_uncommittedPhase", None)
+    chosen.pop("_uncommittedCmd", None)
+    chosen.pop("_wtPath", None)
+    if as_json:
+        chosen["approvedPhases"] = raw_data.get("approvedPhases") or []
+        chosen["phaseDates"] = raw_data.get("phaseDates") or {}
+        chosen["baseCommit"] = raw_data.get("baseCommit") or ""
+        chosen["artifact"] = raw_data.get("artifact") or ""
+        chosen["artifacts"] = raw_data.get("artifacts") or {}
+        print(json.dumps(chosen, indent=2))
+        raise SystemExit(0)
+    app_list = ", ".join(raw_data.get("approvedPhases") or []) or "none"
+    print(f"Story: {chosen['story']} (kind: {chosen['kind']}, tier: {chosen.get('tier') or '-'})")
+    print(f"Branch: {chosen.get('branch') or '-'} (worktree: {chosen.get('worktree') or '.'})")
+    print(f"State file: {chosen.get('stateFile') or '-'}")
+    print(f"Artifact: {raw_data.get('artifact') or '-'}")
+    print(f"Approved phases: {app_list} (lastApprovedPhase: {chosen.get('lastApprovedPhase') or 'none'})")
+    print(f"Active phase: {chosen.get('activePhase') or 'none'} (activeStatus: {chosen.get('activeStatus') or 'none'})")
+    print(f"Verify passed: {chosen.get('verifyPassed')} (reopenCount: {chosen.get('reopenCount') or 0}, baseCommit: {raw_data.get('baseCommit') or '-'})")
+    if chosen.get("blockedReason"):
+        print(f"Blocked reason: {chosen['blockedReason']}")
+    if chosen.get("note"):
+        print(f"Note: {chosen['note']}")
+    print(f"Next: {chosen['nextCommand']}")
+    raise SystemExit(0)
+
 for r in rows:
     r.pop("_own", None)
+    r.pop("_uncommittedPhase", None)
+    r.pop("_uncommittedCmd", None)
+    r.pop("_wtPath", None)
+    r.pop("_data", None)
 
 if as_json:
     print(json.dumps(rows, indent=2))
