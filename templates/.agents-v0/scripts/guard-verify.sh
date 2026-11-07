@@ -736,9 +736,11 @@ PYBNC
 
   # 3. Traceability check T6 (every AC-<n> has a passing row in quality-gate.md)
   if [ "$gv_is_maintain" = 0 ] && [ -f "$GC_HERE/check-traceability.sh" ]; then
-    gv_tr_out="$(AGENTS_V0_TRACE_MODE=fail sh "$GC_HERE/check-traceability.sh" verify "$gv_req_art" --no-write 2>&1)" || {
+    gv_tr_rc=0
+    gv_tr_out="$(sh "$GC_HERE/check-traceability.sh" verify "$gv_req_art" --no-write 2>&1)" || gv_tr_rc=$?
+    if [ "$gv_tr_rc" -ne 0 ] || printf '%s\n' "$gv_tr_out" | grep -q '^TRACE \(WARN\|FAIL\) '; then
       gc_refuse ready "verify traceability check (T6) failed: $gv_tr_out"
-    }
+    fi
   fi
 
   # 4. Secret scan on verify reports and verify-output.txt

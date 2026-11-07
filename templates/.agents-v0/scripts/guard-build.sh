@@ -615,9 +615,11 @@ PYVAL
 
   # 4. Traceability check T4 (endpoint has code under app/) & T5 (endpoint has test under app/)
   if [ -f "$GC_HERE/check-traceability.sh" ]; then
-    gb_tr_out="$(AGENTS_V0_TRACE_MODE=fail sh "$GC_HERE/check-traceability.sh" build "$gb_req_art" --no-write 2>&1)" || {
+    gb_tr_rc=0
+    gb_tr_out="$(sh "$GC_HERE/check-traceability.sh" build "$gb_req_art" --no-write 2>&1)" || gb_tr_rc=$?
+    if [ "$gb_tr_rc" -ne 0 ] || printf '%s\n' "$gb_tr_out" | grep -q '^TRACE \(WARN\|FAIL\) '; then
       gc_refuse ready "build traceability check (T4/T5) failed: $gb_tr_out"
-    }
+    fi
   fi
 
   # 5. Secret scan on build-output.txt and build-report.md

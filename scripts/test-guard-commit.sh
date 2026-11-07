@@ -81,10 +81,13 @@ cp "$tmp/state-approved.json" "$S"
 # --- a staged fake secret inside the onboard paths is refused by the staged scan ------------------------------------
 fake="AKIA""QZ7X3B5N8M2K4J6H"
 printf 'key = %s\n' "$fake" > "$proj/docs/agents-v0/onboarding/leak.md"
+pty_approve "Approve with leak to test scan-staged" >/dev/null 2>&1
 out="$(commit)"; rc=$?
 [ $rc = 1 ] && printf '%s' "$out" | grep -q '^REFUSED scan-staged'; check $? "commit: a staged fake AWS key is refused by the scan" "$out"
 [ "$(git -C "$proj" rev-parse HEAD)" = "$head" ]; check $? "scan refused: no commit made"
-git -C "$proj" restore --staged docs/agents-v0/onboarding/leak.md && mkdir -p "$tmp/trash" && mv "$proj/docs/agents-v0/onboarding/leak.md" "$tmp/trash/"
+git -C "$proj" restore --staged docs/agents-v0/onboarding/leak.md 2>/dev/null || true
+mkdir -p "$tmp/trash" && mv "$proj/docs/agents-v0/onboarding/leak.md" "$tmp/trash/"
+pty_approve "Approved, the onboarding docs are right" >/dev/null 2>&1
 
 # --- a path staged outside the onboard paths is refused -------------------------------------------------------------
 printf 'y\n' > "$proj/other.txt" && git -C "$proj" add other.txt
