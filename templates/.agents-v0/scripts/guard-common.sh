@@ -645,6 +645,73 @@ if bad:
 ' "$1"
 }
 
+# --- export & deck source-approval and read-only tree helpers (Design: DEXA) ---------------------------------------
+# gc_source_approval_date <state_path> <md_path> <phase_csv>: print approval date (YYYY-MM-DD or approved) and exit 0
+# when any phase in <phase_csv> is in <state_path>.approvedPhases or has an Approved row in <md_path>; else exit 1.
+gc_source_approval_date() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import json, os, re, sys
+state_path, md_path, phase_csv = sys.argv[1:4]
+phases = [p.strip() for p in phase_csv.split(",") if p.strip()]
+if state_path and os.path.isfile(state_path):
+    try:
+        st = json.load(open(state_path, encoding="utf-8"))
+        approved = st.get("approvedPhases") or []
+        dates = st.get("phaseDates") or {}
+        upd = (st.get("updatedAt") or "")[:10] or "approved"
+        for p in phases:
+            if p in approved:
+                print(str(dates.get(p) or upd)[:10])
+                sys.exit(0)
+    except Exception:
+        pass
+if md_path and os.path.isfile(md_path):
+    try:
+        txt = open(md_path, encoding="utf-8").read()
+        for line in txt.splitlines():
+            if "|" not in line:
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) >= 2 and any(cells[0].lower() == p.lower() for p in phases):
+                if any(c.lower().startswith("approved") for c in cells[1:]):
+                    for c in cells[1:]:
+                        m = re.search(r"\b(20\d\d-\d\d-\d\d)\b", c)
+                        if m:
+                            print(m.group(1))
+                            sys.exit(0)
+                    print("approved")
+                    sys.exit(0)
+    except Exception:
+        pass
+sys.exit(1)
+PY
+}
+
+# gc_readonly_outside <allowed_prefix_dir>: exit 0 when git status --porcelain -uall has no modified/untracked files
+# outside <allowed_prefix_dir> (ignoring *.lock); otherwise print the offending paths and exit 1.
+gc_readonly_outside() {
+  python3 - "$1" <<'PY'
+import subprocess, sys
+prefix = sys.argv[1].rstrip("/") + "/"
+st = subprocess.run(["git", "status", "--porcelain", "-uall"], capture_output=True, text=True, check=True)
+outside = []
+for line in st.stdout.splitlines():
+    if not line.strip():
+        continue
+    raw = line[3:].strip()
+    if " -> " in raw:
+        raw = raw.split(" -> ", 1)[1].strip()
+    raw = raw.strip('"')
+    if raw.endswith(".lock"):
+        continue
+    if not raw.startswith(prefix):
+        outside.append(raw)
+if outside:
+    print(", ".join(outside))
+    sys.exit(1)
+PY
+}
+
 gc_paths() {
   gc_to_root paths
   printf 'root=%s\n' "$(pwd)"
