@@ -498,6 +498,23 @@ for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh
     err "core/common/commands/v0-status.md names the internal '$internal' (keep the prose to stories-status.sh steps)"
   fi
 done
+# Export & Deck redo, Design: DEX8. Drift check A: the /v0-export and /v0-deck step blocks match `guard-export.sh steps` and `guard-deck.sh steps` byte for byte.
+sh scripts/generate-export-steps.sh --check >/dev/null || err "core/common/commands/v0-export.md step block drifted from guard-export.sh steps (run sh scripts/generate-export-steps.sh)"
+sh scripts/generate-deck-steps.sh --check >/dev/null || err "core/common/commands/v0-deck.md step block drifted from guard-deck.sh steps (run sh scripts/generate-deck-steps.sh)"
+[ -f scripts/test-export-deck-steps.sh ] || err "scripts/test-export-deck-steps.sh missing"
+sh scripts/test-export-deck-steps.sh >/dev/null || err "scripts/test-export-deck-steps.sh failed"
+[ -f scripts/test-guard-export-deck.sh ] || err "scripts/test-guard-export-deck.sh missing"
+sh scripts/test-guard-export-deck.sh >/dev/null || err "scripts/test-guard-export-deck.sh failed"
+# Drift check B: the /v0-export and /v0-deck prose names no internal state writer or git add -A.
+for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh check-attempt-budget.sh check-failure-brief.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-export.md; then
+    err "core/common/commands/v0-export.md names the internal '$internal' (the guard runs it; keep the prose to guard-export.sh steps)"
+  fi
+  if grep -Fq -- "$internal" core/common/commands/v0-deck.md; then
+    err "core/common/commands/v0-deck.md names the internal '$internal' (the guard runs it; keep the prose to guard-deck.sh steps)"
+  fi
+done
 
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
