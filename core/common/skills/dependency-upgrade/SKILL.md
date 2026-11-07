@@ -19,7 +19,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 9. Produce or refresh a CycloneDX or SPDX SBOM for the service.
 10. If the upgrade changes behavior or topology, sync docs (`doc-sync` skill).
 11. Record the change tier in the note, draft `## Lessons` -> `### maintain` in `docs/agents-v0/maintain/<id>/phase-result.md`, and have the main session run `sh .agents-v0/scripts/guard-triage.sh ready <id>` (for `Tier: trivial`) or `sh .agents-v0/scripts/guard-maintain.sh ready <id>` (for `Tier: standard`/`emergency`). A version-only patch change is Trivial-eligible; a minor bump and anything else is `standard`.
-12. Do not commit or push without Sensei's external TTY approval (`sh .agents-v0/scripts/guard-common.sh approve triage <id>` or `approve maintain <id>`) followed by `sh .agents-v0/scripts/guard-triage.sh commit <id>` or `sh .agents-v0/scripts/guard-maintain.sh commit <id>`.
+12. Do not commit or push without the user's external TTY approval (`sh .agents-v0/scripts/guard-common.sh approve triage <id>` or `approve maintain <id>`) followed by `sh .agents-v0/scripts/guard-triage.sh commit <id>` or `sh .agents-v0/scripts/guard-maintain.sh commit <id>`.
 
 ## Rule-compliance checklist
 - [ ] `security-baseline.mdc` §9: dependency scanning; lockfile committed; no new high/critical CVEs without a documented exception; SBOM produced for the service.

@@ -17,7 +17,7 @@
 #   sh .agents-v0/scripts/guard-roadmap.sh ready <discovery-path>
 #        verifies completeness, writes phase-result.md, sets awaiting_approval (DR3).
 #   sh .agents-v0/scripts/guard-roadmap.sh commit
-#        verifies Sensei approval record, writes Approved row, stages roadmap files, commits, tags (DR5).
+#        verifies external approval record, writes Approved row, stages roadmap files, commits, tags (DR5).
 #   sh .agents-v0/scripts/guard-roadmap.sh steps
 #        prints the step list for /v0-roadmap command prose (DR6).
 #
@@ -257,7 +257,7 @@ gr_start() {
       not-awaiting-approval)
         if [ -f "$gr_state" ]; then
           [ "$(gc_state_get "$gr_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse start "roadmap is awaiting Sensei's approval; wait for it, do not start again"
+            || gc_refuse start "roadmap is awaiting approval; wait for it, do not start again"
         fi
         ;;
       *) gc_refuse start "gate-rules names an unknown prerequisite '$gr_req'; reinstall the kit" ;;
@@ -435,15 +435,15 @@ gr_commit() {
   [ $# -eq 0 ] || gr_usage
   gr_load commit
 
-  # 1. Check state approved and Sensei approval record matches (DR5, F1)
+  # 1. Check state approved and external approval record matches (DR5, F1)
   case " $(gc_state_get "$gr_state" approvedPhases | tr -d '[]",') " in
     *" $gr_phase "*) ;;
-    *) gc_refuse commit "roadmap is not approved in $gr_state; Sensei runs approve in his own terminal first" ;;
+    *) gc_refuse commit "roadmap is not approved in $gr_state; the user runs approve in their own terminal first" ;;
   esac
 
   gr_ok_out="$(gc_approval_ok roadmap)" || {
     printf '%s\n' "$gr_ok_out"
-    gc_refuse commit "no approval record from Sensei matches this roadmap; Sensei runs approve in his own terminal"
+    gc_refuse commit "no external approval record matches this roadmap; the user runs approve in their own terminal"
   }
   printf '%s\n' "$gr_ok_out"
 
@@ -461,10 +461,10 @@ import json, os, re, sys
 art_path, rec_path = sys.argv[1:3]
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
-    approver = rec.get("approver", "Sensei")
+    approver = rec.get("approver", "user")
     approved_at = rec.get("approvedAt", "").split("T")[0]
 except Exception:
-    approver = "Sensei"
+    approver = "user"
     approved_at = ""
 
 with open(art_path, "r", encoding="utf-8") as f:
@@ -515,8 +515,8 @@ gr_steps() {
 4. Launch the \`roadmap-planner\` subagent (skill: \`program-roadmap\`) with the discovery path. It reads the discovery document and drafts \`docs/agents-v0/roadmap/<program>.md\` with Now, Next, and Later horizons; it runs no shell commands and leaves the Delivery approvals table empty.
 5. On a blocker, run \`$G block "<plain reason>"\` and stop.
 6. When the planner reports the roadmap done, run \`$G ready <discovery-path>\`. It verifies section completeness and item rules, writes \`docs/agents-v0/roadmap/<program>.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, have the planner fix what it names, then run \`ready\` again.
-7. Stop. Present the roadmap sequence and its phase result to Sensei. Next: $gr_ready_next. Never run approve yourself; the agent cannot approve this gate.
-8. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, appends the verified Approved row to Delivery approvals, stages roadmap files, secret-scans, makes the single gate commit, and tags \`roadmap-v<n>\`. Then suggest: $gr_approved_next.
+7. Stop. Present the roadmap sequence and its phase result to the user. Next: $gr_ready_next. Never run approve yourself; the agent cannot approve this gate.
+8. After the user runs approve in their own terminal, run \`$G commit\`. It verifies the user's approval record, appends the verified Approved row to Delivery approvals, stages roadmap files, secret-scans, makes the single gate commit, and tags \`roadmap-v<n>\`. Then suggest: $gr_approved_next.
 EOF_STEPS
 }
 

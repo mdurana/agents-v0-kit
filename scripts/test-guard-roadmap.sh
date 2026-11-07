@@ -194,14 +194,14 @@ printf '%s' "$out" | grep -q '^OK ready: roadmap prepared'; check $? "ready: pri
 
 # Start refuses while awaiting approval
 out="$(cd "$proj" && sh "$G" start docs/product/claims-discovery.md 2>&1 || true)"
-printf '%s' "$out" | grep -q 'REFUSED start: roadmap is awaiting Sensei'; check $? "start: refuses while awaiting approval" "$out"
+printf '%s' "$out" | grep -q 'REFUSED start: roadmap is awaiting approval'; check $? "start: refuses while awaiting approval" "$out"
 
 # --- 6. commit refused before approve -----------------------------------------------------------
 out="$(cd "$proj" && sh "$G" commit 2>&1 || true)"
 printf '%s' "$out" | grep -q 'REFUSED commit: roadmap is not approved'; check $? "commit: refused before approval" "$out"
 
 # --- 7. approve via pty ------------------------------------------------------------------------
-python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "Approved by Sensei" <<'PY'
+python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "Approved by user" <<'PY'
 import os, pty, sys, time
 proj, script, words = sys.argv[1:4]
 pid, fd = pty.fork()
@@ -232,7 +232,7 @@ rec_file="$(cd "$proj" && GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agent
 
 # --- 8. commit ---------------------------------------------------------------------------------
 out="$(cd "$proj" && sh "$G" commit 2>&1)"
-check $? "commit: exits 0 after Sensei approve" "$out"
+check $? "commit: exits 0 after external approve" "$out"
 printf '%s' "$out" | grep -q '^OK commit: roadmap committed on main as .*, tagged roadmap-v1'; check $? "commit: prints OK commit with tag" "$out"
 git -C "$proj" tag | grep -qx 'roadmap-v1'; check $? "commit: roadmap-v1 tag created"
 git -C "$proj" log -1 --format=%s | grep -qx 'program: roadmap approved'; check $? "commit: gate commit message is 'program: roadmap approved'"

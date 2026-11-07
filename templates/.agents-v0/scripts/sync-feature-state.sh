@@ -125,20 +125,20 @@ case "$art" in
     ;;
 esac
 
-# Architecture prerequisite gate (F8, T6): cannot enter architecture unless Sensei's external roadmap approval record exists
+# Architecture prerequisite gate (F8, T6): cannot enter architecture unless the external roadmap approval record exists
 if [ "$set_active" = 1 ] && [ "$active_phase" = architecture ] && [ "$active_status" != blocked ]; then
   guard_common="$(dirname "$0")/guard-common.sh"
   if [ -f "$guard_common" ]; then
     GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
     if ! ok_msg="$(gc_approval_ok roadmap)"; then
       printf 'FAIL: architecture requires approved roadmap record: %s\n' "$ok_msg" >&2
-      printf '  Complete /v0-roadmap and ensure Sensei approves via guard-common.sh approve roadmap before starting architecture.\n' >&2
+      printf '  Complete /v0-roadmap and ensure the user approves via guard-common.sh approve roadmap before starting architecture.\n' >&2
       exit 1
     fi
   fi
 fi
 
-# Plan prerequisite gate (FA8, DA7): cannot enter non-P0-A plan unless Sensei's external architecture approval record exists
+# Plan prerequisite gate (FA8, DA7): cannot enter non-P0-A plan unless the external architecture approval record exists
 if [ "$set_active" = 1 ] && [ "$active_phase" = plan ] && [ "$active_status" != blocked ]; then
   guard_common="$(dirname "$0")/guard-common.sh"
   if [ -f "$guard_common" ]; then
@@ -148,7 +148,7 @@ if [ "$set_active" = 1 ] && [ "$active_phase" = plan ] && [ "$active_status" != 
       *" roadmap "*|*" architecture "*)
         if ! ok_msg="$(gc_approval_ok architecture)"; then
           printf 'FAIL: plan requires approved architecture record: %s\n' "$ok_msg" >&2
-          printf '  Complete /v0-architecture and ensure Sensei approves via guard-common.sh approve architecture before starting plan.\n' >&2
+          printf '  Complete /v0-architecture and ensure the user approves via guard-common.sh approve architecture before starting plan.\n' >&2
           exit 1
         fi
         ;;
@@ -161,15 +161,15 @@ fi
 # P0-A is already on that branch). Recording it on feature/<feature> or maintain/<id>
 # after the merge leaves that branch ahead of the integration branch.
 approve_lc="$(printf '%s' "$approve_phase" | tr '[:upper:]' '[:lower:]')"
-# Refuse --approve for any phase unless Sensei's external approval record (gc_approval_ok) succeeds (C3)
+# Refuse --approve for any phase unless the external approval record (gc_approval_ok) succeeds (C3)
 case "$approve_lc" in
   onboard|roadmap|architecture|plan|scaffold)
     guard_common="$(dirname "$0")/guard-common.sh"
     if [ -f "$guard_common" ]; then
       GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
       if ! ok_msg="$(gc_approval_ok "$approve_lc")"; then
-        printf 'FAIL: --approve %s refused without Sensei external approval record: %s\n' "$approve_lc" "$ok_msg" >&2
-        printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s\n' "$approve_lc" >&2
+        printf 'FAIL: --approve %s refused without an external approval record: %s\n' "$approve_lc" "$ok_msg" >&2
+        printf '  The user must approve in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s\n' "$approve_lc" >&2
         exit 1
       fi
     else
@@ -193,8 +193,8 @@ case "$approve_lc" in
         if [ -f "$guard_common" ]; then
           GC_HERE="$(dirname "$0")" GUARD_COMMON_LIB=1 . "$guard_common"
           if ! ok_msg="$(gc_approval_ok "$approve_cmd" "$phase_slug")"; then
-            printf 'FAIL: --approve %s for %s refused without Sensei external approval record: %s\n' "$approve_lc" "$phase_slug" "$ok_msg" >&2
-            printf '  Sensei must approve in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s %s\n' "$approve_cmd" "$phase_slug" >&2
+            printf 'FAIL: --approve %s for %s refused without an external approval record: %s\n' "$approve_lc" "$phase_slug" "$ok_msg" >&2
+            printf '  The user must approve in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve %s %s\n' "$approve_cmd" "$phase_slug" >&2
             exit 1
           fi
         fi
@@ -315,7 +315,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
       [ -f "$state" ] && di7_base="$(gc_state_get "$state" baseCommit 2>/dev/null || true)"
       if [ -n "$di7_base" ]; then
         if ! di7_ok="$(gc_approval_ok intake "$slug")"; then
-          printf 'FAIL: design for %s refused without Sensei external intake approval record: %s\n' "$slug" "$di7_ok" >&2
+          printf 'FAIL: design for %s refused without an external intake approval record: %s\n' "$slug" "$di7_ok" >&2
           printf '  Complete /v0-intake %s (sh .agents-v0/scripts/guard-common.sh approve intake %s && sh .agents-v0/scripts/guard-intake.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
           exit 1
         fi
@@ -333,7 +333,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
       fi
       if [ "$dd7_cn" != 1 ] && { [ "$dd7_gm" = "True" ] || [ "$dd7_gm" = "true" ]; }; then
         if ! dd7_ok="$(gc_approval_ok design "$slug")"; then
-          printf 'FAIL: build for %s refused without Sensei external design approval record: %s\n' "$slug" "$dd7_ok" >&2
+          printf 'FAIL: build for %s refused without an external design approval record: %s\n' "$slug" "$dd7_ok" >&2
           printf '  Complete /v0-design %s (sh .agents-v0/scripts/guard-common.sh approve design %s && sh .agents-v0/scripts/guard-design.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
           exit 1
         fi
@@ -346,7 +346,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
       [ -f "$state" ] && db7_gm="$(gc_state_get "$state" buildGuardManaged 2>/dev/null || true)"
       if [ "$db7_gm" = "True" ] || [ "$db7_gm" = "true" ]; then
         if ! db7_ok="$(gc_approval_ok build "$slug")"; then
-          printf 'FAIL: verify for %s refused without Sensei external build approval record: %s\n' "$slug" "$db7_ok" >&2
+          printf 'FAIL: verify for %s refused without an external build approval record: %s\n' "$slug" "$db7_ok" >&2
           printf '  Complete /v0-build %s (sh .agents-v0/scripts/guard-common.sh approve build %s && sh .agents-v0/scripts/guard-build.sh commit %s) first.\n' "$slug" "$slug" "$slug" >&2
           exit 1
         fi
@@ -359,7 +359,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
           docs/agents-v0/maintain/*/note.md | */docs/agents-v0/maintain/*/note.md) dm7_slug="$(basename "$(dirname "$art")")" ;;
         esac
         if ! dm7_ok="$(gc_approval_ok maintain "$dm7_slug")"; then
-          printf 'FAIL: verify for %s refused without Sensei external maintain approval record: %s\n' "$dm7_slug" "$dm7_ok" >&2
+          printf 'FAIL: verify for %s refused without an external maintain approval record: %s\n' "$dm7_slug" "$dm7_ok" >&2
           printf '  Complete /v0-maintain %s (sh .agents-v0/scripts/guard-common.sh approve maintain %s && sh .agents-v0/scripts/guard-maintain.sh commit %s) first.\n' "$dm7_slug" "$dm7_slug" "$dm7_slug" >&2
           exit 1
         fi
@@ -376,7 +376,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
       [ -f "$state" ] && dv7_gm="$(gc_state_get "$state" verifyGuardManaged 2>/dev/null || true)"
       if [ "$dv7_gm" = "True" ] || [ "$dv7_gm" = "true" ]; then
         if ! dv7_ok="$(gc_approval_ok verify "$dv7_slug")"; then
-          printf 'FAIL: release for %s refused without Sensei external verify approval record: %s\n' "$dv7_slug" "$dv7_ok" >&2
+          printf 'FAIL: release for %s refused without an external verify approval record: %s\n' "$dv7_slug" "$dv7_ok" >&2
           printf '  Complete /v0-verify %s (sh .agents-v0/scripts/guard-common.sh approve verify %s && sh .agents-v0/scripts/guard-verify.sh commit %s) first.\n' "$dv7_slug" "$dv7_slug" "$dv7_slug" >&2
           exit 1
         fi
@@ -385,7 +385,7 @@ except Exception: print("")' "$state" 2>/dev/null || true)"
         [ -f "$state" ] && dm7_rgm="$(gc_state_get "$state" maintainGuardManaged 2>/dev/null || true)"
         if [ "$dm7_rgm" = "True" ] || [ "$dm7_rgm" = "true" ]; then
           if ! dm7_rok="$(gc_approval_ok maintain "$dv7_slug")"; then
-            printf 'FAIL: release for %s refused without Sensei external maintain approval record: %s\n' "$dv7_slug" "$dm7_rok" >&2
+            printf 'FAIL: release for %s refused without an external maintain approval record: %s\n' "$dv7_slug" "$dm7_rok" >&2
             printf '  Complete /v0-maintain %s (sh .agents-v0/scripts/guard-common.sh approve maintain %s && sh .agents-v0/scripts/guard-maintain.sh commit %s) first.\n' "$dv7_slug" "$dv7_slug" "$dv7_slug" >&2
             exit 1
           fi

@@ -5,7 +5,7 @@
 # (shipped from `core/<pack>/hooks/pack-scan.sh`). Authoritative F4 access-control
 # evidence is the Verify phase (security-reviewer + vapt-review), not after-edit hook warnings.
 
-# N-1 (kitfix-20261031-n1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): every hook runs Python as
+# N-1 (kitfix-20261031-n1, approved in design review 2026-10-31 16:36 Asia/Manila): every hook runs Python as
 #   "$HOOK_PYTHON" -I -S (the hook_py helper below). HOOK_PYTHON is the absolute interpreter path that install.sh
 #   checked and wrote into the file hook-python next to these scripts. It is never read from the environment: an
 #   agent sets the environment of the commands it starts, and a developer's shell reads agent-writable dotfiles.

@@ -252,7 +252,7 @@ def load_allowlist(head: Optional[str], err: List[str]) -> Dict[Tuple[str, str, 
         data = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as exc:
         err.append(f"INVALID-ALLOWLIST {ALLOWLIST_PATH} at HEAD is not valid JSON ({type(exc).__name__}); all entries "
-                   f"ignored, fix it in a commit Sensei approves")
+                   f"ignored, fix it in a user-approved commit")
         return {}
     if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("entries"), list):
         err.append(f'INVALID-ALLOWLIST {ALLOWLIST_PATH} at HEAD must be {{"version": 1, "entries": [...]}}; all '
@@ -421,7 +421,7 @@ def _finish(out: List[str], err: List[str], hits: int, scanned: int, what: str) 
         print(line)
     if hits:
         print(f"SECRET-SCAN REFUSED hits={hits} (remove the secret from the {what}; a false alarm needs an "
-              f"allow-list entry Sensei approves, committed before this commit: {ALLOWLIST_PATH})")
+              f"user-approved allow-list entry, committed before this commit: {ALLOWLIST_PATH})")
         return 1
     print(f"SECRET-SCAN clean files={scanned}")
     return 0

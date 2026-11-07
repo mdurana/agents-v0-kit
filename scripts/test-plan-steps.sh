@@ -20,7 +20,7 @@ block="$(sed -n '/^<!-- BEGIN generated:/,/^<!-- END generated -->$/p' "$DOC" | 
 for s in check start block ready commit; do
   printf '%s' "$block" | grep -qF "sh .agents-v0/scripts/guard-plan.sh $s"; check $? "block: names guard-plan.sh $s"
 done
-printf '%s' "$block" | grep -qF 'guard-common.sh approve plan'; check $? "block: names Sensei's approve step"
+printf '%s' "$block" | grep -qF 'guard-common.sh approve plan'; check $? "block: names the user's approve step"
 
 # A hand edit inside the block is caught (on a temp copy of the kit files the generator reads).
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/test-plan-steps.XXXXXX")"; trap 'rm -rf "$tmp"' EXIT

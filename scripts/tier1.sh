@@ -4,9 +4,9 @@
 # Default command: validate-kit.sh with KIT_SKIP_APP_TEMPLATE_TEST=1. The Maven and network app-template
 # test is not tier 1 (design rev 6). `-- <command...>` runs that command instead (used by the harness
 # self-test). --time-limit stops the run once it passes the limit and exits 124, naming the limit. The
-# default limit is 600 seconds (N8A; first measured green run 354s; Sensei 2026-11-02 01:55 Manila:
+# default limit is 600 seconds (N8A; first measured green run 354s; 2026-11-02 01:55 Manila:
 # "Tier 1 limit A: 600 seconds OK"). Tier 1 refuses to start without PyYAML, checked with the python3 on
-# PATH that the hook checks use, before the timer starts (Sensei 01:55: "PyYAML A: tier 1 refuses to
+# PATH that the hook checks use, before the timer starts (01:55: "PyYAML A: tier 1 refuses to
 # start without PyYAML"). --report writes one line to <file>:
 #   tier1 PASS|FAIL|TIMEOUT <full kit commit> clean|dirty <seconds>s <time>
 # Ctrl-C, TERM or HUP stops the whole run (exit 130, 143, 129). Refuses when any AGENTS_V0_* test switch
@@ -30,7 +30,7 @@ if [ -n "$limit" ]; then
   [ "$limit" -ge 1 ] || { echo 'tier1: --time-limit must be at least 1' >&2; exit 2; }
 fi
 [ $# -gt 0 ] || set -- env KIT_SKIP_APP_TEMPLATE_TEST=1 sh "$KIT/scripts/validate-kit.sh"
-# PyYAML (Sensei, PyYAML A). Checked before the timer, so a refusal never counts toward the limit.
+# PyYAML (PyYAML A). Checked before the timer, so a refusal never counts toward the limit.
 py="$(command -v python3 2>/dev/null || true)"
 if [ -z "$py" ] || ! "$py" -c 'import yaml' >/dev/null 2>&1; then
   printf 'tier1: PyYAML is missing for %s; tier 1 refuses to start (four hook checks need it, and install.sh requires it).\n' "${py:-python3 (not found on PATH)}" >&2

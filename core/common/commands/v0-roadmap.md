@@ -22,8 +22,8 @@ Only this main session runs guard commands; the subagents run none. <!-- kitfix-
 4. Launch the `roadmap-planner` subagent (skill: `program-roadmap`) with the discovery path. It reads the discovery document and drafts `docs/agents-v0/roadmap/<program>.md` with Now, Next, and Later horizons; it runs no shell commands and leaves the Delivery approvals table empty.
 5. On a blocker, run `sh .agents-v0/scripts/guard-roadmap.sh block "<plain reason>"` and stop.
 6. When the planner reports the roadmap done, run `sh .agents-v0/scripts/guard-roadmap.sh ready <discovery-path>`. It verifies section completeness and item rules, writes `docs/agents-v0/roadmap/<program>.phase-result.md`, and sets state to `awaiting_approval`. When it prints `REFUSED`, have the planner fix what it names, then run `ready` again.
-7. Stop. Present the roadmap sequence and its phase result to Sensei. Next: Sensei reviews the roadmap and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap. Never run approve yourself; the agent cannot approve this gate.
-8. After Sensei runs approve in his own terminal, run `sh .agents-v0/scripts/guard-roadmap.sh commit`. It verifies Sensei's approval record, appends the verified Approved row to Delivery approvals, stages roadmap files, secret-scans, makes the single gate commit, and tags `roadmap-v<n>`. Then suggest: /v0-architecture.
+7. Stop. Present the roadmap sequence and its phase result to the user. Next: The user reviews the roadmap and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap. Never run approve yourself; the agent cannot approve this gate.
+8. After the user runs approve in their own terminal, run `sh .agents-v0/scripts/guard-roadmap.sh commit`. It verifies the user's approval record, appends the verified Approved row to Delivery approvals, stages roadmap files, secret-scans, makes the single gate commit, and tags `roadmap-v<n>`. Then suggest: /v0-architecture.
 <!-- END generated -->
 
 ## Rules

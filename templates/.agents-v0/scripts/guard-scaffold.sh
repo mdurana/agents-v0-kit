@@ -79,7 +79,7 @@ gs_check_prereqs() {
           *) gc_refuse "$gs_step" "plan is not in approvedPhases in $gs_state; complete /v0-plan first" ;;
         esac
         if ! gs_plan_ok="$(gc_approval_ok plan)"; then
-          gc_refuse "$gs_step" "external plan approval record missing or mismatched ($gs_plan_ok); complete /v0-plan and have Sensei approve it first"
+          gc_refuse "$gs_step" "external plan approval record missing or mismatched ($gs_plan_ok); complete /v0-plan and have the user approve it first"
         fi
         ;;
       integration-branch)
@@ -102,7 +102,7 @@ gs_check_prereqs() {
       not-awaiting-approval)
         if [ -f "$gs_state" ]; then
           [ "$(gc_state_get "$gs_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$gs_step" "scaffold is awaiting Sensei's approval; run sh .agents-v0/scripts/guard-common.sh approve scaffold in your external terminal"
+            || gc_refuse "$gs_step" "scaffold is awaiting approval; run sh .agents-v0/scripts/guard-common.sh approve scaffold in your external terminal"
         fi
         ;;
       in-progress)
@@ -248,15 +248,15 @@ gs_commit() {
   [ $# -eq 0 ] || gs_usage
   gs_load commit
 
-  # 1. Check state approved and Sensei approval record matches (DS5, DSA)
+  # 1. Check state approved and external approval record matches (DS5, DSA)
   case " $(gc_state_get "$gs_state" approvedPhases | tr -d '[]",') " in
     *" $gs_phase "*) ;;
-    *) gc_refuse commit "scaffold is not approved in $gs_state; Sensei runs approve in his own terminal first" ;;
+    *) gc_refuse commit "scaffold is not approved in $gs_state; the user runs approve in their own terminal first" ;;
   esac
 
   gs_ok_out="$(gc_approval_ok scaffold)" || {
     printf '%s\n' "$gs_ok_out"
-    gc_refuse commit "no approval record from Sensei matches this scaffold; Sensei runs approve in his own terminal"
+    gc_refuse commit "no external approval record matches this scaffold; the user runs approve in their own terminal"
   }
   printf '%s\n' "$gs_ok_out"
 
@@ -269,10 +269,10 @@ import json, re, sys
 manifest, rec_path = sys.argv[1:3]
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
-    approver = rec.get("approver", "Sensei")
+    approver = rec.get("approver", "user")
     approved_at = rec.get("approvedAt", "").split("T")[0]
 except Exception:
-    approver = "Sensei"
+    approver = "user"
     approved_at = ""
 
 txt = open(manifest, "r", encoding="utf-8").read()
@@ -305,13 +305,13 @@ gs_steps() {
   gs_rule steps approved.next; gs_approved_next="$gs_val"
   G='sh .agents-v0/scripts/guard-scaffold.sh'
   cat <<EOF_STEPS
-1. Run \`$G check\`. It verifies entry prerequisites, greenfield status, on-branch integration check, Sensei's external plan approval record, and that scaffold is not already approved. When it prints \`REFUSED\`, show its message and stop.
+1. Run \`$G check\`. It verifies entry prerequisites, greenfield status, on-branch integration check, the user's external plan approval record, and that scaffold is not already approved. When it prints \`REFUSED\`, show its message and stop.
 2. Run \`$G start\`. It verifies a clean working tree on the integration branch and sets \`docs/agents-v0/program.state.json\` to \`in_progress\` on \`docs/agents-v0/milestones/p0-platform-skeleton.md\`.
 3. Launch the \`platform-engineer\` subagent to configure application scaffold files under \`app/\`, \`Dockerfile\`, \`docker-compose.yml\`, and CI verify baseline. It runs no shell commands and leaves \`Delivery approvals\` tables empty.
 4. On a blocker, run \`$G block "<plain reason>"\` and stop.
 5. When the platform skeleton and container configurations are complete, run \`$G ready\`. It verifies the milestone P0 manifest, Dockerfile, docker-compose.yml, executes the pack's native backend verify command, writes \`docs/agents-v0/milestones/scaffold.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
-6. Stop. Present the platform skeleton verification report to Sensei. Next: $gs_ready_next. Never run approve yourself; the agent cannot approve this gate.
-7. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, updates \`p0-platform-skeleton.md\` status to released with the approved Delivery row, stages scaffold files, secret-scans, makes the single gate commit, and tags \`scaffold-v<n>\`. Then suggest: $gs_approved_next.
+6. Stop. Present the platform skeleton verification report to the user. Next: $gs_ready_next. Never run approve yourself; the agent cannot approve this gate.
+7. After the user runs approve in their own terminal, run \`$G commit\`. It verifies the user's approval record, updates \`p0-platform-skeleton.md\` status to released with the approved Delivery row, stages scaffold files, secret-scans, makes the single gate commit, and tags \`scaffold-v<n>\`. Then suggest: $gs_approved_next.
 EOF_STEPS
 }
 

@@ -14,8 +14,8 @@
 #        print the current branch; refuse a detached HEAD, or a branch other than <branch> when given.
 #   sh .agents-v0/scripts/guard-common.sh paths
 #        print the repository root, the git common dir, the onboarding state file path and the approval folder.
-#   sh .agents-v0/scripts/guard-common.sh approve <command>          (Design: DA/DRA/DAA; Sensei only, in his own terminal)
-#        Sensei approves <command> (onboard, roadmap, architecture) himself, in his own terminal outside Cursor. It needs the command's
+#   sh .agents-v0/scripts/guard-common.sh approve <command>          (Design: DA/DRA/DAA; the user only, in their own terminal)
+#        The user approves <command> (onboard, roadmap, architecture) in their own terminal outside Cursor. It needs the command's
 #        state at awaiting_approval, shows the repo, HEAD and baseCommit, and reads the approver's words from the
 #        terminal (/dev/tty; there is no flag for them). It writes the approval record, then marks the phase
 #        approved in the state (approvedPhases, lastApprovedPhase, phaseDates, phaseTimes; active phase cleared).
@@ -225,7 +225,7 @@ gc_check_feature_slug() {
   esac
 }
 
-# approve <command> [<feature>]: Sensei's own step, in his own terminal (see the header). Never call it from an agent.
+# approve <command> [<feature>]: the user's own step, in their own terminal (see the header). Never call it from an agent.
 # Design: DLRA, DMA, DDLA, DSTA (local-release, maintain, deliver, and triage external approval normalization, maintain/worktree state resolution, and story-branch state preservation).
 gc_approve() {
   [ $# -ge 1 ] && [ $# -le 2 ] || gc_usage
@@ -613,7 +613,7 @@ if not base:
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
 except FileNotFoundError:
-    refuse(f"no approval record for {label} ({rec_path}); Sensei runs approve in his own terminal")
+    refuse(f"no approval record for {label} ({rec_path}); the user runs approve in their own terminal")
 except (OSError, ValueError) as exc:
     refuse(f"cannot read the approval record {rec_path} ({exc})")
 if not isinstance(rec, dict) or rec.get("command") != command or rec.get("repoId") != repo_id:
@@ -622,12 +622,12 @@ if slug and rec.get("feature") not in (None, "", slug):
     refuse(f"the approval record {rec_path} is for feature '{rec.get('feature')}', not '{slug}'")
 if rec.get("baseCommit") != base:
     refuse(f"the approval record approves baseCommit {rec.get('baseCommit')}, but the state's baseCommit is {base}; "
-           "Sensei approves again")
+           "the user approves again")
 exp_hash = (rec.get("contentHash") or "").strip()
 cpaths = (rec.get("commitPaths") or "").strip()
 rec_head = (rec.get("head") or "").strip()
 if not exp_hash or not cpaths or not rec_head:
-    refuse(f"the approval record {rec_path} is missing contentHash, commitPaths, or head; Sensei approves again")
+    refuse(f"the approval record {rec_path} is missing contentHash, commitPaths, or head; the user approves again")
 
 cur_head = subprocess.run(["git", "-C", target_dir, "rev-parse", "-q", "--verify", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
@@ -637,8 +637,8 @@ if not cur_head:
 if cur_head == rec_head:
     cur_hash = compute_content_hash(target_dir, cpaths)
     if cur_hash != exp_hash:
-        refuse(f"files under commit.paths changed after Sensei approved {label} (contentHash mismatch); "
-               "run ready and have Sensei approve again")
+        refuse(f"files under commit.paths changed after {label} was approved (contentHash mismatch); "
+               "run ready and have the user approve again")
 else:
     # Check if command == local-release and wt_dir (or feature/maintain branch) holds the story commit
     check_dir = target_dir
@@ -668,21 +668,21 @@ else:
                     anc = True
                     break
     if not anc:
-        refuse(f"HEAD moved from {rec_head} to {cur_head} after Sensei approved {label}; "
-               "run ready and have Sensei approve again")
+        refuse(f"HEAD moved from {rec_head} to {cur_head} after {label} was approved; "
+               "run ready and have the user approve again")
     if check_head == rec_head:
         cur_hash = compute_content_hash(check_dir, cpaths)
         if cur_hash != exp_hash:
-            refuse(f"files under commit.paths changed after Sensei approved {label} (contentHash mismatch); "
-                   "run ready and have Sensei approve again")
+            refuse(f"files under commit.paths changed after {label} was approved (contentHash mismatch); "
+                   "run ready and have the user approve again")
     else:
         revs = subprocess.run(
             ["git", "-C", check_dir, "rev-list", "--ancestry-path", "--reverse", f"{rec_head}..{check_head}"],
             capture_output=True, text=True
         ).stdout.splitlines()
         if not revs:
-            refuse(f"HEAD moved from {rec_head} to {check_head} after Sensei approved {label}; "
-                   "run ready and have Sensei approve again")
+            refuse(f"HEAD moved from {rec_head} to {check_head} after {label} was approved; "
+                   "run ready and have the user approve again")
         g_commit = revs[0].strip()
         phase_name = (rec.get("phase") or command).strip()
         rel_state = os.path.relpath(state_path, target_dir).replace("\\", "/")
@@ -704,12 +704,12 @@ else:
             if g_subj.endswith(": release approved"):
                 gate_committed = True
         if not gate_committed:
-            refuse(f"HEAD moved from {rec_head} to {check_head} after Sensei approved {label} before the gate was committed; "
-                   "run ready and have Sensei approve again")
+            refuse(f"HEAD moved from {rec_head} to {check_head} after {label} was approved before the gate was committed; "
+                   "run ready and have the user approve again")
         g_hash = compute_content_hash(check_dir, cpaths, tree_rev=g_commit)
         if g_hash != exp_hash:
-            refuse(f"files under commit.paths in commit {g_commit[:7]} do not match what Sensei approved for {label} "
-                   "(contentHash mismatch); run ready and have Sensei approve again")
+            refuse(f"files under commit.paths in commit {g_commit[:7]} do not match what was approved for {label} "
+                   "(contentHash mismatch); run ready and have the user approve again")
 print(f"OK approval: {label} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
 PY
 }

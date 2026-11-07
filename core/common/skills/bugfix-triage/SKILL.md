@@ -17,7 +17,7 @@ Maintain phase playbook for the `maintenance-engineer` agent (`workflow-orchestr
 7. The reproducing test passes. Add the edge-path test. Each attempt appends a card to `docs/agents-v0/build/<id>/build-report.md`; the main session checks `sh .agents-v0/scripts/check-attempt-budget.sh docs/agents-v0/build/<id>/build-report.md` and `sh .agents-v0/scripts/check-failure-brief.sh docs/agents-v0/build/<id>/build-report.md` before the next retry.
 8. The main session runs the full verify command once (`docs/agents-v0/build/<id>/build-output.txt` + `check-tests-ran.sh`). Bounded fix attempts (≤ 3 per failure, prompt-only); on exhaustion run `sh .agents-v0/scripts/guard-maintain.sh block <id> "<reason>"` and stop.
 9. Record the change tier and impacted surfaces in the note, draft `## Lessons` -> `### maintain` in `docs/agents-v0/maintain/<id>/phase-result.md`, and have the main session run `sh .agents-v0/scripts/guard-maintain.sh ready <id>`. Auth, sessions, routes, controllers, uploads, or deployment security configuration means the full Verify with the VAPT checklist.
-10. Do not commit or push without Sensei's external TTY approval (`sh .agents-v0/scripts/guard-common.sh approve maintain <id>`) followed by `sh .agents-v0/scripts/guard-maintain.sh commit <id>`.
+10. Do not commit or push without the user's external TTY approval (`sh .agents-v0/scripts/guard-common.sh approve maintain <id>`) followed by `sh .agents-v0/scripts/guard-maintain.sh commit <id>`.
 
 ## Rule-compliance checklist
 - [ ] `ai-agent-conduct.mdc`: smallest correct diff; no commits/force-push without approval.

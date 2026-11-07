@@ -47,7 +47,7 @@ GR="$proj/.agents-v0/scripts/guard-roadmap.sh"
 S="$proj/docs/agents-v0/program.state.json"
 
 pty_approve() {
-  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by Sensei" <<'PY'
+  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by user" <<'PY'
 import os, pty, sys, time
 proj, script, cmd, words = sys.argv[1:5]
 pid, fd = pty.fork()
@@ -280,7 +280,7 @@ printf '%s' "$out" | grep -q '^OK ready: plan verified'; check $? "ready: prints
 
 # Self-approval via sync-feature-state.sh is refused without external approval record (FP1, DPA)
 out="$(cd "$proj" && sh .agents-v0/scripts/sync-feature-state.sh --approve plan docs/agents-v0/milestones/plan.md 2>&1 || true)"
-printf '%s' "$out" | grep -q 'FAIL: --approve plan refused without Sensei external approval record'; check $? "sync-feature-state: refuses --approve plan without Sensei record (FP1, DPA)" "$out"
+printf '%s' "$out" | grep -q 'FAIL: --approve plan refused without an external approval record'; check $? "sync-feature-state: refuses --approve plan without an external approval record (FP1, DPA)" "$out"
 
 # Commit refused before approve
 out="$(cd "$proj" && sh "$GP" commit 2>&1 || true)"
@@ -292,7 +292,7 @@ rec_file="$(cd "$proj" && GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agent
 [ -f "$rec_file" ]; check $? "approve: wrote plan approval record outside repo"
 
 out="$(cd "$proj" && sh "$GP" commit 2>&1)"
-check $? "commit: exits 0 after Sensei approve" "$out"
+check $? "commit: exits 0 after external approve" "$out"
 printf '%s' "$out" | grep -q '^OK commit: plan committed on main as .*, tagged plan-v1'; check $? "commit: prints OK commit with tag" "$out"
 git -C "$proj" tag | grep -qx 'plan-v1'; check $? "commit: plan-v1 tag created"
 git -C "$proj" log -1 --format=%s | grep -qx 'program: plan approved'; check $? "commit: gate commit message is 'program: plan approved'"

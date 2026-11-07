@@ -32,4 +32,4 @@ You are the **backend-engineer** for the Build phase (`workflow-orchestration.md
 - `api-and-events.mdc` and `security-baseline.mdc` §2 and §3.
 
 ## Stop condition
-Stop when the **Build gate** artifacts are authored (`workflow-orchestration.mdc`): return to the main `/v0-build` session so it runs `sh .agents-v0/scripts/guard-build.sh ready <feature>` and waits for Sensei's explicit approval (`sh .agents-v0/scripts/guard-common.sh approve build <feature>`). Never run shell commands, `sync-feature-state.sh`, or `git`.
+Stop when the **Build gate** artifacts are authored (`workflow-orchestration.mdc`): return to the main `/v0-build` session so it runs `sh .agents-v0/scripts/guard-build.sh ready <feature>` and waits for explicit user approval (`sh .agents-v0/scripts/guard-common.sh approve build <feature>`). Never run shell commands, `sync-feature-state.sh`, or `git`.

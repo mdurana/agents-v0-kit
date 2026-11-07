@@ -370,9 +370,9 @@ rm -f Cargo.lock
 # 17. C3 regression: sync-feature-state.sh --approve design refuses when guard-design.sh start was never run
 rm -f docs/agents-v0/requirements/audit.state.json
 if sh .agents-v0/scripts/sync-feature-state.sh --approve design docs/agents-v0/requirements/audit.md >/dev/null 2>&1; then
-  bad "sync-feature-state.sh --approve design should refuse without Sensei approval record even when guard start was skipped (C3)"
+  bad "sync-feature-state.sh --approve design should refuse without an external approval record even when guard start was skipped (C3)"
 else
-  ok "sync-feature-state.sh --approve design refuses without Sensei approval record when guard start was skipped (C3)"
+  ok "sync-feature-state.sh --approve design refuses without an external approval record when guard start was skipped (C3)"
 fi
 
 # 18. C2 regression: post-approval file edit under commit.paths triggers contentHash mismatch in gc_approval_ok
@@ -401,7 +401,7 @@ cat > "$AGENTS_V0_APPROVALS_DIR/$repo_id/intake-audit.json" <<EOF
   "contentHash": "0000000000000000000000000000000000000000000000000000000000000000",
   "commitPaths": "docs/agents-v0/requirements/audit.md",
   "approvedAt": "2026-11-05T10:00:00Z",
-  "approver": "sensei",
+  "approver": "user",
   "words": "Approved"
 }
 EOF
@@ -424,7 +424,7 @@ cat > "$AGENTS_V0_APPROVALS_DIR/$repo_id/intake-audit.json" <<EOF
   "baseCommit": "$head_sha",
   "commitPaths": "docs/agents-v0/requirements/audit.md",
   "approvedAt": "2026-11-05T10:00:00Z",
-  "approver": "sensei",
+  "approver": "user",
   "words": "Approved"
 }
 EOF

@@ -1,7 +1,7 @@
 #!/bin/sh
 # tier2.sh: run the kit's tier 2 tests, the slower offline script suites moved out of tier 1 (no agent).
 #   sh scripts/tier2.sh [--report <file>]
-# Tier 1 limit C (Sensei, 2026-11-02 08:44 Manila): "Tier 1 limit C stands: keep 600s, keep the hook-policy,
+# Tier 1 limit C (2026-11-02 08:44 Manila): "Tier 1 limit C stands: keep 600s, keep the hook-policy,
 # state guard and agy hook cases in tier 1, move the rest of test-hooks.sh to tier 2". T2_SUITES is the one
 # list of tier 2 suites; validate-kit.sh checks that every suite on it exists and that it does not run them
 # itself. Each suite runs with sh, in order; every suite runs even after a failure, and each failing suite is

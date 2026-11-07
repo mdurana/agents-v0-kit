@@ -14,10 +14,10 @@ This guide matches the workflow in this kit. A new program starts with **Roadmap
 | **Cursor**     | Desktop app with the project open (your team’s service repo, after the kit is installed).            |
 | **Chat**       | Open the AI chat panel in that project.                                                              |
 | **Your input** | A Jira ticket, Confluence page, email spec, or a short description in plain language.                |
-| **Approvals**  | You say when a gate is good enough to continue (see [Gates](#the-five-gates-where-you-approve)). The platform skeleton runs via `/v0-scaffold`. A story with no API, no messages between systems, no screens, and no public route does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. |
+| **Approvals**  | You approve each gate in your own terminal outside Cursor (`sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>` or `approve deliver <feature>`; see [Gates](#the-five-gates-where-you-approve)). The platform skeleton (`P0-A`) runs via `/v0-scaffold`. A story with no API, no messages between systems, no screens, and no public route (`Contract: None`) does not stop at Design, unless it adds a service, a datastore, a security boundary, or a breaking API. |
 
 
-You do **not** need to run terminal commands, edit code, or pick AI models. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
+You do **not** need to edit code or pick AI models — your only terminal command is the `sh .agents-v0/scripts/guard-common.sh approve ...` step at each gate. Optional: ask your team to set the model picker to **Agent → Composer 2.5** for day-to-day chat.
 
 Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so they do not clash with Cursor’s built-in slash commands such as `/plan`.
 
@@ -81,7 +81,7 @@ You can also write in normal language, for example: *“Run intake on PROJ-1234�
 | What you see | What you do |
 |--------------|-------------|
 | The phase was still being written, or it stopped on a problem | Run the same command again (`/v0-design`, `/v0-build`, and so on). The AI keeps the files already saved. A second design run reviews that saved design. A second verify run reuses the test report when the code has not changed, and repeats the checks when it has. |
-| The phase is waiting for you | Reply `Approved` or list what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
+| The phase is waiting for you | Run `sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>` (or `approve deliver <feature>`) in your own terminal outside Cursor, or tell the AI in chat what to change. A green build is not approval. The next phase does not start until you approve a phase that has its own stop. |
 | You did not name a feature | The AI lists the open features and asks which one you mean. It also shows features being worked on in their own folders (`.agents-v0/scripts/stories-status.sh`). |
 
 ---
@@ -96,7 +96,7 @@ The second feature must not change a file the first one is already changing. Tho
 
 When the goal is a new program, start with `/v0-roadmap` and the path of the discovery document your team already agreed. That file may sit anywhere in the repo. It needs these headings, each filled in: Problem, Success metric, Options, Chosen option, In scope, Out of scope. The AI turns In scope into now / next / later and stops. It does not reopen the problem. You approve the sequence. Then `/v0-architecture` writes the system shape (who talks to whom, how data moves and is stored, what happens when a part fails, the options, the network, and who runs it) and an independent reviewer checks it before it stops. You approve that once, before any story exists. The discovery file may name `Stack preference:`. The roadmap copies that line and does not install it. The architecture approval writes the pack the team named, including a stack that is not one of the kit examples, and installs it after that approval. An empty Pack stops until that pack is complete and installed. Then `/v0-plan` writes the milestone files and `docs/agents-v0/milestones/plan.md` (a table of milestones and stories, and a flowchart of the story order) and stops. You approve that picture once. Each story then runs through the gates that apply, in the order the plan sets: a story cannot start building until the stories it depends on have passed Verify. Who skips the roadmap, the architecture command, and the plan is the skip list in `workflow-orchestration.mdc` (a single ticket, the platform skeleton, and a fix after go-live).
 
-With many small stories you can approve the Intake or Design gate for several of them in one message, but only by naming each one, for example `Approved: Design for P2-A, P2-B, P2-C`. That is available only for ordinary stories with no security triggers and no open questions. Build, Verify, and Release are always approved one story at a time. "Approve all" does not count.
+Each story gate is approved explicitly in your terminal outside Cursor (`sh .agents-v0/scripts/guard-common.sh approve <phase> <feature>`, or `approve deliver <feature>` when driving `/v0-deliver <feature>`). Contract-free stories (`Contract: None`, `Material: no`) auto-commit Design at `guard-design.sh ready <feature>` and proceed directly to Build without a separate Design stop.
 
 The AI also stops by itself when one phase has failed too many times in total (default 8 failed attempts). It reports what blocked it; engineering decides whether to raise the limit.
 
@@ -106,7 +106,7 @@ The AI also stops by itself when one phase has failed too many times in total (d
 
 ## The five gates (where you approve)
 
-The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan are the stops for a new program, before these five. A story with an API, messages between systems, screens, or a public route stops at each gate below. The platform skeleton skips Intake and Design and stops once, at Release. Optional local release may record the earlier rows first. A story with none of those does not stop at Design: the design is locked, and you approve it together with the build. A story that adds a service, a datastore, a security boundary, or a breaking API still stops at Design. Each stop ends with a short report: what was done, what’s ready, and what still needs your decision.
+The AI **must not** skip a gate that applies. Roadmap, Architecture, Plan, and Scaffold (`P0-A`) are the stops for a new program, before these five. A story with an API, messages between systems, screens, or a public route stops at each gate below. The platform skeleton (`P0-A`) runs via `/v0-scaffold` on the integration branch and stops once for scaffold approval. A story with no contract (`Contract: None`, `Material: no`) does not stop at Design: `guard-design.sh ready <feature>` auto-commits the `N/A` design and continues to Build. A story that adds a service, a datastore, a security boundary, or a breaking API (`Material: yes`) still stops at Design. Each stop ends with a short report: what was done, what’s ready, and the exact terminal command to run when you are ready to approve.
 
 ### 1. Intake gate
 
@@ -124,11 +124,11 @@ The AI **must not** skip a gate that applies. Roadmap, Architecture, and Plan ar
 | Open questions               | The list says none.                                                                           |
 
 
-**You might say:**  
+**To approve or request changes:**  
 
-- `Approved — proceed to design.`  
-- `Add acceptance criterion: user must confirm identity before download.`  
-- `Regulation XYZ applies; include it.`
+- In your terminal outside Cursor: `sh .agents-v0/scripts/guard-common.sh approve intake <feature>` (or `approve deliver <feature>`), then tell the AI in chat to commit and continue.  
+- Or in chat: `Add acceptance criterion: user must confirm identity before download.`  
+- Or in chat: `Regulation XYZ applies; include it.`
 
 ---
 
@@ -151,11 +151,11 @@ This stop applies when the story adds an API, messages between systems, screens,
 | UX spec and mockups (UI screens) | User flows, per-screen states (loading/error/empty), static HTML mockups, and the default behavior of each control. You approve the spec and the mockups together. |
 
 
-**You might say:**  
+**To approve or request changes:**  
 
-- `Approved.`  
-- `Change flow: notification email must not contain a direct download link.`  
-- `Split read vs write APIs for audit.`
+- In your terminal outside Cursor: `sh .agents-v0/scripts/guard-common.sh approve design <feature>` (or `approve deliver <feature>`), then tell the AI in chat to commit and continue.  
+- Or in chat: `Change flow: notification email must not contain a direct download link.`  
+- Or in chat: `Split read vs write APIs for audit.`
 
 ---
 
@@ -177,10 +177,10 @@ This stop applies when the story adds an API, messages between systems, screens,
 
 You usually **do not** review code line by line. Trust this gate for “engineering says it compiles, matches design, and the automated quality checks pass.”
 
-**You might say:**  
+**To approve or request changes:**  
 
-- `Approved — run verify.`  
-- `Hold — we changed policy on retention; update design first.` (sends work back)
+- In your terminal outside Cursor: `sh .agents-v0/scripts/guard-common.sh approve build <feature>` (or `approve deliver <feature>`), then tell the AI in chat to commit and continue.  
+- Or in chat: `Hold — we changed policy on retention; update design first.` (sends work back)
 
 ---
 
@@ -201,39 +201,39 @@ You usually **do not** review code line by line. Trust this gate for “engineer
 
 Tests finish first. The security checklist and the code review are prepared together, and you see one list of **Critical** items. If that list has anything on it, the AI should fix and re-run verify — you approve again when Critical items are gone. If the code changed after you had already approved verify, that approval is reopened until you approve the new run. A re-run on the same code reuses the test report.
 
-**You might say:**  
+**To approve or request changes:**  
 
-- `Approved for release.`  
-- `Critical on upload validation — fix before we approve.`
+- In your terminal outside Cursor: `sh .agents-v0/scripts/guard-common.sh approve verify <feature>` (or `approve deliver <feature>`), then tell the AI in chat to commit and continue.  
+- Or in chat: `Critical on upload validation — fix before we approve.`
 
 ---
 
 
 
-### 5. Release gate
+### 5. Local Release gate (`/v0-local-release`)
 
-**Your question:** *Are we ready to ship and document?*
+**Your question:** *Are we ready to merge into the integration branch and record lessons?*
 
 
 | You should see | What it means                                                                                              |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| Docs updated   | README and sequence diagrams for what changed. Architecture and network notes are a later docs-only change. |
-| Merge request  | Ready for engineering merge (CI green). |
-| VAPT sign-off  | Security checklist in the merge request description.                                                       |
+| Final verify   | Native stack verify passed one final time (`docs/agents-v0/release/<feature>/release-output.txt`).         |
+| Docs updated   | README, changelog, and sequence diagrams for what changed.                                                 |
+| Proposed lessons | Optional `P-1`, `P-2`, ... candidates gathered from earlier phases for cross-story memory.                |
 
 
-"Ready" is not "released": the AI reports readiness and waits for an authorized human merge. Release is complete only after the merge and green CI are confirmed. Approving a phase does not by itself authorize committing, pushing, or opening a merge request; explicitly request those actions when needed.
+"Ready" is not "released": `guard-local-release.sh ready <feature>` stops and waits for your external approval in your terminal (`sh .agents-v0/scripts/guard-common.sh approve local-release <feature>` or `approve deliver <feature>`). Once you approve, `guard-local-release.sh commit <feature>` commits release preparation on `feature/<feature>`, squash-merges into the integration branch (`git merge --squash`), appends any accepted lessons to `docs/agents-v0/lessons.md`, and marks `release` approved in `<feature>.state.json`.
 
-**You might say:**  
+**To approve or hold:**  
 
-- `Please open the merge request; engineering will merge after CI is green.`  
-- `Wait for product sign-off on release notes.`
+- In your terminal outside Cursor: `sh .agents-v0/scripts/guard-common.sh approve local-release <feature>` (or `approve deliver <feature>`), typing your lesson decision when prompted (`Accept P-1, reject P-2` or `Accept all if proposed`).  
+- Or in chat: `Wait for product sign-off on release notes.`
 
 <!-- MEM-11: approvers decide which lessons from this story become cross-story memory. -->
-**Lessons from this story.** With a local release (`/v0-local-release`), the report also lists **Proposed lessons** (`P-1`, `P-2`, ...): short notes on what went wrong in this story and what to do instead next time. Say which to keep, for example `Accept P-1 and P-3, reject P-2.` Only the ones you accept are added to `docs/agents-v0/lessons.md`, which every later story reads before it starts. Nothing is added without your yes.
+**Lessons from this story.** With a local release (`/v0-local-release`), the report also lists **Proposed lessons** (`P-1`, `P-2`, ...): short notes on what went wrong in this story and what to do instead next time. Say which to keep when `guard-common.sh approve` prompts for your approval note, for example `Accept P-1 and P-3, reject P-2.` Only the ones you accept are added to `docs/agents-v0/lessons.md`, which every later story reads before it starts. Nothing is added without your yes.
 
 <!-- MEM-14: how the approval message is read. -->
-Write each decision as `Accept P-<n>` (or `Keep P-<n>`), with several ids joined by commas or `and`, and `Reject P-<n>` (or `Drop P-<n>`). `Accept all` accepts every proposal you do not also reject. Any `P-<n>` you do not explicitly accept is rejected. Accepting a `P-<n>` that does not exist is an error unless you add `if proposed` (`Accept P-1 if proposed`). The release-manager runs `check-lessons.sh --approval-text` with your exact message, so the lessons it appends are checked against what you wrote. Agents working on a story branch cannot edit `lessons.md`: the edit hook blocks it there.
+Write each decision as `Accept P-<n>` (or `Keep P-<n>`), with several ids joined by commas or `and`, and `Reject P-<n>` (or `Drop P-<n>`). `Accept all` accepts every proposal you do not also reject. Any `P-<n>` you do not explicitly accept is rejected. Accepting a `P-<n>` that does not exist is an error unless you add `if proposed` (`Accept P-1 if proposed`). `guard-local-release.sh commit` runs `check-lessons.sh --approval-text` with the approval note from your external approval record, so the lessons it appends are checked against what you wrote. Agents working on a story branch cannot edit `lessons.md`: the edit hook blocks it there.
 
 ---
 

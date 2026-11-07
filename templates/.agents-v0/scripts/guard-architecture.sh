@@ -16,7 +16,7 @@
 #        verifies architecture pack completeness, Pattern ADR with Pack: <id>, and zero Open findings
 #        in architecture-review.md, writes architecture.phase-result.md, sets awaiting_approval (DA3).
 #   sh .agents-v0/scripts/guard-architecture.sh commit
-#        verifies Sensei approval record, promotes ADR to Accepted, writes Approved row, runs
+#        verifies external approval record, promotes ADR to Accepted, writes Approved row, runs
 #        activate-stack-pack.sh, stages architecture paths, secret-scans, commits, tags (DA5).
 #   sh .agents-v0/scripts/guard-architecture.sh steps
 #        prints the step list for /v0-architecture command prose (DA6).
@@ -81,7 +81,7 @@ ga_check_prereqs() {
           *) gc_refuse "$ga_step" "roadmap is not in approvedPhases in $ga_state; complete /v0-roadmap first" ;;
         esac
         if ! ga_rm_ok="$(gc_approval_ok roadmap)"; then
-          gc_refuse "$ga_step" "external roadmap approval record missing or mismatched ($ga_rm_ok); complete /v0-roadmap and have Sensei approve it first"
+          gc_refuse "$ga_step" "external roadmap approval record missing or mismatched ($ga_rm_ok); complete /v0-roadmap and have the user approve it first"
         fi
         ;;
       not-approved)
@@ -94,7 +94,7 @@ ga_check_prereqs() {
       not-awaiting-approval)
         if [ -f "$ga_state" ]; then
           [ "$(gc_state_get "$ga_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$ga_step" "architecture is awaiting Sensei's approval; wait for it, do not start again"
+            || gc_refuse "$ga_step" "architecture is awaiting approval; wait for it, do not start again"
         fi
         ;;
       *) gc_refuse "$ga_step" "gate-rules names an unknown prerequisite '$ga_req'; reinstall the kit" ;;
@@ -334,15 +334,15 @@ ga_commit() {
   [ $# -eq 0 ] || ga_usage
   ga_load commit
 
-  # 1. Check state approved and Sensei approval record matches (DA5, FA1)
+  # 1. Check state approved and external approval record matches (DA5, FA1)
   case " $(gc_state_get "$ga_state" approvedPhases | tr -d '[]",') " in
     *" $ga_phase "*) ;;
-    *) gc_refuse commit "architecture is not approved in $ga_state; Sensei runs approve in his own terminal first" ;;
+    *) gc_refuse commit "architecture is not approved in $ga_state; the user runs approve in their own terminal first" ;;
   esac
 
   ga_ok_out="$(gc_approval_ok architecture)" || {
     printf '%s\n' "$ga_ok_out"
-    gc_refuse commit "no approval record from Sensei matches this architecture; Sensei runs approve in his own terminal"
+    gc_refuse commit "no external approval record matches this architecture; the user runs approve in their own terminal"
   }
   printf '%s\n' "$ga_ok_out"
 
@@ -356,10 +356,10 @@ import glob, json, os, re, sys
 arch_path, rec_path = sys.argv[1:3]
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
-    approver = rec.get("approver", "Sensei")
+    approver = rec.get("approver", "user")
     approved_at = rec.get("approvedAt", "").split("T")[0]
 except Exception:
-    approver = "Sensei"
+    approver = "user"
     approved_at = ""
 
 adr_files = sorted(
@@ -477,14 +477,14 @@ ga_steps() {
   ga_rule steps approved.next; ga_approved_next="$ga_val"
   G='sh .agents-v0/scripts/guard-architecture.sh'
   cat <<EOF_STEPS
-1. Run \`$G check\`. It verifies entry prerequisites, onboard approval on brownfield codebases, Sensei's external roadmap approval record, and that architecture is not already approved. When it prints \`REFUSED\`, show its message and stop.
+1. Run \`$G check\`. It verifies entry prerequisites, onboard approval on brownfield codebases, the user's external roadmap approval record, and that architecture is not already approved. When it prints \`REFUSED\`, show its message and stop.
 2. Run \`$G start\`. It verifies a clean feature tree and sets \`docs/agents-v0/program.state.json\` to \`in_progress\` on \`docs/agents-v0/architecture.md\`.
 3. Launch the \`solution-architect\` subagent (skill: \`program-architecture\`) to author the architecture pack in order: C4 Context and Container in \`docs/agents-v0/architecture.md\`, Pattern ADR with \`Pack: <id>\` under \`docs/agents-v0/adr/\` (preserving any existing brownfield \`Pack\` cell in \`docs/agents-v0/project-profile.md\`), platform topology in \`docs/agents-v0/network.md\`, \`docs/agents-v0/design/system/context-map.md\` and per-context \`components/<service>.md\`, data flow / \`erDiagram\` / state machine / failure domains / MVP vs. future state in \`architecture.md\`, and \`nfr-slo.md\`, \`threat-model.md\`, \`ops-readiness.md\`, and \`arc-record.md\`. It runs no shell commands and leaves the \`Delivery approvals\` table empty.
 4. Launch the \`design-reviewer\` subagent on the architecture pack to write \`docs/agents-v0/design/system/architecture-review.md\`. Route any \`Open\` findings back to \`solution-architect\` to fix or disposition (\`Resolved\`, \`Deferred\`, or \`Accepted\`), and re-run \`design-reviewer\` until zero \`Open\` findings remain in \`architecture-review.md\` (max 3 review cycles before escalating to the user). Both subagents run no shell commands.
 5. On a blocker, run \`$G block "<plain reason>"\` and stop.
 6. When the pack and review are complete, run \`$G ready\`. It verifies mandatory sections in \`architecture.md\` and \`network.md\`, pattern ADR with \`Pack: <id>\`, required \`design/system/\` files without placeholders, and \`architecture-review.md\` with \`agent: design-reviewer\` and zero \`Open\` findings, writes \`docs/agents-v0/architecture.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
-7. Stop. Present the architecture pack, \`architecture-review.md\`, and \`architecture.phase-result.md\` to Sensei. Next: $ga_ready_next. Never run approve yourself; the agent cannot approve this gate.
-8. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, promotes the pattern ADR \`Status\` to \`Accepted\`, updates \`(Proposed)\` ADR labels, appends the verified \`architecture\` row to \`Delivery approvals\`, binds the stack pack into \`docs/agents-v0/project-profile.md\` and \`.cursor/\`, stages architecture files, secret-scans, makes the single gate commit, and tags \`architecture-v<n>\`. Then suggest: $ga_approved_next.
+7. Stop. Present the architecture pack, \`architecture-review.md\`, and \`architecture.phase-result.md\` to the user. Next: $ga_ready_next. Never run approve yourself; the agent cannot approve this gate.
+8. After the user runs approve in their own terminal, run \`$G commit\`. It verifies the user's approval record, promotes the pattern ADR \`Status\` to \`Accepted\`, updates \`(Proposed)\` ADR labels, appends the verified \`architecture\` row to \`Delivery approvals\`, binds the stack pack into \`docs/agents-v0/project-profile.md\` and \`.cursor/\`, stages architecture files, secret-scans, makes the single gate commit, and tags \`architecture-v<n>\`. Then suggest: $ga_approved_next.
 EOF_STEPS
 }
 

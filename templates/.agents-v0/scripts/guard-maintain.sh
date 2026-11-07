@@ -229,7 +229,7 @@ PYCOL
                 gm_rc="$(gc_state_get "$gm_state" reopenCount 2>/dev/null || echo 0)"
                 case "$gm_rc" in ''|*[!0-9]*) gm_rc=0 ;; esac
                 if [ "$gm_rc" -ge 3 ]; then
-                  gc_refuse "$gm_step" "maintenance note '$gm_feature' has reached the maximum reopen cap (reopenCount=$gm_rc >= 3); write docs/agents-v0/maintain/$gm_feature/helper-brief.md and escalate to Sensei"
+                  gc_refuse "$gm_step" "maintenance note '$gm_feature' has reached the maximum reopen cap (reopenCount=$gm_rc >= 3); write docs/agents-v0/maintain/$gm_feature/helper-brief.md and escalate to the user"
                 fi
               else
                 if [ "$gm_eff_tier" = "emergency" ]; then
@@ -246,7 +246,7 @@ PYCOL
         if [ "$gm_reopen" != 1 ] && [ -f "$gm_state" ]; then
           if [ "$(gc_state_get "$gm_state" activePhase 2>/dev/null || true)" = "maintain" ] \
              && [ "$(gc_state_get "$gm_state" activeStatus 2>/dev/null || true)" = "awaiting_approval" ]; then
-            gc_refuse "$gm_step" "maintain for '$gm_feature' is awaiting Sensei's approval; run sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature in your external terminal"
+            gc_refuse "$gm_step" "maintain for '$gm_feature' is awaiting approval; run sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature in your external terminal"
           fi
         fi
         ;;
@@ -554,7 +554,7 @@ PY
     if [ "$gm_dup" = "DUP" ]; then
       gc_state_set "$gm_state" "$gm_feature" "$gm_artifact" "activePhase=$gm_phase" \
         "activeStatus=$gm_status" "blockedReason=Duplicate helper-brief detected: $gm_b_reason" "nextStep=$gm_next" || exit 1
-      gc_refuse block "duplicate helper-brief ($gm_hb) detected with identical SHA-256 content; escalate to Sensei instead of looping"
+      gc_refuse block "duplicate helper-brief ($gm_hb) detected with identical SHA-256 content; escalate to the user instead of looping"
     fi
   fi
 
@@ -913,13 +913,13 @@ gm_commit() {
 
   [ -f "$gm_state" ] || gc_refuse commit "state file '$gm_state' is missing; run $G start $gm_feature and $G ready $gm_feature first"
 
-  # 1. Verify Sensei's external maintain approval record
+  # 1. Verify the user's external maintain approval record
   case " $(gc_state_get "$gm_state" approvedPhases | tr -d '[]",') " in
     *" $gm_phase "*) ;;
-    *) gc_refuse commit "maintain is not approved in '$gm_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature" ;;
+    *) gc_refuse commit "maintain is not approved in '$gm_state'; the user must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature" ;;
   esac
   if ! gm_why="$(gc_approval_ok maintain "$gm_feature")"; then
-    gc_refuse commit "$gm_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature)"
+    gc_refuse commit "$gm_why (the user must run: sh .agents-v0/scripts/guard-common.sh approve maintain $gm_feature)"
   fi
 
   # 2. Refuse if index already has staged paths
@@ -936,10 +936,10 @@ p = os.environ["GM_NOTE"]
 rep = os.environ["GM_REP"]
 rec_p = os.environ["GM_REC"]
 today = datetime.date.today().isoformat()
-approver = "Sensei"
+approver = "user"
 try:
     rec = json.load(open(rec_p, encoding="utf-8"))
-    approver = rec.get("approver") or "Sensei"
+    approver = rec.get("approver") or "user"
     if rec.get("approvedAt"):
         today = rec["approvedAt"].split("T")[0]
 except Exception:
@@ -1054,8 +1054,8 @@ gm_steps() {
    - **Bounded failure & full verify (main session):** Log each verify attempt card in \`docs/agents-v0/build/<id>/build-report.md\` and raw output in \`docs/agents-v0/build/<id>/build-output.txt\`. If the same test fails twice consecutively, have \`maintenance-engineer\` write \`docs/agents-v0/maintain/<id>/failure-brief.md\` (\`helper: debug-investigator\`, \`outputs:\`, \`return:\`, \`ask:\`, failing test name, and \`file:line\`) and launch shell-less \`debug-investigator\` before attempt three. Once the fix is green, run the full native verify command once (and \`sh .agents-v0/scripts/check-tests-ran.sh\` after Maven verify).
 4. If the baseline is broken, database runtime is unavailable, the attempt budget (8 failed attempts) is spent, a test fails 3 times consecutively, or a helper brief (\`docs/agents-v0/maintain/<id>/helper-brief.md\`) is needed, run \`$G block <id> "<plain reason>"\` (which deduplicates helper briefs by SHA-256 and records \`blocked\`) and stop.
 5. When the maintenance note, tests, and native verify are complete, run \`$G ready <id>\`. It deterministically validates \`docs/agents-v0/maintain/<id>/note.md\` fields and non-placeholder sections (\`## Acceptance\`, \`## Verification\`, \`## Rollback\`), enforces \`Tier confirmed by\` for \`trivial\`/\`emergency\` and \`Follow-up verify due: YYYY-MM-DD\` for \`emergency\`, enforces the \`trivial\` docs/lockfile-only scope rule and the 800-line diff ceiling (\`MAINTAIN_MAX_LINES\`), checks the attempt budget (<= 8 failed attempts), failure-brief rules, \`build-report.md\` attempt cards and \`build-output.txt\` (plus \`check-tests-ran.sh\` and \`check-onboarding-docs.sh\` when \`docs/agents-v0/onboarding/report.md\` exists), scans for secrets, normalizes \`docs/agents-v0/maintain/<id>/phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
-6. Stop. Present the fix, \`docs/agents-v0/maintain/<id>/note.md\`, and \`docs/agents-v0/build/<id>/build-report.md\` to Sensei and wait for explicit approval. Next: $gm_r_next. Never run approve yourself; the agent cannot approve this gate.
-7. After Sensei runs approve in his own terminal, run \`$G commit <id>\`. It verifies Sensei's external approval record, re-verifies \`ready\` invariants, appends the verified \`maintain\` row to \`## Delivery approvals\` in \`docs/agents-v0/maintain/<id>/note.md\`, updates \`phase-result.md\` to \`status: approved\`, stages only the maintenance note's paths, scans staged content for secrets, and commits \`"maintain/<id>: maintain approved"\`. Then suggest: $gm_a_next (or \`/v0-local-release <id> --maintain\` when \`Tier: emergency\`, with full \`/v0-verify <id> --maintain\` owed by \`Follow-up verify due\`).
+6. Stop. Present the fix, \`docs/agents-v0/maintain/<id>/note.md\`, and \`docs/agents-v0/build/<id>/build-report.md\` to the user and wait for explicit approval. Next: $gm_r_next. Never run approve yourself; the agent cannot approve this gate.
+7. After the user runs approve in their own terminal, run \`$G commit <id>\`. It verifies the user's external approval record, re-verifies \`ready\` invariants, appends the verified \`maintain\` row to \`## Delivery approvals\` in \`docs/agents-v0/maintain/<id>/note.md\`, updates \`phase-result.md\` to \`status: approved\`, stages only the maintenance note's paths, scans staged content for secrets, and commits \`"maintain/<id>: maintain approved"\`. Then suggest: $gm_a_next (or \`/v0-local-release <id> --maintain\` when \`Tier: emergency\`, with full \`/v0-verify <id> --maintain\` owed by \`Follow-up verify due\`).
 EOF
 }
 

@@ -43,7 +43,7 @@ pty_approve() {
   repo_dir="$1"
   phase_cmd="$2"
   feature_arg="${3:-}"
-  words="${4:-Approved by Sensei}"
+  words="${4:-Approved by user}"
   python3 - "$repo_dir" "$phase_cmd" "$feature_arg" "$words" <<'PY'
 import os, pty, sys, time
 repo, phase, feature, words = sys.argv[1:5]
@@ -149,7 +149,7 @@ expect_out "check: refusal names /v0-plan" "/v0-plan"
 (cd "$r" && GC_HERE="$r/.agents-v0/scripts" GUARD_COMMON_LIB=1 . "$r/.agents-v0/scripts/guard-common.sh" && \
   gc_state_set docs/agents-v0/program.state.json program docs/agents-v0/milestones/plan.md \
     "approvePhase=roadmap" "approvePhase=architecture" "activePhase=plan" "activeStatus=awaiting_approval")
-expect_pass "setup: Sensei approves plan via PTY" "$r" pty_approve "$r" plan "" "Approve plan"
+expect_pass "setup: the user approves plan via PTY" "$r" pty_approve "$r" plan "" "Approve plan"
 
 expect_fail "check: refuses greenfield when p0-platform-skeleton.md exists but scaffold is not approved" "$r" sh .agents-v0/scripts/guard-intake.sh check orders
 expect_out "check: refusal names /v0-scaffold" "/v0-scaffold"
@@ -157,7 +157,7 @@ expect_out "check: refusal names /v0-scaffold" "/v0-scaffold"
 (cd "$r" && GC_HERE="$r/.agents-v0/scripts" GUARD_COMMON_LIB=1 . "$r/.agents-v0/scripts/guard-common.sh" && \
   gc_state_set docs/agents-v0/program.state.json program docs/agents-v0/milestones/p0-platform-skeleton.md \
     "activePhase=scaffold" "activeStatus=awaiting_approval")
-expect_pass "setup: Sensei approves scaffold via PTY" "$r" pty_approve "$r" scaffold "" "Approve scaffold"
+expect_pass "setup: the user approves scaffold via PTY" "$r" pty_approve "$r" scaffold "" "Approve scaffold"
 git -C "$r" add docs/agents-v0/program.state.json && git -C "$r" commit -qm "program: plan and scaffold approved"
 
 expect_pass "check: passes once plan and scaffold are approved on main" "$r" sh .agents-v0/scripts/guard-intake.sh check orders --tier standard
@@ -317,10 +317,10 @@ expect_fail "self-approval blocked: sync-feature-state.sh --approve intake refus
   sh .agents-v0/scripts/sync-feature-state.sh --approve intake docs/agents-v0/requirements/orders.md
 expect_out "self-approval refusal names guard-common.sh approve intake orders" "guard-common.sh approve intake orders"
 
-expect_fail "commit: refuses before Sensei approves" "$r" sh .agents-v0/scripts/guard-intake.sh commit orders
+expect_fail "commit: refuses before the user approves" "$r" sh .agents-v0/scripts/guard-intake.sh commit orders
 expect_fail "approve: refuses intake without <feature> argument" "$r" pty_approve "$r" intake "" "Approve intake"
 
-expect_pass "approve: Sensei approves intake orders via PTY" "$r" pty_approve "$r" intake orders "LGTM orders intake"
+expect_pass "approve: the user approves intake orders via PTY" "$r" pty_approve "$r" intake orders "LGTM orders intake"
 grep -Fq '"lastApprovedPhase": "intake"' "$r/docs/agents-v0/requirements/orders.state.json" \
   && pass "approve: orders.state.json records lastApprovedPhase=intake" || fail "approve: lastApprovedPhase!=intake"
 

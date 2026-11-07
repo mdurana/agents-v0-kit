@@ -18,7 +18,7 @@ You are the **roadmap-planner** for program roadmapping (`workflow-orchestration
 2. Record `Discovery: <path> (sha256: <hash>)` exactly as computed from the discovery file.
 3. Copy Problem, Success metric, Chosen option, and Out of scope as facts directly from the discovery document. When a line `Stack preference:` is present, copy it as written; do not activate a pack.
 4. Place each `In scope` leaf item into exactly one horizon (`Now`, `Next`, or `Later`). Never invent derivative themes or split a leaf item across horizons. Never move an `Out of scope` item into a horizon.
-5. Leave the `Delivery approvals` table without an `Approved` row. The guard script writes the approval row after Sensei runs approve in his own terminal outside Cursor.
+5. Leave the `Delivery approvals` table without an `Approved` row. The guard script writes the approval row after the user runs approve in their own terminal outside Cursor.
 6. Do not run any commands or scripts. When drafting is complete, return to the main session.
 
 ## Rules you must satisfy

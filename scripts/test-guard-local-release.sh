@@ -43,7 +43,7 @@ pty_approve() {
   repo_dir="$1"
   phase_cmd="$2"
   feature_arg="${3:-}"
-  words="${4:-Approved by Sensei}"
+  words="${4:-Approved by user}"
   python3 - "$repo_dir" "$phase_cmd" "$feature_arg" "$words" <<'PY'
 import os, pty, sys, time
 repo, phase, feature, words = sys.argv[1:5]
@@ -444,10 +444,10 @@ expect_fail "self-approval blocked: sync-feature-state.sh --approve release refu
   sh .agents-v0/scripts/sync-feature-state.sh --approve release docs/agents-v0/requirements/orders.md
 expect_out "self-approval refusal names guard-common.sh approve local-release orders" "guard-common.sh approve local-release orders"
 
-expect_fail "commit: refuses before Sensei approves local-release" "$wt" \
+expect_fail "commit: refuses before the user approves local-release" "$wt" \
   sh .agents-v0/scripts/guard-local-release.sh commit orders
 
-expect_pass "approve: Sensei approves local-release orders via PTY with lesson decision" "$wt" \
+expect_pass "approve: the user approves local-release orders via PTY with lesson decision" "$wt" \
   pty_approve "$wt" local-release orders "Approved, accept P-1"
 grep -Fq '"activePhase": "release"' "$wt/docs/agents-v0/requirements/orders.state.json" \
   && grep -Fq '"activeStatus": "awaiting_approval"' "$wt/docs/agents-v0/requirements/orders.state.json" \

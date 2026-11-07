@@ -539,7 +539,7 @@ REMOTE_WRITE_UNATTENDED_ENV = {"AGY_ALLOW_TOOLS": "Shell(gh:*),Shell(glab:*),She
 #   limit; inproc_parity() checks that the in-process verdict matches the real entry for a block and an allow.
 #   Each case runs attended and unattended, like REMOTE_WRITE_CASES.
 REMOTE_WRITE_INPROC_CASES = [
-    # Jiraiya third look, item A: push in every spelling (Sensei's full token stays on the box; the hook is the block)
+    # Jiraiya third look, item A: push in every spelling (the user's full token stays on the box; the hook is the block)
     ("git-push origin main", "block"),
     ("/usr/lib/git-core/git-push origin main", "block"),
     ("/usr/libexec/git-core/git-send-pack ../bare main", "block"),
@@ -691,14 +691,14 @@ SECRET_ALLOWLIST_SHELL_CASES = [
     ("cat .agents-v0/scripts/gate-rules", "allow"),
 ]
 
-# Design: DA (onboard redo): the approval folder outside the repo and the approve step are Sensei's. An agent
+# Design: DA (onboard redo): the approval folder outside the repo and the approve step belong to the user. An agent
 #   cannot write the folder by the edit tool, touch it by any shell command (~, $HOME, ${HOME} or the expanded
 #   home path), or run `guard-common.sh approve`.
 _HOME = os.path.expanduser("~")
 DA_APPROVAL_PATH_CASES = [
     (_HOME + "/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
     ("~/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
-    ("/home/sensei/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
+    ("/home/alice/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
     (_HOME + "/.agents-v0-approvals", "block"),
     (_HOME + "/notes/approvals.json", "allow"),
 ]
@@ -707,7 +707,7 @@ DA_APPROVAL_SHELL_CASES = [
     ("echo '{}' > $HOME/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
     ("mkdir -p \"${HOME}/.agents-v0-approvals/portal-0123456789ab\"", "block"),
     (f"cp /tmp/r.json {_HOME}/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
-    ("python3 -c \"open('/home/sensei/.agents-v0-approvals/p/onboard.json','w').write('{}')\"", "block"),
+    ("python3 -c \"open('/home/alice/.agents-v0-approvals/p/onboard.json','w').write('{}')\"", "block"),
     ("cat ~/.agents-v0-approvals/portal-0123456789ab/onboard.json", "block"),
     ("ls -la ~/.agents-v0-approvals", "block"),
     ("sh .agents-v0/scripts/guard-common.sh approve onboard", "block"),

@@ -1,6 +1,6 @@
 #!/bin/sh
 # test-guard-commit.sh: the normal path of the onboard commit step (onboard redo, Design: D4).
-# start, discovery docs, ready, Sensei's approve (driven on a pseudo-terminal), then `guard-onboard.sh commit` makes one
+# start, discovery docs, ready, the user's approve (driven on a pseudo-terminal), then `guard-onboard.sh commit` makes one
 # commit of the onboard paths and tags onboard-v1, leaving a clean tree. Refusals covered: commit before approve, a
 # record without the approved state, and a staged fake secret (FAKE value built at run time).
 # Test-only: the kit test copy (install.sh --test-overrides) reads AGENTS_V0_APPROVALS_DIR, so the record goes to a
@@ -39,12 +39,12 @@ for d in architecture.md network.md; do
 done
 out="$(cd "$proj" && sh "$G/guard-onboard.sh" ready 2>&1)"; check $? "setup: ready" "$out"
 
-# --- refused before Sensei approves ---------------------------------------------------------------------------------
+# --- refused before the user approves ---------------------------------------------------------------------------------
 out="$(commit)"; rc=$?
 [ $rc = 1 ] && printf '%s' "$out" | grep -q '^REFUSED commit: onboarding is not approved'; check $? "commit: refused before approve" "$out"
 [ "$(git -C "$proj" rev-parse HEAD)" = "$head" ]; check $? "commit refused: no commit made"
 
-# --- Sensei's approve (pty), then a record without the approved state is still refused -------------------------------
+# --- the user's approve (pty), then a record without the approved state is still refused -------------------------------
 pty_approve() {
   python3 - "$proj" "$G/guard-common.sh" "$1" <<'PY'
 import os, pty, sys, time
@@ -70,7 +70,7 @@ sys.stdout.write(buf.decode(errors="replace"))
 sys.exit(os.waitstatus_to_exitcode(status))
 PY
 }
-out="$(pty_approve "Approved, the onboarding docs are right - Sensei" 2>&1)"; check $? "approve: Sensei's words on the terminal (exit 0)" "$out"
+out="$(pty_approve "Approved, the onboarding docs are right" 2>&1)"; check $? "approve: approver's words on the terminal (exit 0)" "$out"
 cp "$S" "$tmp/state-approved.json"
 # a stray record: the record is there but the state does not show onboard approved (state edited by the test only)
 python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["approvedPhases"]=[]; json.dump(d, open(p,"w"), indent=2)' "$S"
@@ -95,7 +95,7 @@ git -C "$proj" restore --staged other.txt && mv "$proj/other.txt" "$tmp/trash/"
 
 # --- the normal path ----------------------------------------------------------------------------------------------
 out="$(commit)"; rc=$?
-check $rc "commit: exits 0 after Sensei's approve" "$out"
+check $rc "commit: exits 0 after the user's approve" "$out"
 printf '%s' "$out" | grep -q '^OK approval:' && printf '%s' "$out" | grep -q '^OK scan-staged' && printf '%s' "$out" | grep -q '^OK commit: onboard committed on main as .*, tagged onboard-v1'
 check $? "commit: prints OK approval, OK scan-staged and OK commit with the tag" "$out"
 nexta="$(sed -n 's/^onboard approved\.next //p' "$proj/.agents-v0/gate-rules")"

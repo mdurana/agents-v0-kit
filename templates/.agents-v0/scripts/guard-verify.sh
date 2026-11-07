@@ -210,14 +210,14 @@ gv_check_prereqs() {
           gv_rc="$(gc_state_get "$gv_state" reopenCount 2>/dev/null || echo 0)"
           case "$gv_rc" in ''|*[!0-9]*) gv_rc=0 ;; esac
           if [ "$gv_rc" -ge 3 ]; then
-            gc_refuse "$gv_step" "reopen bounce cap exceeded for '$gv_feature' (reopenCount=$gv_rc >= 3); escalate to Sensei before reopening again"
+            gc_refuse "$gv_step" "reopen bounce cap exceeded for '$gv_feature' (reopenCount=$gv_rc >= 3); escalate to the user before reopening again"
           fi
         fi
         ;;
       not-awaiting-approval)
         if [ -f "$gv_state" ]; then
           [ "$(gc_state_get "$gv_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$gv_step" "verify for '$gv_feature' is awaiting Sensei's approval; run sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature in your external terminal"
+            || gc_refuse "$gv_step" "verify for '$gv_feature' is awaiting approval; run sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature in your external terminal"
         fi
         ;;
       in-progress)
@@ -487,7 +487,7 @@ else:
 PY
 )"
     if [ "$gv_dup" = "DUP" ]; then
-      gc_refuse block "identical brief ($gv_hb) was already recorded; escalate to Sensei instead of repeating the same ask"
+      gc_refuse block "identical brief ($gv_hb) was already recorded; escalate to the user instead of repeating the same ask"
     fi
   fi
 
@@ -803,7 +803,7 @@ with open(p, "w", encoding="utf-8") as fh:
     fh.write("\n")
 PYVP
 
-  gc_ok ready "verify for $gv_feature passed all checks (verifyPassed=true) and is awaiting Sensei's approval"
+  gc_ok ready "verify for $gv_feature passed all checks (verifyPassed=true) and is awaiting approval"
   printf 'Next: %s\n' "$gv_next"
 }
 
@@ -832,13 +832,13 @@ gv_commit() {
 
   [ -f "$gv_state" ] || gc_refuse commit "state file '$gv_state' is missing"
 
-  # 1. Verify Sensei's external verify approval record
+  # 1. Verify the user's external verify approval record
   case " $(gc_state_get "$gv_state" approvedPhases | tr -d '[]",') " in
     *" $gv_phase "*) ;;
-    *) gc_refuse commit "verify is not approved in '$gv_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature" ;;
+    *) gc_refuse commit "verify is not approved in '$gv_state'; the user must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature" ;;
   esac
   if ! gv_why="$(gc_approval_ok verify "$gv_feature")"; then
-    gc_refuse commit "$gv_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature)"
+    gc_refuse commit "$gv_why (the user must run: sh .agents-v0/scripts/guard-common.sh approve verify $gv_feature)"
   fi
 
   # 2. Refuse if index already has staged paths
@@ -847,11 +847,19 @@ gv_commit() {
     || gc_refuse commit "the git index already has staged files ($(printf '%s' "$gv_PreStaged" | tr '\n' ' ')); unstage them before running guard-verify.sh commit"
 
   # 3. Append/update Approved Verify row in Delivery approvals of requirements/<feature>.md (or note.md)
-  GV_REQ="$gv_req_art" GV_SLUG="$gv_feature" python3 - <<'PYROW'
-import datetime, os, re
+  gv_rec_file="$(gc_approval_file verify "$gv_feature")"
+  GV_REQ="$gv_req_art" GV_SLUG="$gv_feature" GV_REC="$gv_rec_file" python3 - <<'PYROW'
+import datetime, json, os, re
 
 p = os.environ["GV_REQ"]
 slug = os.environ["GV_SLUG"]
+rec_file = os.environ.get("GV_REC", "")
+approver = "user"
+if rec_file and os.path.isfile(rec_file):
+    try:
+        approver = json.load(open(rec_file, encoding="utf-8")).get("approver") or "user"
+    except Exception:
+        approver = "user"
 today = datetime.date.today().isoformat()
 txt = open(p, encoding="utf-8").read()
 lines = txt.splitlines()
@@ -861,7 +869,7 @@ for extra in ("vapt-checklist.md", "code-review.md", "ux-report.md", "e2e-report
     if os.path.isfile(f"docs/agents-v0/verify/{slug}/{extra}"):
         ev_parts.append(f"`docs/agents-v0/verify/{slug}/{extra}`")
 verify_ev = ", ".join(ev_parts)
-verify_row = f"| Verify | {verify_ev} | Sensei | Approved | {today} |"
+verify_row = f"| Verify | {verify_ev} | {approver} | Approved | {today} |"
 
 out = []
 in_deliv = False
@@ -959,7 +967,7 @@ gv_steps() {
   gv_rule steps ready.next "<feature>"; gv_r_next="$gv_val"
   gv_rule steps approved.next "<feature>"; gv_a_next="$gv_val"
   cat <<EOF
-1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree (or \`maintain/<id>\` for a maintenance note), checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies Sensei's external \`build\` approval record and committed Build gate (or \`maintain\` approval for a maintenance note), and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
+1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree (or \`maintain/<id>\` for a maintenance note), checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies the user's external \`build\` approval record and committed Build gate (or \`maintain\` approval for a maintenance note), and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
 2. Run \`$G start <feature> [--reopen] [--check-db]\`. It verifies a clean working tree, optionally runs \`sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/<feature>.md\`, seeds \`docs/agents-v0/verify/<feature>/quality-gate.md\`, \`docs/agents-v0/verify/<feature>/vapt-checklist.md\`, and \`docs/agents-v0/verify/<feature>/code-review.md\` if absent, and sets state to \`in_progress\`.
 3. Read \`docs/agents-v0/lessons.md\` and execute the verification sequence in the main session with the shell-less Verify subagents (\`test-engineer\`, \`security-reviewer\`, \`code-reviewer\`):
    - **Native stack verify & database runtime:** Before a verify command that needs a database, run \`sh .agents-v0/scripts/check-database-runtime.sh --phase verify docs/agents-v0/requirements/<feature>.md\` (never use \`sudo\`, a package manager, or a Docker TCP socket). Resolve layout roots via \`eval "\$(sh .agents-v0/scripts/resolve-layout.sh)"\`, resolve the verify command with \`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"\`, \`"Service verify"\`, and/or \`"Frontend verify"\`, execute the printed command in this main session, and record raw output in \`docs/agents-v0/verify/<feature>/verify-output.txt\`. After a Maven verify, run \`sh .agents-v0/scripts/check-tests-ran.sh\` (kitfix-20261031-tests-ran).
@@ -967,8 +975,8 @@ gv_steps() {
    - **Role-separated VAPT & code review (\`security-reviewer\` + \`code-reviewer\`):** Unless verifying a maintenance note with \`tier: "trivial"\`, launch shell-less \`security-reviewer\` (skill: \`vapt-review\`) to check always-on VAPT controls (\`F4\`, \`F8\`, \`F9\`, \`F10\`) and surface findings into \`docs/agents-v0/verify/<feature>/vapt-checklist.md\`, and launch shell-less \`code-reviewer\` (skill: \`pr-review\`) to write \`docs/agents-v0/verify/<feature>/code-review.md\`.
 4. If the database runtime is unavailable or \`docs/agents-v0/verify/<feature>/helper-brief.md\` (\`helper: schema-author\`) is needed, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper briefs by SHA-256 and records \`blocked\`) and stop.
 5. Run \`$G ready <feature>\`. It deterministically verifies \`verify-output.txt\`, \`check-tests-ran.sh\`, \`quality-gate.md\` (coverage $\ge 80\%$ changed & module, 0 HIGH/CRITICAL CVEs, \`ux-report.md\` when \`ux-spec.md\` exists), \`vapt-checklist.md\` (\`F4\`, \`F8\`, \`F9\`, \`F10\` with \`file:line\` evidence), \`code-review.md\`, and \`T6\` traceability. If any Open \`Critical\` or \`FAIL\` finding exists across the reports, \`ready\` automatically writes the findings to \`<feature>.phase-result.md\`, runs \`--reopen build\` (or \`--reopen maintain\`, setting \`verifyPassed: false\` and incrementing \`reopenCount\`), and exits with \`REFUSED ready:\` routing back to \`/v0-build <feature>\`. When zero Critical findings exist and all checks pass, \`ready\` writes \`docs/agents-v0/requirements/<feature>.phase-result.md\` and sets state to \`awaiting_approval\` (\`verifyPassed: true\`).
-6. Stop. Present \`docs/agents-v0/verify/<feature>/quality-gate.md\`, \`vapt-checklist.md\`, and \`code-review.md\` to Sensei and wait for explicit approval. Next: $gv_r_next. Never run approve yourself; the agent cannot approve this gate.
-7. After Sensei runs approve in his own terminal, run \`$G commit <feature>\`. It verifies Sensei's external approval record, appends the verified \`Verify\` row to \`Delivery approvals\`, runs \`T6\` traceability checks, stages only the story's verify, test, and state paths, scans staged content for secrets, and commits \`"<story>: verify approved"\` on \`feature/<feature>\`. Then suggest: $gv_a_next.
+6. Stop. Present \`docs/agents-v0/verify/<feature>/quality-gate.md\`, \`vapt-checklist.md\`, and \`code-review.md\` to the user and wait for explicit approval. Next: $gv_r_next. Never run approve yourself; the agent cannot approve this gate.
+7. After the user runs approve in their own terminal, run \`$G commit <feature>\`. It verifies the user's external approval record, appends the verified \`Verify\` row to \`Delivery approvals\`, runs \`T6\` traceability checks, stages only the story's verify, test, and state paths, scans staged content for secrets, and commits \`"<story>: verify approved"\` on \`feature/<feature>\`. Then suggest: $gv_a_next.
 EOF
 }
 

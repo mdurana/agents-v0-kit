@@ -99,20 +99,20 @@ SCRIPT_WRITE_HINT = re.compile(
 # kit's own test suites install copies that keep it (install.sh --test-overrides). An agent must not.
 TEST_OVERRIDES_RE = re.compile(r"--test-overrides\b|\bstrip-test-overrides\.sh\b")
 # Design: DA (onboard redo): the approval record lives outside the repo in ~/.agents-v0-approvals/<repo id>/ and is
-#   written only by `guard-common.sh approve`, which Sensei runs himself in his own terminal. An agent never touches
+#   written only by `guard-common.sh approve`, which the user runs in their own terminal. An agent never touches
 #   the folder (any form: ~, $HOME, ${HOME}, the expanded home path) and never runs approve.
 APPROVALS_DIR_RE = re.compile(
     r"\.agents-v0-(?:approvals\b|[a-z]*[*?\[]|\$\{?[A-Za-z_])"
     r"|agents-v0-(?:approvals\b|a[a-z]*[*?\[]|\$\{?[A-Za-z_])"
 )
-APPROVALS_DIR_MSG = ("the approval folder (~/.agents-v0-approvals) is Sensei's: only `guard-common.sh approve`, run by "
-                     "Sensei in his own terminal, writes it. An agent never reads, writes or lists it. Ask Sensei to approve.")
+APPROVALS_DIR_MSG = ("the approval folder (~/.agents-v0-approvals) is reserved for the user: only `guard-common.sh approve`, run by "
+                     "the user in their own terminal, writes it. An agent never reads, writes or lists it. Ask the user to approve.")
 APPROVE_RUN_RE = re.compile(
     r"(?:\bguard-common(?:\.sh)?\b|\.agents-v0/scripts/(?:\$\{?[A-Za-z_]\w*\}?|[^\s;&|/]*[*?\[]))[^\n;&|]*\sapprove\b"
     r"|\bgc_approve\b"
 )
-APPROVE_RUN_MSG = ("`guard-common.sh approve` is Sensei's own step, run by him in his own terminal outside Cursor. "
-                   "An agent never runs it. Tell Sensei the work is ready for his approval and stop.")
+APPROVE_RUN_MSG = ("`guard-common.sh approve` is the user's own step, run in their own terminal outside Cursor. "
+                   "An agent never runs it. Tell the user the work is ready for approval and stop.")
 TEST_OVERRIDES_MSG = ("installing the kit with its test overrides (install.sh --test-overrides) is for the kit's own test "
                       "suites only; an agent never reinstalls or strips the kit scripts. Report the problem instead.")
 
@@ -686,7 +686,7 @@ def _is_harness_path(p: str) -> bool:
     return any(c and HARNESS_PATH_RE.search(c) for c in cands)
 
 
-# kitfix-20261031-n1 (Sasuke N-1, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): Python start-up
+# kitfix-20261031-n1 (Sasuke N-1, approved in design review 2026-10-31 16:36 Asia/Manila): Python start-up
 #   files run inside every Python process of the user that owns them: the user site (~/.local/lib/python*/,
 #   with usercustomize.py and *.pth files), a python* in ~/.local/bin (often first on PATH), and any
 #   usercustomize.py / sitecustomize.py or site-packages *.pth. The hooks no longer load them (-I -S, a pinned
@@ -710,7 +710,7 @@ PY_STARTUP_EDIT_MSG = ("Python start-up file or user site ({}): code there runs 
                        "need the change, make it yourself in a terminal.")
 
 
-# kitfix-20261031-jn4 (Jiraiya JN-4 with M-1, approved by Sensei 2026-11-01 00:04 Asia/Manila): N-1 closes Python
+# kitfix-20261031-jn4 (Jiraiya JN-4 with M-1, approved in design review 2026-11-01 00:04 Asia/Manila): N-1 closes Python
 #   start-up injection only. The shell and session start-up files of the agent user are the same kind of file: the
 #   login shell, the desktop session, systemd --user, pam or launchd read them before the IDE or agy starts, so a
 #   PATH, LD_PRELOAD, LD_LIBRARY_PATH or other variable written there reaches every later process, the kit hooks
@@ -1494,7 +1494,7 @@ def _segment_uses_outside_kit(seg: str, stdin_exec: bool, hook_root: str) -> Opt
 #   Evasion forms (env prefixes, command/exec/nohup wrappers, absolute paths, quoting, sh -c, $(...), chains) are
 #   unwrapped by split_segments/_expand_wrapper before this runs; git aliases are resolved below.
 REMOTE_WRITE_MSG = ("{} changes the remote; an agent never runs it, in any mode, supervised included (N11C). "
-                    "Sensei runs it himself in his own terminal: hand over the exact command and stop.")
+                    "The user runs it in their own terminal: hand over the exact command and stop.")
 # gh flags that take a value as the next token (so the value is not read as a subcommand).
 _GH_VALUED_FLAGS = {"-R", "--repo", "--hostname", "-X", "--method", "-H", "--header", "-f", "-F", "--field",
                     "--raw-field", "--input", "-q", "--jq", "-t", "--template", "-p", "--preview", "--cache",
@@ -1554,12 +1554,12 @@ GH_WRITES = {
 }
 UNRESOLVED_CMD_MSG = ("`{}`: the shell fills this in at run time, so the guard cannot tell whether it pushes or "
                       "writes to GitHub; an agent spells the command out (N11C). Anything that changes the remote, "
-                      "Sensei runs himself in his own terminal.")
+                      "the user runs in their own terminal.")
 GH_UNKNOWN_MSG = ("`gh {}` is not a known read-only gh command: it may be an alias or an extension, which can push or "
                   "merge, so an agent does not run it, in any mode (N11C). Use the read it stands for (gh pr view, "
-                  "gh run view, ...); anything that changes the remote, Sensei runs himself in his own terminal.")
+                  "gh run view, ...); anything that changes the remote, the user runs in their own terminal.")
 GH_TOKEN_MSG = ("gh auth token prints the GitHub token; an agent never reads it, in any mode (N11C). "
-                "Sensei runs gh himself in his own terminal: hand over the exact command and stop.")
+                "The user runs gh in their own terminal: hand over the exact command and stop.")
 GLAB_WRITES = {("mr", "create"), ("mr", "new"), ("mr", "update"), ("mr", "close"), ("mr", "reopen"),
                ("mr", "delete"), ("mr", "note"), ("mr", "rebase"), ("mr", "revoke"),
                ("ci", "run"), ("ci", "trigger"), ("ci", "retry"), ("ci", "cancel"), ("ci", "delete"),
@@ -1893,7 +1893,7 @@ def classify_segment(seg: str) -> Tuple[Action, str]:
     if bin0 == "glab":
         pairs = set(zip(parts[1:], parts[2:]))
         joined = " ".join(parts[1:])
-        own = " Sensei runs it himself in his own terminal."
+        own = " The user runs it in their own terminal."
         if ("mr", "merge") in pairs:
             return "block", "glab mr merge requires explicit human authorization." + own
         if ("mr", "approve") in pairs:

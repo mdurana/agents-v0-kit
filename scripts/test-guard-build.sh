@@ -43,7 +43,7 @@ pty_approve() {
   repo_dir="$1"
   phase_cmd="$2"
   feature_arg="${3:-}"
-  words="${4:-Approved by Sensei}"
+  words="${4:-Approved by user}"
   python3 - "$repo_dir" "$phase_cmd" "$feature_arg" "$words" <<'PY'
 import os, pty, sys, time
 repo, phase, feature, words = sys.argv[1:5]
@@ -416,9 +416,9 @@ expect_fail "self-approval blocked: sync-feature-state.sh --approve build refuse
   sh .agents-v0/scripts/sync-feature-state.sh --approve build docs/agents-v0/requirements/orders.md
 expect_out "self-approval refusal names guard-common.sh approve build orders" "guard-common.sh approve build orders"
 
-expect_fail "commit: refuses before Sensei approves build" "$wt" sh .agents-v0/scripts/guard-build.sh commit orders
+expect_fail "commit: refuses before the user approves build" "$wt" sh .agents-v0/scripts/guard-build.sh commit orders
 
-expect_pass "approve: Sensei approves build orders via PTY" "$wt" pty_approve "$wt" build orders "Approve build orders"
+expect_pass "approve: the user approves build orders via PTY" "$wt" pty_approve "$wt" build orders "Approve build orders"
 grep -Fq '"lastApprovedPhase": "build"' "$wt/docs/agents-v0/requirements/orders.state.json" \
   && pass "approve: orders.state.json records lastApprovedPhase=build" || fail "approve: lastApprovedPhase!=build"
 

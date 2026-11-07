@@ -42,7 +42,7 @@ expect_out() {
 
 G() {
   dir="$1"; shift
-  git -C "$dir" -c user.name="Sensei" -c user.email="sensei@example.com" -c commit.gpgsign=false "$@"
+  git -C "$dir" -c user.name="Approver" -c user.email="approver@example.com" -c commit.gpgsign=false "$@"
 }
 
 pty_approve() {
@@ -162,7 +162,7 @@ else
   fail "start: state.json fields mismatch"
 fi
 
-expect_pass "block: records blocked state for doc-readme" "$r" sh .agents-v0/scripts/guard-triage.sh block doc-readme "Waiting on Sensei tier confirmation"
+expect_pass "block: records blocked state for doc-readme" "$r" sh .agents-v0/scripts/guard-triage.sh block doc-readme "Waiting on user tier confirmation"
 expect_pass "start: resumes doc-readme from blocked" "$r" sh .agents-v0/scripts/guard-triage.sh start doc-readme
 
 expect_fail "ready: refuses while note.md still has placeholders and unconfirmed tier" "$r" sh .agents-v0/scripts/guard-triage.sh ready doc-readme
@@ -174,7 +174,7 @@ Id: doc-readme
 Type: docs
 Trigger: README-1
 Tier: trivial
-Tier confirmed by: sensei on 2026-11-05
+Tier confirmed by: user on 2026-11-05
 
 ## Scope
 - `README.md` build instructions.
@@ -231,7 +231,7 @@ rm -rf "$r/docs/contracts"
 expect_pass "ready: marks doc-readme awaiting_approval when note and diff are valid" "$r" sh .agents-v0/scripts/guard-triage.sh ready doc-readme
 expect_out "ready: prints approve triage <id> instruction" "approve triage doc-readme"
 
-expect_fail "commit: refuses before Sensei's external approval" "$r" sh .agents-v0/scripts/guard-triage.sh commit doc-readme
+expect_fail "commit: refuses before the user's external approval" "$r" sh .agents-v0/scripts/guard-triage.sh commit doc-readme
 
 # Verify stories-status.sh while awaiting_approval
 expect_pass "stories-status: --story doc-readme while awaiting_approval" "$r" sh .agents-v0/scripts/stories-status.sh --story doc-readme
@@ -250,7 +250,7 @@ expect_fail "approve triage: refuses Tier: standard note" "$r" pty_approve "$r" 
 expect_out "approve triage: refusal mentions Tier: trivial only" "only applies to Tier: trivial"
 rm -rf "$r/docs/agents-v0/maintain/std-bug"
 
-# Sensei runs approve triage doc-readme in external PTY
+# the user runs approve triage doc-readme in external PTY
 expect_pass "approve triage: succeeds on Tier: trivial note doc-readme" "$r" pty_approve "$r" triage doc-readme "approved trivial readme fix"
 expect_out "approve triage: confirms approval" "OK approve:"
 
@@ -273,7 +273,7 @@ cat > "$r/docs/agents-v0/requirements/orders.md" <<'EOF'
 ## Delivery approvals
 | Phase | Artifacts | Approver | Decision | Date |
 |---|---|---|---|---|
-| Release | docs/agents-v0/requirements/orders.md | sensei | Approved | 2026-11-05 |
+| Release | docs/agents-v0/requirements/orders.md | user | Approved | 2026-11-05 |
 EOF
 cat > "$r/docs/agents-v0/requirements/orders.state.json" <<'EOF'
 {

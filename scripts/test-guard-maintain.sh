@@ -43,7 +43,7 @@ pty_approve() {
   repo_dir="$1"
   phase_cmd="$2"
   feature_arg="${3:-}"
-  words="${4:-Approved by Sensei}"
+  words="${4:-Approved by user}"
   python3 - "$repo_dir" "$phase_cmd" "$feature_arg" "$words" <<'PY'
 import os, pty, sys, time
 repo, phase, feature, words = sys.argv[1:5]
@@ -290,7 +290,7 @@ expect_fail "DM5: guard-maintain.sh commit is refused without external approval 
   sh .agents-v0/scripts/guard-maintain.sh commit fix-bug
 expect_out "DM5: commit refusal names guard-common.sh approve maintain fix-bug" "guard-common.sh approve maintain fix-bug"
 
-expect_pass "DMA: Sensei approves maintain fix-bug from external PTY (run from main repo)" "$r" \
+expect_pass "DMA: the user approves maintain fix-bug from external PTY (run from main repo)" "$r" \
   pty_approve "$r" maintain fix-bug "Approved fix-bug"
 
 touch "$wt/docs/agents-v0/maintain/fix-bug/state.json.lock"
@@ -330,7 +330,7 @@ fi
 
 # Re-ready, re-approve, and re-commit fix-bug after reopen
 expect_pass "ready: re-ready fix-bug after reopen" "$wt" sh .agents-v0/scripts/guard-maintain.sh ready fix-bug
-expect_pass "DMA: Sensei re-approves fix-bug in PTY" "$r" pty_approve "$r" maintain fix-bug "Re-approved fix-bug"
+expect_pass "DMA: the user re-approves fix-bug in PTY" "$r" pty_approve "$r" maintain fix-bug "Re-approved fix-bug"
 expect_pass "DM5: re-commit fix-bug after reopen" "$wt" sh .agents-v0/scripts/guard-maintain.sh commit fix-bug
 
 # -----------------------------------------------------------------------------
@@ -390,7 +390,7 @@ expect_fail "trivial ready: refuses when Tier confirmed by is missing" "$r" \
 expect_out "trivial ready: refusal names Tier confirmed by" "Tier confirmed by"
 
 # Add Tier confirmed by, then test scope violation (editing app/src/App.java in trivial tier)
-sed -i '/^Tier: trivial$/a Tier confirmed by: Sensei on 2026-11-06' "$r/docs/agents-v0/maintain/doc-sync-1/note.md"
+sed -i '/^Tier: trivial$/a Tier confirmed by: user on 2026-11-06' "$r/docs/agents-v0/maintain/doc-sync-1/note.md"
 printf '// forbidden trivial edit\n' >> "$r/app/src/App.java"
 expect_fail "trivial ready: refuses when non-doc / non-manifest file app/src/App.java is modified" "$r" \
   sh .agents-v0/scripts/guard-maintain.sh ready doc-sync-1
@@ -399,7 +399,7 @@ git -C "$r" checkout -- app/src/App.java
 
 expect_pass "trivial ready: passes for docs-only edit with Tier confirmed by" "$r" \
   sh .agents-v0/scripts/guard-maintain.sh ready doc-sync-1
-expect_pass "trivial DMA: Sensei approves doc-sync-1 in PTY" "$r" \
+expect_pass "trivial DMA: the user approves doc-sync-1 in PTY" "$r" \
   pty_approve "$r" maintain doc-sync-1 "Approved trivial doc sync"
 expect_pass "trivial DM5: commit doc-sync-1 on main" "$r" \
   sh .agents-v0/scripts/guard-maintain.sh commit doc-sync-1
@@ -418,7 +418,7 @@ Id: hotfix-1
 Type: bug
 Trigger: INC-999
 Tier: emergency
-Tier confirmed by: Sensei on 2026-11-06
+Tier confirmed by: user on 2026-11-06
 
 ## Scope
 - `app/src/App.java` null-check guard.
@@ -451,7 +451,7 @@ expect_out "emergency ready: refusal names Follow-up verify due" "Follow-up veri
 sed -i '/^Tier confirmed by:/a Follow-up verify due: 2026-11-10' "$wt_em/docs/agents-v0/maintain/hotfix-1/note.md"
 expect_pass "emergency ready: passes once Follow-up verify due and Rollback are present" "$wt_em" \
   sh .agents-v0/scripts/guard-maintain.sh ready hotfix-1
-expect_pass "emergency DMA: Sensei approves hotfix-1 in PTY" "$r" \
+expect_pass "emergency DMA: the user approves hotfix-1 in PTY" "$r" \
   pty_approve "$r" maintain hotfix-1 "Approved emergency hotfix-1"
 expect_pass "emergency DM5: commit hotfix-1 on maintain/hotfix-1" "$wt_em" \
   sh .agents-v0/scripts/guard-maintain.sh commit hotfix-1

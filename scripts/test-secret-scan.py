@@ -111,7 +111,7 @@ def scan3(repo: str, *args: str):
 
 def entry(**over) -> dict:
     e = {"id": "SA-1", "ruleId": "content.assignment", "path": "app/config.txt", "lineSha256": "0" * 64,
-         "reason": "test fixture value, not a real key", "approvedBy": "Sensei",
+         "reason": "test fixture value, not a real key", "approvedBy": "user",
          "approvedAt": "2026-11-02T09:00:00+08:00",
          "approvalSource": {"channel": "team chat", "messageTime": "2026-11-02T09:00:00+08:00",
                             "quote": "OK, allow-list it"}}

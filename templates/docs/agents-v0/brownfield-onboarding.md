@@ -42,7 +42,7 @@ The steps `/v0-onboard` follows are the same list as its command file, generated
 4. Launch the `codebase-documenter` subagent (skill: `onboard-discovery`) with the scope answers. It reads code and writes the onboarding docs; it runs no commands. For each `docs/agents-v0/onboarding/<module>.helper-brief.md` it writes, launch one `explore-researcher` from this session and pass its result back.
 5. On a blocker, run `sh .agents-v0/scripts/guard-onboard.sh block "<plain reason>"` and stop.
 6. When the documenter reports the docs done, run `sh .agents-v0/scripts/guard-onboard.sh ready`. It records the baseline audit, runs the onboarding docs check and sets the state to `awaiting_approval`. When it prints `REFUSED`, have the documenter fix what it names, then run `ready` again.
-7. Stop. Present the onboarding report, its open questions and the triage list. Next: Sensei reviews the onboarding docs and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard. Never run approve yourself.
+7. Stop. Present the onboarding report, its open questions and the triage list. Next: The user reviews the onboarding docs and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard. Never run approve yourself.
 8. After the user says approve ran, run `sh .agents-v0/scripts/guard-onboard.sh commit`. It checks the approval, secret-scans and makes the one onboard commit with its `onboard-v<n>` tag. Then suggest: /v0-roadmap, /v0-intake, /v0-triage, or /v0-maintain.
 <!-- END generated -->
 

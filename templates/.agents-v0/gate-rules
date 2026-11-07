@@ -24,8 +24,8 @@ onboard block.next Fix the blocker, then run /v0-onboard again; it resumes from 
 onboard ready.requires in-progress
 onboard ready.baseline docs/agents-v0/discovery/baseline-audit.txt
 onboard ready.status awaiting_approval
-onboard ready.next Sensei reviews the onboarding docs and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard
-# commit (Design: D4): main session only, after Sensei's approve. Needs onboard approved in the state AND his approval
+onboard ready.next The user reviews the onboarding docs and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve onboard
+# commit (Design: D4): main session only, after the user's approve. Needs onboard approved in the state AND the approval
 # record (gc_approval_ok). Stages these paths (those that exist or are tracked; *.lock never), refuses when the index
 # already holds another path, secret-scans the staged content, commits once and tags <commit.tag><n>. The pack paths
 # are the folders activate-stack-pack.sh writes (.cursor/rules/org, .cursor/skills).
@@ -53,7 +53,7 @@ roadmap block.next Fix the blocker, then run /v0-roadmap <discovery-path> again;
 # ready: verifies roadmap completeness and sets awaiting_approval
 roadmap ready.requires in-progress
 roadmap ready.status awaiting_approval
-roadmap ready.next Sensei reviews the roadmap and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap
+roadmap ready.next The user reviews the roadmap and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve roadmap
 # commit: checks approval record, stages roadmap files and state, secret-scans, commits and tags
 roadmap commit.paths docs/agents-v0/roadmap docs/agents-v0/program.state.json
 roadmap commit.message program: roadmap approved
@@ -76,7 +76,7 @@ architecture block.next Fix the blocker, then run /v0-architecture again; it res
 # ready: verifies architecture pack completeness and zero Open findings in architecture-review.md
 architecture ready.requires in-progress
 architecture ready.status awaiting_approval
-architecture ready.next Sensei reviews the architecture pack and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve architecture
+architecture ready.next The user reviews the architecture pack and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve architecture
 # commit: checks approval record, promotes ADR to Accepted, appends Approved row, runs activate-stack-pack.sh, stages paths, secret-scans, commits and tags
 architecture commit.paths docs/agents-v0/architecture.md docs/agents-v0/architecture.phase-result.md docs/agents-v0/network.md docs/agents-v0/adr docs/agents-v0/design/system docs/agents-v0/diagrams docs/agents-v0/project-profile.md docs/agents-v0/program.state.json .cursor/rules/org .cursor/skills .cursor/agents .agents/rules/org .agents/skills .agents/agents
 architecture commit.message program: architecture approved
@@ -99,7 +99,7 @@ plan block.next Fix the blocker, then run /v0-plan again; it resumes from the fi
 # ready: verifies plan table, flowchart, and story manifests (sentence, surface, size 1-8, no cycles)
 plan ready.requires in-progress
 plan ready.status awaiting_approval
-plan ready.next Sensei reviews the plan manifests and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve plan
+plan ready.next The user reviews the plan manifests and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve plan
 # commit: checks approval record, appends Approved row to manifests, stages paths, secret-scans, commits and tags
 plan commit.paths docs/agents-v0/milestones docs/agents-v0/program.state.json
 plan commit.message program: plan approved
@@ -122,7 +122,7 @@ scaffold block.next Fix the blocker, then run /v0-scaffold again; it resumes fro
 # ready: verifies native pack verify passes, p0 milestone manifest exists, Dockerfile and Compose exist
 scaffold ready.requires in-progress
 scaffold ready.status awaiting_approval
-scaffold ready.next Sensei reviews the platform skeleton and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve scaffold
+scaffold ready.next The user reviews the platform skeleton and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve scaffold
 # commit: checks approval record, updates p0-platform-skeleton.md status to released with Approved row, stages paths, secret-scans, commits and tags
 scaffold commit.paths app Dockerfile docker-compose.yml compose.yaml .dockerignore pom.xml build.gradle package.json pyproject.toml requirements.txt Cargo.toml go.mod docs/agents-v0/milestones docs/agents-v0/program.state.json
 scaffold commit.message scaffold: platform skeleton approved
@@ -146,7 +146,7 @@ intake block.next Resolve the blocker or helper brief, then run /v0-intake <feat
 # ready: verifies user story, Gherkin AC-1..AC-8, negative/edge + security-trigger refusal, single surface / vertical slice, mandatory sections, and Open questions: none
 intake ready.requires in-progress
 intake ready.status awaiting_approval
-intake ready.next Sensei reviews docs/agents-v0/requirements/<feature>.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve intake <feature>
+intake ready.next The user reviews docs/agents-v0/requirements/<feature>.md and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve intake <feature>
 # commit: verifies approval record, appends Approved row, runs feature-worktree.sh <feature>, stages intake files in the worktree, secret-scans, and commits "<story>: intake approved" on feature/<feature>
 intake commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
 intake commit.message <story>: intake approved
@@ -169,7 +169,7 @@ design block.next Resolve the blocker or helper brief, then run /v0-design <feat
 # ready: verifies design.md, traceability (T1-T3), OpenAPI 3.0 + BOLA + additionalProperties:false + Idempotency-Key, negative/edge failure modes, UX mockups data-component parity, ADR options, and review.md (0 Open Critical), or Contract: None shortcut
 design ready.requires in-progress
 design ready.status awaiting_approval
-design ready.next Sensei reviews docs/agents-v0/design/<feature>/ and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve design <feature>
+design ready.next The user reviews docs/agents-v0/design/<feature>/ and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve design <feature>
 # commit: verifies approval record (or Contract: None shortcut), promotes ADR to Accepted, appends Approved Design row, runs check-traceability.sh design, stages design paths, secret-scans, and commits "<story>: design approved" on feature/<feature>
 design commit.paths docs/agents-v0/design/<feature> docs/agents-v0/adr docs/agents-v0/diagrams docs/agents-v0/design/system/arc-record.md docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 design commit.message <story>: design approved
@@ -194,7 +194,7 @@ build block.next Resolve the blocker, failure brief, or attempt budget issue, th
 # ready: verifies attempt budget (<8), failure-brief & no 3rd red, plan.md rows all done with named test, OpenAPI catalog merge, T4/T5 traceability, build-report.md cards & per-AC file:line citations, build-output.txt non-empty & secret-free, and check-tests-ran.sh
 build ready.requires in-progress
 build ready.status awaiting_approval
-build ready.next Sensei reviews docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve build <feature>
+build ready.next The user reviews docs/agents-v0/build/<feature>/build-report.md and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve build <feature>
 # commit: verifies approval record, appends Approved Build row (and Design Contract: None row if needed), runs check-traceability.sh build, stages build paths, secret-scans, and commits "<story>: build approved" on feature/<feature>
 build commit.paths app openapi docs/agents-v0/build/<feature> docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 build commit.message <story>: build approved
@@ -220,7 +220,7 @@ verify block.next Resolve the blocker or helper brief, then run /v0-verify <feat
 # ready: verifies verify-output.txt, check-tests-ran.sh, quality-gate.md (coverage >=80% changed & module, 0 HIGH/CRIT CVEs), vapt-checklist.md (F4/F8/F9/F10), code-review.md, T6 traceability, and auto-bounces to build if any Open Critical finding exists
 verify ready.requires in-progress
 verify ready.status awaiting_approval
-verify ready.next Sensei reviews docs/agents-v0/verify/<feature>/ reports and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve verify <feature>
+verify ready.next The user reviews docs/agents-v0/verify/<feature>/ reports and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve verify <feature>
 # commit: verifies approval record, appends Approved Verify row, runs check-traceability.sh verify, stages verify paths, secret-scans, and commits "<story>: verify approved" on feature/<feature>
 verify commit.paths app docs/agents-v0/verify/<feature> docs/agents-v0/design/system/slo-evidence.md docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 verify commit.message <story>: verify approved
@@ -244,7 +244,7 @@ local-release block.next Resolve the blocker, then run /v0-local-release <featur
 # ready: verifies release-output.txt, check-tests-ran.sh, check-lessons.sh --unchanged-since (x2), and sets awaiting_approval
 local-release ready.requires in-progress
 local-release ready.status awaiting_approval
-local-release ready.next Sensei reviews the release preparation and Proposed lessons (P-<n>) and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release <feature> (typing approval words and which P-<n> to accept/reject)
+local-release ready.next The user reviews the release preparation and Proposed lessons (P-<n>) and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release <feature> (typing approval words and which P-<n> to accept/reject)
 # commit: two-step safe staging & secret scan — commits "<story>: release approved" on feature/<feature>, squash-merges into the integration branch, applies P-<n> decisions to docs/agents-v0/lessons.md, commits "<story>: release approved (squash-merge of feature/<feature>)" with Story-Branch/Story-Tip trailers, and runs check-release-evidence.sh
 local-release commit.paths README.md CHANGELOG.md docs/agents-v0/diagrams docs/agents-v0/release/<feature> docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md docs/agents-v0/requirements/<feature>.trace.json
 local-release commit.message <story>: release approved
@@ -277,7 +277,7 @@ maintain block.next Resolve the blocker, helper brief, or attempt budget issue, 
 # ready: verifies note.md, tier confirmation, emergency rollback + follow-up date, trivial scope restriction, <=800 non-doc source lines, attempt budget (<8), failure-brief & no 3rd red, build-output.txt + check-tests-ran.sh, check-onboarding-docs.sh, and sets awaiting_approval
 maintain ready.requires in-progress
 maintain ready.status awaiting_approval
-maintain ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>
+maintain ready.next The user reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>
 # commit: verifies external approval record, appends Approved Maintain row, updates phase-result.md, runs sync-feature-state.sh --approve maintain --clear-active, stages explicit paths, secret-scans, and commits "maintain/<feature>: maintain approved"
 maintain commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.gradle build.gradle.kts package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
 maintain commit.message maintain/<feature>: maintain approved
@@ -300,7 +300,7 @@ deliver block.next Resolve the blocker or helper brief, then run /v0-deliver <fe
 # ready: delegates to the active phase guard's ready subcommand, auto-advances Contract: None in design, and auto-bounces Verify on Open Critical findings
 deliver ready.requires in-progress
 deliver ready.status awaiting_approval
-deliver ready.next Sensei reviews the phase deliverables and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve <phase> <feature> (or: sh .agents-v0/scripts/guard-common.sh approve deliver <feature>)
+deliver ready.next The user reviews the phase deliverables and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve <phase> <feature> (or: sh .agents-v0/scripts/guard-common.sh approve deliver <feature>)
 # commit: verifies external approval record and delegates safe-staged commit to the active phase guard
 deliver commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
 deliver commit.message <story>: phase approved
@@ -326,7 +326,7 @@ triage block.next Resolve the blocker or helper brief, then run /v0-triage <feat
 # ready: verifies trivial diff scope (docs-only or 1-for-1 patch version bump, zero contract/schema/code changes) and delegates to guard-maintain.sh ready <feature>
 triage ready.requires in-progress
 triage ready.status awaiting_approval
-triage ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve triage <feature> (or: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>)
+triage ready.next The user reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve triage <feature> (or: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>)
 # commit: verifies external approval record and delegates safe-staged commit to guard-maintain.sh commit <feature>
 triage commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.gradle build.gradle.kts package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
 triage commit.message maintain/<feature>: maintain approved

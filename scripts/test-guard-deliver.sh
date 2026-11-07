@@ -44,7 +44,7 @@ pty_approve() {
   repo_dir="$1"
   phase_cmd="$2"
   feature_arg="${3:-}"
-  words="${4:-Approved by Sensei}"
+  words="${4:-Approved by user}"
   python3 - "$repo_dir" "$phase_cmd" "$feature_arg" "$words" <<'PY'
 import os, pty, sys, time
 repo, phase, feature, words = sys.argv[1:5]

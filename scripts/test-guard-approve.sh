@@ -1,6 +1,6 @@
 #!/bin/sh
 # test-guard-approve.sh: the normal path of the DA approve step (onboard redo, Design: DA).
-# Sensei's `guard-common.sh approve onboard` reads his words from the terminal (driven here through a
+# The user's `guard-common.sh approve onboard` reads their words from the terminal (driven here through a
 # pseudo-terminal), writes the approval record outside the repo and marks onboard approved in the state;
 # gc_approval_ok (for D4) passes only on a record for this repo and command that matches the state's baseCommit;
 # the Cursor hook denies an agent touching the approval folder or running approve.
@@ -84,9 +84,9 @@ out="$(pty_approve "   " 2>&1)"; rc=$?
 rec="$(lib gc_approval_file onboard)"
 [ ! -e "$rec" ]; check $? "approve: no record after a refusal" "$rec"
 
-words="Approved, the onboarding docs are right - Sensei"
+words="Approved, the onboarding docs are right"
 out="$(pty_approve "$words" 2>&1)"; rc=$?
-check $rc "approve: Sensei's words on the terminal approve onboard (exit 0)" "$out"
+check $rc "approve: approver's words on the terminal approve onboard (exit 0)" "$out"
 printf '%s' "$out" | grep -q 'OK approve: onboard approved at baseCommit'; check $? "approve: prints OK approve" "$out"
 printf '%s' "$out" | grep -q "baseCommit: $base"; check $? "approve: shows the baseCommit before asking" "$out"
 

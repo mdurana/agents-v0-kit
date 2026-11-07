@@ -16,7 +16,7 @@
 #        verifies milestone manifests completeness, concrete story sentences, surface, size 1-8,
 #        no cycles, cross-context integration stories, writes plan.phase-result.md, sets awaiting_approval (DP3).
 #   sh .agents-v0/scripts/guard-plan.sh commit
-#        verifies Sensei approval record, appends Approved row to manifests, stages plan paths,
+#        verifies external approval record, appends Approved row to manifests, stages plan paths,
 #        secret-scans, commits, tags (DP5).
 #   sh .agents-v0/scripts/guard-plan.sh steps
 #        prints the step list for /v0-plan command prose (DP6).
@@ -81,7 +81,7 @@ gp_check_prereqs() {
           *) gc_refuse "$gp_step" "architecture is not in approvedPhases in $gp_state; complete /v0-architecture first" ;;
         esac
         if ! gp_arch_ok="$(gc_approval_ok architecture)"; then
-          gc_refuse "$gp_step" "external architecture approval record missing or mismatched ($gp_arch_ok); complete /v0-architecture and have Sensei approve it first"
+          gc_refuse "$gp_step" "external architecture approval record missing or mismatched ($gp_arch_ok); complete /v0-architecture and have the user approve it first"
         fi
         ;;
       not-approved)
@@ -94,7 +94,7 @@ gp_check_prereqs() {
       not-awaiting-approval)
         if [ -f "$gp_state" ]; then
           [ "$(gc_state_get "$gp_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$gp_step" "plan is awaiting Sensei's approval; wait for it, do not start again"
+            || gc_refuse "$gp_step" "plan is awaiting approval; wait for it, do not start again"
         fi
         ;;
       *) gc_refuse "$gp_step" "gate-rules names an unknown prerequisite '$gp_req'; reinstall the kit" ;;
@@ -156,7 +156,7 @@ gp_ready() {
   case "$(gc_state_get "$gp_state" activeStatus)" in
     in_progress|blocked) ;;
     awaiting_approval)
-      gc_refuse ready "plan is already awaiting approval; Sensei runs approve in his own terminal" ;;
+      gc_refuse ready "plan is already awaiting approval; the user runs approve in their own terminal" ;;
     *) gc_refuse ready "plan is not in progress; run start first" ;;
   esac
 
@@ -390,15 +390,15 @@ gp_commit() {
   [ $# -eq 0 ] || gp_usage
   gp_load commit
 
-  # 1. Check state approved and Sensei approval record matches (DP5, FP1)
+  # 1. Check state approved and external approval record matches (DP5, FP1)
   case " $(gc_state_get "$gp_state" approvedPhases | tr -d '[]",') " in
     *" $gp_phase "*) ;;
-    *) gc_refuse commit "plan is not approved in $gp_state; Sensei runs approve in his own terminal first" ;;
+    *) gc_refuse commit "plan is not approved in $gp_state; the user runs approve in their own terminal first" ;;
   esac
 
   gp_ok_out="$(gc_approval_ok plan)" || {
     printf '%s\n' "$gp_ok_out"
-    gc_refuse commit "no approval record from Sensei matches this plan; Sensei runs approve in his own terminal"
+    gc_refuse commit "no external approval record matches this plan; the user runs approve in their own terminal"
   }
   printf '%s\n' "$gp_ok_out"
 
@@ -412,10 +412,10 @@ import glob, json, os, re, sys
 plan_path, rec_path = sys.argv[1:3]
 try:
     rec = json.load(open(rec_path, encoding="utf-8"))
-    approver = rec.get("approver", "Sensei")
+    approver = rec.get("approver", "user")
     approved_at = rec.get("approvedAt", "").split("T")[0]
 except Exception:
-    approver = "Sensei"
+    approver = "user"
     approved_at = ""
 
 manifests = sorted(
@@ -463,13 +463,13 @@ gp_steps() {
   gp_rule steps approved.next; gp_approved_next="$gp_val"
   G='sh .agents-v0/scripts/guard-plan.sh'
   cat <<EOF_STEPS
-1. Run \`$G check\`. It verifies entry prerequisites, onboard approval on brownfield codebases, Sensei's external architecture approval record, and that plan is not already approved. When it prints \`REFUSED\`, show its message and stop.
+1. Run \`$G check\`. It verifies entry prerequisites, onboard approval on brownfield codebases, the user's external architecture approval record, and that plan is not already approved. When it prints \`REFUSED\`, show its message and stop.
 2. Run \`$G start\`. It verifies a clean feature tree and sets \`docs/agents-v0/program.state.json\` to \`in_progress\` on \`docs/agents-v0/milestones/plan.md\`.
 3. Launch the \`program-planner\` subagent (skill: \`program-planning\`) to author milestone manifests under \`docs/agents-v0/milestones/\` and \`docs/agents-v0/milestones/plan.md\` (milestone summary table and \`flowchart TD\` story dependency graph). It runs no shell commands and leaves \`Delivery approvals\` tables empty.
 4. On a blocker, run \`$G block "<plain reason>"\` and stop.
 5. When milestone manifests and plan.md are complete, run \`$G ready\`. It verifies that every manifest has concrete \`As a [role], I want [goal], so that [benefit].\` stories without placeholders, valid \`Surface\`, valid \`Size\` (\`1\`–\`8\`, seeded P0-A = \`4\`), concrete story-ID dependencies without cycles, and integration stories for cross-context calls, writes \`docs/agents-v0/milestones/plan.phase-result.md\`, and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
-6. Stop. Present the milestone manifests and \`docs/agents-v0/milestones/plan.md\` to Sensei. Next: $gp_ready_next. Never run approve yourself; the agent cannot approve this gate.
-7. After Sensei runs approve in his own terminal, run \`$G commit\`. It verifies Sensei's approval record, appends the verified \`plan\` row to \`Delivery approvals\` in \`plan.md\` and every in-scope milestone manifest, stages plan files, secret-scans, makes the single gate commit, and tags \`plan-v<n>\`. Then suggest: $gp_approved_next.
+6. Stop. Present the milestone manifests and \`docs/agents-v0/milestones/plan.md\` to the user. Next: $gp_ready_next. Never run approve yourself; the agent cannot approve this gate.
+7. After the user runs approve in their own terminal, run \`$G commit\`. It verifies the user's approval record, appends the verified \`plan\` row to \`Delivery approvals\` in \`plan.md\` and every in-scope milestone manifest, stages plan files, secret-scans, makes the single gate commit, and tags \`plan-v<n>\`. Then suggest: $gp_approved_next.
 EOF_STEPS
 }
 

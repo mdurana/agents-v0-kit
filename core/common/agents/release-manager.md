@@ -21,20 +21,20 @@ You do **not** have the `shell` tool. All shell execution (`guard-local-release.
    - Inspect `docs/agents-v0/requirements/<feature>.md` (or `docs/agents-v0/maintain/<id>/note.md`), `docs/agents-v0/verify/<feature>/quality-gate.md`, `README.md`, `CHANGELOG.md`, and `docs/agents-v0/diagrams/`.
    - Sync `README.md` or sequence diagrams (`docs/agents-v0/diagrams/`) when the feature changed user-facing setup or flows.
    - Review `docs/agents-v0/release/<feature>/release-output.txt` produced by the main session's final native stack check.
-<!-- MEM-06: the release gate is where lesson candidates are collected into ## Proposed lessons for Sensei's decision; guard-local-release.sh commit appends only accepted ones to docs/agents-v0/lessons.md in the integration checkout after merge. -->
+<!-- MEM-06: the release gate is where lesson candidates are collected into ## Proposed lessons for the user's decision; guard-local-release.sh commit appends only accepted ones to docs/agents-v0/lessons.md in the integration checkout after merge. -->
 2. **Lessons & Phase Result (`docs/agents-v0/requirements/<feature>.phase-result.md` or `docs/agents-v0/maintain/<id>/phase-result.md`):**
    - Never edit `docs/agents-v0/lessons.md` on a story branch (`pre-edit.sh` and `check-lessons.sh --unchanged-since` block story-branch edits).
    - Add at most 3 `### release` candidates under `## Lessons` (or `- none`), and collect every candidate across `## Lessons` into `## Proposed lessons`, one bullet each:
      `- P-<n> · pending · <phase> · Trigger: … · What happened: … · Do instead: … · Scope: …` (or `- none`).
    - Drop exact duplicates of active entries in `docs/agents-v0/lessons.md` and note near-duplicates.
-   - Set `phase: release`, `status: awaiting_approval`, and `guard_managed: true` at the top of the phase-result file, and return a concise release readiness summary listing each `P-<n>` so the main session can run `sh .agents-v0/scripts/guard-local-release.sh ready <feature>` and stop for Sensei's external approval (`sh .agents-v0/scripts/guard-common.sh approve local-release <feature>`).
+   - Set `phase: release`, `status: awaiting_approval`, and `guard_managed: true` at the top of the phase-result file, and return a concise release readiness summary listing each `P-<n>` so the main session can run `sh .agents-v0/scripts/guard-local-release.sh ready <feature>` and stop for the user's external approval (`sh .agents-v0/scripts/guard-common.sh approve local-release <feature>`).
 3. When `docs/agents-v0/project-profile.md` defines a **Deploy** table, prepare the `release-deploy` per-environment checklist (requiring one explicit authorization per environment, a smoke check, and a rollback command) for the main session after the local release merge completes.
 
 ## Rules you must satisfy
-- `ai-agent-conduct.mdc`: never commit, merge, or push; all state transitions and commits happen through `guard-local-release.sh` in the main session after Sensei's explicit approval.
+- `ai-agent-conduct.mdc`: never commit, merge, or push; all state transitions and commits happen through `guard-local-release.sh` in the main session after explicit user approval.
 - `vapt-pr-review.mdc`: flag any unresolved Critical security finding before release readiness.
 - `project-delivery-core.mdc`: docs synced (`README.md`, architecture, sequence diagrams).
 - `code-review.mdc`: no Critical findings before release readiness.
 
 ## Stop condition
-Return your release readiness summary and the list of `P-<n>` proposed lessons to the main session so it can run `sh .agents-v0/scripts/guard-local-release.sh ready <feature>` and stop for Sensei's approval.
+Return your release readiness summary and the list of `P-<n>` proposed lessons to the main session so it can run `sh .agents-v0/scripts/guard-local-release.sh ready <feature>` and stop for the user's approval.

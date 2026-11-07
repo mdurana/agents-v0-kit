@@ -10,7 +10,7 @@
 #
 # --record (onboard fix JO-15a) saves a short summary to docs/agents-v0/discovery/baseline-audit.txt:
 # result, exit code, the commands run (credentials masked), commit, time with its offset in the project
-# zone, and on a red result the failing test names. Names only, never build output (Sensei 2A, SOC-8).
+# zone, and on a red result the failing test names. Names only, never build output (2A, SOC-8).
 # A red result is recorded and the exit code stays 1.
 set -eu
 

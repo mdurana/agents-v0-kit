@@ -77,7 +77,7 @@ if [ "$want_steps" = 1 ]; then
    - If no state files exist at all, ask whether this is an existing repository (`/v0-onboard`), a new greenfield program (`/v0-roadmap`), or a trivial docs/patch edit (`/v0-triage <id>`).
 3. **Inspect detailed state, release evidence & post-Verify drift (`--story <slug>`):**
    - `sh .agents-v0/scripts/stories-status.sh --story <slug>` reports `story`, `kind`, `tier`, `branch`, `worktree`, `stateFile`, `artifact`, `approvedPhases`, `lastApprovedPhase`, `activePhase`, `activeStatus`, `verifyPassed`, `reopenCount`, `baseCommit`, `blockedReason`, `note`, and `nextCommand`.
-   - When `kind` is `feature` and `release` is in `approvedPhases`, `stories-status.sh` cross-checks `sh .agents-v0/scripts/check-release-evidence.sh docs/agents-v0/requirements/<feature>.md`. If `Release evidence OK: False` (`note` contains `unsupported by evidence`), report the state as **unsupported by evidence**, do not call the story complete, do not name a next story, and tell Sensei to restore `docs/agents-v0/requirements/<feature>.state.json` from version control (the kit cannot re-open a released story). When `docs/agents-v0/project-profile.md` has a configured **Deploy** table and no deploy record is on disk, report `release-deploy` as the next step.
+   - When `kind` is `feature` and `release` is in `approvedPhases`, `stories-status.sh` cross-checks `sh .agents-v0/scripts/check-release-evidence.sh docs/agents-v0/requirements/<feature>.md`. If `Release evidence OK: False` (`note` contains `unsupported by evidence`), report the state as **unsupported by evidence**, do not call the story complete, do not name a next story, and ask the user to restore `docs/agents-v0/requirements/<feature>.state.json` from version control (the kit cannot re-open a released story). When `docs/agents-v0/project-profile.md` has a configured **Deploy** table and no deploy record is on disk, report `release-deploy` as the next step.
    - When `note` reports an **uncommitted gate** (`uncommitted gate (<phase>): run sh .agents-v0/scripts/guard-<phase>.sh commit ...`), report that external TTY approval is already recorded on disk and the gate commit is the immediate next command before any new phase starts.
    - When `note` reports **post-Verify source drift** (`post-Verify source drift: re-run /v0-verify <slug>`), advise re-running `/v0-verify <slug>` before `/v0-local-release`.
 4. **Report & stop (strictly read-only):** Report the state summary, any `blockedReason` or `note`, and the deterministic `Next:` command from `stories-status.sh --story <slug>`. Ignore `docs/agents-v0/backlog/tickets.csv` and `docs/agents-v0/presentations/`, and never name `/v0-export` or `/v0-deck` as the next command. Do not mutate any file or advance any phase during `/v0-status`.
@@ -248,7 +248,7 @@ def approval_record_path(kind, story, phase):
 
 
 def detect_uncommitted_gate(wt, kind, story, state_rel, data):
-    """Detect if Sensei externally approved a gate that has not been committed via guard-<phase>.sh commit yet."""
+    """Detect if the user externally approved a gate that has not been committed via guard-<phase>.sh commit yet."""
     if not data or wt.get("nogit") or not wt.get("exists"):
         return "", ""
     wt_path = wt["path"]
@@ -373,11 +373,11 @@ def compute_next_command(row, data, wt_path):
     if active_status == "awaiting_approval":
         ap_cmd = "local-release" if active_phase == "release" else active_phase
         if kind in ("program", "onboarding"):
-            return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit"
+            return f"Run in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit"
         if kind == "maintain" and ap_cmd == "maintain" and tier == "trivial":
-            return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve triage {story} — then run: sh .agents-v0/scripts/guard-triage.sh commit {story}"
+            return f"Run in external terminal: sh .agents-v0/scripts/guard-common.sh approve triage {story} — then run: sh .agents-v0/scripts/guard-triage.sh commit {story}"
         flag_m = " --maintain" if (kind == "maintain" and ap_cmd in ("verify", "local-release")) else ""
-        return f"Sensei runs in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} {story} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit {story}{flag_m}"
+        return f"Run in external terminal: sh .agents-v0/scripts/guard-common.sh approve {ap_cmd} {story} — then run: sh .agents-v0/scripts/guard-{ap_cmd}.sh commit {story}{flag_m}"
 
     # No activePhase: route from lastApprovedPhase
     if kind == "onboarding":

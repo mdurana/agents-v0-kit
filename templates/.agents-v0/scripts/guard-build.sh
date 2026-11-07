@@ -184,14 +184,14 @@ gb_check_prereqs() {
           gb_rc="$(gc_state_get "$gb_state" reopenCount 2>/dev/null || echo 0)"
           case "$gb_rc" in ''|*[!0-9]*) gb_rc=0 ;; esac
           if [ "$gb_rc" -ge 3 ]; then
-            gc_refuse "$gb_step" "reopen bounce cap exceeded for '$gb_feature' (reopenCount=$gb_rc >= 3); escalate to Sensei before reopening again"
+            gc_refuse "$gb_step" "reopen bounce cap exceeded for '$gb_feature' (reopenCount=$gb_rc >= 3); escalate to the user before reopening again"
           fi
         fi
         ;;
       not-awaiting-approval)
         if [ -f "$gb_state" ]; then
           [ "$(gc_state_get "$gb_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$gb_step" "build for '$gb_feature' is awaiting Sensei's approval; run sh .agents-v0/scripts/guard-common.sh approve build $gb_feature in your external terminal"
+            || gc_refuse "$gb_step" "build for '$gb_feature' is awaiting approval; run sh .agents-v0/scripts/guard-common.sh approve build $gb_feature in your external terminal"
         fi
         ;;
       in-progress)
@@ -418,7 +418,7 @@ else:
 PY
 )"
     if [ "$gb_dup" = "DUP" ]; then
-      gc_refuse block "identical brief ($gb_hb) was already recorded; escalate to Sensei instead of repeating the same ask"
+      gc_refuse block "identical brief ($gb_hb) was already recorded; escalate to the user instead of repeating the same ask"
     fi
   fi
 
@@ -676,7 +676,7 @@ PYPR
   gb_rule ready ready.next "$gb_feature"; gb_next="$gb_val"
   gc_state_set "$gb_state" "$gb_feature" "$gb_req_art" "activePhase=$gb_phase" \
     "activeStatus=awaiting_approval" "blockedReason=" "nextStep=$gb_next" || exit 1
-  gc_ok ready "build for $gb_feature verified and awaiting Sensei's approval"
+  gc_ok ready "build for $gb_feature verified and awaiting approval"
   printf 'Next: %s\n' "$gb_next"
 }
 
@@ -689,13 +689,13 @@ gb_commit() {
 
   [ -f "$gb_state" ] || gc_refuse commit "state file '$gb_state' is missing"
 
-  # 1. Verify Sensei's external build approval record
+  # 1. Verify the user's external build approval record
   case " $(gc_state_get "$gb_state" approvedPhases | tr -d '[]",') " in
     *" $gb_phase "*) ;;
-    *) gc_refuse commit "build is not approved in '$gb_state'; Sensei must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature" ;;
+    *) gc_refuse commit "build is not approved in '$gb_state'; the user must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature" ;;
   esac
   if ! gb_why="$(gc_approval_ok build "$gb_feature")"; then
-    gc_refuse commit "$gb_why (Sensei must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature)"
+    gc_refuse commit "$gb_why (the user must run: sh .agents-v0/scripts/guard-common.sh approve build $gb_feature)"
   fi
 
   # 2. Refuse if index already has staged paths
@@ -704,11 +704,19 @@ gb_commit() {
     || gc_refuse commit "the git index already has staged files ($(printf '%s' "$gb_PreStaged" | tr '\n' ' ')); unstage them before running guard-build.sh commit"
 
   # 3. Append/update Approved Build row (and Design Contract: None row if design was not in Delivery approvals) in requirements/<feature>.md
-  GB_REQ="$gb_req_art" GB_SLUG="$gb_feature" python3 - <<'PYROW'
-import datetime, os, re
+  gb_rec_file="$(gc_approval_file build "$gb_feature")"
+  GB_REQ="$gb_req_art" GB_SLUG="$gb_feature" GB_REC="$gb_rec_file" python3 - <<'PYROW'
+import datetime, json, os, re
 
 p = os.environ["GB_REQ"]
 slug = os.environ["GB_SLUG"]
+rec_file = os.environ.get("GB_REC", "")
+approver = "user"
+if rec_file and os.path.isfile(rec_file):
+    try:
+        approver = json.load(open(rec_file, encoding="utf-8")).get("approver") or "user"
+    except Exception:
+        approver = "user"
 today = datetime.date.today().isoformat()
 txt = open(p, encoding="utf-8").read()
 lines = txt.splitlines()
@@ -722,8 +730,8 @@ if os.path.isfile(f"docs/agents-v0/design/{slug}/review.md"):
     design_ev += f", `docs/agents-v0/design/{slug}/review.md`"
 
 build_ev = f"`docs/agents-v0/build/{slug}/plan.md`, `docs/agents-v0/build/{slug}/build-report.md`"
-design_row = f"| Design | {design_ev} | Sensei | Approved | {today} |"
-build_row = f"| Build | {build_ev} | Sensei | Approved | {today} |"
+design_row = f"| Design | {design_ev} | {approver} | Approved | {today} |"
+build_row = f"| Build | {build_ev} | {approver} | Approved | {today} |"
 
 out = []
 in_deliv = False
@@ -830,7 +838,7 @@ gb_steps() {
   gb_rule steps ready.next "<feature>"; gb_r_next="$gb_val"
   gb_rule steps approved.next "<feature>"; gb_a_next="$gb_val"
   cat <<EOF
-1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree, checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies Sensei's external \`design\` approval (or \`Contract: None\`) and committed gate, runs \`sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/<feature>.md\`, and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
+1. Run \`$G check <feature> [--reopen]\`. It validates the \`<feature>\` slug, blocks \`p0-a*\` (redirecting to \`/v0-scaffold\`), verifies the current checkout is the \`feature/<feature>\` worktree, checks \`docs/agents-v0/project-profile.md\` Pack configuration, verifies the user's external \`design\` approval (or \`Contract: None\`) and committed gate, runs \`sh .agents-v0/scripts/check-story-dependencies.sh docs/agents-v0/requirements/<feature>.md\`, and ensures the story is not already released or approved (or checks \`reopenCount < 3\` when \`--reopen\` is passed). When it prints \`REFUSED\`, show its message and stop.
 2. Run \`$G start <feature> [--reopen]\`. It verifies a clean working tree on \`feature/<feature>\`, seeds \`docs/agents-v0/build/<feature>/plan.md\` (one row per approved \`AC-*\`) and \`docs/agents-v0/build/<feature>/build-report.md\` if absent, and sets \`docs/agents-v0/requirements/<feature>.state.json\` to \`in_progress\`.
 3. Read \`docs/agents-v0/lessons.md\` and execute the implementation loop in the main session with the shell-less Build subagents (\`backend-engineer\`, \`bff-engineer\`, \`frontend-engineer\`, \`debug-investigator\`):
    - **Baseline & database runtime:** Unless the working tree is clean at the default branch tip, resolve and run the verify command via \`sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"\` or \`"Frontend verify"\`. Before the first test that needs a database, run \`sh .agents-v0/scripts/check-database-runtime.sh --phase build docs/agents-v0/requirements/<feature>.md\` (never use \`sudo\`, a package manager, or a Docker TCP socket).
@@ -838,8 +846,8 @@ gb_steps() {
    - **Bounded failure & full verify:** If the same test fails twice consecutively, have the engineer write \`docs/agents-v0/build/<feature>/failure-brief.md\` (\`helper: debug-investigator\`, \`outputs:\`, \`return:\`, \`ask:\`, failing test name, and \`file:line\`) and launch shell-less \`debug-investigator\` before attempt three. Once all \`plan.md\` rows are \`done\`, run the full native verify command once (and \`sh .agents-v0/scripts/check-tests-ran.sh\` after Maven verify), recording the summary and per-AC \`file:line\` citations in \`docs/agents-v0/build/<feature>/build-report.md\` and raw output in \`docs/agents-v0/build/<feature>/build-output.txt\`.
 4. If the baseline is broken, database runtime is unavailable, the attempt budget (8 failed attempts) is spent, a test fails 3 times consecutively, or a helper brief is needed, run \`$G block <feature> "<plain reason>"\` (which deduplicates helper/failure briefs and records \`blocked\`) and stop.
 5. When all \`plan.md\` rows are \`done\` and full verify passes, run \`$G ready <feature>\`. It deterministically verifies the attempt budget, failure-brief rules (and no 3rd failure of the same test), \`plan.md\` row completeness, OpenAPI catalog merge, \`T4\`/\`T5\` code-and-test traceability under \`app/\`, \`build-report.md\` attempt cards and per-AC \`file:line\` citations, non-empty secret-free \`build-output.txt\`, and \`check-tests-ran.sh\`, then writes \`docs/agents-v0/requirements/<feature>.phase-result.md\` and sets state to \`awaiting_approval\`. When it prints \`REFUSED\`, fix what it names and run \`ready\` again.
-6. Stop. Present \`docs/agents-v0/build/<feature>/build-report.md\` and the \`file:line\` citations to Sensei and wait for explicit approval. Next: $gb_r_next. Never run approve yourself; the agent cannot approve this gate.
-7. After Sensei runs approve in his own terminal, run \`$G commit <feature>\`. It verifies Sensei's external approval record, appends the verified \`Build\` row (and \`Design\` row if \`Contract: None\`) to \`Delivery approvals\`, runs traceability checks, stages only the story's build, app, catalog, and state paths, scans staged content for secrets, and commits \`"<story>: build approved"\` on \`feature/<feature>\`. Then suggest: $gb_a_next.
+6. Stop. Present \`docs/agents-v0/build/<feature>/build-report.md\` and the \`file:line\` citations to the user and wait for explicit approval. Next: $gb_r_next. Never run approve yourself; the agent cannot approve this gate.
+7. After the user runs approve in their own terminal, run \`$G commit <feature>\`. It verifies the user's external approval record, appends the verified \`Build\` row (and \`Design\` row if \`Contract: None\`) to \`Delivery approvals\`, runs traceability checks, stages only the story's build, app, catalog, and state paths, scans staged content for secrets, and commits \`"<story>: build approved"\` on \`feature/<feature>\`. Then suggest: $gb_a_next.
 EOF
 }
 

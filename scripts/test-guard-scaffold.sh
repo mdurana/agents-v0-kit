@@ -49,7 +49,7 @@ GR="$proj/.agents-v0/scripts/guard-roadmap.sh"
 S="$proj/docs/agents-v0/program.state.json"
 
 pty_approve() {
-  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by Sensei" <<'PY'
+  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by user" <<'PY'
 import os, pty, sys, time
 proj, script, cmd, words = sys.argv[1:5]
 pid, fd = pty.fork()
@@ -285,7 +285,7 @@ printf '%s' "$out" | grep -q '^OK ready: scaffold baseline verified'; check $? "
 
 # Self-approval via sync-feature-state.sh is refused without external approval record (DSA)
 out="$(cd "$proj" && sh .agents-v0/scripts/sync-feature-state.sh --approve scaffold docs/agents-v0/milestones/p0-platform-skeleton.md 2>&1 || true)"
-printf '%s' "$out" | grep -q 'FAIL: --approve scaffold refused without Sensei external approval record'; check $? "sync-feature-state: refuses --approve scaffold without Sensei record (DSA)" "$out"
+printf '%s' "$out" | grep -q 'FAIL: --approve scaffold refused without an external approval record'; check $? "sync-feature-state: refuses --approve scaffold without an external approval record (DSA)" "$out"
 
 # Commit refused before external approval (DS5)
 out="$(cd "$proj" && sh "$GS" commit 2>&1 || true)"
@@ -297,7 +297,7 @@ rec_file="$(cd "$proj" && GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agent
 [ -f "$rec_file" ]; check $? "approve: wrote scaffold approval record outside repo"
 
 out="$(cd "$proj" && sh "$GS" commit 2>&1)"
-check $? "commit: exits 0 after Sensei approve" "$out"
+check $? "commit: exits 0 after external approve" "$out"
 printf '%s' "$out" | grep -q '^OK commit: scaffold committed on main as .*, tagged scaffold-v1'; check $? "commit: prints OK commit with tag" "$out"
 git -C "$proj" tag | grep -qx 'scaffold-v1'; check $? "commit: scaffold-v1 tag created"
 git -C "$proj" log -1 --format=%s | grep -qx 'scaffold: platform skeleton approved'; check $? "commit: gate commit message is 'scaffold: platform skeleton approved'"

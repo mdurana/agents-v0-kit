@@ -61,8 +61,8 @@ printf '%s' "$out" | grep -qF "Next: $next"; check $? "block: prints the next st
 [ "$(js "$S" blockedReason)" = "$reason" ]; check $? "block: blockedReason is the plain reason" "$(js "$S" blockedReason)"
 [ -n "$next" ] && [ "$(js "$S" nextStep)" = "$next" ]; check $? "block: nextStep is recorded (gate-rules default)" "$(js "$S" nextStep)"
 [ "$(js "$S" baseCommit)" = "$head" ]; check $? "block: keeps the other keys (baseCommit)"
-out="$(cd "$proj" && sh "$G" block "waiting for the API key" --next "Ask Sensei for the API key" 2>&1)"; rc=$?
-[ $rc = 0 ] && [ "$(js "$S" nextStep)" = "Ask Sensei for the API key" ] && [ "$(js "$S" blockedReason)" = "waiting for the API key" ]
+out="$(cd "$proj" && sh "$G" block "waiting for the API key" --next "Ask the user for the API key" 2>&1)"; rc=$?
+[ $rc = 0 ] && [ "$(js "$S" nextStep)" = "Ask the user for the API key" ] && [ "$(js "$S" blockedReason)" = "waiting for the API key" ]
 check $? "block --next: records the given next step" "$out"
 
 # --- ready (Design: D3): baseline record, docs check, awaiting_approval ---------------------------------------
@@ -86,11 +86,11 @@ check $rc "ready: exits 0 after discovery (run from a subdirectory)" "$out"
 printf '%s' "$out" | grep -q '^OK ready: onboard state is awaiting_approval (baseline NO-BUILD, docs/agents-v0/discovery/baseline-audit.txt)'
 check $? "ready: prints OK ready with the state and the baseline result" "$out"
 nextr="$(sed -n 's/^onboard ready\.next //p' "$proj/.agents-v0/gate-rules")"
-[ -n "$nextr" ] && printf '%s' "$out" | grep -qF "Next: $nextr"; check $? "ready: prints the next step (Sensei's approve) from gate-rules" "$out"
+[ -n "$nextr" ] && printf '%s' "$out" | grep -qF "Next: $nextr"; check $? "ready: prints the next step (the user's approve) from gate-rules" "$out"
 [ -f "$B" ] && grep -q '^result: NO-BUILD$' "$B" && grep -q "^commit: $head\$" "$B"
 check $? "ready: the baseline audit --record wrote docs/agents-v0/discovery/baseline-audit.txt" "$(cat "$B" 2>&1)"
 [ "$(js "$S" activeStatus)" = awaiting_approval ]; check $? "ready: activeStatus is awaiting_approval" "$(js "$S" activeStatus)"
-[ "$(js "$S" nextStep)" = "$nextr" ]; check $? "ready: nextStep is Sensei's approve step" "$(js "$S" nextStep)"
+[ "$(js "$S" nextStep)" = "$nextr" ]; check $? "ready: nextStep is the user's approve step" "$(js "$S" nextStep)"
 [ "$(js "$S" blockedReason)" = "" ]; check $? "ready: blockedReason is cleared"
 [ "$(js "$S" baseCommit)" = "$head" ]; check $? "ready: keeps the other keys (baseCommit)"
 out="$(cd "$proj" && sh "$G" start 2>&1)"; rc=$?

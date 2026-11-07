@@ -14,9 +14,9 @@
 #   sh .agents-v0/scripts/guard-onboard.sh ready
 #        (Design: D3; main session only, after discovery) runs the baseline audit with --record, which writes
 #        docs/agents-v0/discovery/baseline-audit.txt (a red baseline is recorded, not refused), runs the
-#        onboarding docs check, then sets the onboard state to awaiting_approval for Sensei's approve step.
+#        onboarding docs check, then sets the onboard state to awaiting_approval for the user's approve step.
 #   sh .agents-v0/scripts/guard-onboard.sh commit
-#        (Design: D4; main session only, after Sensei ran approve in his own terminal) needs onboard approved in
+#        (Design: D4; main session only, after the user ran approve in their own terminal) needs onboard approved in
 #        the state AND his approval record, then makes the one gate commit of the onboard paths (secret-scanned)
 #        and tags it onboard-v<n> (guard-common.sh gc_commit_tag).
 #   sh .agents-v0/scripts/guard-onboard.sh steps
@@ -66,7 +66,7 @@ go_start() {
         esac ;;
       not-awaiting-approval)
         [ "$(gc_state_get "$go_state" activeStatus)" != awaiting_approval ] \
-          || gc_refuse start "onboarding is awaiting Sensei's approval; wait for it, do not start again" ;;
+          || gc_refuse start "onboarding is awaiting approval; wait for it, do not start again" ;;
       *) gc_refuse start "gate-rules names an unknown prerequisite '$go_req'; reinstall the kit (install.sh --update)" ;;
     esac
   done
@@ -135,14 +135,14 @@ go_ready() {
 go_commit() {
   [ $# -eq 0 ] || go_usage
   go_load commit
-  # Both checks: the state says approved AND Sensei's record matches (approve writes the record before the state).
+  # Both checks: the state says approved AND the user's approval record matches (approve writes the record before the state).
   case " $(gc_state_get "$go_state" approvedPhases | tr -d '[]",') " in
     *" $go_phase "*) ;;
-    *) gc_refuse commit "onboarding is not approved in $go_state; Sensei runs approve in his own terminal first" ;;
+    *) gc_refuse commit "onboarding is not approved in $go_state; the user runs approve in their own terminal first" ;;
   esac
   go_ok_out="$(gc_approval_ok onboard)" || {
     printf '%s\n' "$go_ok_out"
-    gc_refuse commit "no approval record from Sensei matches this onboarding; Sensei runs approve in his own terminal"
+    gc_refuse commit "no external approval record matches this onboarding; the user runs approve in their own terminal"
   }
   printf '%s\n' "$go_ok_out"
   gc_commit_tag onboard

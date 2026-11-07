@@ -216,7 +216,7 @@ done
 ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "cat $hr/status/pending-turn.json" allow ) || fail=1
 ( cd "$scratch/kp" && TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" shell_case "echo x > $hr/status/pending-turn.json" allow ) || fail=1   # attended: unchanged
 ( cd "$scratch/kp" && AGY_ALLOW_TOOLS="$UA" TEST_ROOT="$hr" PLAN_DIR="$scratch/hv" run_hook pre-edit.sh cursor "{\"file_path\":$(json_str "$scratch/hv/scripts/lib.sh")}" block "edit of a harness script" ) || fail=1
-# kitfix-20261031-n1 (Sasuke N-1/N-2, approved by Sensei via Kakashi 2026-10-31 16:36 Asia/Manila): the hooks run
+# kitfix-20261031-n1 (Sasuke N-1/N-2, approved in design review 2026-10-31 16:36 Asia/Manila): the hooks run
 #   the pinned "$HOOK_PYTHON" -I -S, so none of these Python start-up vectors can change a verdict. Each vector has a negative control that
 #   shows the fixture does what it should to a bare python3 (otherwise a pass would prove nothing).
 n1="$scratch/n1"; mkdir -p "$n1/proj/.agents-v0" "$n1/fakebin" "$n1/marks"

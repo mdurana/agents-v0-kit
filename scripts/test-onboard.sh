@@ -362,7 +362,7 @@ expect_pass "audit-brownfield-baseline: passes when dotnet test runs real tests"
 
 # --- normal path through the guard: start -> ready -> approve -> commit (onboard redo, Design: D6) ---------------
 # Same helpers as test-guard-commit.sh: a kit test copy (install.sh --test-overrides) so AGENTS_V0_APPROVALS_DIR sends
-# Sensei's approval record to a temp folder, and his approve words typed on a pseudo-terminal. Normal path only.
+# the user's approval record to a temp folder, and his approve words typed on a pseudo-terminal. Normal path only.
 onboard_normal_path() (
   for v in $(env | sed -n 's/^\(GIT_[A-Za-z_]*\)=.*/\1/p'); do unset "$v"; done
   export GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
@@ -382,7 +382,7 @@ onboard_normal_path() (
     [ ! -f "$p/docs/agents-v0/$d" ] || printf '# %s\n\nOne module, no network calls (`README.md:1`).\n' "$d" > "$p/docs/agents-v0/$d"
   done
   (cd "$p" && sh "$G/guard-onboard.sh" ready) || { echo "ready failed"; exit 1; }
-  python3 - "$p" "$G/guard-common.sh" "Approved, the onboarding docs are right - Sensei" <<'PY2' || { echo "approve failed"; exit 1; }
+  python3 - "$p" "$G/guard-common.sh" "Approved, the onboarding docs are right" <<'PY2' || { echo "approve failed"; exit 1; }
 import os, pty, sys, time
 proj, script, words = sys.argv[1:4]
 pid, fd = pty.fork()

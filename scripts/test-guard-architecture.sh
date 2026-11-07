@@ -46,7 +46,7 @@ GR="$proj/.agents-v0/scripts/guard-roadmap.sh"
 S="$proj/docs/agents-v0/program.state.json"
 
 pty_approve() {
-  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by Sensei" <<'PY'
+  python3 - "$proj" "$proj/.agents-v0/scripts/guard-common.sh" "$1" "Approved by user" <<'PY'
 import os, pty, sys, time
 proj, script, cmd, words = sys.argv[1:5]
 pid, fd = pty.fork()
@@ -290,11 +290,11 @@ printf '%s' "$out" | grep -q '^OK ready: architecture pack verified'; check $? "
 
 # Start refuses while awaiting approval
 out="$(cd "$proj" && sh "$GA" start 2>&1 || true)"
-printf '%s' "$out" | grep -q 'REFUSED start: architecture is awaiting Sensei'; check $? "start: refuses while awaiting approval" "$out"
+printf '%s' "$out" | grep -q 'REFUSED start: architecture is awaiting approval'; check $? "start: refuses while awaiting approval" "$out"
 
 # Self-approval via sync-feature-state.sh is refused without external approval record (FA1)
 out="$(cd "$proj" && sh .agents-v0/scripts/sync-feature-state.sh --approve architecture docs/agents-v0/architecture.md 2>&1 || true)"
-printf '%s' "$out" | grep -q 'FAIL: --approve architecture refused without Sensei external approval record'; check $? "sync-feature-state: refuses --approve architecture without Sensei record (FA1)" "$out"
+printf '%s' "$out" | grep -q 'FAIL: --approve architecture refused without an external approval record'; check $? "sync-feature-state: refuses --approve architecture without an external approval record (FA1)" "$out"
 
 # Commit refused before approve
 out="$(cd "$proj" && sh "$GA" commit 2>&1 || true)"
@@ -306,7 +306,7 @@ rec_file="$(cd "$proj" && GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agent
 [ -f "$rec_file" ]; check $? "approve: wrote architecture approval record outside repo"
 
 out="$(cd "$proj" && sh "$GA" commit 2>&1)"
-check $? "commit: exits 0 after Sensei approve" "$out"
+check $? "commit: exits 0 after external approve" "$out"
 printf '%s' "$out" | grep -q '^OK commit: architecture committed on main as .*, tagged architecture-v1'; check $? "commit: prints OK commit with tag" "$out"
 git -C "$proj" tag | grep -qx 'architecture-v1'; check $? "commit: architecture-v1 tag created"
 git -C "$proj" log -1 --format=%s | grep -qx 'program: architecture approved'; check $? "commit: gate commit message is 'program: architecture approved'"

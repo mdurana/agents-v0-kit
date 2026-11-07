@@ -2,7 +2,7 @@
 # Source it from a test:   KIT="$(cd "$(dirname "$0")/.." && pwd)"; . "$KIT/scripts/lib/tier1-harness.sh"
 # Tier 1 is offline and runs no agent. Every case runs on an installed copy (install.sh into a temp git
 # repo), never on the kit's own copy. Cleanup removes only the one temp folder this run created
-# (Sensei, 2026-11-01 12:04: the suites may remove only the temp folders they create in that same run).
+# (2026-11-01 12:04: the suites may remove only the temp folders they create in that same run).
 # Kit-only file: it is not installed into projects.
 
 [ -n "${KIT:-}" ] || { printf 'tier1-harness: set KIT before sourcing\n' >&2; exit 2; }

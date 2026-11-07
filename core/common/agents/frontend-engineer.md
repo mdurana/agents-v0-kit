@@ -36,4 +36,4 @@ You are the **frontend-engineer** for the Build phase of the delivery lifecycle 
 - UX spec conformance: per-screen state matrix, component default behavior, layout matching the approved mockups, WCAG 2.1 AA accessibility, design-system tokens/components.
 
 ## Stop condition
-Stop when the **Build gate** artifacts are authored (`workflow-orchestration.mdc`): return to the main `/v0-build` session so it runs `sh .agents-v0/scripts/guard-build.sh ready <feature>` and waits for Sensei's explicit approval (`sh .agents-v0/scripts/guard-common.sh approve build <feature>`). Never run shell commands, `sync-feature-state.sh`, or `git`.
+Stop when the **Build gate** artifacts are authored (`workflow-orchestration.mdc`): return to the main `/v0-build` session so it runs `sh .agents-v0/scripts/guard-build.sh ready <feature>` and waits for explicit user approval (`sh .agents-v0/scripts/guard-common.sh approve build <feature>`). Never run shell commands, `sync-feature-state.sh`, or `git`.

@@ -24,7 +24,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - **Open questions** — resolve them with the user. Before the gate the section includes `Open questions: none`.
    - **Milestone file** — when `Milestone:` is set, also record `Milestone file: docs/agents-v0/milestones/<milestone>.md` and `Story: <story-id>`. The manifest must name that story id.
    - **Milestone/Story links** — `Milestone: <Pn-name>` and `Story: <story-id>` under the title when the story belongs to a milestone program (`docs/agents-v0/milestones/<milestone>.md`).
-   - **Delivery approvals** — leave the table empty with headers only (never pre-fill rows; `guard-intake.sh commit <feature>` appends the verified `Intake` row after Sensei's external approval):
+   - **Delivery approvals** — leave the table empty with headers only (never pre-fill rows; `guard-intake.sh commit <feature>` appends the verified `Intake` row after the user's external approval):
 
      | Phase | Artifacts | Approver | Decision | Date |
      |-------|-----------|----------|----------|------|
@@ -38,7 +38,7 @@ Intake phase playbook for the `requirements-analyst` agent (`workflow-orchestrat
    - Record `Vertical slice: yes` only when the user asks for one journey across surfaces. That story may list more than one surface and still has at most eight criteria. Greenfield P0-A runs `/v0-scaffold` on the integration branch, not `/v0-intake`.
 6. Resolve open questions with the user. Write `Open questions: none` under `## Open questions`.
 7. Verify that `docs/agents-v0/requirements/<feature>.md` satisfies every item in the checklist below.
-8. Do not write the phase-result file and do not run shell commands. Present the drafted requirements artifact and return. The main session runs `sh .agents-v0/scripts/guard-intake.sh ready <feature>` (which validates the artifact, writes `docs/agents-v0/requirements/<feature>.phase-result.md`, and sets `awaiting_approval`). After Sensei approves in his external terminal (`sh .agents-v0/scripts/guard-common.sh approve intake <feature>`) and authorises the branch in its own turn, the main session runs `sh .agents-v0/scripts/guard-intake.sh commit <feature>` (`/v0-intake`). Do not start Design. Do not create a worktree before approval.
+8. Do not write the phase-result file and do not run shell commands. Present the drafted requirements artifact and return. The main session runs `sh .agents-v0/scripts/guard-intake.sh ready <feature>` (which validates the artifact, writes `docs/agents-v0/requirements/<feature>.phase-result.md`, and sets `awaiting_approval`). After the user approves in their external terminal (`sh .agents-v0/scripts/guard-common.sh approve intake <feature>`) and authorises the branch in its own turn, the main session runs `sh .agents-v0/scripts/guard-intake.sh commit <feature>` (`/v0-intake`). Do not start Design. Do not create a worktree before approval.
 
 Scenario shape:
 

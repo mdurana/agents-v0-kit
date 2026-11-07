@@ -269,7 +269,7 @@ PYEM
       not-awaiting-approval)
         if [ -f "$glr_state" ]; then
           [ "$(gc_state_get "$glr_state" activeStatus)" != awaiting_approval ] \
-            || gc_refuse "$glr_step" "local-release for '$glr_feature' is awaiting Sensei's approval; run sh .agents-v0/scripts/guard-common.sh approve local-release $glr_feature in your external terminal"
+            || gc_refuse "$glr_step" "local-release for '$glr_feature' is awaiting approval; run sh .agents-v0/scripts/guard-common.sh approve local-release $glr_feature in your external terminal"
         fi
         ;;
       in-progress)
@@ -821,11 +821,11 @@ with open(p, "w", encoding="utf-8") as fh:
     fh.write("\n")
 PY
 
-  gc_ok ready "local-release for '$glr_feature' is awaiting Sensei's approval"
-  printf 'Stop here. Present the release readiness summary and every P-<n> in %s to Sensei.\n' "$glr_result"
-  printf 'Sensei approves from an external terminal with:\n'
+  gc_ok ready "local-release for '$glr_feature' is awaiting approval"
+  printf 'Stop here. Present the release readiness summary and every P-<n> in %s to the user.\n' "$glr_result"
+  printf 'The user approves from an external terminal with:\n'
   printf '  sh .agents-v0/scripts/guard-common.sh approve local-release %s\n' "$glr_feature"
-  printf 'Wait for Sensei to reply in chat before running: %s commit %s\n' "$G" "$glr_feature"
+  printf 'Wait for the user to reply in chat before running: %s commit %s\n' "$G" "$glr_feature"
 }
 
 # Design: DLR5 (/v0-local-release two-step commit: story-branch release prep commit + integration branch squash/no-ff merge, lesson decisions, --approve release, and check-release-evidence.sh).
@@ -853,7 +853,7 @@ glr_commit() {
   [ -f "$glr_state" ] || gc_refuse commit "state file '$glr_state' is missing"
   glr_check_prereqs commit "git-work-tree kit-installed feature-branch pack-configured not-released"
 
-  # 1. Verify Sensei's external approval record for local-release <feature>
+  # 1. Verify the user's external approval record for local-release <feature>
   if ! glr_ok_msg="$(gc_approval_ok local-release "$glr_feature")"; then
     gc_refuse commit "$glr_ok_msg"
   fi
@@ -984,7 +984,7 @@ PYST
       gc_refuse commit "sync-feature-state.sh --approve release failed: $glr_sync_out"
     fi
 
-    # 2. Apply Sensei's lesson decisions from approval words to phase-result and docs/agents-v0/lessons.md
+    # 2. Apply the user's lesson decisions from approval words to phase-result and docs/agents-v0/lessons.md
     GLR_RES="$glr_result" GLR_WORDS="$glr_words" GLR_SLUG="$glr_feature" GLR_HERE="$GC_HERE" python3 - <<'PYLES'
 import datetime, os, re, subprocess, sys
 from pathlib import Path
@@ -1122,7 +1122,7 @@ art = Path(os.environ["GLR_ART"])
 if not art.is_file():
     raise SystemExit(0)
 rec = json.load(open(os.environ["GLR_APP_FILE"], encoding="utf-8"))
-approver = rec.get("approver") or "sensei"
+approver = rec.get("approver") or "user"
 date_str = (rec.get("approvedAt") or datetime.date.today().isoformat())[:10]
 txt = art.read_text(encoding="utf-8")
 if re.search(r"(?im)^\|\s*Release\s*\|", txt):
@@ -1177,14 +1177,14 @@ PYART
 # Design: DLR6 (/v0-local-release generated steps block).
 glr_steps() {
   cat <<'EOF'
-1. Run `sh .agents-v0/scripts/guard-local-release.sh check <feature> [--maintain]`. It validates the `<feature>` slug, blocks `p0-a*` (redirecting to `/v0-scaffold`), verifies the current checkout is the `feature/<feature>` worktree (or `maintain/<id>` for a maintenance note), checks `docs/agents-v0/project-profile.md` Pack configuration, confirms the story is not already released, and verifies `verify` is approved with `"verifyPassed": true`, Sensei's external `verify` approval record, and committed Verify gate (or `tier: "emergency"` maintenance note with rollback plan and `Follow-up verify due`). When it prints `REFUSED`, show its message and stop.
+1. Run `sh .agents-v0/scripts/guard-local-release.sh check <feature> [--maintain]`. It validates the `<feature>` slug, blocks `p0-a*` (redirecting to `/v0-scaffold`), verifies the current checkout is the `feature/<feature>` worktree (or `maintain/<id>` for a maintenance note), checks `docs/agents-v0/project-profile.md` Pack configuration, confirms the story is not already released, and verifies `verify` is approved with `"verifyPassed": true`, the user's external `verify` approval record, and committed Verify gate (or `tier: "emergency"` maintenance note with rollback plan and `Follow-up verify due`). When it prints `REFUSED`, show its message and stop.
 2. Run `sh .agents-v0/scripts/guard-local-release.sh start <feature> [--maintain]`. It checks for post-Verify non-doc drift: if any file outside `docs/`, `README.md`, `CHANGELOG.md`, or `.gitignore` changed since the Verify gate commit, `start` automatically reopens `verify` (`verifyPassed: false`), increments `reopenCount`, and exits with `REFUSED start: BOUNCED` routing back to `/v0-verify <feature>`. Otherwise it creates `docs/agents-v0/release/<feature>/` and sets `activePhase: "release"`, `activeStatus: "in_progress"`.
 3. Execute the release preparation and final native stack check in the main session with the shell-less `release-manager` subagent (skill: `local-release`):
    - **Changelog & Final Native Stack Check (main session):** When the profile uses a changelog, run `sh .agents-v0/scripts/release-notes.sh docs/agents-v0/requirements/<feature>.md --include-unreleased --insert CHANGELOG.md`. Resolve the final verify command with `sh .agents-v0/scripts/run-backend-verify.sh "Backend verify"` and/or `"Frontend verify"`, execute the printed command into `docs/agents-v0/release/<feature>/release-output.txt`, and run `sh .agents-v0/scripts/check-tests-ran.sh docs/agents-v0/release/<feature>/release-output.txt` after Maven output. If the tree is not green, run `sh .agents-v0/scripts/guard-local-release.sh block <feature> "<plain reason>"` and stop.
    - **Docs Sync & Proposed Lessons (`release-manager`, no shell):** Launch shell-less `release-manager` to sync `README.md` or sequence diagrams (`docs/agents-v0/diagrams/`) when user-facing setup or flows changed, add at most 3 `### release` candidates under `## Lessons` in `docs/agents-v0/requirements/<feature>.phase-result.md` (or `docs/agents-v0/maintain/<id>/phase-result.md`), and collect every candidate across `## Lessons` into `## Proposed lessons` as `- P-<n> · pending · <phase> · Trigger: … · What happened: … · Do instead: … · Scope: …` (or `- none`), dropping exact duplicates of active entries in `docs/agents-v0/lessons.md`. A story branch never edits `docs/agents-v0/lessons.md`.
 4. Run `sh .agents-v0/scripts/guard-local-release.sh ready <feature> [--maintain]`. It verifies `docs/agents-v0/release/<feature>/release-output.txt` is non-empty and green, re-checks post-Verify non-doc drift, runs `sh .agents-v0/scripts/check-lessons.sh --unchanged-since <integration-ref> --phase-result <phase-result>` before and after normalizing `## Proposed lessons`, scans for secrets, and sets `activePhase: "release"`, `activeStatus: "awaiting_approval"`.
-5. Stop. Present the release readiness summary and every `P-<n>` in `## Proposed lessons` to Sensei and wait for explicit approval (asking Sensei to accept or reject each `P-<n>`; any `P-<n>` not explicitly accepted is marked `rejected`). Next: Sensei reviews the release summary and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release <feature>. Never run approve yourself; the agent cannot approve this gate.
-6. After Sensei runs approve in his own terminal, run `sh .agents-v0/scripts/guard-local-release.sh commit <feature> [--maintain]`. It verifies Sensei's external approval record, commits the release preparation (`"<story>: release approved"`) on `feature/<feature>` (or `maintain/<id>`), switches to the integration worktree resolved by `sh .agents-v0/scripts/resolve-integration-branch.sh`, runs `git merge --squash feature/<feature>` (or `git merge --no-ff --no-commit maintain/<id>`), marks each `P-<n>` `accepted` or `rejected` from Sensei's verbatim approval words, appends accepted entries to `docs/agents-v0/lessons.md` using `check-lessons.sh --next-id`, validates with `check-lessons.sh --decided` and `check-lessons.sh --phase-result <phase-result> --approval-text '<Sensei words>'`, records the `Release` approval on the integration branch, commits the single squash commit (`"<story>: release approved (squash-merge of feature/<feature>)"` with `Story-Branch: feature/<feature>` and `Story-Tip: <tip>` trailers), and runs `sh .agents-v0/scripts/check-release-evidence.sh docs/agents-v0/requirements/<feature>.md`.
+5. Stop. Present the release readiness summary and every `P-<n>` in `## Proposed lessons` to the user and wait for explicit approval (asking the user to accept or reject each `P-<n>`; any `P-<n>` not explicitly accepted is marked `rejected`). Next: The user reviews the release summary and runs, in their own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve local-release <feature>. Never run approve yourself; the agent cannot approve this gate.
+6. After the user runs approve in their own terminal, run `sh .agents-v0/scripts/guard-local-release.sh commit <feature> [--maintain]`. It verifies the user's external approval record, commits the release preparation (`"<story>: release approved"`) on `feature/<feature>` (or `maintain/<id>`), switches to the integration worktree resolved by `sh .agents-v0/scripts/resolve-integration-branch.sh`, runs `git merge --squash feature/<feature>` (or `git merge --no-ff --no-commit maintain/<id>`), marks each `P-<n>` `accepted` or `rejected` from the user's verbatim approval words, appends accepted entries to `docs/agents-v0/lessons.md` using `check-lessons.sh --next-id`, validates with `check-lessons.sh --decided` and `check-lessons.sh --phase-result <phase-result> --approval-text '<approval words>'`, records the `Release` approval on the integration branch, commits the single squash commit (`"<story>: release approved (squash-merge of feature/<feature>)"` with `Story-Branch: feature/<feature>` and `Story-Tip: <tip>` trailers), and runs `sh .agents-v0/scripts/check-release-evidence.sh docs/agents-v0/requirements/<feature>.md`.
 7. <!-- kitfix-20261031-keep-branches --> <!-- kitfix-20261029-step4-p1e --> Keep `feature/<feature>` and `maintain/<id>` branches after release (never delete or rename them, and never commit or modify state on the story branch after merge). List every commit made in this turn (short SHA, branch, subject) across both worktrees. When `docs/agents-v0/project-profile.md` defines a **Deploy** table, follow `release-deploy` (one explicit authorization per environment, a smoke check, and a rollback command).
 EOF
 }

@@ -21,7 +21,7 @@ block="$(sed -n '/^<!-- BEGIN generated:/,/^<!-- END generated -->$/p' "$DOC" | 
 for s in start block ready commit; do
   printf '%s' "$block" | grep -qF "sh .agents-v0/scripts/guard-onboard.sh $s"; check $? "block: names guard-onboard.sh $s"
 done
-printf '%s' "$block" | grep -qF 'guard-common.sh approve onboard'; check $? "block: names Sensei's approve step"
+printf '%s' "$block" | grep -qF 'guard-common.sh approve onboard'; check $? "block: names the user's approve step"
 bfblock="$(sed -n '/^<!-- BEGIN generated:/,/^<!-- END generated -->$/p' "$BF" | sed '1d;$d')"
 [ -n "$steps" ] && [ "$bfblock" = "$steps" ]; check $? "brownfield-onboarding.md (D7): the user doc lists the same steps as the guard"
 

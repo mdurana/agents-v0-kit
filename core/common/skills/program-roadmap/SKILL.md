@@ -14,7 +14,7 @@ Roadmap playbook for the `roadmap-planner` agent (`workflow-orchestration.mdc` P
 4. Write `docs/agents-v0/roadmap/<program>.md` using `docs/agents-v0/roadmap/_template.md`. Set `Discovery:` to the path the user gave and its sha256 checksum (`Discovery: <path> (sha256: <hash>)`). Copy Problem, Success metric, Chosen option, and Out of scope as facts. Leave the `Delivery approvals` table without an `Approved` row. When the discovery file has a line `Stack preference:`, copy that line onto the roadmap as written. Do not activate a pack from it.
 5. Place each In scope item in exactly one of Now, Next, or Later. The item text is copied verbatim. Do not invent a theme. Do not move an Out of scope item into a horizon.
 6. Verify the roadmap content gate before reporting done: every required heading is filled, `Discovery:` has the sha256 checksum, and every In scope item belongs to one horizon.
-7. Return completion to the main session. The main session records the phase result and sets the state to awaiting_approval. Do not run any commands or attempt self-approval. Sensei reviews the sequence and approves externally in his own terminal outside Cursor.
+7. Return completion to the main session. The main session records the phase result and sets the state to awaiting_approval. Do not run any commands or attempt self-approval. The user reviews the sequence and approves externally in his own terminal outside Cursor.
 
 8. Do not write milestone stories, acceptance criteria, or an ARC record in this skill. `/v0-architecture` writes the ARC record. `/v0-plan` writes the stories. `/v0-intake` writes the Gherkin. `/v0-design` writes the feature contract.
 
