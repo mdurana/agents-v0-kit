@@ -331,3 +331,24 @@ triage ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and d
 triage commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.gradle build.gradle.kts package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
 triage commit.message maintain/<feature>: maintain approved
 triage approved.next /v0-verify <feature> --maintain
+
+# --- export (/v0-export, guard-export.sh) -------------------------------------------------------
+export phase export
+export params docs/agents-v0/backlog/export-params.md
+export sources docs/agents-v0/backlog/tickets-sources.md
+export output docs/agents-v0/backlog/tickets.csv
+export check.requires git-work-tree kit-installed export-params-valid approved-plan-manifest
+export verify.requires tickets-sources-valid tickets-csv-header-valid cited-sources-approved read-only-outside-backlog
+export commit.paths docs/agents-v0/backlog/export-params.md docs/agents-v0/backlog/tickets-sources.md docs/agents-v0/backlog/tickets.csv
+export commit.message v0(export): regenerate tickets.csv
+
+# --- deck (/v0-deck, guard-deck.sh) -------------------------------------------------------------
+deck phase deck
+deck template docs/agents-v0/presentations/_params.md
+deck output docs/agents-v0/presentations/<stem>.md
+deck params docs/agents-v0/presentations/<stem>.params.md
+deck check.requires git-work-tree kit-installed valid-kind valid-audience non-empty-decision approved-sources
+deck verify.requires deck-exists params-valid cited-sources-approved read-only-outside-presentations
+deck commit.paths docs/agents-v0/presentations/<stem>.md docs/agents-v0/presentations/<stem>.params.md
+deck commit.message v0(deck): write <stem> briefing
+

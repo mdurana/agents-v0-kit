@@ -16,9 +16,9 @@ case "$branch" in
   *) exit 0 ;;
 esac
 all="$(grep -c '^Design:' "$msg" || true)"
-good="$(grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA|DA[0-9]+|DAA|DP[0-9]+|DPA|DS[0-9]+|DSA|DI[0-9]+|DIA|DD[0-9]+|DDA|DB[0-9]+|DBA|DV[0-9]+|DVA|DLR[0-9]+|DLRA|DM[0-9]+|DMA|DDL[0-9]+|DDLA|DST[0-9]+|DSTA)$' "$msg" || true)"
+good="$(grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA|DA[0-9]+|DAA|DP[0-9]+|DPA|DS[0-9]+|DSA|DI[0-9]+|DIA|DD[0-9]+|DDA|DB[0-9]+|DBA|DV[0-9]+|DVA|DLR[0-9]+|DLRA|DM[0-9]+|DMA|DDL[0-9]+|DDLA|DST[0-9]+|DSTA|DEX[0-9]+|DEXA)$' "$msg" || true)"
 if [ "$all" != 1 ] || [ "$good" != 1 ]; then
-  printf 'commit-msg: a commit on %s needs exactly one line `Design: D<n>` (or `Design: DA`, `Design: DR<n>`, `Design: DRA`, `Design: DA<n>`, `Design: DAA`, `Design: DP<n>`, `Design: DPA`, `Design: DS<n>`, `Design: DSA`, `Design: DI<n>`, `Design: DIA`, `Design: DD<n>`, `Design: DDA`, `Design: DB<n>`, `Design: DBA`, `Design: DV<n>`, `Design: DVA`, `Design: DLR<n>`, `Design: DLRA`, `Design: DM<n>`, `Design: DMA`, `Design: DDL<n>`, `Design: DDLA`, `Design: DST<n>`, `Design: DSTA`); found %s Design: line(s), %s well-formed.\n' "$branch" "$all" "$good" >&2
+  printf 'commit-msg: a commit on %s needs exactly one line `Design: D<n>` (or `Design: DA`, `Design: DR<n>`, `Design: DRA`, `Design: DA<n>`, `Design: DAA`, `Design: DP<n>`, `Design: DPA`, `Design: DS<n>`, `Design: DSA`, `Design: DI<n>`, `Design: DIA`, `Design: DD<n>`, `Design: DDA`, `Design: DB<n>`, `Design: DBA`, `Design: DV<n>`, `Design: DVA`, `Design: DLR<n>`, `Design: DLRA`, `Design: DM<n>`, `Design: DMA`, `Design: DDL<n>`, `Design: DDLA`, `Design: DST<n>`, `Design: DSTA`, `Design: DEX<n>`, `Design: DEXA`); found %s Design: line(s), %s well-formed.\n' "$branch" "$all" "$good" >&2
   exit 1
 fi
 
