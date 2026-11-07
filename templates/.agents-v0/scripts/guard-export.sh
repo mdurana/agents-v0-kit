@@ -162,49 +162,21 @@ ge_verify() {
   ge_exp_hdr="Issue Type,Parent ID,Summary,Description,Acceptance Criteria,Priority,Story ID,Surface,Size,Milestone,Feature artifact"
   [ "$ge_hdr" = "$ge_exp_hdr" ] || gc_refuse verify "docs/agents-v0/backlog/tickets.csv header must be exactly '$ge_exp_hdr' with no preamble (got '$ge_hdr')"
 
-  ge_vout="$(python3 - <<'PY'
+  ge_chk_json="$(ge_check | tail -n 1)" || exit 1
+  ge_ro_out="$(gc_readonly_outside docs/agents-v0/backlog)" || gc_refuse verify "/v0-export is read-only outside docs/agents-v0/backlog/; modified or untracked paths found: $ge_ro_out"
+
+  ge_vout="$(python3 - "$ge_chk_json" <<'PY'
+import csv
 import json
 import os
 import re
-import subprocess
 import sys
 
-def is_approved_source(path):
-    if path == "docs/agents-v0/backlog/export-params.md":
-        return os.path.isfile(path)
-    prog_state = "docs/agents-v0/program.state.json"
-    if path.startswith("docs/agents-v0/milestones/") and path.endswith(".md"):
-        if os.path.isfile(prog_state):
-            try:
-                st = json.load(open(prog_state, encoding="utf-8"))
-                if "plan" in (st.get("approvedPhases") or []):
-                    return True
-            except Exception:
-                pass
-        if os.path.isfile(path):
-            txt = open(path, encoding="utf-8").read()
-            for line in txt.splitlines():
-                if "|" in line and "plan" in line.lower() and "approved" in line.lower():
-                    return True
-        return False
-    m = re.match(r"^docs/agents-v0/requirements/([A-Za-z0-9._-]+)\.md$", path)
-    if m:
-        slug = m.group(1)
-        st_path = f"docs/agents-v0/requirements/{slug}.state.json"
-        if os.path.isfile(st_path):
-            try:
-                st = json.load(open(st_path, encoding="utf-8"))
-                if "intake" in (st.get("approvedPhases") or []):
-                    return True
-            except Exception:
-                pass
-        if os.path.isfile(path):
-            txt = open(path, encoding="utf-8").read()
-            for line in txt.splitlines():
-                if "|" in line and "intake" in line.lower() and "approved" in line.lower():
-                    return True
-        return False
-    return False
+payload = json.loads(sys.argv[1])
+expected_issue_type = payload["issueType"]
+approved_manifests = {m["path"] for m in payload.get("approvedManifests") or []}
+approved_reqs = {r["path"] for r in payload.get("approvedRequirements") or []}
+allowed_sources = {"docs/agents-v0/backlog/export-params.md"} | approved_manifests | approved_reqs
 
 src_txt = open("docs/agents-v0/backlog/tickets-sources.md", encoding="utf-8").read()
 cited = set(re.findall(r"(docs/agents-v0/[A-Za-z0-9._/-]+\.md)", src_txt))
@@ -214,27 +186,30 @@ if not cited:
     sys.exit(1)
 
 for p in sorted(cited):
-    if not is_approved_source(p):
+    if p not in allowed_sources:
         print(f"REFUSED:docs/agents-v0/backlog/tickets-sources.md cites unapproved or disallowed source '{p}'")
         sys.exit(1)
 
-st = subprocess.run(["git", "status", "--porcelain", "-uall"], capture_output=True, text=True, check=True)
-outside = []
-for line in st.stdout.splitlines():
-    if not line.strip():
-        continue
-    raw = line[3:].strip()
-    if " -> " in raw:
-        raw = raw.split(" -> ", 1)[1].strip()
-    raw = raw.strip('"')
-    if raw.endswith(".lock"):
-        continue
-    if not raw.startswith("docs/agents-v0/backlog/"):
-        outside.append(raw)
+with open("docs/agents-v0/backlog/tickets.csv", encoding="utf-8", newline="") as fh:
+    reader = csv.reader(fh)
+    rows = list(reader)
 
-if outside:
-    print("REFUSED:/v0-export is read-only outside docs/agents-v0/backlog/; modified or untracked paths found: " + ", ".join(outside))
-    sys.exit(1)
+for idx, row in enumerate(rows[1:], start=2):
+    if not any(c.strip() for c in row):
+        continue
+    if len(row) != 11:
+        print(f"REFUSED:docs/agents-v0/backlog/tickets.csv row {idx} has {len(row)} columns (expected 11)")
+        sys.exit(1)
+    issue_type, _parent, _summary, _desc, ac, _prio, _story, _surface, _size, milestone, feat_art = [c.strip() for c in row]
+    if issue_type != expected_issue_type:
+        print(f"REFUSED:docs/agents-v0/backlog/tickets.csv row {idx} Issue Type '{issue_type}' does not match confirmed Issue type '{expected_issue_type}'")
+        sys.exit(1)
+    if milestone and milestone not in approved_manifests:
+        print(f"REFUSED:docs/agents-v0/backlog/tickets.csv row {idx} Milestone '{milestone}' is not an approved plan manifest")
+        sys.exit(1)
+    if ("Given " in ac or "Scenario:" in ac or "AC-" in ac) and feat_art not in approved_reqs:
+        print(f"REFUSED:docs/agents-v0/backlog/tickets.csv row {idx} uses Gherkin acceptance criteria from unapproved feature artifact '{feat_art}'")
+        sys.exit(1)
 
 print("OK:verified")
 PY

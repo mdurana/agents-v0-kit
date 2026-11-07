@@ -346,10 +346,12 @@ gd_verify() {
     gd_chk_json="$(gd_check "$gd_kind" "$gd_paud" "$gd_pdec" | tail -n 1)" || exit 1
   fi
 
+  [ -s "$gd_deck" ] || gc_refuse verify "$gd_deck is empty"
+  gd_ro_out="$(gc_readonly_outside docs/agents-v0/presentations)" || gc_refuse verify "/v0-deck is read-only outside docs/agents-v0/presentations/; modified or untracked paths found: $gd_ro_out"
+
   gd_vout="$(python3 - "$gd_params" "$gd_chk_json" <<'PY'
 import json
 import re
-import subprocess
 import sys
 
 params_path, chk_json = sys.argv[1:3]
@@ -369,24 +371,6 @@ for p in sorted(cited):
     if p not in allowed:
         print(f"REFUSED:{params_path} cites unapproved or disallowed source '{p}'")
         sys.exit(1)
-
-st = subprocess.run(["git", "status", "--porcelain", "-uall"], capture_output=True, text=True, check=True)
-outside = []
-for line in st.stdout.splitlines():
-    if not line.strip():
-        continue
-    raw = line[3:].strip()
-    if " -> " in raw:
-        raw = raw.split(" -> ", 1)[1].strip()
-    raw = raw.strip('"')
-    if raw.endswith(".lock"):
-        continue
-    if not raw.startswith("docs/agents-v0/presentations/"):
-        outside.append(raw)
-
-if outside:
-    print("REFUSED:/v0-deck is read-only outside docs/agents-v0/presentations/; modified or untracked paths found: " + ", ".join(outside))
-    sys.exit(1)
 
 print("OK:verified")
 PY
