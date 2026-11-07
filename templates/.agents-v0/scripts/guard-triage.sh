@@ -288,10 +288,8 @@ gt_check() {
     esac
   done
 
-  gc_need_git_work_tree check
   gc_to_root check
-  gc_need_kit check
-  gc_need_onboard_if_brownfield check
+  [ -x .agents-v0/scripts/guard-maintain.sh ] || gc_refuse check "missing .agents-v0/scripts/guard-maintain.sh"
 
   if [ -z "$gt_c_slug" ]; then
     gt_check_trivial_diff check "" "HEAD"
@@ -333,10 +331,8 @@ gt_start() {
     esac
   done
 
-  gc_need_git_work_tree start
   gc_to_root start
-  gc_need_kit start
-  gc_need_onboard_if_brownfield start
+  [ -x .agents-v0/scripts/guard-maintain.sh ] || gc_refuse start "missing .agents-v0/scripts/guard-maintain.sh"
   gt_validate_slug start "$gt_s_slug"
   gt_verify_trivial_tier start "$gt_s_slug"
   gt_check_trivial_diff start "$gt_s_slug" "HEAD"
@@ -376,9 +372,8 @@ gt_block() {
   gt_b_slug="${1:-}"
   shift || true
   gt_b_reason="${*:-}"
-  gc_need_git_work_tree block
   gc_to_root block
-  gc_need_kit block
+  [ -x .agents-v0/scripts/guard-maintain.sh ] || gc_refuse block "missing .agents-v0/scripts/guard-maintain.sh"
   gt_validate_slug block "$gt_b_slug"
   [ -n "$(printf '%s' "$gt_b_reason" | tr -d '[:space:]')" ] || gc_refuse block "missing block reason"
   gt_verify_trivial_tier block "$gt_b_slug"
@@ -407,9 +402,8 @@ PY
 gt_ready() {
   [ $# -eq 1 ] || gt_usage
   gt_r_slug="$1"
-  gc_need_git_work_tree ready
   gc_to_root ready
-  gc_need_kit ready
+  [ -x .agents-v0/scripts/guard-maintain.sh ] || gc_refuse ready "missing .agents-v0/scripts/guard-maintain.sh"
   gt_validate_slug ready "$gt_r_slug"
   gt_verify_trivial_tier ready "$gt_r_slug"
 
@@ -442,9 +436,8 @@ PY
 gt_commit() {
   [ $# -eq 1 ] || gt_usage
   gt_m_slug="$1"
-  gc_need_git_work_tree commit
   gc_to_root commit
-  gc_need_kit commit
+  [ -x .agents-v0/scripts/guard-maintain.sh ] || gc_refuse commit "missing .agents-v0/scripts/guard-maintain.sh"
   gt_validate_slug commit "$gt_m_slug"
   gt_verify_trivial_tier commit "$gt_m_slug"
 

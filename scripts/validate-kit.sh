@@ -479,6 +479,25 @@ for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh
     err "core/common/commands/v0-deliver.md names the internal '$internal' (the guard runs it; keep the prose to guard-deliver.sh steps)"
   fi
 done
+# Triage & Status redo, Design: DST8. Drift check A: the /v0-triage and /v0-status step blocks match `guard-triage.sh steps` and `stories-status.sh steps` byte for byte.
+sh scripts/generate-triage-steps.sh --check >/dev/null || err "core/common/commands/v0-triage.md step block drifted from guard-triage.sh steps (run sh scripts/generate-triage-steps.sh)"
+sh scripts/generate-status-steps.sh --check >/dev/null || err "core/common/commands/v0-status.md step block drifted from stories-status.sh steps (run sh scripts/generate-status-steps.sh)"
+[ -f scripts/test-triage-steps.sh ] || err "scripts/test-triage-steps.sh missing"
+sh scripts/test-triage-steps.sh >/dev/null || err "scripts/test-triage-steps.sh failed"
+[ -f scripts/test-status-steps.sh ] || err "scripts/test-status-steps.sh missing"
+sh scripts/test-status-steps.sh >/dev/null || err "scripts/test-status-steps.sh failed"
+[ -f scripts/test-guard-triage-status.sh ] || err "scripts/test-guard-triage-status.sh missing"
+sh scripts/test-guard-triage-status.sh >/dev/null || err "scripts/test-guard-triage-status.sh failed"
+# Drift check B: the /v0-triage and /v0-status prose names no internal state writer or git add -A.
+for internal in sync-feature-state.sh check-gate-commit.sh check-traceability.sh check-attempt-budget.sh check-failure-brief.sh \
+  secret_scan.py GUARD_COMMON_LIB gc_ 'guard-common.sh scan' 'git add -A'; do
+  if grep -Fq -- "$internal" core/common/commands/v0-triage.md; then
+    err "core/common/commands/v0-triage.md names the internal '$internal' (the guard runs it; keep the prose to guard-triage.sh steps)"
+  fi
+  if grep -Fq -- "$internal" core/common/commands/v0-status.md; then
+    err "core/common/commands/v0-status.md names the internal '$internal' (keep the prose to stories-status.sh steps)"
+  fi
+done
 
 # Design: line check: every commit on the onboard redo line (after its base 36b86cfe) names exactly one design line.
 # Same rule as the kit's commit-msg hook (scripts/hooks/commit-msg). Skipped where the base is not in history.
@@ -509,7 +528,7 @@ grep -Fq 'check-gate-commit.sh' templates/.agents-v0/scripts/sync-feature-state.
 grep -Fq 'check-traceability.sh' templates/.agents-v0/scripts/sync-feature-state.sh || err "sync-feature-state must run check-traceability.sh at design/build/verify approval"
 grep -Fq 'Story-Branch' templates/.agents-v0/scripts/check-release-evidence.sh || err "check-release-evidence must accept a squash release (Story-Branch trailer)"
 grep -Fq 'already squash-merged' templates/.agents-v0/scripts/feature-worktree.sh || err "feature-worktree must refuse a squash-released branch"
-for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-maintain v0-deliver v0-roadmap v0-architecture v0-plan v0-onboard v0-scaffold; do
+for c in v0-intake v0-design v0-build v0-verify v0-local-release v0-maintain v0-triage v0-deliver v0-roadmap v0-architecture v0-plan v0-onboard v0-scaffold; do
   grep -Fq 'kitfix-20261031-gate-commit' "core/common/commands/$c.md" || err "$c.md must state the gate commit (kitfix-20261031-gate-commit)"
 done
 for c in v0-design v0-build v0-verify; do
@@ -536,7 +555,7 @@ sh scripts/test-memory.sh || err "scripts/test-memory.sh failed"
 grep -Fq 'stories-status.sh' core/common/commands/v0-status.md || err "/v0-status does not use stories-status.sh"
 grep -Fq 'check-lessons.sh' core/common/commands/v0-local-release.md || err "/v0-local-release does not run check-lessons.sh"
 grep -Fq '## Proposed lessons' core/common/skills/local-release/SKILL.md || err "local-release does not collect Proposed lessons"
-for c in plan scaffold intake design build verify maintain deliver; do
+for c in plan scaffold intake design build verify maintain triage deliver; do
   grep -Fq 'docs/agents-v0/lessons.md' "core/common/commands/v0-$c.md" || err "/v0-$c does not read docs/agents-v0/lessons.md"
 done
 for s in stories-status.sh check-lessons.sh; do
