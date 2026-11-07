@@ -57,8 +57,8 @@ Phase commands use a **`/v0-` prefix** (for example `/v0-plan`, `/v0-build`) so 
 | `/v0-plan`     | After that architecture decision is approved: milestones, ordered stories, and `docs/agents-v0/milestones/plan.md` (the milestone table and story flowchart) before any `/v0-intake`. |
 | `/v0-scaffold` | Greenfield platform skeleton (`P0-A`) on the integration branch before feature intake. |
 | `/v0-intake`   | Turn one idea or ticket into clear requirements. Each acceptance criterion is a Given / When / Then. One is a failure case, unless the story has no security trigger and no failure behavior. |
-| `/v0-export`   | Optional. Regenerates a Jira spreadsheet from the approved stories. It does not change the plan. |
-| `/v0-deck`     | Optional. Writes a briefing from one approved story (`intake`), or from the approved roadmap and plan (`product` or `delivery`). You say who the audience is and what the meeting must decide. |
+| `/v0-export`   | Optional (`guard-export.sh`). Regenerates a Jira spreadsheet (`tickets.csv` + `tickets-sources.md`) from the approved stories. It does not change the plan. |
+| `/v0-deck`     | Optional (`guard-deck.sh`). Writes a briefing (`<name>.md` + `<name>.params.md`) from one approved story (`intake`), or from the approved roadmap and plan (`product` or `delivery`). You say who the audience is and what the meeting must decide. |
 | `/v0-design`   | After intake is approved, when the story has an API, messages between systems, screens, or a public route. A story with none of those locks the design and continues, unless it adds a service, a datastore, a security boundary, or a breaking API — that one still stops for an architecture decision. |
 | `/v0-build`    | After design is approved, or after a no-contract design is locked. |
 | `/v0-verify`   | After build is approved — automated tests and security review. |

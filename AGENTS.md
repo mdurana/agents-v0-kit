@@ -23,8 +23,8 @@ Build and maintain enterprise-grade systems — one backend pack the program nam
 | Maintain | `/v0-maintain` | maintenance-engineer | bugfix-triage, dependency-upgrade, doc-sync, characterization-tests, migration-safety | `docs/agents-v0/maintain/<id>/note.md` & `state.json`; routes to Verify |
 | Trivial fixes | `/v0-triage` | maintenance-engineer | doc-sync, dependency-upgrade | Guarded by `guard-triage.sh` (`tier: "trivial"`, `approve triage <id>`); abbreviated Verify |
 | Deliver (one story) | `/v0-deliver` | orchestrator | — | Dispatches each phase command via `guard-deliver.sh` across worktrees, stopping at every human gate (`P0-A` runs via `/v0-scaffold`) |
-| Export (on request) | `/v0-export` | — | jira-export | `docs/agents-v0/backlog/tickets.csv` (documentation only, approves nothing) |
-| Briefing (on request) | `/v0-deck` | — | leadership-deck | `docs/agents-v0/presentations/<name>.md` (documentation only, approves nothing) |
+| Export (on request) | `/v0-export` | docs-author | jira-export | Guarded by `guard-export.sh`; writes `docs/agents-v0/backlog/tickets.csv` & `tickets-sources.md` (documentation only, approves nothing) |
+| Briefing (on request) | `/v0-deck` | docs-author | leadership-deck | Guarded by `guard-deck.sh`; writes `docs/agents-v0/presentations/<name>.md` & `<name>.params.md` (documentation only, approves nothing) |
 | Resume | `/v0-status` | orchestrator | — | Read-only status + deterministic `nextCommand` across worktrees via `.agents-v0/scripts/stories-status.sh [--story <slug>]` |
 
 <!-- MEM-01/MEM-03: /v0-status reads every worktree through stories-status.sh; accepted cross-story lessons live in docs/agents-v0/lessons.md (workflow-orchestration.mdc Lessons Memory). -->

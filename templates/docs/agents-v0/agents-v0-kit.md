@@ -80,8 +80,8 @@ A standard story follows the solid path: **Intake → Design → Build → Verif
 | `/v0-maintain` | Bugfix, CVE, upgrade, refactor, doc sync | `docs/agents-v0/maintain/<id>/note.md`, `docs/agents-v0/maintain/<id>/state.json` |
 | `/v0-triage` | User-confirmed trivial doc/version fix | `docs/agents-v0/maintain/<id>/note.md` (`tier: "trivial"` in `state.json`) |
 | `/v0-deliver` | Dispatches one story across phases via `guard-deliver.sh`, stopping at each gate for external TTY approval | Delegates to phase guards across worktrees; updates `<feature>.state.json` and `<feature>.phase-result.md` |
-| `/v0-export` | On-demand Jira CSV export | `docs/agents-v0/backlog/tickets.csv` |
-| `/v0-deck` | On-demand executive briefing deck | `docs/agents-v0/presentations/<name>.md` |
+| `/v0-export` | On-demand Jira CSV export (`guard-export.sh` + `docs-author`) | `docs/agents-v0/backlog/tickets.csv`, `tickets-sources.md` |
+| `/v0-deck` | On-demand executive briefing deck (`guard-deck.sh` + `docs-author`) | `docs/agents-v0/presentations/<name>.md`, `<name>.params.md` |
 | `/v0-status` | Inspect current phase and next action | Read-only status summary |
 
 ## State and Approvals (`state.json`)

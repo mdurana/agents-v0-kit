@@ -23,7 +23,7 @@ flowchart LR
   maintain[Maintain] --> verify
 ```
 
-Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`), then **Scaffold** (`/v0-scaffold`) for greenfield platform skeleton. A single story starts at Intake. `/v0-export` and `/v0-deck` are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
+Phases: **Intake → Design → Build → Verify → Local Release (`/v0-local-release`)**, with **Maintain** feeding into Verify. A new program of more than one story starts with **Roadmap** (`/v0-roadmap`), then **Architecture** (`/v0-architecture`), then **Plan** (`/v0-plan`), then **Scaffold** (`/v0-scaffold`) for greenfield platform skeleton. A single story starts at Intake. `/v0-export` (`guard-export.sh`) and `/v0-deck` (`guard-deck.sh`) are documentation utilities, not phases. Full map: `docs/agents-v0/agents-v0-kit.md`.
 
 ## State and Phase Resume (`state.json`)
 
