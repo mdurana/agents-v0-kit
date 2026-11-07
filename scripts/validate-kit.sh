@@ -488,8 +488,8 @@ if git rev-parse --git-dir >/dev/null 2>&1 && git cat-file -e "$redo_base^{commi
   && git merge-base --is-ancestor "$redo_base" HEAD 2>/dev/null; then
   for c in $(git rev-list --no-merges "$redo_base..HEAD"); do
     dl_all="$(git log -1 --format=%B "$c" | grep -c '^Design:' || true)"
-    dl_good="$(git log -1 --format=%B "$c" | grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA|DA[0-9]+|DAA|DP[0-9]+|DPA|DS[0-9]+|DSA|DI[0-9]+|DIA|DD[0-9]+|DDA|DB[0-9]+|DBA|DV[0-9]+|DVA|DLR[0-9]+|DLRA|DM[0-9]+|DMA|DDL[0-9]+|DDLA)$' || true)"
-    [ "$dl_all" = 1 ] && [ "$dl_good" = 1 ] || err "commit $(git rev-parse --short "$c") needs exactly one line 'Design: D<n>' (or DA, DR<n>, DRA, DA<n>, DAA, DP<n>, DPA, DS<n>, DSA, DI<n>, DIA, DD<n>, DDA, DB<n>, DBA, DV<n>, DVA, DLR<n>, DLRA, DM<n>, DMA, DDL<n>, DDLA); found $dl_all, $dl_good well-formed"
+    dl_good="$(git log -1 --format=%B "$c" | grep -Ec '^Design: (D[0-9]+|DA|DR[0-9]+|DRA|DA[0-9]+|DAA|DP[0-9]+|DPA|DS[0-9]+|DSA|DI[0-9]+|DIA|DD[0-9]+|DDA|DB[0-9]+|DBA|DV[0-9]+|DVA|DLR[0-9]+|DLRA|DM[0-9]+|DMA|DDL[0-9]+|DDLA|DST[0-9]+|DSTA)$' || true)"
+    [ "$dl_all" = 1 ] && [ "$dl_good" = 1 ] || err "commit $(git rev-parse --short "$c") needs exactly one line 'Design: D<n>' (or DA, DR<n>, DRA, DA<n>, DAA, DP<n>, DPA, DS<n>, DSA, DI<n>, DIA, DD<n>, DDA, DB<n>, DBA, DV<n>, DVA, DLR<n>, DLRA, DM<n>, DMA, DDL<n>, DDLA, DST<n>, DSTA); found $dl_all, $dl_good well-formed"
   done
 
 else

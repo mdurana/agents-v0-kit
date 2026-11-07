@@ -305,3 +305,29 @@ deliver ready.next Sensei reviews the phase deliverables and runs, in his own te
 deliver commit.paths docs/agents-v0/requirements/<feature>.md docs/agents-v0/requirements/<feature>.state.json docs/agents-v0/requirements/<feature>.phase-result.md
 deliver commit.message <story>: phase approved
 deliver approved.next /v0-deliver <feature>
+
+# --- triage (/v0-triage, guard-triage.sh) -------------------------------------------------------
+triage phase maintain
+triage feature <feature>
+triage state docs/agents-v0/maintain/<feature>/state.json
+triage artifact docs/agents-v0/maintain/<feature>/note.md
+triage template docs/agents-v0/maintain/_note.template.md
+triage report docs/agents-v0/build/<feature>/build-report.md
+triage output docs/agents-v0/build/<feature>/build-output.txt
+triage result docs/agents-v0/maintain/<feature>/phase-result.md
+# check & start: prerequisites
+triage check.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released not-approved trivial-diff
+triage start.requires git-work-tree kit-installed onboard-if-brownfield no-collision not-released not-awaiting-approval trivial-diff
+triage start.status in_progress
+triage start.next Ask the user to confirm Tier: trivial in chat, record Tier confirmed by in docs/agents-v0/maintain/<feature>/note.md, and launch the shell-less maintenance-engineer subagent (skill: doc-sync for documentation edits or dependency-upgrade for a 1-for-1 patch version bump).
+# block: status and next step
+triage block.status blocked
+triage block.next Resolve the blocker or helper brief, then run /v0-triage <feature> again; it resumes from the files on disk.
+# ready: verifies trivial diff scope (docs-only or 1-for-1 patch version bump, zero contract/schema/code changes) and delegates to guard-maintain.sh ready <feature>
+triage ready.requires in-progress
+triage ready.status awaiting_approval
+triage ready.next Sensei reviews docs/agents-v0/maintain/<feature>/note.md and docs/agents-v0/build/<feature>/build-report.md and runs, in his own terminal outside Cursor: sh .agents-v0/scripts/guard-common.sh approve triage <feature> (or: sh .agents-v0/scripts/guard-common.sh approve maintain <feature>)
+# commit: verifies external approval record and delegates safe-staged commit to guard-maintain.sh commit <feature>
+triage commit.paths app src openapi docs README.md CHANGELOG.md pom.xml build.gradle build.gradle.kts package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt Cargo.toml Cargo.lock go.mod go.sum docs/agents-v0/maintain/<feature> docs/agents-v0/build/<feature>
+triage commit.message maintain/<feature>: maintain approved
+triage approved.next /v0-verify <feature> --maintain
