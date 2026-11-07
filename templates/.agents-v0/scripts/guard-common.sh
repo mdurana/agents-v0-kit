@@ -357,10 +357,29 @@ gc_approve() {
 import datetime, fcntl, hashlib, json, os, pwd, re, sys, tempfile
 out, command, phase, repo, repo_id, common, head, base, words, slug, target_dir, cpaths = sys.argv[1:13]
 
+def normalize_doc(rel: str, raw: bytes) -> bytes:
+    if not rel.endswith(".md"):
+        return raw
+    txt = raw.decode("utf-8", errors="replace")
+    txt = re.sub(r"(?m)^##\s+Delivery approvals[ \t]*$\n?(?:^[ \t]*\|[^\n]*$\n?|[ \t]*$\n?)*", "", txt)
+    if rel.startswith("docs/agents-v0/adr/"):
+        txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status:?(?:\*\*)?:?[ \t]*)Accepted\b[^\n]*$", r"\g<1>Proposed", txt)
+        txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?(?:Deciders|Date):?(?:\*\*)?:?)[^\n]*\n*", r"\g<1>\n", txt)
+    if rel.startswith("docs/agents-v0/design/system/"):
+        txt = txt.replace("(Accepted)", "(Proposed)")
+    if rel == "docs/agents-v0/project-profile.md":
+        txt = re.sub(r"(?m)^(\s*[-*]?\s*(?:\*\*)?Pack(?:\*\*)?:\s*).*$", r"\g<1>", txt)
+        txt = re.sub(r"(?m)^(\|\s*(?:Pack|Language / runtime|Framework|Build / test tool|Verify|Lint|Typecheck|Unit tests|Integration tests|Mutation|Coverage|SAST / SCA|Container build)\s*\|).*$", r"\g<1>", txt)
+    if rel == "docs/agents-v0/milestones/p0-platform-skeleton.md" or rel.startswith("docs/agents-v0/maintain/"):
+        txt = re.sub(r"(?m)^(-\s*status:\s*)(?:planned|in_progress|awaiting_approval|approved|released)\b", r"\g<1>in_progress", txt)
+        txt = re.sub(r"\|\s*(?:planned|in_progress|released)\s*\|", "| planned |", txt)
+    return (txt.rstrip() + "\n").encode("utf-8")
+
 def compute_content_hash(root_dir: str, paths_str: str) -> str:
     skip_re = re.compile(
         r"(?:^|/)(?:state\.json|[^/]+\.state\.json|phase-result\.md|[^/]+\.phase-result\.md|"
         r"[^/]+\.trace\.json|lessons\.md|lessons-archive\.md|CHANGELOG\.md|.*\.lock)$"
+        r"|^(?:\.cursor|\.agents)/"
     )
     rels = set()
     for tok in paths_str.split():
@@ -384,12 +403,7 @@ def compute_content_hash(root_dir: str, paths_str: str) -> str:
             raw = open(fp, "rb").read()
         except OSError:
             continue
-        if rel.endswith(".md"):
-            txt = raw.decode("utf-8", errors="replace")
-            txt = re.sub(r"(?ms)^##\s+Delivery approvals\b.*?(?=^##\s+|\Z)", "", txt)
-            if rel.startswith("docs/agents-v0/adr/"):
-                txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status(?:\*\*)?:\s*)Accepted\b", r"\g<1>Proposed", txt)
-            raw = txt.encode("utf-8")
+        raw = normalize_doc(rel, raw)
         h.update(rel.encode("utf-8") + b"\0" + hashlib.sha256(raw).hexdigest().encode("ascii") + b"\n")
     return h.hexdigest()
 
@@ -498,69 +512,95 @@ gc_approval_ok() {
   esac
   gc_ok_state_full="$gc_ok_root/$gc_ok_state"
   gc_ok_target_dir="$gc_ok_root"
+  gc_ok_wt=""
   if [ -n "$gc_ok_slug" ]; then
     if [ ! -f "$gc_ok_state_full" ] && [ -f "$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
       gc_ok_state_full="$gc_ok_root/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
     fi
-    if [ ! -f "$gc_ok_state_full" ]; then
-      gc_ok_wt="$(git -C "$gc_ok_root" worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_ok_slug}" -v m="branch refs/heads/maintain/${gc_ok_slug}" '
-        /^worktree / { p = substr($0, 10) }
-        $0 == f || $0 == m { print p; exit }
-      ')"
-      if [ -n "$gc_ok_wt" ] && [ -d "$gc_ok_wt" ]; then
-        if [ -f "$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json" ]; then
-          gc_ok_state_full="$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
-          gc_ok_target_dir="$gc_ok_wt"
-        elif [ -f "$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
-          gc_ok_state_full="$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
-          gc_ok_target_dir="$gc_ok_wt"
-        fi
+    gc_ok_wt="$(git -C "$gc_ok_root" worktree list --porcelain 2>/dev/null | awk -v f="branch refs/heads/feature/${gc_ok_slug}" -v m="branch refs/heads/maintain/${gc_ok_slug}" '
+      /^worktree / { p = substr($0, 10) }
+      $0 == f || $0 == m { print p; exit }
+    ')"
+    if [ ! -f "$gc_ok_state_full" ] && [ -n "$gc_ok_wt" ] && [ -d "$gc_ok_wt" ]; then
+      if [ -f "$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json" ]; then
+        gc_ok_state_full="$gc_ok_wt/docs/agents-v0/requirements/${gc_ok_slug}.state.json"
+        gc_ok_target_dir="$gc_ok_wt"
+      elif [ -f "$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json" ]; then
+        gc_ok_state_full="$gc_ok_wt/docs/agents-v0/maintain/${gc_ok_slug}/state.json"
+        gc_ok_target_dir="$gc_ok_wt"
       fi
     fi
   fi
   gc_ok_id="$(cd "$gc_ok_root" && gc_repo_id)" || { printf 'REFUSED approval: cannot compute the repo id\n'; return 1; }
   gc_ok_file="$(cd "$gc_ok_root" && gc_approval_file "$gc_ok_cmd" "$gc_ok_slug")" || { printf 'REFUSED approval: cannot find the approval folder\n'; return 1; }
-  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_state_full" "$gc_ok_slug" "$gc_ok_target_dir" <<'PY'
+  python3 - "$gc_ok_file" "$gc_ok_cmd" "$gc_ok_id" "$gc_ok_state_full" "$gc_ok_slug" "$gc_ok_target_dir" "${gc_ok_wt:-}" <<'PY'
 import hashlib, json, os, re, subprocess, sys
-rec_path, command, repo_id, state_path, slug, target_dir = sys.argv[1:7]
+rec_path, command, repo_id, state_path, slug, target_dir, wt_dir = sys.argv[1:8]
 label = f"{command} ({slug})" if slug else command
 def refuse(why):
     print(f"REFUSED approval: {why}")
     raise SystemExit(1)
 
-def compute_content_hash(root_dir: str, paths_str: str) -> str:
-    skip_re = re.compile(
-        r"(?:^|/)(?:state\.json|[^/]+\.state\.json|phase-result\.md|[^/]+\.phase-result\.md|"
-        r"[^/]+\.trace\.json|lessons\.md|lessons-archive\.md|CHANGELOG\.md|.*\.lock)$"
-    )
+skip_re = re.compile(
+    r"(?:^|/)(?:state\.json|[^/]+\.state\.json|phase-result\.md|[^/]+\.phase-result\.md|"
+    r"[^/]+\.trace\.json|lessons\.md|lessons-archive\.md|CHANGELOG\.md|.*\.lock)$"
+    r"|^(?:\.cursor|\.agents)/"
+)
+
+def normalize_doc(rel: str, raw: bytes) -> bytes:
+    if not rel.endswith(".md"):
+        return raw
+    txt = raw.decode("utf-8", errors="replace")
+    txt = re.sub(r"(?m)^##\s+Delivery approvals[ \t]*$\n?(?:^[ \t]*\|[^\n]*$\n?|[ \t]*$\n?)*", "", txt)
+    if rel.startswith("docs/agents-v0/adr/"):
+        txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status:?(?:\*\*)?:?[ \t]*)Accepted\b[^\n]*$", r"\g<1>Proposed", txt)
+        txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?(?:Deciders|Date):?(?:\*\*)?:?)[^\n]*\n*", r"\g<1>\n", txt)
+    if rel.startswith("docs/agents-v0/design/system/"):
+        txt = txt.replace("(Accepted)", "(Proposed)")
+    if rel == "docs/agents-v0/project-profile.md":
+        txt = re.sub(r"(?m)^(\s*[-*]?\s*(?:\*\*)?Pack(?:\*\*)?:\s*).*$", r"\g<1>", txt)
+        txt = re.sub(r"(?m)^(\|\s*(?:Pack|Language / runtime|Framework|Build / test tool|Verify|Lint|Typecheck|Unit tests|Integration tests|Mutation|Coverage|SAST / SCA|Container build)\s*\|).*$", r"\g<1>", txt)
+    if rel == "docs/agents-v0/milestones/p0-platform-skeleton.md" or rel.startswith("docs/agents-v0/maintain/"):
+        txt = re.sub(r"(?m)^(-\s*status:\s*)(?:planned|in_progress|awaiting_approval|approved|released)\b", r"\g<1>in_progress", txt)
+        txt = re.sub(r"\|\s*(?:planned|in_progress|released)\s*\|", "| planned |", txt)
+    return (txt.rstrip() + "\n").encode("utf-8")
+
+def compute_content_hash(root_dir: str, paths_str: str, tree_rev: str = "") -> str:
     rels = set()
-    for tok in paths_str.split():
-        if "<" in tok or ">" in tok:
-            continue
-        full = os.path.join(root_dir, tok)
-        if os.path.isfile(full):
-            rels.add(tok.lstrip("./"))
-        elif os.path.isdir(full):
-            for dirpath, dirnames, filenames in os.walk(full):
-                dirnames[:] = [d for d in dirnames if d != ".git"]
-                for fn in filenames:
-                    rel = os.path.relpath(os.path.join(dirpath, fn), root_dir).replace("\\", "/")
-                    rels.add(rel)
+    toks = [t.lstrip("./") for t in paths_str.split() if "<" not in t and ">" not in t]
+    if tree_rev:
+        if toks:
+            out = subprocess.run(["git", "-C", root_dir, "ls-tree", "-r", "--name-only", "-z", tree_rev, "--"] + toks,
+                                 capture_output=True)
+            if out.returncode == 0:
+                rels.update(p for p in out.stdout.decode("utf-8", "replace").split("\0") if p)
+    else:
+        for tok in toks:
+            full = os.path.join(root_dir, tok)
+            if os.path.isfile(full):
+                rels.add(tok)
+            elif os.path.isdir(full):
+                for dirpath, dirnames, filenames in os.walk(full):
+                    dirnames[:] = [d for d in dirnames if d != ".git"]
+                    for fn in filenames:
+                        rel = os.path.relpath(os.path.join(dirpath, fn), root_dir).replace("\\", "/")
+                        rels.add(rel)
     h = hashlib.sha256()
     for rel in sorted(rels):
         if skip_re.search(rel):
             continue
-        fp = os.path.join(root_dir, rel)
-        try:
-            raw = open(fp, "rb").read()
-        except OSError:
-            continue
-        if rel.endswith(".md"):
-            txt = raw.decode("utf-8", errors="replace")
-            txt = re.sub(r"(?ms)^##\s+Delivery approvals\b.*?(?=^##\s+|\Z)", "", txt)
-            if rel.startswith("docs/agents-v0/adr/"):
-                txt = re.sub(r"(?m)^(\s*(?:-\s*)?(?:\*\*)?Status(?:\*\*)?:\s*)Accepted\b", r"\g<1>Proposed", txt)
-            raw = txt.encode("utf-8")
+        if tree_rev:
+            sp = subprocess.run(["git", "-C", root_dir, "show", f"{tree_rev}:{rel}"], capture_output=True)
+            if sp.returncode != 0:
+                continue
+            raw = sp.stdout
+        else:
+            fp = os.path.join(root_dir, rel)
+            try:
+                raw = open(fp, "rb").read()
+            except OSError:
+                continue
+        raw = normalize_doc(rel, raw)
         h.update(rel.encode("utf-8") + b"\0" + hashlib.sha256(raw).hexdigest().encode("ascii") + b"\n")
     return h.hexdigest()
 
@@ -585,14 +625,91 @@ if rec.get("baseCommit") != base:
            "Sensei approves again")
 exp_hash = (rec.get("contentHash") or "").strip()
 cpaths = (rec.get("commitPaths") or "").strip()
-if exp_hash and cpaths:
-    cur_head = subprocess.run(["git", "-C", target_dir, "rev-parse", "-q", "--verify", "HEAD"],
-                              capture_output=True, text=True).stdout.strip()
-    if cur_head and cur_head == (rec.get("head") or "").strip():
-        cur_hash = compute_content_hash(target_dir, cpaths)
+rec_head = (rec.get("head") or "").strip()
+if not exp_hash or not cpaths or not rec_head:
+    refuse(f"the approval record {rec_path} is missing contentHash, commitPaths, or head; Sensei approves again")
+
+cur_head = subprocess.run(["git", "-C", target_dir, "rev-parse", "-q", "--verify", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+if not cur_head:
+    refuse(f"cannot resolve HEAD in {target_dir}")
+
+if cur_head == rec_head:
+    cur_hash = compute_content_hash(target_dir, cpaths)
+    if cur_hash != exp_hash:
+        refuse(f"files under commit.paths changed after Sensei approved {label} (contentHash mismatch); "
+               "run ready and have Sensei approve again")
+else:
+    # Check if command == local-release and wt_dir (or feature/maintain branch) holds the story commit
+    check_dir = target_dir
+    check_head = cur_head
+    anc = subprocess.run(["git", "-C", check_dir, "merge-base", "--is-ancestor", rec_head, check_head],
+                         capture_output=True).returncode == 0
+    if not anc and slug:
+        if wt_dir and os.path.isdir(wt_dir):
+            wt_head = subprocess.run(["git", "-C", wt_dir, "rev-parse", "-q", "--verify", "HEAD"],
+                                     capture_output=True, text=True).stdout.strip()
+            if wt_head and (wt_head == rec_head or subprocess.run(
+                ["git", "-C", wt_dir, "merge-base", "--is-ancestor", rec_head, wt_head],
+                capture_output=True
+            ).returncode == 0):
+                check_dir = wt_dir
+                check_head = wt_head
+                anc = True
+        if not anc:
+            for br in (f"refs/heads/feature/{slug}", f"refs/heads/maintain/{slug}"):
+                br_sha = subprocess.run(["git", "-C", check_dir, "rev-parse", "-q", "--verify", br],
+                                        capture_output=True, text=True).stdout.strip()
+                if br_sha and (br_sha == rec_head or subprocess.run(
+                    ["git", "-C", check_dir, "merge-base", "--is-ancestor", rec_head, br_sha],
+                    capture_output=True
+                ).returncode == 0):
+                    check_head = br_sha
+                    anc = True
+                    break
+    if not anc:
+        refuse(f"HEAD moved from {rec_head} to {cur_head} after Sensei approved {label}; "
+               "run ready and have Sensei approve again")
+    if check_head == rec_head:
+        cur_hash = compute_content_hash(check_dir, cpaths)
         if cur_hash != exp_hash:
             refuse(f"files under commit.paths changed after Sensei approved {label} (contentHash mismatch); "
                    "run ready and have Sensei approve again")
+    else:
+        revs = subprocess.run(
+            ["git", "-C", check_dir, "rev-list", "--ancestry-path", "--reverse", f"{rec_head}..{check_head}"],
+            capture_output=True, text=True
+        ).stdout.splitlines()
+        if not revs:
+            refuse(f"HEAD moved from {rec_head} to {check_head} after Sensei approved {label}; "
+                   "run ready and have Sensei approve again")
+        g_commit = revs[0].strip()
+        phase_name = (rec.get("phase") or command).strip()
+        rel_state = os.path.relpath(state_path, target_dir).replace("\\", "/")
+        if rel_state.startswith(".."):
+            rel_state = os.path.relpath(state_path, check_dir).replace("\\", "/")
+        gate_committed = False
+        g_st_sp = subprocess.run(["git", "-C", check_dir, "show", f"{g_commit}:{rel_state}"],
+                                 capture_output=True, text=True)
+        if g_st_sp.returncode == 0:
+            try:
+                g_st = json.loads(g_st_sp.stdout)
+                if phase_name in (g_st.get("approvedPhases") or []):
+                    gate_committed = True
+            except ValueError:
+                pass
+        if not gate_committed and command == "local-release":
+            g_subj = subprocess.run(["git", "-C", check_dir, "log", "-1", "--format=%s", g_commit],
+                                    capture_output=True, text=True).stdout.strip()
+            if g_subj.endswith(": release approved"):
+                gate_committed = True
+        if not gate_committed:
+            refuse(f"HEAD moved from {rec_head} to {check_head} after Sensei approved {label} before the gate was committed; "
+                   "run ready and have Sensei approve again")
+        g_hash = compute_content_hash(check_dir, cpaths, tree_rev=g_commit)
+        if g_hash != exp_hash:
+            refuse(f"files under commit.paths in commit {g_commit[:7]} do not match what Sensei approved for {label} "
+                   "(contentHash mismatch); run ready and have Sensei approve again")
 print(f"OK approval: {label} approved by {rec.get('approver')} at {rec.get('approvedAt')} (baseCommit {base})")
 PY
 }

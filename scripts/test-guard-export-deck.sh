@@ -411,5 +411,36 @@ else
   ok "gc_approval_ok refuses when files under commit.paths changed after approval (C2 contentHash mismatch)"
 fi
 
+# 19. C2 regression: approval record missing contentHash is refused (fail-closed)
+cat > "$AGENTS_V0_APPROVALS_DIR/$repo_id/intake-audit.json" <<EOF
+{
+  "command": "intake",
+  "phase": "intake",
+  "feature": "audit",
+  "repo": "$REPO",
+  "repoId": "$repo_id",
+  "gitCommonDir": "$REPO/.git",
+  "head": "$head_sha",
+  "baseCommit": "$head_sha",
+  "commitPaths": "docs/agents-v0/requirements/audit.md",
+  "approvedAt": "2026-11-05T10:00:00Z",
+  "approver": "sensei",
+  "words": "Approved"
+}
+EOF
+if (GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agents-v0/scripts/guard-common.sh && gc_approval_ok intake audit) >/dev/null 2>&1; then
+  bad "gc_approval_ok should refuse when approval record is missing contentHash (C2 fail-closed)"
+else
+  ok "gc_approval_ok refuses when approval record is missing contentHash (C2 fail-closed)"
+fi
+
+# 20. C2 regression: moving HEAD after approve before gate commit is refused (fail-closed)
+git commit --allow-empty -q -m "unrelated commit moving HEAD after approve"
+if (GC_HERE=.agents-v0/scripts GUARD_COMMON_LIB=1 . .agents-v0/scripts/guard-common.sh && gc_approval_ok intake audit) >/dev/null 2>&1; then
+  bad "gc_approval_ok should refuse when HEAD moved after approve before the gate was committed (C2 fail-closed)"
+else
+  ok "gc_approval_ok refuses when HEAD moved after approve before the gate was committed (C2 fail-closed)"
+fi
+
 printf '=== test-guard-export-deck.sh: %d passed, %d failed ===\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
