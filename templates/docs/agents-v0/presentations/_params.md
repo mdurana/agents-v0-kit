@@ -10,5 +10,6 @@ Decision: <the question the meeting must answer, in the user's words>
 |------|----------------|
 | <path> | <YYYY-MM-DD> |
 
-> `/v0-deck` writes a sibling `<name>.md` deck and this params file.
+> `/v0-deck` (`docs-author` + `leadership-deck`) writes a sibling `<name>.md` deck and this params file,
+> verified by `guard-deck.sh verify` and committed by `guard-deck.sh commit`.
 > The deck is not a delivery gate. `/v0-status` does not report it.
